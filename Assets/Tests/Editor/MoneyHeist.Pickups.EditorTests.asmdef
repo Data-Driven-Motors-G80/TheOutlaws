@@ -1,0 +1,21 @@
+{
+    "name": "MoneyHeist.Pickups.EditorTests",
+    "rootNamespace": "",
+    "references": [
+        "MoneyHeist.Pickups"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false,
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ]
+}
