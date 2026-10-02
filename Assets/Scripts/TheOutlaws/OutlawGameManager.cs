@@ -75,13 +75,13 @@ public sealed class OutlawGameManager : MonoBehaviour
 
     private static void ScaleVehicles(Transform player)
     {
-        player.localScale *= VehicleScale;
+        player.localScale = Vector3.one * VehicleScale;
 
         ChaseCar[] policeCars = Object.FindObjectsByType<ChaseCar>(
             FindObjectsSortMode.None);
         foreach (ChaseCar policeCar in policeCars)
         {
-            policeCar.transform.localScale *= VehicleScale;
+            policeCar.transform.localScale = Vector3.one * VehicleScale;
         }
     }
 

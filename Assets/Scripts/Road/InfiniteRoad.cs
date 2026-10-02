@@ -17,10 +17,13 @@ public sealed class InfiniteRoad : MonoBehaviour
 
     private readonly Queue<ActiveSegment> activeSegments = new Queue<ActiveSegment>();
     private readonly Dictionary<RoadSegment, ObjectPool<RoadSegment>> pools = new Dictionary<RoadSegment, ObjectPool<RoadSegment>>();
+    private System.Random random;
     private Pose nextEntry;
 
     private void Awake()
     {
+        random = new System.Random(19020);
+
         if (!HasValidSetup())
         {
             enabled = false;
@@ -133,7 +136,7 @@ public sealed class InfiniteRoad : MonoBehaviour
             return segmentPrefabs[0];
         }
 
-        return segmentPrefabs[Random.Range(0, segmentPrefabs.Length)];
+        return segmentPrefabs[random.Next(0, segmentPrefabs.Length)];
     }
 
     private ObjectPool<RoadSegment> GetPool(RoadSegment prefab)

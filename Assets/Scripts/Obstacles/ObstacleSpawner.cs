@@ -23,11 +23,14 @@ public sealed class ObstacleSpawner : MonoBehaviour
 
     private readonly List<Obstacle> activeObstacles = new List<Obstacle>();
     private ObjectPool<Obstacle> pool;
+    private System.Random random;
     private Vector3 previousCarPosition;
     private float distanceUntilSpawn;
 
     private void Awake()
     {
+        random = new System.Random(19019);
+
         if (!HasValidSetup())
         {
             enabled = false;
@@ -53,7 +56,7 @@ public sealed class ObstacleSpawner : MonoBehaviour
         while (distanceUntilSpawn <= 0f)
         {
             TrySpawn();
-            distanceUntilSpawn += Random.Range(minSpacing, maxSpacing);
+            distanceUntilSpawn += NextRange(minSpacing, maxSpacing);
         }
     }
 
@@ -94,11 +97,11 @@ public sealed class ObstacleSpawner : MonoBehaviour
         }
 
         float limit = Mathf.Max(0f, point.Width * 0.5f - edgeMargin);
-        float firstOffset = Random.Range(-limit, limit);
+        float firstOffset = NextRange(-limit, limit);
 
         PlaceObstacle(point, firstOffset);
 
-        if (Random.value < doubleRowChance)
+        if (random.NextDouble() < doubleRowChance)
         {
             PlaceObstacle(point, GetSecondOffset(firstOffset, limit));
         }
@@ -117,7 +120,7 @@ public sealed class ObstacleSpawner : MonoBehaviour
 
     private float GetSecondOffset(float firstOffset, float limit)
     {
-        float offset = Random.Range(-limit, limit);
+        float offset = NextRange(-limit, limit);
 
         if (Mathf.Abs(offset - firstOffset) >= minRowSeparation)
         {
@@ -171,6 +174,11 @@ public sealed class ObstacleSpawner : MonoBehaviour
                 activeObstacles.RemoveAt(i);
             }
         }
+    }
+
+    private float NextRange(float minimum, float maximum)
+    {
+        return minimum + (maximum - minimum) * (float)random.NextDouble();
     }
 
     private void LogError(string message, Object context = null)

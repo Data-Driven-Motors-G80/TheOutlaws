@@ -15,7 +15,7 @@ public sealed class PickupSpawner : MonoBehaviour
 
     private readonly List<PickupItem> active = new List<PickupItem>();
     private readonly Collider[] overlaps = new Collider[32];
-    private readonly System.Random random = new System.Random();
+    private System.Random random;
     private Vector3 previousPosition;
     private float untilNext;
     private int spawnCount;
@@ -25,6 +25,8 @@ public sealed class PickupSpawner : MonoBehaviour
 
     private void Start()
     {
+        random = new System.Random(19022);
+
         if (road == null || car == null || pickupPrefab == null)
         {
             Debug.LogError("PickupSpawner needs the road, car and pickup prefab.", this);
