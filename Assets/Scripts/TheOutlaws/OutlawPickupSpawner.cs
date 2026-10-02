@@ -63,7 +63,9 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
 
         float lateralLimit = Mathf.Max(0f, point.Width * 0.5f - 1.5f);
         float side = spawnIndex++ % 2 == 0 ? -0.65f : 0.65f;
-        Vector3 position = point.Position + point.Right * lateralLimit * side + point.Up * 0.75f;
+        // Keep the pickup low enough to overlap the player's reduced collider.
+        // The previous 0.75 offset let the car pass underneath the trigger.
+        Vector3 position = point.Position + point.Right * lateralLimit * side + point.Up * 0.32f;
         GameObject pickup = OutlawAmmoPickup.Create(position, point.Up, shooting);
         pickup.transform.SetParent(transform, true);
         active.Add(pickup);

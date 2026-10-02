@@ -10,6 +10,7 @@ public sealed class OutlawGameManager : MonoBehaviour
     private const float MaximumPoliceSpeed = 18f;
     private const float PoliceIncreaseInterval = 22f;
     private const float PoliceIncreaseAmount = 0.65f;
+    private const float VehicleScale = 0.85f;
 
     private AutoDriveCar driver;
     private CarPickupEffects pickupEffects;
@@ -49,6 +50,8 @@ public sealed class OutlawGameManager : MonoBehaviour
         road = Object.FindFirstObjectByType<InfiniteRoad>();
         obstacles = Object.FindFirstObjectByType<ObstacleSpawner>();
 
+        ScaleVehicles(player.transform);
+
         shooting = player.GetComponent<OutlawShooting>();
         if (shooting == null)
         {
@@ -68,6 +71,18 @@ public sealed class OutlawGameManager : MonoBehaviour
         }
 
         Time.timeScale = 0f;
+    }
+
+    private static void ScaleVehicles(Transform player)
+    {
+        player.localScale *= VehicleScale;
+
+        ChaseCar[] policeCars = Object.FindObjectsByType<ChaseCar>(
+            FindObjectsSortMode.None);
+        foreach (ChaseCar policeCar in policeCars)
+        {
+            policeCar.transform.localScale *= VehicleScale;
+        }
     }
 
     private void Update()

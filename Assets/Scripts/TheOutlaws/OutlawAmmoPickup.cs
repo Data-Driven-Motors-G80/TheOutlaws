@@ -11,13 +11,20 @@ public sealed class OutlawAmmoPickup : MonoBehaviour
         pickup.name = "Ammo Pickup";
         pickup.transform.position = position;
         pickup.transform.up = up;
-        pickup.transform.localScale = new Vector3(0.55f, 0.18f, 0.55f);
+        pickup.transform.localScale = new Vector3(0.55f, 0.24f, 0.55f);
 
         Renderer renderer = pickup.GetComponent<Renderer>();
         renderer.material.color = new Color(0.12f, 0.55f, 1f);
 
         Collider trigger = pickup.GetComponent<Collider>();
         trigger.isTrigger = true;
+        if (trigger is CapsuleCollider capsule)
+        {
+            // A generous vertical trigger makes collection reliable on curved
+            // or banked road segments without making the visual larger.
+            capsule.height = 3f;
+            capsule.radius = 0.75f;
+        }
         Rigidbody body = pickup.AddComponent<Rigidbody>();
         body.isKinematic = true;
         body.useGravity = false;
