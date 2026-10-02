@@ -168,6 +168,12 @@ public sealed class ObstacleSpawner : MonoBehaviour
         {
             Obstacle obstacle = activeObstacles[i];
 
+            if (obstacle.GameObject == null)
+            {
+                activeObstacles.RemoveAt(i);
+                continue;
+            }
+
             if (Vector3.Dot(car.position - obstacle.Transform.position, car.forward) > despawnDistance)
             {
                 pool.Release(obstacle);

@@ -48,7 +48,15 @@ public sealed class OutlawProjectile : MonoBehaviour
 
     private void Update()
     {
-        transform.position += direction * Speed * Time.deltaTime;
+        float distance = Speed * Time.deltaTime;
+        // Sweep between frames so fast shots cannot skip the police collider.
+        foreach (RaycastHit hit in Physics.SphereCastAll(transform.position, 0.14f,
+                     direction, distance, ~0, QueryTriggerInteraction.Collide))
+        {
+            OnTriggerEnter(hit.collider);
+            if (consumed) return;
+        }
+        transform.position += direction * distance;
     }
 
     private void OnTriggerEnter(Collider other)
@@ -79,6 +87,7 @@ public sealed class OutlawProjectile : MonoBehaviour
             obstacle = obstacle.parent;
         }
 
+        consumed = true;
         Destroy(obstacle.gameObject);
         Destroy(gameObject);
     }

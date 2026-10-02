@@ -25,6 +25,7 @@ public sealed class RiskRunController : MonoBehaviour
     public void ApplyShotSlowdown()
     {
         if (effects == null || effects.RunState.IsGameOver) return;
+        effects.RepelPolice(8f);
         slowedUntil = Mathf.Max(slowedUntil, Time.time + 4f);
         ConfigureSpeeds();
     }

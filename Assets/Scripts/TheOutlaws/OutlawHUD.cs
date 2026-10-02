@@ -7,6 +7,7 @@ public sealed class OutlawHUD : MonoBehaviour
     private OutlawGameManager game;
     private Image ammoBar;
     private TMP_Text ammoLabel;
+    private TMP_Text extractionLabel;
     private GUIStyle titleStyle;
     private GUIStyle bodyStyle;
     private GUIStyle buttonStyle;
@@ -20,6 +21,8 @@ public sealed class OutlawHUD : MonoBehaviour
 
     private void Update()
     {
+        if (extractionLabel != null && game != null)
+            extractionLabel.SetText("EXTRACTION: {0:0} m", game.DistanceRemaining);
         if (ammoBar != null && game != null && game.Shooting != null)
         {
             ammoBar.fillAmount = game.Shooting.NormalizedAmmo;
@@ -33,7 +36,7 @@ public sealed class OutlawHUD : MonoBehaviour
         }
     }
 
-    private void BuildLabeledBars()
+    public void BuildLabeledBars()
     {
         Image fuelBar = FindImage("FuelBar");
         Image policeBar = FindImage("ProximityFill");
@@ -41,21 +44,34 @@ public sealed class OutlawHUD : MonoBehaviour
         if (fuelBar != null)
         {
             RectTransform fuelRect = fuelBar.rectTransform;
-            fuelRect.anchoredPosition += Vector2.down * 30f;
+            ammoBar = FindImage("AmmoBar");
+            if (ammoBar == null) fuelRect.anchoredPosition += Vector2.down * 30f;
             CreateLabel(fuelRect, "FUEL");
 
-            GameObject ammoObject = Instantiate(fuelBar.gameObject, fuelRect.parent);
-            ammoObject.name = "AmmoBar";
-            ammoBar = ammoObject.GetComponent<Image>();
+            if (ammoBar == null)
+            {
+                GameObject ammoObject = Instantiate(fuelBar.gameObject, fuelRect.parent);
+                ammoObject.name = "AmmoBar";
+                ammoBar = ammoObject.GetComponent<Image>();
+            }
             ammoBar.color = new Color(0.12f, 0.55f, 1f);
+            ammoBar.fillAmount = 0.5f;
             RectTransform ammoRect = ammoBar.rectTransform;
             ammoRect.anchoredPosition = fuelRect.anchoredPosition + Vector2.down * 104f;
             ammoLabel = CreateLabel(ammoRect, "AMMO");
+            ammoLabel.text = "AMMO  4 / 8";
         }
 
         if (policeBar != null)
         {
+            policeBar.fillAmount = RiskRunState.InitialPursuitGap / RiskRunState.MaximumPursuitGap;
             CreateLabel(policeBar.rectTransform, "POLICE DISTANCE");
+            extractionLabel = CreateLabel(policeBar.rectTransform, "EXTRACTION");
+            extractionLabel.fontSize = 18f;
+            extractionLabel.text = "EXTRACTION: 1350 m";
+            extractionLabel.rectTransform.anchoredPosition = policeBar.rectTransform.anchoredPosition
+                + Vector2.down * (policeBar.rectTransform.rect.height
+                    * Mathf.Abs(policeBar.rectTransform.localScale.y) * 0.5f + 22f);
         }
     }
 
@@ -67,6 +83,8 @@ public sealed class OutlawHUD : MonoBehaviour
 
     private static TextMeshProUGUI CreateLabel(RectTransform bar, string text)
     {
+        Transform existing = bar.parent.Find(text + " Label");
+        if (existing != null) return existing.GetComponent<TextMeshProUGUI>();
         GameObject labelObject = new GameObject(text + " Label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         labelObject.layer = bar.gameObject.layer;
         RectTransform labelRect = labelObject.GetComponent<RectTransform>();
@@ -75,7 +93,8 @@ public sealed class OutlawHUD : MonoBehaviour
         labelRect.anchorMax = bar.anchorMax;
         labelRect.pivot = bar.pivot;
         labelRect.sizeDelta = new Vector2(bar.sizeDelta.x, 28f);
-        labelRect.anchoredPosition = bar.anchoredPosition + Vector2.up * (bar.sizeDelta.y * 0.5f + 18f);
+        labelRect.anchoredPosition = bar.anchoredPosition + Vector2.up
+            * (bar.rect.height * Mathf.Abs(bar.localScale.y) * 0.5f + 18f);
 
         TextMeshProUGUI label = labelObject.GetComponent<TextMeshProUGUI>();
         label.text = text;
@@ -174,25 +193,6 @@ public sealed class OutlawHUD : MonoBehaviour
 
     private void DrawRunningHUD(float width)
     {
-        Rect status = new Rect(width - 315f, 18f, 290f, 132f);
-        DrawPanel(status);
-        GUI.Label(new Rect(status.x, status.y + 4f, status.width, 30f),
-            $"EXTRACTION: {game.DistanceRemaining:0} m", smallStyle);
-        GUI.Label(new Rect(status.x, status.y + 34f, status.width, 28f),
-            $"TIME: {game.ElapsedSeconds:0.0}s", smallStyle);
-        GUI.Label(new Rect(status.x, status.y + 64f, status.width, 28f),
-            $"AMMO: {game.Shooting.CurrentAmmo} / {game.Shooting.MaximumAmmo}", smallStyle);
-        GUI.Label(new Rect(status.x, status.y + 94f, status.width, 28f),
-            "W/UP forward shot  |  S/DOWN rear shot", smallStyle);
-
-        Rect progressBackground = new Rect(width - 295f, 158f, 250f, 16f);
-        DrawPanel(progressBackground);
-        Color previous = GUI.color;
-        GUI.color = new Color(0.9f, 0.12f, 0.1f);
-        GUI.DrawTexture(new Rect(progressBackground.x, progressBackground.y,
-            progressBackground.width * game.Progress, progressBackground.height), Texture2D.whiteTexture);
-        GUI.color = previous;
-
         if (game.PoliceAlertActive)
         {
             Rect warning = new Rect((width - 430f) * 0.5f, 175f, 430f, 58f);

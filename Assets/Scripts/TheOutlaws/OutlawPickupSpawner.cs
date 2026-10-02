@@ -3,8 +3,8 @@ using UnityEngine;
 
 public sealed class OutlawPickupSpawner : MonoBehaviour
 {
-    private const float FirstSpawnDistance = 45f;
-    private const float SpawnSpacing = 120f;
+    private const float FirstSpawnDistance = 18f;
+    private const float SpawnSpacing = 30f;
     private const int MaximumActive = 4;
 
     private readonly List<GameObject> active = new List<GameObject>();
@@ -27,6 +27,11 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
         driver = player != null ? player.GetComponent<AutoDriveCar>() : null;
         shooting = playerShooting;
         pickupEffects = effects;
+        active.Clear();
+        foreach (OutlawAmmoPickup pickup in GetComponentsInChildren<OutlawAmmoPickup>())
+            active.Add(pickup.gameObject);
+        spawnIndex = active.Count;
+        nextSpawnAt = active.Count > 0 ? SpawnSpacing : 0f;
     }
 
     private void Update()
@@ -55,14 +60,16 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
             }
         }
 
-        bool needsGuaranteedPickup = active.Count == 0;
+        bool hasPickupAhead = active.Exists(pickup => pickup != null &&
+            Vector3.Dot(pickup.transform.position - player.position, player.forward) > 3f);
+        bool needsGuaranteedPickup = !hasPickupAhead;
         bool reachedScheduledSpawn = driver.RoadDistanceTravelled >= nextSpawnAt;
         if ((!needsGuaranteedPickup && !reachedScheduledSpawn) || active.Count >= MaximumActive)
         {
             return;
         }
 
-        float distanceAhead = needsGuaranteedPickup ? FirstSpawnDistance : 65f;
+        float distanceAhead = needsGuaranteedPickup ? FirstSpawnDistance : 28f;
         if (TrySpawnAmmo(distanceAhead))
         {
             nextSpawnAt = driver.RoadDistanceTravelled + SpawnSpacing;
@@ -79,7 +86,8 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
         }
 
         float lateralLimit = Mathf.Max(0f, point.Width * 0.5f - 1.5f);
-        float side = spawnIndex++ % 2 == 0 ? -0.65f : 0.65f;
+        float side = spawnIndex == 0 ? 0f : (spawnIndex % 2 == 0 ? -0.45f : 0.45f);
+        spawnIndex++;
         // Keep the pickup low enough to overlap the player's reduced collider.
         // The previous 0.75 offset let the car pass underneath the trigger.
         Vector3 position = point.Position + point.Right * lateralLimit * side + point.Up * 0.32f;

@@ -49,7 +49,7 @@ public sealed class ChaseMeter : MonoBehaviour
                 ? 0f
                 : Mathf.Clamp01(
                     pickupEffects.RunState.PursuitGap /
-                    RiskRunState.InitialPursuitGap);
+                    RiskRunState.MaximumPursuitGap);
             return;
         }
 

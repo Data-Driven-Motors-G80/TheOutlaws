@@ -66,7 +66,8 @@ public sealed class PickupHUD : MonoBehaviour
 
     private void OnGUI()
     {
-        if (effects == null) return;
+        // OutlawHUD owns the game-over screen; this HUD only shows pickup feedback.
+        if (effects == null || effects.RunState.IsGameOver) return;
         if (popupText == null)
         {
             popupText = new GUIStyle(GUI.skin.label)
@@ -91,9 +92,7 @@ public sealed class PickupHUD : MonoBehaviour
         GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
         float width = Screen.width / scale;
         float height = Screen.height / scale;
-        RiskRunState run = effects.RunState;
-
-        if (popupRemaining > 0f || run.IsGameOver)
+        if (popupRemaining > 0f)
         {
             float popupWidth = Mathf.Min(620f, width - 80f);
             Rect popupRect = new Rect(
@@ -104,9 +103,9 @@ public sealed class PickupHUD : MonoBehaviour
             );
             DrawPanel(popupRect);
             GUI.Label(new Rect(popupRect.x, popupRect.y + 4f, popupWidth, 52f),
-                run.IsGameOver ? "CAUGHT!" : popupMessage, popupText);
+                popupMessage, popupText);
             GUI.Label(new Rect(popupRect.x + 12f, popupRect.y + 56f, popupWidth - 24f, 40f),
-                run.IsGameOver ? "Press R to restart" : popupHint, popupDetail);
+                popupHint, popupDetail);
         }
 
         GUI.matrix = previous;

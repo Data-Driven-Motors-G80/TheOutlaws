@@ -22,6 +22,12 @@ public sealed class InfiniteRoad : MonoBehaviour
 
     private void Awake()
     {
+        EnsureInitialized();
+    }
+
+    private void EnsureInitialized()
+    {
+        if (activeSegments.Count > 0) return;
         random = new System.Random(19020);
 
         if (!HasValidSetup())
@@ -30,6 +36,14 @@ public sealed class InfiniteRoad : MonoBehaviour
             return;
         }
 
+        // Managed queues/pools are lost when scripts reload during Play mode.
+        // Rebuild their generated road objects together instead of using an empty queue.
+        foreach (RoadSegment segment in GetComponentsInChildren<RoadSegment>())
+        {
+            segment.gameObject.SetActive(false);
+            Destroy(segment.gameObject);
+        }
+        pools.Clear();
         Vector3 origin = new Vector3(transform.position.x, transform.position.y, car.position.z - behindBuffer);
         nextEntry = new Pose(origin, Quaternion.identity);
 
@@ -41,7 +55,8 @@ public sealed class InfiniteRoad : MonoBehaviour
 
     private void Update()
     {
-        while (activeSegments.Peek().Segment.DistancePastEnd(car.position) > behindBuffer)
+        EnsureInitialized();
+        while (activeSegments.Count > 0 && activeSegments.Peek().Segment.DistancePastEnd(car.position) > behindBuffer)
         {
             activeSegments.Dequeue().Release();
             SpawnSegment();
@@ -50,6 +65,7 @@ public sealed class InfiniteRoad : MonoBehaviour
 
     public bool TryGetPathPoint(Vector3 worldPosition, out RoadPathPoint pathPoint)
     {
+        EnsureInitialized();
         pathPoint = default;
         float closestSqrDistance = float.MaxValue;
         bool found = false;

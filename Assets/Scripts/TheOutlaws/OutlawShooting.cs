@@ -19,6 +19,8 @@ public sealed class OutlawShooting : MonoBehaviour
     {
         pickupEffects = effects;
         obstacles = obstacleSpawner;
+        CurrentAmmo = 4;
+        nextFireTime = 0f;
     }
 
     private void Update()

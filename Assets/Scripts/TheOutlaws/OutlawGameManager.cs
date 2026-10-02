@@ -77,10 +77,12 @@ public sealed class OutlawGameManager : MonoBehaviour
         }
         shooting.Configure(pickupEffects, obstacles);
 
-        OutlawPickupSpawner spawner = gameObject.AddComponent<OutlawPickupSpawner>();
+        OutlawPickupSpawner spawner = GetComponent<OutlawPickupSpawner>();
+        if (spawner == null) spawner = gameObject.AddComponent<OutlawPickupSpawner>();
         spawner.Configure(road, player.transform, shooting, pickupEffects);
 
-        hud = gameObject.AddComponent<OutlawHUD>();
+        hud = GetComponent<OutlawHUD>();
+        if (hud == null) hud = gameObject.AddComponent<OutlawHUD>();
         hud.Configure(this);
 
         if (pursuit != null)
@@ -118,8 +120,9 @@ public sealed class OutlawGameManager : MonoBehaviour
         {
             // Frame the road between the player and police. With the smaller
             // vehicles this places advancing police clearly inside the view.
-            mainCamera.transform.localPosition = new Vector3(0f, 6f, -10f);
-            mainCamera.transform.localRotation = Quaternion.Euler(18f, 0f, 0f);
+            mainCamera.transform.localPosition = new Vector3(0f, 24f, -32f) / VehicleScale;
+            mainCamera.transform.localRotation = Quaternion.Euler(35f, 0f, 0f);
+            mainCamera.fieldOfView = 60f;
             mainCamera.transform.localScale = Vector3.one;
         }
     }

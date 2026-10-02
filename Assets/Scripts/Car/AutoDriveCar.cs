@@ -112,6 +112,7 @@ public sealed class AutoDriveCar : MonoBehaviour
 
     private void Update()
     {
+        if (Time.timeScale <= 0f) return;
         float deltaTime = Time.deltaTime;
 
         UpdateForwardSpeed(deltaTime);

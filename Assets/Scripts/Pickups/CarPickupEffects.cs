@@ -135,7 +135,7 @@ public sealed class CarPickupEffects : MonoBehaviour
 
     private void Update()
     {
-        if (!simulationActive) return;
+        if (!simulationActive || Time.timeScale <= 0f) return;
         runState.Tick(Time.deltaTime, baseForwardSpeed, policeSpeed);
         fuelState.Tick(Time.deltaTime, fuelConsumptionPerSecond);
     }
