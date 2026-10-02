@@ -183,7 +183,7 @@ public sealed class OutlawHUD : MonoBehaviour
         GUI.Label(new Rect(status.x, status.y + 64f, status.width, 28f),
             $"AMMO: {game.Shooting.CurrentAmmo} / {game.Shooting.MaximumAmmo}", smallStyle);
         GUI.Label(new Rect(status.x, status.y + 94f, status.width, 28f),
-            "W/UP forward shot  •  S/DOWN rear shot", smallStyle);
+            "W/UP forward shot  |  S/DOWN rear shot", smallStyle);
 
         Rect progressBackground = new Rect(width - 295f, 158f, 250f, 16f);
         DrawPanel(progressBackground);
@@ -192,6 +192,19 @@ public sealed class OutlawHUD : MonoBehaviour
         GUI.DrawTexture(new Rect(progressBackground.x, progressBackground.y,
             progressBackground.width * game.Progress, progressBackground.height), Texture2D.whiteTexture);
         GUI.color = previous;
+
+        if (game.PoliceAlertActive)
+        {
+            Rect warning = new Rect((width - 430f) * 0.5f, 175f, 430f, 58f);
+            DrawPanel(warning);
+            GUIStyle warningStyle = new GUIStyle(bodyStyle)
+            {
+                fontSize = 27,
+                fontStyle = FontStyle.Bold
+            };
+            warningStyle.normal.textColor = new Color(1f, 0.25f, 0.2f);
+            GUI.Label(warning, "POLICE CLOSING IN!", warningStyle);
+        }
     }
 
     private void DrawResult(float width, float height)

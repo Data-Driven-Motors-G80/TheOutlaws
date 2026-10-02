@@ -11,6 +11,7 @@ public sealed class OutlawGameManager : MonoBehaviour
     private const float PoliceIncreaseInterval = 22f;
     private const float PoliceIncreaseAmount = 0.65f;
     private const float VehicleScale = 0.85f;
+    private static readonly Vector3 PolicePrefabScale = new Vector3(2f, 1f, 3.5f);
 
     private AutoDriveCar driver;
     private CarPickupEffects pickupEffects;
@@ -20,8 +21,11 @@ public sealed class OutlawGameManager : MonoBehaviour
     private ObstacleSpawner obstacles;
     private OutlawShooting shooting;
     private OutlawHUD hud;
+    private ChaseCar[] policeCars;
     private float elapsed;
     private float nextPoliceIncrease = PoliceIncreaseInterval;
+    private float previousPursuitGap;
+    private float policeAlertRemaining;
     private GameObject finishGate;
 
     public OutlawGameState State { get; private set; } = OutlawGameState.Ready;
@@ -32,6 +36,8 @@ public sealed class OutlawGameManager : MonoBehaviour
     public OutlawShooting Shooting => shooting;
     public FuelMeter Fuel => fuel;
     public CarPickupEffects PickupEffects => pickupEffects;
+    public bool PoliceAlertActive => policeAlertRemaining > 0f;
+    public int PoliceCarCount => policeCars != null ? policeCars.Length : 0;
 
     private void Awake()
     {
@@ -50,7 +56,14 @@ public sealed class OutlawGameManager : MonoBehaviour
         road = Object.FindFirstObjectByType<InfiniteRoad>();
         obstacles = Object.FindFirstObjectByType<ObstacleSpawner>();
 
-        ScaleVehicles(player.transform);
+        policeCars = Object.FindObjectsByType<ChaseCar>(FindObjectsSortMode.None);
+        ConfigureVehiclesAndCamera(player.transform);
+
+        if (!ValidateRequiredSystems())
+        {
+            enabled = false;
+            return;
+        }
 
         shooting = player.GetComponent<OutlawShooting>();
         if (shooting == null)
@@ -70,19 +83,55 @@ public sealed class OutlawGameManager : MonoBehaviour
             pursuit.SetPoliceSpeed(BasePoliceSpeed);
         }
 
+        previousPursuitGap = pickupEffects.RunState.PursuitGap;
+
         Time.timeScale = 0f;
     }
 
-    private static void ScaleVehicles(Transform player)
+    private void ConfigureVehiclesAndCamera(Transform player)
     {
         player.localScale = Vector3.one * VehicleScale;
 
-        ChaseCar[] policeCars = Object.FindObjectsByType<ChaseCar>(
-            FindObjectsSortMode.None);
         foreach (ChaseCar policeCar in policeCars)
         {
-            policeCar.transform.localScale = Vector3.one * VehicleScale;
+            // ChaseCar lives directly on Team 19's stretched car prefab. Keep
+            // those original proportions and reduce each axis by only 15%.
+            policeCar.transform.localScale = PolicePrefabScale * VehicleScale;
+            policeCar.gameObject.SetActive(true);
+            policeCar.enabled = true;
+
+            Renderer[] renderers = policeCar.GetComponentsInChildren<Renderer>(true);
+            foreach (Renderer policeRenderer in renderers)
+            {
+                policeRenderer.enabled = true;
+                policeRenderer.material.color = new Color(0.08f, 0.2f, 0.55f);
+            }
         }
+
+        Camera mainCamera = Camera.main;
+        if (mainCamera != null && mainCamera.transform.IsChildOf(player))
+        {
+            // Frame the road between the player and police. With the smaller
+            // vehicles this places advancing police clearly inside the view.
+            mainCamera.transform.localPosition = new Vector3(0f, 6f, -10f);
+            mainCamera.transform.localRotation = Quaternion.Euler(18f, 0f, 0f);
+            mainCamera.transform.localScale = Vector3.one;
+        }
+    }
+
+    private bool ValidateRequiredSystems()
+    {
+        bool valid = driver != null && pickupEffects != null && fuel != null &&
+                     pursuit != null && road != null && obstacles != null &&
+                     policeCars != null && policeCars.Length > 0;
+        if (!valid)
+        {
+            Debug.LogError(
+                "The Outlaws setup is incomplete. The player, road, obstacle spawner, " +
+                "fuel system, pursuit controller, and at least one police car are required.",
+                this);
+        }
+        return valid;
     }
 
     private void Update()
@@ -108,6 +157,7 @@ public sealed class OutlawGameManager : MonoBehaviour
         }
 
         elapsed += Time.deltaTime;
+        UpdatePoliceFeedback();
         IncreasePolicePressure();
         UpdateFinishGate();
 
@@ -120,6 +170,20 @@ public sealed class OutlawGameManager : MonoBehaviour
         {
             EndGame(OutlawGameState.Lost);
         }
+    }
+
+    private void UpdatePoliceFeedback()
+    {
+        float currentGap = pickupEffects.RunState.PursuitGap;
+        if (currentGap < previousPursuitGap - 1f)
+        {
+            policeAlertRemaining = 2.25f;
+        }
+        else
+        {
+            policeAlertRemaining = Mathf.Max(0f, policeAlertRemaining - Time.deltaTime);
+        }
+        previousPursuitGap = currentGap;
     }
 
     public void BeginGame()

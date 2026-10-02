@@ -16,6 +16,10 @@ public sealed class ChaseCar : MonoBehaviour
     [SerializeField, Min(0f)] private float turnSharpness = 8f;
     [SerializeField, Min(0f)] private float edgeMargin = 1f;
 
+    [Header("Visible Pursuit Range")]
+    [SerializeField, Min(1f)] private float maximumVisualGap = 8f;
+    [SerializeField, Min(0f)] private float minimumVisualGap = 0.35f;
+
     private float startingBumperGap;
     private float relativeLateralOffset;
     private float heightOffset;
@@ -78,12 +82,14 @@ public sealed class ChaseCar : MonoBehaviour
             playerPoint.Forward
         );
 
-        startingBumperGap = Mathf.Max(
+        float sceneBumperGap = Mathf.Max(
             0f,
-            centerDistance -
-            chaseFrontLength -
-            playerBackLength
-        );
+            centerDistance - chaseFrontLength - playerBackLength);
+
+        // The gameplay model begins with a 45 m pursuit gap, while the scene
+        // cars were originally placed only a few metres apart. Use a readable
+        // visual range so a collision produces an obvious police advance.
+        startingBumperGap = Mathf.Max(sceneBumperGap, maximumVisualGap);
 
         Vector3 chaseOffset =
             transform.position - chasePoint.Position;
@@ -132,8 +138,10 @@ public sealed class ChaseCar : MonoBehaviour
             playerPoint.Forward
         );
 
-        float bumperGap =
-            startingBumperGap * meter.Value;
+        float bumperGap = Mathf.Lerp(
+            minimumVisualGap,
+            startingBumperGap,
+            meter.Value);
 
         float centerFollowDistance =
             bumperGap +
