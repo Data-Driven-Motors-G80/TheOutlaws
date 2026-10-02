@@ -6,6 +6,7 @@ public sealed class OutlawHUD : MonoBehaviour
 {
     private OutlawGameManager game;
     private Image ammoBar;
+    private TMP_Text ammoLabel;
     private GUIStyle titleStyle;
     private GUIStyle bodyStyle;
     private GUIStyle buttonStyle;
@@ -22,6 +23,13 @@ public sealed class OutlawHUD : MonoBehaviour
         if (ammoBar != null && game != null && game.Shooting != null)
         {
             ammoBar.fillAmount = game.Shooting.NormalizedAmmo;
+        }
+
+        if (ammoLabel != null && game != null && game.Shooting != null)
+        {
+            ammoLabel.SetText("AMMO  {0} / {1}",
+                game.Shooting.CurrentAmmo,
+                game.Shooting.MaximumAmmo);
         }
     }
 
@@ -42,7 +50,7 @@ public sealed class OutlawHUD : MonoBehaviour
             ammoBar.color = new Color(0.12f, 0.55f, 1f);
             RectTransform ammoRect = ammoBar.rectTransform;
             ammoRect.anchoredPosition = fuelRect.anchoredPosition + Vector2.down * 104f;
-            CreateLabel(ammoRect, "AMMO");
+            ammoLabel = CreateLabel(ammoRect, "AMMO");
         }
 
         if (policeBar != null)
@@ -57,7 +65,7 @@ public sealed class OutlawHUD : MonoBehaviour
         return target != null ? target.GetComponent<Image>() : null;
     }
 
-    private static void CreateLabel(RectTransform bar, string text)
+    private static TextMeshProUGUI CreateLabel(RectTransform bar, string text)
     {
         GameObject labelObject = new GameObject(text + " Label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         labelObject.layer = bar.gameObject.layer;
@@ -76,6 +84,7 @@ public sealed class OutlawHUD : MonoBehaviour
         label.alignment = TextAlignmentOptions.Center;
         label.color = Color.white;
         label.raycastTarget = false;
+        return label;
     }
 
     private void EnsureStyles()
@@ -165,16 +174,18 @@ public sealed class OutlawHUD : MonoBehaviour
 
     private void DrawRunningHUD(float width)
     {
-        Rect status = new Rect(width - 315f, 18f, 290f, 104f);
+        Rect status = new Rect(width - 315f, 18f, 290f, 132f);
         DrawPanel(status);
         GUI.Label(new Rect(status.x, status.y + 4f, status.width, 30f),
             $"EXTRACTION: {game.DistanceRemaining:0} m", smallStyle);
         GUI.Label(new Rect(status.x, status.y + 34f, status.width, 28f),
             $"TIME: {game.ElapsedSeconds:0.0}s", smallStyle);
         GUI.Label(new Rect(status.x, status.y + 64f, status.width, 28f),
+            $"AMMO: {game.Shooting.CurrentAmmo} / {game.Shooting.MaximumAmmo}", smallStyle);
+        GUI.Label(new Rect(status.x, status.y + 94f, status.width, 28f),
             "W/UP forward shot  •  S/DOWN rear shot", smallStyle);
 
-        Rect progressBackground = new Rect(width - 295f, 128f, 250f, 16f);
+        Rect progressBackground = new Rect(width - 295f, 158f, 250f, 16f);
         DrawPanel(progressBackground);
         Color previous = GUI.color;
         GUI.color = new Color(0.9f, 0.12f, 0.1f);

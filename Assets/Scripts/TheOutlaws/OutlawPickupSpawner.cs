@@ -13,7 +13,7 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
     private AutoDriveCar driver;
     private OutlawShooting shooting;
     private CarPickupEffects pickupEffects;
-    private float nextSpawnAt = FirstSpawnDistance;
+    private float nextSpawnAt;
     private int spawnIndex;
 
     public void Configure(
@@ -39,26 +39,43 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
 
         for (int i = active.Count - 1; i >= 0; i--)
         {
-            if (active[i] == null)
+            GameObject pickup = active[i];
+            if (pickup == null)
             {
+                active.RemoveAt(i);
+                continue;
+            }
+
+            // Do not let missed pickups behind the car occupy all active slots.
+            if (Vector3.Dot(player.position - pickup.transform.position, player.forward) > 18f ||
+                Vector3.Distance(player.position, pickup.transform.position) > 140f)
+            {
+                Destroy(pickup);
                 active.RemoveAt(i);
             }
         }
 
-        if (driver.RoadDistanceTravelled < nextSpawnAt || active.Count >= MaximumActive)
+        bool needsGuaranteedPickup = active.Count == 0;
+        bool reachedScheduledSpawn = driver.RoadDistanceTravelled >= nextSpawnAt;
+        if ((!needsGuaranteedPickup && !reachedScheduledSpawn) || active.Count >= MaximumActive)
         {
             return;
         }
 
-        SpawnAmmo();
-        nextSpawnAt += SpawnSpacing;
+        float distanceAhead = needsGuaranteedPickup ? FirstSpawnDistance : 65f;
+        if (TrySpawnAmmo(distanceAhead))
+        {
+            nextSpawnAt = driver.RoadDistanceTravelled + SpawnSpacing;
+        }
     }
 
-    private void SpawnAmmo()
+    private bool TrySpawnAmmo(float distanceAhead)
     {
-        if (!TryGetPointAhead(65f, out RoadPathPoint point))
+        if (!TryGetPointAhead(distanceAhead, out RoadPathPoint point))
         {
-            return;
+            // The infinite road may still be extending. Leave the schedule
+            // unchanged so Update retries instead of skipping this pickup.
+            return false;
         }
 
         float lateralLimit = Mathf.Max(0f, point.Width * 0.5f - 1.5f);
@@ -69,6 +86,7 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
         GameObject pickup = OutlawAmmoPickup.Create(position, point.Up, shooting);
         pickup.transform.SetParent(transform, true);
         active.Add(pickup);
+        return true;
     }
 
     private bool TryGetPointAhead(float distance, out RoadPathPoint point)
