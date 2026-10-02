@@ -9,21 +9,40 @@ public class FuelTank : MonoBehaviour
     private float bobSpeed = 5f;
     private float flipSpeed = 90f;
 
-    private Vector3 initialPosition;
+    private Transform visual;
 
     private void Awake()
     {
-        // Set the initial position of the fuel tank
-        initialPosition = transform.position;
+        MeshFilter sourceFilter = GetComponent<MeshFilter>();
+        MeshRenderer sourceRenderer = GetComponent<MeshRenderer>();
+
+        if (sourceFilter == null || sourceRenderer == null)
+        {
+            visual = transform;
+            return;
+        }
+
+        GameObject visualObject = new GameObject("Fuel Visual");
+        visualObject.transform.SetParent(transform, false);
+        MeshFilter visualFilter = visualObject.AddComponent<MeshFilter>();
+        MeshRenderer visualRenderer = visualObject.AddComponent<MeshRenderer>();
+        visualFilter.sharedMesh = sourceFilter.sharedMesh;
+        visualRenderer.sharedMaterials = sourceRenderer.sharedMaterials;
+        sourceRenderer.enabled = false;
+        visual = visualObject.transform;
     }
+
     private void Update()
     {
-        // Bobbing motion
-        float bobOffset = Mathf.Sin(Time.time * bobSpeed) * bobHeight;
-        transform.position = initialPosition + Vector3.up * bobOffset;
+        if (visual == null)
+        {
+            return;
+        }
 
-        // Rotating motion
-        transform.Rotate(Vector3.up, flipSpeed * Time.deltaTime);
+        // Animate only the model. The root trigger remains low and stationary.
+        float bobOffset = Mathf.Sin(Time.time * bobSpeed) * bobHeight;
+        visual.localPosition = Vector3.up * bobOffset;
+        visual.Rotate(Vector3.up, flipSpeed * Time.deltaTime, Space.Self);
     }
 
 }

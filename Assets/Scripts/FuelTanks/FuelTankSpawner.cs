@@ -31,6 +31,10 @@ public class FuelTankSpawner : MonoBehaviour
 
         previousCarPosition = car.position;
         distanceUntilSpawn = spawnDistance;
+
+        // Keep the stationary pickup trigger in the player's driving path.
+        // Only the visual model bobs; the car should never pass underneath it.
+        heightOffset = Mathf.Min(heightOffset, 0.35f);
     }
 
     private void Update()
