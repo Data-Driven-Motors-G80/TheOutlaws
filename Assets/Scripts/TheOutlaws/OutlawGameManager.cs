@@ -57,6 +57,11 @@ public sealed class OutlawGameManager : MonoBehaviour
         obstacles = Object.FindFirstObjectByType<ObstacleSpawner>();
 
         policeCars = Object.FindObjectsByType<ChaseCar>(FindObjectsSortMode.None);
+        System.Array.Sort(policeCars, (a, b) => string.CompareOrdinal(a.name, b.name));
+        for (int i = 1; i < policeCars.Length; i++)
+            policeCars[i].gameObject.SetActive(false);
+        if (policeCars.Length > 0)
+            policeCars = new[] { policeCars[0] };
         ConfigureVehiclesAndCamera(player.transform);
 
         if (!ValidateRequiredSystems())

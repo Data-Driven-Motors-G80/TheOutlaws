@@ -7,6 +7,7 @@ public sealed class OutlawProjectile : MonoBehaviour
     private CarPickupEffects pickupEffects;
     private ObstacleSpawner obstacles;
     private Vector3 direction;
+    private bool consumed;
 
     public static void Create(
         Vector3 position,
@@ -52,17 +53,17 @@ public sealed class OutlawProjectile : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
+        if (consumed) return;
         if (targetsPolice)
         {
-            if (other.GetComponentInParent<ChaseCar>() == null)
+            ChaseCar police = other.GetComponentInParent<ChaseCar>();
+            if (police == null)
             {
                 return;
             }
 
-            if (pickupEffects != null)
-            {
-                pickupEffects.RepelPolice(9f);
-            }
+            consumed = true;
+            police.HitByShot();
             Destroy(gameObject);
             return;
         }

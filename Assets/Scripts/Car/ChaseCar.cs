@@ -23,11 +23,19 @@ public sealed class ChaseCar : MonoBehaviour
     private float startingBumperGap;
     private float relativeLateralOffset;
     private float heightOffset;
+    private CarPickupEffects effects;
+
+    public void HitByShot()
+    {
+        if (player != null)
+            player.GetComponent<RiskRunController>()?.ApplyShotSlowdown();
+    }
 
     public float DistanceToPlayer { get; private set; }
 
     private void Awake()
     {
+        if (player != null) effects = player.GetComponent<CarPickupEffects>();
         if (chaseCollider == null)
         {
             chaseCollider =
@@ -107,9 +115,7 @@ public sealed class ChaseCar : MonoBehaviour
             playerPoint.Right
         );
 
-        relativeLateralOffset =
-            chaseLateralOffset -
-            playerLateralOffset;
+        relativeLateralOffset = 0f;
 
         heightOffset = Vector3.Dot(
             chaseOffset,
@@ -138,10 +144,15 @@ public sealed class ChaseCar : MonoBehaviour
             playerPoint.Forward
         );
 
-        float bumperGap = Mathf.Lerp(
+        // Include the buffer above the initial gap: rear shots must visibly
+        // increase separation even while the HUD's normalized bar is full.
+        float pursuitRatio = effects != null
+            ? effects.RunState.PursuitGap / RiskRunState.InitialPursuitGap
+            : meter.Value;
+        float bumperGap = Mathf.LerpUnclamped(
             minimumVisualGap,
             startingBumperGap,
-            meter.Value);
+            pursuitRatio);
 
         float centerFollowDistance =
             bumperGap +

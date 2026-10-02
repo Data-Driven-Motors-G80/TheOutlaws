@@ -12,7 +12,11 @@ public static class OutlawsBootstrap
         // Reset it explicitly so every run begins from the same conditions.
         Time.timeScale = 1f;
         Random.InitState(RunSeed);
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+        SceneManager.sceneLoaded += OnSceneLoaded;
     }
+
+    private static void OnSceneLoaded(Scene scene, LoadSceneMode mode) => Install();
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Install()

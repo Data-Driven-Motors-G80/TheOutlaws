@@ -20,6 +20,14 @@ public sealed class RiskRunController : MonoBehaviour
     private AutoDriveCar car;
     private CarPickupEffects effects;
     private bool restarting;
+    private float slowedUntil;
+
+    public void ApplyShotSlowdown()
+    {
+        if (effects == null || effects.RunState.IsGameOver) return;
+        slowedUntil = Mathf.Max(slowedUntil, Time.time + 4f);
+        ConfigureSpeeds();
+    }
 
     private void Awake()
     {
@@ -60,6 +68,12 @@ public sealed class RiskRunController : MonoBehaviour
     {
         if (effects == null) return;
         effects.SetSimulationActive(car != null && car.isActiveAndEnabled && car.IsDriveReady);
-        if (car != null) effects.ConfigurePursuit(car.BaseForwardSpeed, policeSpeed);
+        if (car != null)
+        {
+            float effectivePoliceSpeed = Time.time < slowedUntil
+                ? Mathf.Max(0f, Mathf.Min(policeSpeed, car.BaseForwardSpeed - 6f))
+                : policeSpeed;
+            effects.ConfigurePursuit(car.BaseForwardSpeed, effectivePoliceSpeed);
+        }
     }
 }
