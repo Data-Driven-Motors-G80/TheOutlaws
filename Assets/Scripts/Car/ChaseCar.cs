@@ -19,8 +19,10 @@ public sealed class ChaseCar : MonoBehaviour
     [Header("Visible Pursuit Range")]
     [SerializeField, Min(1f)] private float maximumVisualGap = 8f;
     [SerializeField, Min(0f)] private float minimumVisualGap = 0.35f;
+    [SerializeField, Min(0f)] private float visualGapChangeSpeed = 2.5f;
 
     private float startingBumperGap;
+    private float displayedBumperGap;
     private float relativeLateralOffset;
     private float heightOffset;
     private CarPickupEffects effects;
@@ -98,6 +100,8 @@ public sealed class ChaseCar : MonoBehaviour
         // cars were originally placed only a few metres apart. Use a readable
         // visual range so a collision produces an obvious police advance.
         startingBumperGap = Mathf.Max(sceneBumperGap, maximumVisualGap);
+        displayedBumperGap = GetTargetBumperGap();
+        DistanceToPlayer = displayedBumperGap;
 
         Vector3 chaseOffset =
             transform.position - chasePoint.Position;
@@ -144,18 +148,15 @@ public sealed class ChaseCar : MonoBehaviour
             playerPoint.Forward
         );
 
-        // Include the buffer above the initial gap: rear shots must visibly
-        // increase separation even while the HUD's normalized bar is full.
-        float pursuitRatio = effects != null
-            ? effects.RunState.PursuitGap / RiskRunState.InitialPursuitGap
-            : meter.Value;
-        float bumperGap = Mathf.LerpUnclamped(
-            minimumVisualGap,
-            startingBumperGap,
-            pursuitRatio);
+        // A collision changes the gameplay gap immediately, but the police
+        // should visibly close that distance instead of teleporting forward.
+        displayedBumperGap = Mathf.MoveTowards(
+            displayedBumperGap,
+            GetTargetBumperGap(),
+            visualGapChangeSpeed * Time.deltaTime);
 
         float centerFollowDistance =
-            bumperGap +
+            displayedBumperGap +
             chaseFrontLength +
             playerBackLength;
 
@@ -232,7 +233,21 @@ public sealed class ChaseCar : MonoBehaviour
             blend
         );
 
-        DistanceToPlayer = bumperGap;
+        DistanceToPlayer = displayedBumperGap;
+    }
+
+    private float GetTargetBumperGap()
+    {
+        // Include the buffer above the initial gap: rear shots must visibly
+        // increase separation even while the HUD's normalized bar is full.
+        float pursuitRatio = effects != null
+            ? effects.RunState.PursuitGap / RiskRunState.InitialPursuitGap
+            : meter.Value;
+
+        return Mathf.LerpUnclamped(
+            minimumVisualGap,
+            startingBumperGap,
+            pursuitRatio);
     }
 
     private float GetColliderExtent(

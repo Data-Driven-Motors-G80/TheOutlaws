@@ -6,6 +6,50 @@ using UnityEngine.TestTools;
 public sealed class PickupEffectStateTests
 {
     [Test]
+    public void RepeatedReversePickup_DuringCountdownQueuesTimeWithoutRestartingCountdown()
+    {
+        var car = new GameObject("Reverse countdown test");
+        try
+        {
+            var effects = car.AddComponent<CarPickupEffects>();
+            effects.TryApply(PickupEffectType.ReverseSteering);
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            typeof(CarPickupEffects).GetField("reverseCountdownRemaining", flags).SetValue(effects, 0.5f);
+            Assert.That(effects.TryApply(PickupEffectType.ReverseSteering), Is.True);
+            Assert.That(effects.ReverseCountdownRemaining, Is.EqualTo(0.5f));
+            Assert.That(effects.SteeringMultiplier, Is.EqualTo(1f));
+            Assert.That(typeof(CarPickupEffects).GetField("pendingReverseDuration", flags).GetValue(effects), Is.EqualTo(16f));
+            Assert.That(effects.ReverseCompletionCount, Is.Zero);
+        }
+        finally { Object.DestroyImmediate(car); }
+    }
+
+    [Test]
+    public void RepeatedReversePickup_AddsEightSecondsWithoutCountdownOrNormalSteering()
+    {
+        var car = new GameObject("Reverse extension test");
+        try
+        {
+            var effects = car.AddComponent<CarPickupEffects>();
+            effects.RunState.TryCollectWithoutReward(PickupEffectType.ReverseSteering, 8f);
+            effects.RunState.Tick(3f);
+            Assert.That(effects.TryApply(PickupEffectType.ReverseSteering), Is.True);
+            Assert.That(effects.RemainingSeconds, Is.EqualTo(13f));
+            Assert.That(effects.SteeringMultiplier, Is.EqualTo(-1f));
+            Assert.That(effects.ReverseCountdownRemaining, Is.Zero);
+            Assert.That(effects.ReverseCompletionCount, Is.Zero);
+            effects.RunState.Tick(12f);
+            Assert.That(effects.SteeringMultiplier, Is.EqualTo(-1f));
+            effects.RunState.Tick(1f);
+            Assert.That(effects.SteeringMultiplier, Is.EqualTo(1f));
+        }
+        finally
+        {
+            Object.DestroyImmediate(car);
+        }
+    }
+
+    [Test]
     public void NewState_HasNormalDrivingMultipliers()
     {
         AssertNormal(new PickupEffectState());

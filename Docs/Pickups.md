@@ -2,12 +2,13 @@
 
 ## Current reporting slice (2026-09-27)
 
-The current local slice deliberately leaves pickup score out of the gameplay path. It adds one special pickup whose result is hidden until collection and then chosen with a 50/25/25 split:
+The current local slice leaves pickup score out of the gameplay path. Mystery pickups have four equally likely results (25% each). Distance recovery is presented as `POLICE JAMMER DEPLOYED`; nitro displays `NITRO ACTIVATED!`.
 
 | Result | Behavior |
 | --- | --- |
-| Proximity recovery | Adds half of the maximum police-gap capacity, capped at the maximum. It does not add score or start a temporary effect. |
-| Reversed controls | Reverses steering for 5 seconds. Fuel is unchanged and no score is added. |
+| Police jammer | Adds half of the maximum police-gap capacity, capped at the maximum. It does not add score or start a temporary effect. |
+| Nitro | Boosts forward speed by 35% for 5 seconds by default. Replaces the current temporary driving effect; collecting nitro again refreshes its duration without stacking speed. |
+| Reversed controls | Shows 3 → 2 → 1, activating reversed steering as 1 appears. Lasts 8 seconds by default, then displays CONTROLS ARE NORMAL. Duration is editable on CarPickupEffects. Fuel is unchanged and no score is added. |
 | One-hit shield | Blocks the next collision that would start crash recovery. It is consumed once and cannot be stacked. |
 
 The current main-scene slice uses the local `FuelState` owned by `CarPickupEffects`; it does not add a second score authority or a pickup score bonus. The persistent pickup panel was removed so it no longer covers the fuel or proximity bars; only the short center result/capture popup remains. The proximity recovery popup uses `PROXIMITY RESTORED` and no longer shows the old `GAP` wording or the bottom control/probability panel. The saved `PickupPlayground.unity` test scene was synchronized with the main scene after a playtest showed that its older copy had only the score header; it now contains the ProximityHUD, FuelBar, FuelMeter, ChaseMeter, and FuelTankSpawner wiring too.
@@ -30,7 +31,7 @@ Optional plain cube pickups give 10 points immediately and apply one random temp
 
 Completing the 5-second effect earns another 75 points. Press **Space** to cancel early and forfeit that pending 75; already earned points remain. One effect is active at a time. A new pickup discards the old pending bonus, grants its own 10 points, and starts a new effect and 75-point challenge. This applies to repeated pickups of the same type too. Timers use scaled game time.
 
-Colliding with an obstacle no longer slows the car. A new collision deducts `0.5` normalized proximity; from the default 45 m visible meter this becomes 22.5 m. Any recovery buffer above the visible meter is discarded before the deduction so the hit is visible. A 1-second duplicate-contact protection window follows. The recovery wait still holds positive proximity recovery for 2.6 seconds, after which clean driving can recover proximity. Police travel at 14 m/s and the base car at 15 m/s; proximity starts at 45 m and is capped at 75 m. These are implementation values, not playtest findings.
+Colliding with an obstacle no longer slows the car. A new collision deducts `0.2` normalized proximity, which is exactly 9 m from the current police distance. Recovery distance is preserved, so a hit at the 75 m maximum leaves 66 m. A 1-second duplicate-contact protection window follows. The recovery wait still holds positive proximity recovery for 2.6 seconds, after which clean driving can recover proximity. Police travel at 14 m/s and the base car at 15 m/s; proximity starts at 45 m and is capped at 75 m. These are implementation values, not playtest findings.
 
 At 0 m the run ends, pending rewards are lost, and movement and score stop. Press **R** to restart after capture. There is no fixed lives counter. The score combines forward road distance and already earned pickup points; sideways weaving does not farm distance points in this prototype. Pursuit is represented by functional text, not a separate police AI.
 

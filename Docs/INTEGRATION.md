@@ -26,9 +26,22 @@ conflict with Team 19's road and chase systems.
 
 ## Runtime integration
 
-`OutlawsBootstrap` activates only in the `GetawayChase` scene. It creates the
-combined systems at runtime and connects them to the existing Team 19 scene
-objects, which keeps the original scene references stable and makes the merge
-easy to maintain.
+`GetawayChase` stores the combined systems on `The Outlaws Game Systems`,
+with shooting on `PlayerCar` and the labeled bars saved in the canvas.
+`OutlawGameManager` connects these existing components when Play starts.
+`OutlawsBootstrap` only resets time scale and the random seed for each run.
+
+Camera transforms and field of view, vehicle scale, police materials and
+visibility, and HUD layout now come from the saved scene. Startup does not
+overwrite these values or recreate missing systems. HUD references can be
+assigned in the Inspector; existing named labels remain a binding fallback.
+The explicit **The Outlaws > Apply Gameplay Layout to Current Scene** editor
+command rebuilds the default layout only when invoked; it can overwrite custom
+layout choices and should not be used during ordinary editing.
+
+Make persistent hierarchy edits outside Play mode and save the scene. Unity
+discards ordinary Play-mode edits when Play stops. During gameplay, movement
+scripts still control vehicle positions, bars reflect live resource values,
+and spawners still create road segments, obstacles, and pickups as before.
 
 The central integration scripts are in `Assets/Scripts/TheOutlaws`.

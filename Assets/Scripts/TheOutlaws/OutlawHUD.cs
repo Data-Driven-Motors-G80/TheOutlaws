@@ -5,9 +5,9 @@ using UnityEngine.UI;
 public sealed class OutlawHUD : MonoBehaviour
 {
     private OutlawGameManager game;
-    private Image ammoBar;
-    private TMP_Text ammoLabel;
-    private TMP_Text extractionLabel;
+    [SerializeField] private Image ammoBar;
+    [SerializeField] private TMP_Text ammoLabel;
+    [SerializeField] private TMP_Text extractionLabel;
     private GUIStyle titleStyle;
     private GUIStyle bodyStyle;
     private GUIStyle buttonStyle;
@@ -16,7 +16,14 @@ public sealed class OutlawHUD : MonoBehaviour
     public void Configure(OutlawGameManager manager)
     {
         game = manager;
-        BuildLabeledBars();
+        // Bind saved UI without rebuilding or repositioning it during Play.
+        if (ammoBar == null) ammoBar = FindImage("AmmoBar");
+        if (ammoLabel == null)
+            ammoLabel = GameObject.Find("AMMO Label")?.GetComponent<TMP_Text>();
+        if (extractionLabel == null)
+            extractionLabel = GameObject.Find("EXTRACTION Label")?.GetComponent<TMP_Text>();
+        if (ammoBar == null || ammoLabel == null || extractionLabel == null)
+            Debug.LogError("The Outlaws HUD is missing saved UI references. Assign them in the Inspector.", this);
     }
 
     private void Update()
@@ -38,6 +45,8 @@ public sealed class OutlawHUD : MonoBehaviour
 
     public void BuildLabeledBars()
     {
+        // This layout builder is used only by the explicit editor setup command.
+        if (Application.isPlaying) return;
         Image fuelBar = FindImage("FuelBar");
         Image policeBar = FindImage("ProximityFill");
 

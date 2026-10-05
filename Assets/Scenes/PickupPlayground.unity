@@ -1222,7 +1222,7 @@ MonoBehaviour:
   obstacles: {fileID: 1802903151}
   meter: {fileID: 1970884430}
   pickupEffects: {fileID: 1633598808}
-  crashDrainAmount: 0.5
+  crashDrainAmount: 0.2
 --- !u!65 &1633598806
 BoxCollider:
   m_ObjectHideFlags: 0

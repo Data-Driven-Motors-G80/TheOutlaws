@@ -10,8 +10,6 @@ public sealed class OutlawGameManager : MonoBehaviour
     private const float MaximumPoliceSpeed = 18f;
     private const float PoliceIncreaseInterval = 22f;
     private const float PoliceIncreaseAmount = 0.65f;
-    private const float VehicleScale = 0.85f;
-    private static readonly Vector3 PolicePrefabScale = new Vector3(2f, 1f, 3.5f);
 
     private AutoDriveCar driver;
     private CarPickupEffects pickupEffects;
@@ -58,31 +56,20 @@ public sealed class OutlawGameManager : MonoBehaviour
 
         policeCars = Object.FindObjectsByType<ChaseCar>(FindObjectsSortMode.None);
         System.Array.Sort(policeCars, (a, b) => string.CompareOrdinal(a.name, b.name));
-        for (int i = 1; i < policeCars.Length; i++)
-            policeCars[i].gameObject.SetActive(false);
-        if (policeCars.Length > 0)
-            policeCars = new[] { policeCars[0] };
-        ConfigureVehiclesAndCamera(player.transform);
+        // Active police and their appearance are authored in the scene.
+        shooting = player.GetComponent<OutlawShooting>();
+        OutlawPickupSpawner spawner = GetComponent<OutlawPickupSpawner>();
+        hud = GetComponent<OutlawHUD>();
 
-        if (!ValidateRequiredSystems())
+        if (!ValidateRequiredSystems() || shooting == null || spawner == null || hud == null)
         {
+            Debug.LogError("The Outlaws requires saved Shooting, Pickup Spawner, and HUD components. Check the scene setup.", this);
             enabled = false;
             return;
         }
 
-        shooting = player.GetComponent<OutlawShooting>();
-        if (shooting == null)
-        {
-            shooting = player.AddComponent<OutlawShooting>();
-        }
         shooting.Configure(pickupEffects, obstacles);
-
-        OutlawPickupSpawner spawner = GetComponent<OutlawPickupSpawner>();
-        if (spawner == null) spawner = gameObject.AddComponent<OutlawPickupSpawner>();
         spawner.Configure(road, player.transform, shooting, pickupEffects);
-
-        hud = GetComponent<OutlawHUD>();
-        if (hud == null) hud = gameObject.AddComponent<OutlawHUD>();
         hud.Configure(this);
 
         if (pursuit != null)
@@ -93,38 +80,6 @@ public sealed class OutlawGameManager : MonoBehaviour
         previousPursuitGap = pickupEffects.RunState.PursuitGap;
 
         Time.timeScale = 0f;
-    }
-
-    private void ConfigureVehiclesAndCamera(Transform player)
-    {
-        player.localScale = Vector3.one * VehicleScale;
-
-        foreach (ChaseCar policeCar in policeCars)
-        {
-            // ChaseCar lives directly on Team 19's stretched car prefab. Keep
-            // those original proportions and reduce each axis by only 15%.
-            policeCar.transform.localScale = PolicePrefabScale * VehicleScale;
-            policeCar.gameObject.SetActive(true);
-            policeCar.enabled = true;
-
-            Renderer[] renderers = policeCar.GetComponentsInChildren<Renderer>(true);
-            foreach (Renderer policeRenderer in renderers)
-            {
-                policeRenderer.enabled = true;
-                policeRenderer.material.color = new Color(0.08f, 0.2f, 0.55f);
-            }
-        }
-
-        Camera mainCamera = Camera.main;
-        if (mainCamera != null && mainCamera.transform.IsChildOf(player))
-        {
-            // Frame the road between the player and police. With the smaller
-            // vehicles this places advancing police clearly inside the view.
-            mainCamera.transform.localPosition = new Vector3(0f, 24f, -32f) / VehicleScale;
-            mainCamera.transform.localRotation = Quaternion.Euler(35f, 0f, 0f);
-            mainCamera.fieldOfView = 60f;
-            mainCamera.transform.localScale = Vector3.one;
-        }
     }
 
     private bool ValidateRequiredSystems()

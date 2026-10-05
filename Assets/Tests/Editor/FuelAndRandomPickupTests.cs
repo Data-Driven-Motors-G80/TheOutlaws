@@ -28,12 +28,13 @@ public sealed class FuelAndRandomPickupTests
     }
 
     [Test]
-    public void RandomPickupOutcomeState_ProducesBothOutcomesWithASeed()
+    public void RandomPickupOutcomeState_ProducesAllFourOutcomesWithASeed()
     {
         var outcomes = new RandomPickupOutcomeState(12345);
         int reverse = 0;
         int proximity = 0;
         int shield = 0;
+        int nitro = 0;
 
         for (int i = 0; i < 1000; i++)
         {
@@ -48,6 +49,9 @@ public sealed class FuelAndRandomPickupTests
                 case RandomPickupOutcome.Shield:
                     shield++;
                     break;
+                case RandomPickupOutcome.Nitro:
+                    nitro++;
+                    break;
                 default:
                     Assert.Fail("A random special pickup must always have a valid outcome.");
                     break;
@@ -57,7 +61,8 @@ public sealed class FuelAndRandomPickupTests
         Assert.That(reverse, Is.GreaterThan(0));
         Assert.That(proximity, Is.GreaterThan(0));
         Assert.That(shield, Is.GreaterThan(0));
-        Assert.That(reverse + proximity + shield, Is.EqualTo(1000));
+        Assert.That(nitro, Is.GreaterThan(0));
+        Assert.That(reverse + proximity + shield + nitro, Is.EqualTo(1000));
     }
 
     [Test]

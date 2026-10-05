@@ -34,7 +34,7 @@ selected gameplay ideas from Team 21's **Redline Run** into one cohesive game.
 3. Open `Assets/Scenes/GetawayChase.unity`.
 4. Enter Play mode.
 
-The integration systems install themselves when `GetawayChase` loads. The HUD
+The integration systems and HUD layout are saved in `GetawayChase`. The HUD
 keeps Team 19's bars and adds clear `FUEL`, `AMMO`, and `POLICE DISTANCE`
 labels. Team 21's unwanted visual-effect system is not included.
 

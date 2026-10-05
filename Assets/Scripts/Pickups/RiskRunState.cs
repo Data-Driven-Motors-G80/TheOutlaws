@@ -8,7 +8,8 @@ public sealed class RiskRunState
     public const float PickupProximityRecovery = MaximumPursuitGap * 0.5f;
     // Collisions drain the proximity bar but do not slow the car.
     public const float CrashSlowDuration = 0f;
-    public const float DefaultCrashProximityDrain = 0.5f;
+    // 20% of the initial 45 m gap, so each collision costs 9 m.
+    public const float DefaultCrashProximityDrain = 0.2f;
     public const float CollisionProtectionDuration = 1f;
     public const float RecoveryWaitDuration = 2.6f;
     public const int PickupReward = 10;
@@ -118,11 +119,12 @@ public sealed class RiskRunState
             return false;
 
         double clampedDrain = Math.Min(1d, normalizedProximityDrain);
-        // ChaseMeter exposes proximity as a 0..1 value. Discard any buffer
-        // above the visible meter before applying the normalized collision cost
-        // so a crash always produces a visible bar change.
-        double visibleGap = Math.Min(InitialPursuitGap, pursuitGap);
-        pursuitGap = Math.Max(0d, visibleGap - InitialPursuitGap * clampedDrain);
+        // The normalized cost is based on the 45 m starting gap. Subtract it
+        // from the current distance so every hit costs the same number of
+        // metres, including after the player has earned recovery distance.
+        pursuitGap = Math.Max(
+            0d,
+            pursuitGap - InitialPursuitGap * clampedDrain);
         if (pursuitGap <= 0d)
         {
             IsGameOver = true;
@@ -211,6 +213,14 @@ public sealed class RiskRunState
                 PendingBonus = 0;
             }
         }
+    }
+
+    // Used when a countdown boundary splits one rendered frame into two ticks.
+    public void TickAdditionalFrameTime(float elapsedSeconds, float baseForwardSpeed,
+        float policeSpeed, float previousForwardDistance)
+    {
+        Tick(elapsedSeconds, baseForwardSpeed, policeSpeed);
+        LastTickForwardDistance += previousForwardDistance;
     }
 
     public void Reset()

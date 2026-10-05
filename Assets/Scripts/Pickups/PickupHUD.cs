@@ -12,6 +12,9 @@ public sealed class PickupHUD : MonoBehaviour
     private float popupRemaining;
     private int shownPickupCount;
     private int shownShieldUseCount;
+    private int shownReverseActivationCount;
+    private int shownReverseCompletionCount;
+    private int shownReverseExtensionCount;
 
     private void Update()
     {
@@ -23,12 +26,15 @@ public sealed class PickupHUD : MonoBehaviour
             bool reverse = effects.ActiveEffect == PickupEffectType.ReverseSteering;
             bool proximity = effects.LastOutcome == RandomPickupOutcome.ProximityRecovery;
             bool shield = effects.LastOutcome == RandomPickupOutcome.Shield;
-            popupMessage = proximity ? "PROXIMITY RESTORED"
+            bool nitro = effects.ActiveEffect == PickupEffectType.Boost;
+            popupMessage = proximity ? "POLICE JAMMER DEPLOYED"
                 : shield ? "SHIELD READY!"
+                : nitro ? "NITRO ACTIVATED!"
                 : reverse ? "CONTROLS REVERSED!"
                 : null;
             popupHint = proximity ? "Police distance recovered"
                 : shield ? "Next hit is blocked"
+                : nitro ? $"Speed boosted by 35% for {effects.RemainingSeconds:0.#} seconds"
                 : reverse ? "A / Left: move right     D / Right: move left"
                 : null;
             popupRemaining = popupMessage != null && !effects.RunState.IsGameOver ? PopupDuration : 0f;
@@ -45,6 +51,30 @@ public sealed class PickupHUD : MonoBehaviour
             }
         }
 
+        if (effects.ReverseActivationCount != shownReverseActivationCount)
+        {
+            shownReverseActivationCount = effects.ReverseActivationCount;
+            popupMessage = "1 — CONTROLS REVERSED!";
+            popupHint = "A / Left: move right     D / Right: move left";
+            popupRemaining = PopupDuration;
+        }
+
+        if (effects.ReverseExtensionCount != shownReverseExtensionCount)
+        {
+            shownReverseExtensionCount = effects.ReverseExtensionCount;
+            popupMessage = $"REVERSED CONTROLS +{effects.ReverseExtensionSeconds:0.#} SECONDS";
+            popupHint = $"{Mathf.CeilToInt(effects.RemainingSeconds)} seconds remaining";
+            popupRemaining = PopupDuration;
+        }
+
+        if (effects.ReverseCompletionCount != shownReverseCompletionCount)
+        {
+            shownReverseCompletionCount = effects.ReverseCompletionCount;
+            popupMessage = "CONTROLS ARE NORMAL";
+            popupHint = "A / Left: move left     D / Right: move right";
+            popupRemaining = PopupDuration;
+        }
+
         if (popupRemaining > 0f)
             popupRemaining = Mathf.Max(0f, popupRemaining - Time.unscaledDeltaTime);
     }
@@ -54,6 +84,9 @@ public sealed class PickupHUD : MonoBehaviour
         popupRemaining = 0f;
         shownPickupCount = 0;
         shownShieldUseCount = 0;
+        shownReverseActivationCount = 0;
+        shownReverseCompletionCount = 0;
+        shownReverseExtensionCount = 0;
     }
 
     private static void DrawPanel(Rect rect)
@@ -92,20 +125,23 @@ public sealed class PickupHUD : MonoBehaviour
         GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
         float width = Screen.width / scale;
         float height = Screen.height / scale;
-        if (popupRemaining > 0f)
+        bool countingDown = effects.ReverseCountdownRemaining > 0f;
+        if (popupRemaining > 0f || countingDown)
         {
-            float popupWidth = Mathf.Min(620f, width - 80f);
+            const float margin = 24f;
+            const float popupHeight = 100f;
+            float popupWidth = Mathf.Min(620f, width - margin * 2f);
             Rect popupRect = new Rect(
-                (width - popupWidth) * 0.5f,
-                height * 0.4f,
+                width - popupWidth - margin,
+                height - popupHeight - margin,
                 popupWidth,
-                100f
+                popupHeight
             );
             DrawPanel(popupRect);
             GUI.Label(new Rect(popupRect.x, popupRect.y + 4f, popupWidth, 52f),
-                popupMessage, popupText);
+                countingDown ? $"CONTROLS REVERSE IN {Mathf.CeilToInt(effects.ReverseCountdownRemaining) + 1}" : popupMessage, popupText);
             GUI.Label(new Rect(popupRect.x + 12f, popupRect.y + 56f, popupWidth - 24f, 40f),
-                popupHint, popupDetail);
+                countingDown ? "Get ready — steering is still normal" : popupHint, popupDetail);
         }
 
         GUI.matrix = previous;

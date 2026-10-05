@@ -10,6 +10,14 @@ public sealed class CarPickupEffects : MonoBehaviour
     private float baseForwardSpeed = 15f;
     private float policeSpeed = 14f;
     private bool simulationActive = true;
+    private float reverseCountdownRemaining;
+    private float pendingReverseDuration;
+    public float ReverseCountdownRemaining => reverseCountdownRemaining;
+    public int ReverseActivationCount { get; private set; }
+    public int ReverseCompletionCount { get; private set; }
+    public int ReverseExtensionCount { get; private set; }
+    public float ReverseExtensionSeconds => reverseControlDuration;
+    [SerializeField, Min(0.1f)] private float reverseControlDuration = 8f;
     [SerializeField, Min(0f)] private float fuelConsumptionPerSecond = FuelState.DefaultConsumptionPerSecond;
 
     public RiskRunState RunState => runState;
@@ -75,10 +83,12 @@ public sealed class CarPickupEffects : MonoBehaviour
                 }
 
                 LastOutcome = outcome;
-                bool reversed = runState.TryCollectWithoutReward(PickupEffectType.ReverseSteering, duration);
-                if (reversed)
+                PickupEffectType temporaryEffect = outcome == RandomPickupOutcome.Nitro
+                    ? PickupEffectType.Boost : PickupEffectType.ReverseSteering;
+                bool collected = TryApplyTemporaryEffect(temporaryEffect, duration);
+                if (collected)
                     PickupCount++;
-                return reversed;
+                return collected;
 
 
             case PickupEffectType.Shield:
@@ -91,7 +101,7 @@ public sealed class CarPickupEffects : MonoBehaviour
                 return shieldedPickup;
 
             default:
-                bool applied = runState.TryCollectWithoutReward(effect, duration);
+                bool applied = TryApplyTemporaryEffect(effect, duration);
                 if (applied)
                     PickupCount++;
                 return applied;
@@ -130,13 +140,72 @@ public sealed class CarPickupEffects : MonoBehaviour
 
     public void Clear()
     {
+        reverseCountdownRemaining = 0f;
         runState.TryBailOut();
+    }
+
+    private bool TryApplyTemporaryEffect(PickupEffectType effect, float duration)
+    {
+        if (effect != PickupEffectType.ReverseSteering)
+        {
+            bool applied = runState.TryCollectWithoutReward(effect, duration);
+            if (applied) reverseCountdownRemaining = 0f;
+            return applied;
+        }
+
+        if (runState.IsGameOver || float.IsNaN(duration) || float.IsInfinity(duration) || duration <= 0f)
+            return false;
+
+        if (ActiveEffect == PickupEffectType.ReverseSteering)
+        {
+            runState.Effects.Apply(PickupEffectType.ReverseSteering,
+                RemainingSeconds + reverseControlDuration);
+            ReverseExtensionCount++;
+            return true;
+        }
+
+        if (reverseCountdownRemaining > 0f)
+        {
+            // Keep the original countdown; queue the extra time for activation.
+            pendingReverseDuration += reverseControlDuration;
+            ReverseExtensionCount++;
+            return true;
+        }
+
+        runState.TryBailOut();
+        pendingReverseDuration = reverseControlDuration;
+        // Show 3 immediately, 2 after one second, then activate as 1 appears.
+        reverseCountdownRemaining = 2f;
+        return true;
     }
 
     private void Update()
     {
         if (!simulationActive || Time.timeScale <= 0f) return;
-        runState.Tick(Time.deltaTime, baseForwardSpeed, policeSpeed);
+        bool reverseWasActive = ActiveEffect == PickupEffectType.ReverseSteering;
+        int activationsBeforeTick = ReverseActivationCount;
+        float elapsed = Time.deltaTime;
+        if (reverseCountdownRemaining > 0f)
+        {
+            float countdownStep = Mathf.Min(elapsed, reverseCountdownRemaining);
+            runState.Tick(countdownStep, baseForwardSpeed, policeSpeed);
+            reverseCountdownRemaining = Mathf.Max(0f, reverseCountdownRemaining - countdownStep);
+            elapsed -= countdownStep;
+            float countdownDistance = runState.LastTickForwardDistance;
+            if (runState.IsGameOver) reverseCountdownRemaining = 0f;
+            else if (reverseCountdownRemaining <= 0f)
+            {
+                runState.TryCollectWithoutReward(PickupEffectType.ReverseSteering, pendingReverseDuration);
+                ReverseActivationCount++;
+            }
+            // Preserve total movement across both parts of this frame.
+            if (elapsed > 0f)
+                runState.TickAdditionalFrameTime(elapsed, baseForwardSpeed, policeSpeed, countdownDistance);
+        }
+        else runState.Tick(elapsed, baseForwardSpeed, policeSpeed);
+        if (!runState.IsGameOver && ActiveEffect == PickupEffectType.None
+            && (reverseWasActive || ReverseActivationCount != activationsBeforeTick))
+            ReverseCompletionCount++;
         fuelState.Tick(Time.deltaTime, fuelConsumptionPerSecond);
     }
 
@@ -146,5 +215,10 @@ public sealed class CarPickupEffects : MonoBehaviour
         fuelState.Reset();
         LastOutcome = RandomPickupOutcome.None;
         PickupCount = 0;
+        reverseCountdownRemaining = 0f;
+        pendingReverseDuration = 0f;
+        ReverseActivationCount = 0;
+        ReverseCompletionCount = 0;
+        ReverseExtensionCount = 0;
     }
 }

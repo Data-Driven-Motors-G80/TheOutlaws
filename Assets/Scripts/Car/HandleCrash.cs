@@ -13,7 +13,7 @@ public sealed class HandleCrash : MonoBehaviour
 
     [Header("Obstacle Collision")]
     [SerializeField, Range(0f, 1f)]
-    private float crashDrainAmount = 0.5f;
+    private float crashDrainAmount = RiskRunState.DefaultCrashProximityDrain;
 
     private bool restarting;
     private FuelMeter fuelMeter;
