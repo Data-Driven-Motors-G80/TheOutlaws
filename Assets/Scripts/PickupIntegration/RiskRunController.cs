@@ -7,15 +7,7 @@ using UnityEngine.SceneManagement;
 [RequireComponent(typeof(AutoDriveCar), typeof(CarPickupEffects))]
 public sealed class RiskRunController : MonoBehaviour
 {
-    [SerializeField, Min(0f)] private float policeSpeed = 14f;
-
-    public float PoliceSpeed => policeSpeed;
-
-    public void SetPoliceSpeed(float value)
-    {
-        policeSpeed = Mathf.Max(0f, value);
-        ConfigureSpeeds();
-    }
+    [SerializeField, Min(0f)] private float policeClosingSpeed = 0.5f;
 
     private AutoDriveCar car;
     private CarPickupEffects effects;
@@ -71,6 +63,7 @@ public sealed class RiskRunController : MonoBehaviour
         effects.SetSimulationActive(car != null && car.isActiveAndEnabled && car.IsDriveReady);
         if (car != null)
         {
+            float policeSpeed = car.BaseForwardSpeed + policeClosingSpeed;
             float effectivePoliceSpeed = Time.time < slowedUntil
                 ? Mathf.Max(0f, Mathf.Min(policeSpeed, car.BaseForwardSpeed - 6f))
                 : policeSpeed;

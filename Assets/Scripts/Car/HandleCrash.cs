@@ -134,6 +134,7 @@ public sealed class HandleCrash : MonoBehaviour
                 return;
             }
 
+            pickupEffects.HitObstacle();
             pickupEffects.TryCrash(crashDrainAmount);
             return;
         }

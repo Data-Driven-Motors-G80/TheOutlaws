@@ -7,7 +7,7 @@ The current local slice leaves pickup score out of the gameplay path. Mystery pi
 | Result | Behavior |
 | --- | --- |
 | Police jammer | Adds half of the maximum police-gap capacity, capped at the maximum. It does not add score or start a temporary effect. |
-| Nitro | Boosts forward speed by 35% for 5 seconds by default. Replaces the current temporary driving effect; collecting nitro again refreshes its duration without stacking speed. |
+| Nitro | Boosts forward speed by 35% until an unshielded obstacle hit. No timer; repeated nitro does not stack speed. Can coexist with reversed controls. A shield protects nitro from the blocked hit. |
 | Reversed controls | Shows 3 → 2 → 1, activating reversed steering as 1 appears. Lasts 8 seconds by default, then displays CONTROLS ARE NORMAL. Duration is editable on CarPickupEffects. Fuel is unchanged and no score is added. |
 | One-hit shield | Blocks the next collision that would start crash recovery. It is consumed once and cannot be stacked. |
 

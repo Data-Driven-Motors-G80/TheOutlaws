@@ -6,10 +6,6 @@ using UnityEngine.SceneManagement;
 public sealed class OutlawGameManager : MonoBehaviour
 {
     private const float FinishDistance = 1350f;
-    private const float BasePoliceSpeed = 14f;
-    private const float MaximumPoliceSpeed = 18f;
-    private const float PoliceIncreaseInterval = 22f;
-    private const float PoliceIncreaseAmount = 0.65f;
 
     private AutoDriveCar driver;
     private CarPickupEffects pickupEffects;
@@ -21,7 +17,6 @@ public sealed class OutlawGameManager : MonoBehaviour
     private OutlawHUD hud;
     private ChaseCar[] policeCars;
     private float elapsed;
-    private float nextPoliceIncrease = PoliceIncreaseInterval;
     private float previousPursuitGap;
     private float policeAlertRemaining;
     private GameObject finishGate;
@@ -72,11 +67,6 @@ public sealed class OutlawGameManager : MonoBehaviour
         spawner.Configure(road, player.transform, shooting, pickupEffects);
         hud.Configure(this);
 
-        if (pursuit != null)
-        {
-            pursuit.SetPoliceSpeed(BasePoliceSpeed);
-        }
-
         previousPursuitGap = pickupEffects.RunState.PursuitGap;
 
         Time.timeScale = 0f;
@@ -121,7 +111,6 @@ public sealed class OutlawGameManager : MonoBehaviour
 
         elapsed += Time.deltaTime;
         UpdatePoliceFeedback();
-        IncreasePolicePressure();
         UpdateFinishGate();
 
         if (DistanceTravelled >= FinishDistance)
@@ -182,19 +171,6 @@ public sealed class OutlawGameManager : MonoBehaviour
 
         State = result;
         Time.timeScale = 0f;
-    }
-
-    private void IncreasePolicePressure()
-    {
-        if (pursuit == null || elapsed < nextPoliceIncrease)
-        {
-            return;
-        }
-
-        nextPoliceIncrease += PoliceIncreaseInterval;
-        pursuit.SetPoliceSpeed(Mathf.Min(
-            MaximumPoliceSpeed,
-            pursuit.PoliceSpeed + PoliceIncreaseAmount));
     }
 
     private void UpdateFinishGate()

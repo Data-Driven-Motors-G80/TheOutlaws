@@ -64,7 +64,7 @@ public static class MainScenePickupIntegrationBuilder
         }
         SetReference(spawner, "obstacles", obstacles);
         SetValue(spawner, "spawnDistance", 55f);
-        SetValue(spawner, "spacing", 95f);
+        SetValue(spawner, "spacing", 160f);
         SetValue(spawner, "effectDuration", 5f);
         SetValue(spawner, "cycleEffectsForTesting", false);
 

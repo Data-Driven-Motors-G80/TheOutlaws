@@ -20,6 +20,8 @@ public sealed class ChaseCar : MonoBehaviour
     [SerializeField, Min(1f)] private float maximumVisualGap = 8f;
     [SerializeField, Min(0f)] private float minimumVisualGap = 0.35f;
     [SerializeField, Min(0f)] private float visualGapChangeSpeed = 2.5f;
+    [SerializeField, Range(0f, 1f)] private float visibleBelowMeterValue = 0.5f;
+    private Renderer[] policeRenderers;
 
     private float startingBumperGap;
     private float displayedBumperGap;
@@ -37,6 +39,7 @@ public sealed class ChaseCar : MonoBehaviour
 
     private void Awake()
     {
+        policeRenderers = GetComponentsInChildren<Renderer>(true);
         if (player != null) effects = player.GetComponent<CarPickupEffects>();
         if (chaseCollider == null)
         {
@@ -127,10 +130,12 @@ public sealed class ChaseCar : MonoBehaviour
         );
 
         IgnoreOtherChaseCars();
+        UpdateVisibility();
     }
 
     private void LateUpdate()
     {
+        UpdateVisibility();
         if (!road.TryGetPathPoint(
                 player.position,
                 out RoadPathPoint playerPoint))
@@ -234,6 +239,23 @@ public sealed class ChaseCar : MonoBehaviour
         );
 
         DistanceToPlayer = displayedBumperGap;
+    }
+
+    private void UpdateVisibility()
+    {
+        float normalizedGap = effects != null && effects.isActiveAndEnabled
+            ? effects.RunState.PursuitGap / RiskRunState.MaximumPursuitGap
+            : meter != null ? meter.Value : 1f;
+        foreach (Renderer policeRenderer in policeRenderers)
+            if (policeRenderer != null)
+                policeRenderer.forceRenderingOff = normalizedGap > visibleBelowMeterValue;
+    }
+
+    private void OnDisable()
+    {
+        if (policeRenderers == null) return;
+        foreach (Renderer policeRenderer in policeRenderers)
+            if (policeRenderer != null) policeRenderer.forceRenderingOff = false;
     }
 
     private float GetTargetBumperGap()

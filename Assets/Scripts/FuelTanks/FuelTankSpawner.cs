@@ -6,8 +6,8 @@ public class FuelTankSpawner : MonoBehaviour
     [SerializeField] private Transform car;
 
     [Header("Spawning")]
-    // Spawn distance is in front of the car 50m per fuel tank
-    // Spawn direction is based on the car's forward vector
+    // Keep spacing independent of how far ahead the pickup appears.
+    [SerializeField, Min(1f)] private float spawnSpacing = 75f;
     [SerializeField, Min(0f)] private float spawnDistance = 50f;
 
     [Header("Fuel Tank")]
@@ -30,7 +30,7 @@ public class FuelTankSpawner : MonoBehaviour
         }
 
         previousCarPosition = car.position;
-        distanceUntilSpawn = spawnDistance;
+        distanceUntilSpawn = spawnSpacing;
 
         // Keep the stationary pickup trigger in the player's driving path.
         // Only the visual model bobs; the car should never pass underneath it.
@@ -45,7 +45,7 @@ public class FuelTankSpawner : MonoBehaviour
         if (distanceUntilSpawn <= 0f)
         {
             SpawnFuelTank();
-            distanceUntilSpawn = spawnDistance;
+            distanceUntilSpawn = spawnSpacing;
         }
     }
 

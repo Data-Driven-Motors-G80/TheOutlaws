@@ -337,7 +337,7 @@ MonoBehaviour:
   pickupPrefab: {fileID: 136182238796722122, guid: a5f8ce0d514bad840b83246d0c70b77c, type: 3}
   obstacles: {fileID: 1802903151}
   spawnDistance: 55
-  spacing: 95
+  spacing: 160
   effectDuration: 5
   cycleEffectsForTesting: 0
 --- !u!4 &338326838
@@ -1295,7 +1295,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b2b0dbbfafd511d41974bbb96c90b46c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RiskRunController
-  policeSpeed: 14
+  policeClosingSpeed: 0.5
 --- !u!1 &1802903150
 GameObject:
   m_ObjectHideFlags: 0
@@ -1763,6 +1763,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::FuelTankSpawner
   car: {fileID: 1633598803}
+  spawnSpacing: 75
   spawnDistance: 50
   fuelTankPrefab: {fileID: 4882813726840004750, guid: 09dcac4f01cdc45b9946155c79139d1b, type: 3}
   lifetime: 10

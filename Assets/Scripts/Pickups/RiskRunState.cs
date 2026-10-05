@@ -26,6 +26,17 @@ public sealed class RiskRunState
     public PickupEffectState Effects { get; } = new PickupEffectState();
     public float PursuitGap => (float)pursuitGap;
     public bool IsGameOver { get; private set; }
+    public bool HasNitro { get; private set; }
+    public float ForwardSpeedMultiplier => HasNitro ? 1.35f : Effects.ForwardSpeedMultiplier;
+
+    public bool TryActivateNitro()
+    {
+        if (IsGameOver) return false;
+        HasNitro = true;
+        return true;
+    }
+
+    public void LoseNitro() => HasNitro = false;
     public float CrashSlowRemaining => (float)crashSlowRemaining;
     public float CollisionProtectionRemaining => (float)collisionProtectionRemaining;
     public float RecoveryWaitRemaining => (float)recoveryWaitRemaining;
@@ -177,7 +188,7 @@ public sealed class RiskRunState
             if (recoveryWaitRemaining > 0d)
                 step = Math.Min(step, recoveryWaitRemaining);
 
-            double forwardSpeed = (double)baseForwardSpeed * Effects.ForwardSpeedMultiplier
+            double forwardSpeed = (double)baseForwardSpeed * ForwardSpeedMultiplier
                 * CrashSpeedMultiplier;
             double relativeSpeed = forwardSpeed - policeSpeed;
             if (recoveryWaitRemaining > 0d && relativeSpeed > 0d)
@@ -227,6 +238,7 @@ public sealed class RiskRunState
     {
         pursuitGap = InitialPursuitGap;
         IsGameOver = false;
+        HasNitro = false;
         crashSlowRemaining = 0d;
         collisionProtectionRemaining = 0d;
         recoveryWaitRemaining = 0d;

@@ -26,7 +26,7 @@ public sealed class CarPickupEffects : MonoBehaviour
     public PickupEffectType ActiveEffect => runState.Effects.ActiveEffect;
     public float RemainingSeconds => runState.Effects.RemainingSeconds;
     public float SteeringMultiplier => runState.Effects.SteeringMultiplier;
-    public float ForwardSpeedMultiplier => runState.Effects.ForwardSpeedMultiplier * runState.CrashSpeedMultiplier;
+    public float ForwardSpeedMultiplier => runState.ForwardSpeedMultiplier * runState.CrashSpeedMultiplier;
     public float LateralAccelerationMultiplier => runState.Effects.LateralAccelerationMultiplier;
     public float CurrentFuel => fuelState.CurrentFuel;
     public bool ShieldReady => runState.HasShield;
@@ -113,6 +113,11 @@ public sealed class CarPickupEffects : MonoBehaviour
         return isActiveAndEnabled && runState.TryCrash(proximityDrain);
     }
 
+    public void HitObstacle()
+    {
+        if (isActiveAndEnabled) runState.LoseNitro();
+    }
+
     public bool EndRun()
     {
         return isActiveAndEnabled && runState.EndRun();
@@ -146,6 +151,12 @@ public sealed class CarPickupEffects : MonoBehaviour
 
     private bool TryApplyTemporaryEffect(PickupEffectType effect, float duration)
     {
+        if (effect == PickupEffectType.Boost)
+        {
+            bool activated = runState.TryActivateNitro();
+            if (activated) LastOutcome = RandomPickupOutcome.Nitro;
+            return activated;
+        }
         if (effect != PickupEffectType.ReverseSteering)
         {
             bool applied = runState.TryCollectWithoutReward(effect, duration);

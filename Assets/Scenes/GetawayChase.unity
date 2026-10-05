@@ -342,7 +342,7 @@ MonoBehaviour:
   pickupPrefab: {fileID: 136182238796722122, guid: a5f8ce0d514bad840b83246d0c70b77c, type: 3}
   obstacles: {fileID: 1802903151}
   spawnDistance: 55
-  spacing: 95
+  spacing: 160
   effectDuration: 5
   cycleEffectsForTesting: 0
 --- !u!4 &146678643
@@ -446,13 +446,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.3007058, y: 0, z: 0, w: 0.95371693}
-  m_LocalPosition: {x: -0.07, y: 5.28, z: -15.93}
+  m_LocalRotation: {x: 0.25881904, y: 0, z: 0, w: 0.9659258}
+  m_LocalPosition: {x: -0.33, y: 4.84, z: -11.45}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1633598803}
-  m_LocalEulerAnglesHint: {x: 15, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 30, y: 0, z: 0}
 --- !u!114 &330585547
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -713,6 +713,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FuelTankSpawner
   car: {fileID: 1633598803}
+  spawnSpacing: 75
   spawnDistance: 50
   fuelTankPrefab: {fileID: 4882813726840004750, guid: 09dcac4f01cdc45b9946155c79139d1b, type: 3}
   lifetime: 10
@@ -1435,6 +1436,7 @@ MonoBehaviour:
   maximumVisualGap: 8
   minimumVisualGap: 0.35
   visualGapChangeSpeed: 2.5
+  visibleBelowMeterValue: 0.5
 --- !u!1 &980293025
 GameObject:
   m_ObjectHideFlags: 0
@@ -2043,6 +2045,7 @@ MonoBehaviour:
   maximumVisualGap: 8
   minimumVisualGap: 0.35
   visualGapChangeSpeed: 2.5
+  visibleBelowMeterValue: 0.5
 --- !u!1 &1551234747
 GameObject:
   m_ObjectHideFlags: 0
@@ -2292,6 +2295,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3240a58ab3bb4a3c98a95dc736235759, type: 3}
   m_Name: 
   m_EditorClassIdentifier: MoneyHeist.Pickups::CarPickupEffects
+  reverseControlDuration: 8
   fuelConsumptionPerSecond: 4
 --- !u!114 &1633598809
 MonoBehaviour:
@@ -2305,7 +2309,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b2b0dbbfafd511d41974bbb96c90b46c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RiskRunController
-  policeSpeed: 14
+  policeClosingSpeed: 0.5
 --- !u!114 &1633598810
 MonoBehaviour:
   m_ObjectHideFlags: 0

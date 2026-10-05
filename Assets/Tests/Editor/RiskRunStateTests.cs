@@ -3,6 +3,24 @@ using NUnit.Framework;
 public sealed class RiskRunStateTests
 {
     [Test]
+    public void Nitro_PersistsThroughTimeAndReverseEffectsUntilLost()
+    {
+        var run = new RiskRunState();
+        Assert.That(run.TryActivateNitro(), Is.True);
+        run.TryCollectWithoutReward(PickupEffectType.ReverseSteering, 8f);
+        run.Tick(30f);
+        Assert.That(run.HasNitro, Is.True);
+        Assert.That(run.ForwardSpeedMultiplier, Is.EqualTo(1.35f));
+        run.TryActivateNitro();
+        Assert.That(run.ForwardSpeedMultiplier, Is.EqualTo(1.35f));
+        run.LoseNitro();
+        Assert.That(run.ForwardSpeedMultiplier, Is.EqualTo(1f));
+        run.TryActivateNitro();
+        run.Reset();
+        Assert.That(run.HasNitro, Is.False);
+    }
+
+    [Test]
     public void NewRun_StartsWithRecoverableDistanceAndNoRewardsOrEffects()
     {
         var run = new RiskRunState();

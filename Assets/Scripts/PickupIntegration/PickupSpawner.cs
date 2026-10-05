@@ -9,7 +9,7 @@ public sealed class PickupSpawner : MonoBehaviour
     [SerializeField] private PickupItem pickupPrefab;
     [SerializeField] private ObstacleSpawner obstacles;
     [SerializeField, Min(5f)] private float spawnDistance = 55f;
-    [SerializeField, Min(5f)] private float spacing = 95f;
+    [SerializeField, Min(5f)] private float spacing = 160f;
     [SerializeField, Min(0.1f)] private float effectDuration = 5f;
     [SerializeField] private bool cycleEffectsForTesting;
 
@@ -78,8 +78,7 @@ public sealed class PickupSpawner : MonoBehaviour
             if (BlockedByObstacle(position)) continue;
 
             PickupItem item = Instantiate(pickupPrefab, position, Quaternion.identity, transform);
-            // The special pickup hides a 50/25/25 outcome: reverse steering,
-            // proximity recovery, or a one-hit shield.
+            // Four equally likely outcomes: nitro, jammer, shield, or reverse steering.
             item.Configure(PickupEffectType.RandomFuelOrReverse, effectDuration);
             active.Add(item);
             spawnCount++;
