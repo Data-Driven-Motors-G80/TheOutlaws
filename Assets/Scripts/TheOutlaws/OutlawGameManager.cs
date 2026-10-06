@@ -5,7 +5,13 @@ using UnityEngine.SceneManagement;
 [DefaultExecutionOrder(-200)]
 public sealed class OutlawGameManager : MonoBehaviour
 {
-    private const float FinishDistance = 1350f;
+    private const float DesertPortalDistance = 675f;
+
+    [Header("Difficulty")]
+    [SerializeField, Min(0f)] private float openingSeconds = 20f;
+    [SerializeField, Min(1f)] private float difficultyRampSeconds = 70f;
+    [SerializeField, Range(1f, 2f)] private float maximumObstacleDensity = 1.4f;
+    [SerializeField, Range(0f, 1f)] private float maximumPoliceClosingSpeed = 0.65f;
 
     private AutoDriveCar driver;
     private CarPickupEffects pickupEffects;
@@ -19,12 +25,10 @@ public sealed class OutlawGameManager : MonoBehaviour
     private float elapsed;
     private float previousPursuitGap;
     private float policeAlertRemaining;
-    private GameObject finishGate;
+    private bool portalSpawned;
 
     public OutlawGameState State { get; private set; } = OutlawGameState.Ready;
     public float DistanceTravelled => driver != null ? driver.RoadDistanceTravelled : 0f;
-    public float DistanceRemaining => Mathf.Max(0f, FinishDistance - DistanceTravelled);
-    public float Progress => Mathf.Clamp01(DistanceTravelled / FinishDistance);
     public float ElapsedSeconds => elapsed;
     public OutlawShooting Shooting => shooting;
     public FuelMeter Fuel => fuel;
@@ -110,18 +114,28 @@ public sealed class OutlawGameManager : MonoBehaviour
         }
 
         elapsed += Time.deltaTime;
+        UpdateDifficulty();
         UpdatePoliceFeedback();
-        UpdateFinishGate();
+        UpdateDesertPortal();
 
-        if (DistanceTravelled >= FinishDistance)
-        {
-            EndGame(OutlawGameState.Won);
-        }
-        else if ((pickupEffects != null && pickupEffects.RunState.IsGameOver) ||
+        if ((pickupEffects != null && pickupEffects.RunState.IsGameOver) ||
                  (fuel != null && fuel.IsEmpty))
         {
             EndGame(OutlawGameState.Lost);
         }
+    }
+
+    private void UpdateDifficulty()
+    {
+        RunDifficultyState difficulty = RunDifficultyState.Evaluate(
+            elapsed, openingSeconds, difficultyRampSeconds);
+        obstacles.ConfigureDifficulty(
+            Mathf.Lerp(1f, maximumObstacleDensity, difficulty.Progress) *
+            Mathf.Lerp(1f, 0.7f, difficulty.Relief),
+            Mathf.Lerp(0.1f, 0.35f, difficulty.Progress) * (1f - difficulty.Relief));
+        pursuit.SetClosingSpeed(Mathf.Lerp(
+            Mathf.Lerp(0.1f, maximumPoliceClosingSpeed, difficulty.Progress),
+            -0.35f, difficulty.Relief));
     }
 
     private void UpdatePoliceFeedback()
@@ -145,6 +159,7 @@ public sealed class OutlawGameManager : MonoBehaviour
             return;
         }
 
+        UpdateDifficulty();
         State = OutlawGameState.Running;
         Time.timeScale = 1f;
     }
@@ -173,16 +188,14 @@ public sealed class OutlawGameManager : MonoBehaviour
         Time.timeScale = 0f;
     }
 
-    private void UpdateFinishGate()
+    private void UpdateDesertPortal()
     {
-        if (finishGate != null || road == null || DistanceRemaining > 90f)
+        float remaining = DesertPortalDistance - DistanceTravelled;
+        if (portalSpawned || remaining > 90f) return;
+        if (TryGetPointAhead(Mathf.Max(0f, remaining), out RoadPathPoint point))
         {
-            return;
-        }
-
-        if (TryGetPointAhead(DistanceRemaining, out RoadPathPoint point))
-        {
-            finishGate = OutlawFinishGate.Create(point);
+            OutlawAreaPortal.Create(point, driver.transform, road, this);
+            portalSpawned = true;
         }
     }
 

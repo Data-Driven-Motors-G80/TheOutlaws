@@ -19,6 +19,14 @@ public sealed class InfiniteRoad : MonoBehaviour
     private readonly Dictionary<RoadSegment, ObjectPool<RoadSegment>> pools = new Dictionary<RoadSegment, ObjectPool<RoadSegment>>();
     private System.Random random;
     private Pose nextEntry;
+    private Color? surfaceColor;
+
+    public void SetSurfaceColor(Color color)
+    {
+        surfaceColor = color;
+        foreach (ActiveSegment active in activeSegments)
+            active.Segment.SetSurfaceColor(color);
+    }
 
     private void Awake()
     {
@@ -140,6 +148,7 @@ public sealed class InfiniteRoad : MonoBehaviour
         RoadSegment segment = pool.Get();
 
         segment.AlignStartTo(nextEntry);
+        if (surfaceColor.HasValue) segment.SetSurfaceColor(surfaceColor.Value);
         nextEntry = segment.ExitPose;
 
         activeSegments.Enqueue(new ActiveSegment(segment, pool));

@@ -26,6 +26,29 @@ public sealed class ObstacleSpawner : MonoBehaviour
     private System.Random random;
     private Vector3 previousCarPosition;
     private float distanceUntilSpawn;
+    private AutoDriveCar driver;
+    private bool useFairRows;
+    private float density = 1f;
+    private float difficultRowChance;
+    private int previousOpenLane = 1;
+    private float previousRoadDistance;
+
+    public void ConfigureDifficulty(float obstacleDensity, float twoObstacleChance)
+    {
+        useFairRows = true;
+        density = Mathf.Clamp(obstacleDensity, 0.5f, 2f);
+        difficultRowChance = Mathf.Clamp01(twoObstacleChance);
+    }
+
+    private float NextSpacing()
+    {
+        if (!useFairRows) return NextRange(minSpacing, maxSpacing);
+        // Allow steering and the length of both vehicles, even as the car speeds up.
+        float speed = driver != null ? driver.ForwardSpeed : 15f;
+        if (driver != null && driver.TryGetComponent(out CarPickupEffects effects))
+            speed *= effects.RunState.ForwardSpeedMultiplier;
+        return Mathf.Max(NextRange(32f, 42f) / density, speed * 1.3f + 4f);
+    }
 
     private void Awake()
     {
@@ -43,20 +66,27 @@ public sealed class ObstacleSpawner : MonoBehaviour
             actionOnRelease: obstacle => obstacle.GameObject.SetActive(false),
             actionOnDestroy: obstacle => Destroy(obstacle.GameObject));
 
+        driver = car.GetComponent<AutoDriveCar>();
         previousCarPosition = car.position;
     }
 
     private void Update()
     {
+        if (Time.timeScale <= 0f) return;
         RecycleBehindCar();
 
-        distanceUntilSpawn -= Vector3.Distance(car.position, previousCarPosition);
+        float travelled = driver != null
+            ? Mathf.Max(0f, driver.RoadDistanceTravelled - previousRoadDistance)
+            : Vector3.Distance(car.position, previousCarPosition);
+        if (driver != null) previousRoadDistance = driver.RoadDistanceTravelled;
+        distanceUntilSpawn -= travelled;
         previousCarPosition = car.position;
 
-        while (distanceUntilSpawn <= 0f)
+        if (distanceUntilSpawn <= 0f)
         {
             TrySpawn();
-            distanceUntilSpawn += NextRange(minSpacing, maxSpacing);
+            // After a long frame, do not stack catch-up rows at the same position.
+            distanceUntilSpawn = NextSpacing();
         }
     }
 
@@ -96,6 +126,12 @@ public sealed class ObstacleSpawner : MonoBehaviour
             return;
         }
 
+        if (useFairRows)
+        {
+            SpawnFairRow(point);
+            return;
+        }
+
         float limit = Mathf.Max(0f, point.Width * 0.5f - edgeMargin);
         float firstOffset = NextRange(-limit, limit);
 
@@ -104,6 +140,23 @@ public sealed class ObstacleSpawner : MonoBehaviour
         if (random.NextDouble() < doubleRowChance)
         {
             PlaceObstacle(point, GetSecondOffset(firstOffset, limit));
+        }
+    }
+
+    private void SpawnFairRow(RoadPathPoint point)
+    {
+        // Keep the guaranteed route in the same or an adjacent lane, never force
+        // a two-lane swerve between consecutive rows.
+        int openLane = random.Next(Mathf.Max(0, previousOpenLane - 1),
+            Mathf.Min(2, previousOpenLane + 1) + 1);
+        previousOpenLane = openLane;
+        int firstLane = (openLane + 1 + random.Next(2)) % 3;
+        float laneWidth = point.Width / 3f;
+        PlaceObstacle(point, (firstLane - 1) * laneWidth);
+        if (random.NextDouble() < difficultRowChance)
+        {
+            int secondLane = 3 - openLane - firstLane;
+            PlaceObstacle(point, (secondLane - 1) * laneWidth);
         }
     }
 

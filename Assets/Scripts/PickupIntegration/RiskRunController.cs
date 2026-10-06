@@ -14,6 +14,12 @@ public sealed class RiskRunController : MonoBehaviour
     private bool restarting;
     private float slowedUntil;
 
+    // The manager owns the gameplay clock; preserve shot slowdown on top of difficulty.
+    public void SetClosingSpeed(float metresPerSecond)
+    {
+        policeClosingSpeed = Mathf.Clamp(metresPerSecond, -0.5f, 1f);
+    }
+
     public void ApplyShotSlowdown()
     {
         if (effects == null || effects.RunState.IsGameOver) return;

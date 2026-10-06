@@ -29,7 +29,7 @@ public sealed class OutlawHUD : MonoBehaviour
     private void Update()
     {
         if (extractionLabel != null && game != null)
-            extractionLabel.SetText("EXTRACTION: {0:0} m", game.DistanceRemaining);
+            extractionLabel.SetText("DISTANCE: {0:0} m", game.DistanceTravelled);
         if (ammoBar != null && game != null && game.Shooting != null)
         {
             ammoBar.fillAmount = game.Shooting.NormalizedAmmo;
@@ -77,7 +77,7 @@ public sealed class OutlawHUD : MonoBehaviour
             CreateLabel(policeBar.rectTransform, "POLICE DISTANCE");
             extractionLabel = CreateLabel(policeBar.rectTransform, "EXTRACTION");
             extractionLabel.fontSize = 18f;
-            extractionLabel.text = "EXTRACTION: 1350 m";
+            extractionLabel.text = "DISTANCE: 0 m";
             extractionLabel.rectTransform.anchoredPosition = policeBar.rectTransform.anchoredPosition
                 + Vector2.down * (policeBar.rectTransform.rect.height
                     * Mathf.Abs(policeBar.rectTransform.localScale.y) * 0.5f + 22f);
@@ -188,7 +188,7 @@ public sealed class OutlawHUD : MonoBehaviour
         DrawPanel(panel);
         GUI.Label(new Rect(panel.x, panel.y + 20f, panel.width, 65f), "THE OUTLAWS", titleStyle);
         GUI.Label(new Rect(panel.x + 30f, panel.y + 90f, panel.width - 60f, 80f),
-            "Outrun the police, manage your fuel, collect ammo, and reach the extraction point.", bodyStyle);
+            "Survive the endless chase. Dodge obstacles, collect fuel and ammo, and drive as far as you can.", bodyStyle);
 
         if (GUI.Button(new Rect(panel.x + 125f, panel.y + 185f, panel.width - 250f, 64f), "START", buttonStyle))
         {
