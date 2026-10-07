@@ -24,6 +24,7 @@ public sealed class ObstacleSpawner : MonoBehaviour
     private readonly List<Obstacle> activeObstacles = new List<Obstacle>();
     private ObjectPool<Obstacle> pool;
     private System.Random random;
+    private System.Random sizeRandom;
     private Vector3 previousCarPosition;
     private float distanceUntilSpawn;
     private AutoDriveCar driver;
@@ -32,6 +33,7 @@ public sealed class ObstacleSpawner : MonoBehaviour
     private float difficultRowChance;
     private int previousOpenLane = 1;
     private float previousRoadDistance;
+    private bool firstFairRow = true;
 
     public void ConfigureDifficulty(float obstacleDensity, float twoObstacleChance)
     {
@@ -53,6 +55,7 @@ public sealed class ObstacleSpawner : MonoBehaviour
     private void Awake()
     {
         random = new System.Random(19019);
+        sizeRandom = new System.Random(19023);
 
         if (!HasValidSetup())
         {
@@ -149,20 +152,61 @@ public sealed class ObstacleSpawner : MonoBehaviour
         // a two-lane swerve between consecutive rows.
         int openLane = random.Next(Mathf.Max(0, previousOpenLane - 1),
             Mathf.Min(2, previousOpenLane + 1) + 1);
-        previousOpenLane = openLane;
         int firstLane = (openLane + 1 + random.Next(2)) % 3;
-        float laneWidth = point.Width / 3f;
-        PlaceObstacle(point, (firstLane - 1) * laneWidth);
-        if (random.NextDouble() < difficultRowChance)
+        if (firstFairRow)
         {
-            int secondLane = 3 - openLane - firstLane;
-            PlaceObstacle(point, (secondLane - 1) * laneWidth);
+            // Teach the first dodge explicitly instead of letting a stationary
+            // player coast through a randomly empty centre lane.
+            openLane = random.Next(2) == 0 ? 0 : 2;
+            firstLane = 1;
+            firstFairRow = false;
         }
+        previousOpenLane = openLane;
+        float laneWidth = point.Width / 3f;
+        float gapCenter = (openLane - 1) * laneWidth;
+        const float gapHalfWidth = 1.4f;
+        bool doubleRow = random.NextDouble() < difficultRowChance;
+        int secondLane = 3 - openLane - firstLane;
+        PlaceWideObstacle(point, firstLane, doubleRow ? secondLane : -1, gapCenter, gapHalfWidth);
+        if (doubleRow)
+            PlaceWideObstacle(point, secondLane, firstLane, gapCenter, gapHalfWidth);
     }
 
-    private void PlaceObstacle(RoadPathPoint point, float lateralOffset)
+    private void PlaceWideObstacle(RoadPathPoint point, int lane, int otherLane,
+        float gapCenter, float gapHalfWidth)
+    {
+        float preferredCenter = (lane - 1) * point.Width / 3f;
+        bool leftOfGap = preferredCenter < gapCenter;
+        float minimum = leftOfGap ? -point.Width * 0.5f : gapCenter + gapHalfWidth;
+        float maximum = leftOfGap ? gapCenter - gapHalfWidth : point.Width * 0.5f;
+        if (otherLane >= 0)
+        {
+            float otherCenter = (otherLane - 1) * point.Width / 3f;
+            if ((otherCenter < gapCenter) == leftOfGap)
+            {
+                // Two blocks on the same side share the space without overlapping.
+                float split = (preferredCenter + otherCenter) * 0.5f;
+                if (preferredCenter < otherCenter) maximum = Mathf.Min(maximum, split - 0.15f);
+                else minimum = Mathf.Max(minimum, split + 0.15f);
+            }
+        }
+        float availableWidth = maximum - minimum;
+        if (availableWidth < 0.8f) return;
+        float width = SizeRange(0.8f, Mathf.Min(4.8f, availableWidth));
+        // Lane indices only guide the route. The blocks can straddle painted lines.
+        float center = Mathf.Clamp(preferredCenter + SizeRange(-0.6f, 0.6f),
+            minimum + width * 0.5f, maximum - width * 0.5f);
+        PlaceObstacle(point, center, width);
+    }
+
+    private void PlaceObstacle(RoadPathPoint point, float lateralOffset, float worldWidth = -1f)
     {
         Obstacle obstacle = pool.Get();
+        // Always start from the prefab scale so pooled blocks do not keep growing.
+        float width = worldWidth > 0f ? worldWidth : SizeRange(0.8f, 4.8f);
+        float widthScale = width / Mathf.Max(0.01f, obstacle.BaseWidth);
+        obstacle.Transform.localScale = Vector3.Scale(obstacle.BaseScale,
+            new Vector3(widthScale, SizeRange(0.65f, 2f), SizeRange(0.8f, 1.2f)));
         obstacle.Transform.rotation = Quaternion.LookRotation(point.Forward, point.Up);
 
         float halfHeight = obstacle.Renderer.bounds.extents.y;
@@ -200,9 +244,10 @@ public sealed class ObstacleSpawner : MonoBehaviour
 
         float travelled = 0f;
 
-        while (travelled < spawnDistance)
+        float distanceAhead = useFairRows ? Mathf.Min(spawnDistance, 50f) : spawnDistance;
+        while (travelled < distanceAhead)
         {
-            float step = Mathf.Min(SampleStep, spawnDistance - travelled);
+            float step = Mathf.Min(SampleStep, distanceAhead - travelled);
 
             if (!road.TryGetPathPoint(point.Position + point.Forward * step, out point))
             {
@@ -235,6 +280,11 @@ public sealed class ObstacleSpawner : MonoBehaviour
         }
     }
 
+    private float SizeRange(float minimum, float maximum)
+    {
+        return minimum + (maximum - minimum) * (float)sizeRandom.NextDouble();
+    }
+
     private float NextRange(float minimum, float maximum)
     {
         return minimum + (maximum - minimum) * (float)random.NextDouble();
@@ -252,8 +302,12 @@ public sealed class ObstacleSpawner : MonoBehaviour
             GameObject = gameObject;
             Transform = gameObject.transform;
             Renderer = gameObject.GetComponentInChildren<Renderer>();
+            BaseScale = Transform.localScale;
+            BaseWidth = Renderer.bounds.size.x;
         }
 
+        public Vector3 BaseScale { get; }
+        public float BaseWidth { get; }
         public GameObject GameObject { get; }
         public Transform Transform { get; }
         public Renderer Renderer { get; }

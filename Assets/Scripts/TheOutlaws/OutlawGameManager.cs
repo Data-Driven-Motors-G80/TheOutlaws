@@ -5,10 +5,10 @@ using UnityEngine.SceneManagement;
 [DefaultExecutionOrder(-200)]
 public sealed class OutlawGameManager : MonoBehaviour
 {
-    private const float DesertPortalDistance = 675f;
+    private const float SnowPortalDistance = 675f;
 
     [Header("Difficulty")]
-    [SerializeField, Min(0f)] private float openingSeconds = 20f;
+    [SerializeField, Min(0f)] private float openingSeconds = 5f;
     [SerializeField, Min(1f)] private float difficultyRampSeconds = 70f;
     [SerializeField, Range(1f, 2f)] private float maximumObstacleDensity = 1.4f;
     [SerializeField, Range(0f, 1f)] private float maximumPoliceClosingSpeed = 0.65f;
@@ -116,7 +116,7 @@ public sealed class OutlawGameManager : MonoBehaviour
         elapsed += Time.deltaTime;
         UpdateDifficulty();
         UpdatePoliceFeedback();
-        UpdateDesertPortal();
+        UpdateSnowPortal();
 
         if ((pickupEffects != null && pickupEffects.RunState.IsGameOver) ||
                  (fuel != null && fuel.IsEmpty))
@@ -130,11 +130,11 @@ public sealed class OutlawGameManager : MonoBehaviour
         RunDifficultyState difficulty = RunDifficultyState.Evaluate(
             elapsed, openingSeconds, difficultyRampSeconds);
         obstacles.ConfigureDifficulty(
-            Mathf.Lerp(1f, maximumObstacleDensity, difficulty.Progress) *
+            Mathf.Lerp(1.2f, maximumObstacleDensity, difficulty.Progress) *
             Mathf.Lerp(1f, 0.7f, difficulty.Relief),
-            Mathf.Lerp(0.1f, 0.35f, difficulty.Progress) * (1f - difficulty.Relief));
+            Mathf.Lerp(0.25f, 0.35f, difficulty.Progress) * (1f - difficulty.Relief));
         pursuit.SetClosingSpeed(Mathf.Lerp(
-            Mathf.Lerp(0.1f, maximumPoliceClosingSpeed, difficulty.Progress),
+            Mathf.Lerp(0.25f, maximumPoliceClosingSpeed, difficulty.Progress),
             -0.35f, difficulty.Relief));
     }
 
@@ -188,9 +188,9 @@ public sealed class OutlawGameManager : MonoBehaviour
         Time.timeScale = 0f;
     }
 
-    private void UpdateDesertPortal()
+    private void UpdateSnowPortal()
     {
-        float remaining = DesertPortalDistance - DistanceTravelled;
+        float remaining = SnowPortalDistance - DistanceTravelled;
         if (portalSpawned || remaining > 90f) return;
         if (TryGetPointAhead(Mathf.Max(0f, remaining), out RoadPathPoint point))
         {

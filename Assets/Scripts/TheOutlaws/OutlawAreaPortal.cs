@@ -13,7 +13,7 @@ public sealed class OutlawAreaPortal : MonoBehaviour
     public static OutlawAreaPortal Create(RoadPathPoint point, Transform player,
         InfiniteRoad road, OutlawGameManager game)
     {
-        var root = new GameObject("Desert Portal");
+        var root = new GameObject("Snowy Mountain Portal");
         root.transform.SetPositionAndRotation(point.Position,
             Quaternion.LookRotation(point.Forward, point.Up));
         var portal = root.AddComponent<OutlawAreaPortal>();
@@ -27,11 +27,11 @@ public sealed class OutlawAreaPortal : MonoBehaviour
         Renderer surface = road.GetComponentInChildren<RoadSegment>()
             .transform.Find("Road").GetComponent<Renderer>();
         portal.portalMaterial = new Material(surface.sharedMaterial);
-        portal.portalMaterial.color = new Color(0.65f, 0.15f, 1f);
+        portal.portalMaterial.color = new Color(0.2f, 0.8f, 1f);
         if (portal.portalMaterial.HasProperty("_EmissionColor"))
         {
             portal.portalMaterial.EnableKeyword("_EMISSION");
-            portal.portalMaterial.SetColor("_EmissionColor", new Color(0.65f, 0.15f, 1f) * 2f);
+            portal.portalMaterial.SetColor("_EmissionColor", new Color(0.2f, 0.8f, 1f) * 2f);
         }
         portal.AddBar(new Vector3(-portal.halfWidth - 0.25f, 2.8f, 0f), new Vector3(0.5f, 5.6f, 0.5f));
         portal.AddBar(new Vector3(portal.halfWidth + 0.25f, 2.8f, 0f), new Vector3(0.5f, 5.6f, 0.5f));
@@ -63,7 +63,7 @@ public sealed class OutlawAreaPortal : MonoBehaviour
             Vector3 crossing = Vector3.Lerp(previousPosition, current, t);
             if (Mathf.Abs(crossing.x) <= halfWidth && crossing.y >= -1f && crossing.y <= 5.6f)
             {
-                road.SetSurfaceColor(new Color(0.82f, 0.61f, 0.32f));
+                road.SetSurfaceColor(new Color(0.55f, 0.72f, 0.82f));
                 enabled = false;
                 Destroy(gameObject, 3f);
             }

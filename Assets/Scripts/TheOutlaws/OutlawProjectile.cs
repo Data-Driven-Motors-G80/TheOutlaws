@@ -3,11 +3,14 @@ using UnityEngine;
 public sealed class OutlawProjectile : MonoBehaviour
 {
     private const float Speed = 34f;
+    private const float MaximumRange = 20f;
     private bool targetsPolice;
     private CarPickupEffects pickupEffects;
     private ObstacleSpawner obstacles;
     private Vector3 direction;
     private bool consumed;
+    private float distanceTravelled;
+    private Vector3 launchPosition;
 
     public static void Create(
         Vector3 position,
@@ -40,6 +43,7 @@ public sealed class OutlawProjectile : MonoBehaviour
 
         OutlawProjectile behaviour = projectile.AddComponent<OutlawProjectile>();
         behaviour.direction = direction.normalized;
+        behaviour.launchPosition = position;
         behaviour.targetsPolice = targetsPolice;
         behaviour.pickupEffects = effects;
         behaviour.obstacles = obstacleSpawner;
@@ -48,20 +52,33 @@ public sealed class OutlawProjectile : MonoBehaviour
 
     private void Update()
     {
-        float distance = Speed * Time.deltaTime;
-        // Sweep between frames so fast shots cannot skip the police collider.
-        foreach (RaycastHit hit in Physics.SphereCastAll(transform.position, 0.14f,
-                     direction, distance, ~0, QueryTriggerInteraction.Collide))
+        if (consumed) return;
+        float distance = Mathf.Min(Speed * Time.deltaTime, MaximumRange - distanceTravelled);
+        // Clamp the sweep to the remaining range and resolve the nearest hit first.
+        // SphereCastAll does not guarantee hit order.
+        RaycastHit[] hits = Physics.SphereCastAll(transform.position, 0.14f,
+            direction, distance, ~0, QueryTriggerInteraction.Collide);
+        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+        foreach (RaycastHit hit in hits)
         {
             OnTriggerEnter(hit.collider);
             if (consumed) return;
         }
         transform.position += direction * distance;
+        distanceTravelled += distance;
+        if (distanceTravelled >= MaximumRange)
+        {
+            consumed = true;
+            Destroy(gameObject);
+        }
     }
 
     private void OnTriggerEnter(Collider other)
     {
         if (consumed) return;
+        // Include trigger callbacks in the range limit, including the bullet's radius.
+        if ((other.ClosestPoint(launchPosition) - launchPosition).sqrMagnitude > MaximumRange * MaximumRange)
+            return;
         if (targetsPolice)
         {
             ChaseCar police = other.GetComponentInParent<ChaseCar>();

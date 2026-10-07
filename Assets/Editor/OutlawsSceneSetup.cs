@@ -15,6 +15,9 @@ public static class OutlawsSceneSetup
             throw new InvalidOperationException("Open GetawayChase outside Play mode first.");
         var player = GameObject.Find("PlayerCar").transform;
         player.localScale = Vector3.one * 0.85f;
+        // Resize the model and hitbox together without moving the child camera.
+        player.Find("Car").localScale = new Vector3(1.76f, 1f, 3.08f);
+        player.GetComponent<BoxCollider>().size = new Vector3(1.76f, 1f, 3.08f);
         var shooting = player.GetComponent<OutlawShooting>() ?? player.gameObject.AddComponent<OutlawShooting>();
         var camera = Camera.main;
         camera.transform.localPosition = new Vector3(0, 24, -32) / 0.85f;
@@ -42,15 +45,9 @@ public static class OutlawsSceneSetup
         if (!root.GetComponent<OutlawPickupSpawner>()) root.AddComponent<OutlawPickupSpawner>();
         var hud = root.GetComponent<OutlawHUD>() ?? root.AddComponent<OutlawHUD>();
         hud.BuildLabeledBars();
-        if (root.GetComponentInChildren<OutlawAmmoPickup>() == null)
-        {
-            var pickup = OutlawAmmoPickup.Create(player.position + player.forward * 18f + Vector3.up * 0.32f, Vector3.up, shooting);
-            pickup.transform.SetParent(root.transform, true);
-            var renderer = pickup.GetComponentInChildren<Renderer>();
-            var temporary = renderer.sharedMaterial;
-            renderer.sharedMaterial = SaveMaterial(temporary, "OutlawsAmmo", new Color(0.12f, 0.55f, 1f));
-            UnityEngine.Object.DestroyImmediate(temporary);
-        }
+        // Ammo is supplied by the distance-based spawner, never a free opening pickup.
+        foreach (var pickup in root.GetComponentsInChildren<OutlawAmmoPickup>(true))
+            pickup.gameObject.SetActive(false);
         // Record prefab overrides so the saved cars match the editor view.
         foreach (var component in scene.GetRootGameObjects().SelectMany(r => r.GetComponentsInChildren<Component>(true)))
             if (component != null && PrefabUtility.IsPartOfPrefabInstance(component))

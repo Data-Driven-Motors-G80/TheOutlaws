@@ -13,6 +13,7 @@ public sealed class RiskRunController : MonoBehaviour
     private CarPickupEffects effects;
     private bool restarting;
     private float slowedUntil;
+    private bool hasShooting;
 
     // The manager owns the gameplay clock; preserve shot slowdown on top of difficulty.
     public void SetClosingSpeed(float metresPerSecond)
@@ -31,6 +32,7 @@ public sealed class RiskRunController : MonoBehaviour
     private void Awake()
     {
         car = GetComponent<AutoDriveCar>();
+        hasShooting = GetComponent<OutlawShooting>() != null;
         effects = GetComponent<CarPickupEffects>();
         ConfigureSpeeds();
     }
@@ -59,7 +61,9 @@ public sealed class RiskRunController : MonoBehaviour
             return;
         }
 
-        if (keyboard.spaceKey.wasPressedThisFrame)
+        // In The Outlaws, Space belongs exclusively to shooting. Preserve the
+        // original bail-out control only for the separate pickup playground.
+        if (!hasShooting && keyboard.spaceKey.wasPressedThisFrame)
             effects.Clear();
     }
 

@@ -53,7 +53,7 @@ public sealed class OutlawAmmoPickup : MonoBehaviour
     private void OnTriggerEnter(Collider other)
     {
         if (!collected && shooting != null &&
-            other.GetComponentInParent<OutlawShooting>() == shooting && shooting.AddAmmo(3))
+            other.GetComponentInParent<OutlawShooting>() == shooting && shooting.AddAmmo(1))
         {
             // Destroy is deferred; multiple car colliders can enter this frame.
             collected = true;

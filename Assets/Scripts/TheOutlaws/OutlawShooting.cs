@@ -4,14 +4,14 @@ using UnityEngine.InputSystem;
 [DisallowMultipleComponent]
 public sealed class OutlawShooting : MonoBehaviour
 {
-    private const int MaximumAmmoValue = 8;
+    private const int MaximumAmmoValue = 5;
     private const float FireCooldown = 0.3f;
 
     private CarPickupEffects pickupEffects;
     private ObstacleSpawner obstacles;
     private float nextFireTime;
 
-    public int CurrentAmmo { get; private set; } = 4;
+    public int CurrentAmmo { get; private set; } = 2;
     public int MaximumAmmo => MaximumAmmoValue;
     public float NormalizedAmmo => (float)CurrentAmmo / MaximumAmmoValue;
 
@@ -19,7 +19,7 @@ public sealed class OutlawShooting : MonoBehaviour
     {
         pickupEffects = effects;
         obstacles = obstacleSpawner;
-        CurrentAmmo = 4;
+        CurrentAmmo = 2;
         nextFireTime = 0f;
     }
 
@@ -30,13 +30,9 @@ public sealed class OutlawShooting : MonoBehaviour
             return;
         }
 
-        if (Keyboard.current.wKey.wasPressedThisFrame || Keyboard.current.upArrowKey.wasPressedThisFrame)
+        if (Keyboard.current.spaceKey.wasPressedThisFrame)
         {
-            TryShoot(false);
-        }
-        else if (Keyboard.current.sKey.wasPressedThisFrame || Keyboard.current.downArrowKey.wasPressedThisFrame)
-        {
-            TryShoot(true);
+            TryShoot();
         }
     }
 
@@ -51,19 +47,19 @@ public sealed class OutlawShooting : MonoBehaviour
         return true;
     }
 
-    private void TryShoot(bool backwards)
+    private void TryShoot()
     {
         if (CurrentAmmo <= 0)
         {
             return;
         }
 
-        Vector3 direction = backwards ? -transform.forward : transform.forward;
+        Vector3 direction = transform.forward;
         Vector3 position = transform.position + direction * 2.2f + transform.up * 0.55f;
         OutlawProjectile.Create(
             position,
             direction,
-            backwards,
+            false,
             pickupEffects,
             obstacles,
             GetComponentsInChildren<Collider>());

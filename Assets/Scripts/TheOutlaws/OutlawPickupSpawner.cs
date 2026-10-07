@@ -3,9 +3,10 @@ using UnityEngine;
 
 public sealed class OutlawPickupSpawner : MonoBehaviour
 {
-    private const float FirstSpawnDistance = 18f;
-    private const float SpawnSpacing = 30f;
-    private const int MaximumActive = 4;
+    private const float SpawnAheadDistance = 55f;
+    private const int MinimumSpawnSpacing = 500;
+    private const int MaximumSpawnSpacing = 800;
+    private const int MaximumActive = 1;
 
     private readonly List<GameObject> active = new List<GameObject>();
     private InfiniteRoad road;
@@ -15,6 +16,7 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
     private CarPickupEffects pickupEffects;
     private float nextSpawnAt;
     private int spawnIndex;
+    private System.Random spacingRandom;
 
     public void Configure(
         InfiniteRoad infiniteRoad,
@@ -28,15 +30,24 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
         shooting = playerShooting;
         pickupEffects = effects;
         active.Clear();
-        foreach (OutlawAmmoPickup pickup in GetComponentsInChildren<OutlawAmmoPickup>())
-            active.Add(pickup.gameObject);
-        spawnIndex = active.Count;
-        nextSpawnAt = active.Count > 0 ? SpawnSpacing : 0f;
+        // Remove the old free starting pickup; all ammo now follows the schedule.
+        foreach (OutlawAmmoPickup pickup in GetComponentsInChildren<OutlawAmmoPickup>(true))
+        {
+            pickup.gameObject.SetActive(false);
+            Destroy(pickup.gameObject);
+        }
+        spawnIndex = 0;
+        // Independent entropy keeps ammo unpredictable on restart without changing
+        // the seeded obstacle layouts or power-up outcomes.
+        spacingRandom = new System.Random(System.Guid.NewGuid().GetHashCode());
+        // Reveal the pickup early so its actual road position is 500–800 m away.
+        nextSpawnAt = (driver != null ? driver.RoadDistanceTravelled : 0f)
+            + NextSpawnSpacing() - SpawnAheadDistance;
     }
 
     private void Update()
     {
-        if (road == null || player == null || driver == null || shooting == null ||
+        if (Time.timeScale <= 0f || road == null || player == null || driver == null || shooting == null ||
             (pickupEffects != null && pickupEffects.RunState.IsGameOver))
         {
             return;
@@ -60,20 +71,22 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
             }
         }
 
-        bool hasPickupAhead = active.Exists(pickup => pickup != null &&
-            Vector3.Dot(pickup.transform.position - player.position, player.forward) > 3f);
-        bool needsGuaranteedPickup = !hasPickupAhead;
-        bool reachedScheduledSpawn = driver.RoadDistanceTravelled >= nextSpawnAt;
-        if ((!needsGuaranteedPickup && !reachedScheduledSpawn) || active.Count >= MaximumActive)
+        // Missed or collected ammo must not trigger an immediate replacement.
+        // Sample one 500–800 m gap per successful spawn, never every frame.
+        if (driver.RoadDistanceTravelled < nextSpawnAt || active.Count >= MaximumActive)
         {
             return;
         }
 
-        float distanceAhead = needsGuaranteedPickup ? FirstSpawnDistance : 28f;
-        if (TrySpawnAmmo(distanceAhead))
+        if (TrySpawnAmmo(SpawnAheadDistance))
         {
-            nextSpawnAt = driver.RoadDistanceTravelled + SpawnSpacing;
+            nextSpawnAt = driver.RoadDistanceTravelled + NextSpawnSpacing();
         }
+    }
+
+    private float NextSpawnSpacing()
+    {
+        return spacingRandom.Next(MinimumSpawnSpacing, MaximumSpawnSpacing + 1);
     }
 
     private bool TrySpawnAmmo(float distanceAhead)
@@ -86,7 +99,7 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
         }
 
         float lateralLimit = Mathf.Max(0f, point.Width * 0.5f - 1.5f);
-        float side = spawnIndex == 0 ? 0f : (spawnIndex % 2 == 0 ? -0.45f : 0.45f);
+        float side = spawnIndex % 2 == 0 ? -0.9f : 0.9f;
         spawnIndex++;
         // Keep the pickup low enough to overlap the player's reduced collider.
         // The previous 0.75 offset let the car pass underneath the trigger.

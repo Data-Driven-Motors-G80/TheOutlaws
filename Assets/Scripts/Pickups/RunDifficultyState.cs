@@ -12,7 +12,7 @@ public readonly struct RunDifficultyState
         Relief = relief;
     }
 
-    public static RunDifficultyState Evaluate(float elapsed, float opening = 20f, float ramp = 70f)
+    public static RunDifficultyState Evaluate(float elapsed, float opening = 5f, float ramp = 70f)
     {
         float active = Math.Max(0f, elapsed - Math.Max(0f, opening));
         float t = Math.Min(1f, active / Math.Max(1f, ramp));

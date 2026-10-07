@@ -64,11 +64,11 @@ public sealed class OutlawHUD : MonoBehaviour
                 ammoBar = ammoObject.GetComponent<Image>();
             }
             ammoBar.color = new Color(0.12f, 0.55f, 1f);
-            ammoBar.fillAmount = 0.5f;
+            ammoBar.fillAmount = 2f / 5f;
             RectTransform ammoRect = ammoBar.rectTransform;
             ammoRect.anchoredPosition = fuelRect.anchoredPosition + Vector2.down * 104f;
             ammoLabel = CreateLabel(ammoRect, "AMMO");
-            ammoLabel.text = "AMMO  4 / 8";
+            ammoLabel.text = "AMMO  2 / 5";
         }
 
         if (policeBar != null)
@@ -196,7 +196,7 @@ public sealed class OutlawHUD : MonoBehaviour
         }
 
         GUI.Label(new Rect(panel.x + 30f, panel.y + 265f, panel.width - 60f, 80f),
-            "A / D or arrows: steer\nW / Up: shoot forward    S / Down: shoot backward", smallStyle);
+            "A / D or Left / Right: steer\nSpace: shoot forward", smallStyle);
         GUI.Label(new Rect(panel.x, panel.y + 350f, panel.width, 28f), "Click START or press Enter", smallStyle);
     }
 
@@ -218,7 +218,7 @@ public sealed class OutlawHUD : MonoBehaviour
 
     private void DrawResult(float width, float height)
     {
-        Rect panel = new Rect((width - 500f) * 0.5f, (height - 270f) * 0.5f, 500f, 270f);
+        Rect panel = new Rect((width - 500f) * 0.5f, (height - 310f) * 0.5f, 500f, 310f);
         DrawPanel(panel);
         string title = game.State == OutlawGameState.Won ? "ESCAPED!" : "CAUGHT!";
         string detail = game.State == OutlawGameState.Won
@@ -233,6 +233,8 @@ public sealed class OutlawHUD : MonoBehaviour
         {
             game.Restart();
         }
+        GUI.Label(new Rect(panel.x, panel.y + 260f, panel.width, 28f),
+            "Press R to restart", smallStyle);
     }
 
     private static void DrawPanel(Rect rect)
