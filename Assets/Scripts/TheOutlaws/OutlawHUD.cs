@@ -202,6 +202,19 @@ public sealed class OutlawHUD : MonoBehaviour
 
     private void DrawRunningHUD(float width)
     {
+        if (!string.IsNullOrEmpty(game.TutorialMessage))
+        {
+            Rect tutorial = new Rect((width - 760f) * 0.5f, 245f, 760f, 68f);
+            DrawPanel(tutorial);
+            GUIStyle tutorialStyle = new GUIStyle(bodyStyle)
+            {
+                fontSize = 22,
+                fontStyle = FontStyle.Bold
+            };
+            tutorialStyle.normal.textColor = new Color(1f, 0.86f, 0.18f);
+            GUI.Label(tutorial, game.TutorialMessage, tutorialStyle);
+        }
+
         if (game.PoliceAlertActive)
         {
             Rect warning = new Rect((width - 430f) * 0.5f, 175f, 430f, 58f);

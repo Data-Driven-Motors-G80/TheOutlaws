@@ -134,15 +134,35 @@ public sealed class HandleCrash : MonoBehaviour
                 return;
             }
 
+            TrafficLightObstacle trafficLight = obstacle.GetComponent<TrafficLightObstacle>();
+            float proximityDrain = trafficLight != null
+                ? trafficLight.ProximityDrain
+                : crashDrainAmount;
             pickupEffects.HitObstacle();
-            pickupEffects.TryCrash(crashDrainAmount);
+            if (pickupEffects.TryCrash(proximityDrain))
+                ApplyFuelPenalty(trafficLight);
             return;
         }
 
         if (meter != null)
         {
-            meter.ApplyDrain(crashDrainAmount);
+            Transform obstacle = other.transform;
+            while (obstacle.parent != null && obstacle.parent != obstacles.transform)
+                obstacle = obstacle.parent;
+            TrafficLightObstacle trafficLight = obstacle.GetComponent<TrafficLightObstacle>();
+            meter.ApplyDrain(trafficLight != null ? trafficLight.ProximityDrain : crashDrainAmount);
+            ApplyFuelPenalty(trafficLight);
         }
+    }
+
+    private void ApplyFuelPenalty(TrafficLightObstacle trafficLight)
+    {
+        if (trafficLight == null || trafficLight.FuelPenaltyFraction <= 0f) return;
+        float maximumFuel = fuelMeter != null ? fuelMeter.MaximumFuel : FuelState.MaximumFuel;
+        float penalty = maximumFuel * trafficLight.FuelPenaltyFraction;
+        if (fuelMeter != null) fuelMeter.ChangeFuel(-penalty);
+        if (pickupEffects != null && pickupEffects.isActiveAndEnabled)
+            pickupEffects.ConsumeFuel(penalty);
     }
 
     public void Crash()

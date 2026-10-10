@@ -4,8 +4,6 @@ using UnityEngine;
 public sealed class OutlawPickupSpawner : MonoBehaviour
 {
     private const float SpawnAheadDistance = 55f;
-    private const int MinimumSpawnSpacing = 500;
-    private const int MaximumSpawnSpacing = 800;
     private const int MaximumActive = 1;
 
     private readonly List<GameObject> active = new List<GameObject>();
@@ -40,7 +38,8 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
         // Independent entropy keeps ammo unpredictable on restart without changing
         // the seeded obstacle layouts or power-up outcomes.
         spacingRandom = new System.Random(System.Guid.NewGuid().GetHashCode());
-        // Reveal the pickup early so its actual road position is 500–800 m away.
+        // Reveal the pickup early so its actual road position follows the
+        // distance-based schedule rather than appearing directly on the car.
         nextSpawnAt = (driver != null ? driver.RoadDistanceTravelled : 0f)
             + NextSpawnSpacing() - SpawnAheadDistance;
     }
@@ -72,7 +71,7 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
         }
 
         // Missed or collected ammo must not trigger an immediate replacement.
-        // Sample one 500–800 m gap per successful spawn, never every frame.
+        // Sample one distance-appropriate gap per successful spawn, never every frame.
         if (driver.RoadDistanceTravelled < nextSpawnAt || active.Count >= MaximumActive)
         {
             return;
@@ -86,7 +85,10 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
 
     private float NextSpawnSpacing()
     {
-        return spacingRandom.Next(MinimumSpawnSpacing, MaximumSpawnSpacing + 1);
+        float distance = driver != null ? driver.RoadDistanceTravelled : 0f;
+        int minimum = AmmoSpawnSchedule.GetMinimumSpacing(distance);
+        int maximum = AmmoSpawnSchedule.GetMaximumSpacing(distance);
+        return spacingRandom.Next(minimum, maximum + 1);
     }
 
     private bool TrySpawnAmmo(float distanceAhead)

@@ -21,6 +21,7 @@ public sealed class OutlawGameManager : MonoBehaviour
     private ObstacleSpawner obstacles;
     private OutlawShooting shooting;
     private OutlawHUD hud;
+    private TrafficObstacleTutorial trafficTutorial;
     private ChaseCar[] policeCars;
     private float elapsed;
     private float previousPursuitGap;
@@ -35,6 +36,9 @@ public sealed class OutlawGameManager : MonoBehaviour
     public CarPickupEffects PickupEffects => pickupEffects;
     public bool PoliceAlertActive => policeAlertRemaining > 0f;
     public int PoliceCarCount => policeCars != null ? policeCars.Length : 0;
+    public string TutorialMessage => trafficTutorial != null
+        ? trafficTutorial.CurrentMessage
+        : null;
 
     private void Awake()
     {
@@ -69,6 +73,10 @@ public sealed class OutlawGameManager : MonoBehaviour
 
         shooting.Configure(pickupEffects, obstacles);
         spawner.Configure(road, player.transform, shooting, pickupEffects);
+        trafficTutorial = GetComponent<TrafficObstacleTutorial>();
+        if (trafficTutorial == null)
+            trafficTutorial = gameObject.AddComponent<TrafficObstacleTutorial>();
+        trafficTutorial.Configure(road, player.transform, driver, shooting);
         hud.Configure(this);
 
         previousPursuitGap = pickupEffects.RunState.PursuitGap;
@@ -160,6 +168,7 @@ public sealed class OutlawGameManager : MonoBehaviour
         }
 
         UpdateDifficulty();
+        trafficTutorial.BeginTutorial();
         State = OutlawGameState.Running;
         Time.timeScale = 1f;
     }

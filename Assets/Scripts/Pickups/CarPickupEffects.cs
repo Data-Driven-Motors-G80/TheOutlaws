@@ -133,6 +133,11 @@ public sealed class CarPickupEffects : MonoBehaviour
         fuelState.Refill(amount);
     }
 
+    public void ConsumeFuel(float amount)
+    {
+        fuelState.Consume(amount);
+    }
+
     /// <summary>
     /// Pushes the pursuing police back after a successful rear shot.
     /// This keeps Team 21's defensive shooting mechanic inside Team 19's

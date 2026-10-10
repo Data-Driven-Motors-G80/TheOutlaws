@@ -25,6 +25,8 @@ public sealed class ObstacleSpawner : MonoBehaviour
     private ObjectPool<Obstacle> pool;
     private System.Random random;
     private System.Random sizeRandom;
+    private System.Random colorRandom;
+    private System.Random roadblockRandom;
     private Vector3 previousCarPosition;
     private float distanceUntilSpawn;
     private AutoDriveCar driver;
@@ -34,6 +36,8 @@ public sealed class ObstacleSpawner : MonoBehaviour
     private int previousOpenLane = 1;
     private float previousRoadDistance;
     private bool firstFairRow = true;
+    private int tutorialRowsSpawned;
+    private float nextRoadblockAt = TrafficRoadblockRules.FirstRoadblockDistance;
 
     public void ConfigureDifficulty(float obstacleDensity, float twoObstacleChance)
     {
@@ -56,6 +60,8 @@ public sealed class ObstacleSpawner : MonoBehaviour
     {
         random = new System.Random(19019);
         sizeRandom = new System.Random(19023);
+        colorRandom = new System.Random(19029);
+        roadblockRandom = new System.Random(19033);
 
         if (!HasValidSetup())
         {
@@ -87,9 +93,9 @@ public sealed class ObstacleSpawner : MonoBehaviour
 
         if (distanceUntilSpawn <= 0f)
         {
-            TrySpawn();
+            bool spawnedSpecialRow = TrySpawn();
             // After a long frame, do not stack catch-up rows at the same position.
-            distanceUntilSpawn = NextSpacing();
+            distanceUntilSpawn = spawnedSpecialRow ? 45f : NextSpacing();
         }
     }
 
@@ -122,17 +128,37 @@ public sealed class ObstacleSpawner : MonoBehaviour
         return true;
     }
 
-    private void TrySpawn()
+    private bool TrySpawn()
     {
         if (!TryGetPointAhead(out RoadPathPoint point))
         {
-            return;
+            return false;
+        }
+
+        if (tutorialRowsSpawned < 2)
+        {
+            TrafficObstacleState tutorialState = tutorialRowsSpawned == 0
+                ? TrafficObstacleState.Green
+                : TrafficObstacleState.Yellow;
+            SpawnFullWidthBarrier(point, tutorialState);
+            tutorialRowsSpawned++;
+            return true;
+        }
+
+        float distance = driver != null ? driver.RoadDistanceTravelled : 0f;
+        if (distance >= nextRoadblockAt)
+        {
+            SpawnRoadblock(point, TrafficRoadblockRules.ChoosePattern(
+                distance, roadblockRandom.NextDouble()));
+            nextRoadblockAt = distance + TrafficRoadblockRules.GetNextSpacing(
+                distance, roadblockRandom.NextDouble());
+            return true;
         }
 
         if (useFairRows)
         {
             SpawnFairRow(point);
-            return;
+            return false;
         }
 
         float limit = Mathf.Max(0f, point.Width * 0.5f - edgeMargin);
@@ -144,6 +170,59 @@ public sealed class ObstacleSpawner : MonoBehaviour
         {
             PlaceObstacle(point, GetSecondOffset(firstOffset, limit));
         }
+        return false;
+    }
+
+    private void SpawnRoadblock(RoadPathPoint point, TrafficRoadblockPattern pattern)
+    {
+        float laneWidth = point.Width / 3f;
+        switch (pattern)
+        {
+            case TrafficRoadblockPattern.TwoLaneGreen:
+            case TrafficRoadblockPattern.TwoLaneYellow:
+                TrafficObstacleState twoLaneState = pattern == TrafficRoadblockPattern.TwoLaneGreen
+                    ? TrafficObstacleState.Green
+                    : TrafficObstacleState.Yellow;
+                float side = roadblockRandom.Next(2) == 0 ? -1f : 1f;
+                PlaceObstacle(point, side * laneWidth * 0.5f,
+                    laneWidth * 2f, twoLaneState);
+                break;
+            case TrafficRoadblockPattern.FullGreen:
+                SpawnFullWidthBarrier(point, TrafficObstacleState.Green);
+                break;
+            case TrafficRoadblockPattern.FullYellow:
+                SpawnFullWidthBarrier(point, TrafficObstacleState.Yellow);
+                break;
+            default:
+                SpawnMixedBarrier(point);
+                break;
+        }
+    }
+
+    private void SpawnFullWidthBarrier(RoadPathPoint point, TrafficObstacleState state)
+    {
+        PlaceObstacle(point, 0f, Mathf.Max(0.8f, point.Width - 0.1f), state);
+    }
+
+    private void SpawnMixedBarrier(RoadPathPoint point)
+    {
+        float laneWidth = point.Width / 3f;
+        TrafficObstacleState[] states =
+        {
+            TrafficObstacleState.Red,
+            TrafficObstacleState.Yellow,
+            TrafficObstacleState.Green
+        };
+        for (int i = states.Length - 1; i > 0; i--)
+        {
+            int swap = roadblockRandom.Next(i + 1);
+            TrafficObstacleState value = states[i];
+            states[i] = states[swap];
+            states[swap] = value;
+        }
+        for (int lane = 0; lane < 3; lane++)
+            PlaceObstacle(point, (lane - 1) * laneWidth,
+                laneWidth + 0.08f, states[lane]);
     }
 
     private void SpawnFairRow(RoadPathPoint point)
@@ -199,7 +278,11 @@ public sealed class ObstacleSpawner : MonoBehaviour
         PlaceObstacle(point, center, width);
     }
 
-    private void PlaceObstacle(RoadPathPoint point, float lateralOffset, float worldWidth = -1f)
+    private void PlaceObstacle(
+        RoadPathPoint point,
+        float lateralOffset,
+        float worldWidth = -1f,
+        TrafficObstacleState? forcedState = null)
     {
         Obstacle obstacle = pool.Get();
         // Always start from the prefab scale so pooled blocks do not keep growing.
@@ -211,8 +294,31 @@ public sealed class ObstacleSpawner : MonoBehaviour
 
         float halfHeight = obstacle.Renderer.bounds.extents.y;
         obstacle.Transform.position = point.Position + point.Right * lateralOffset + point.Up * halfHeight;
+        float distance = driver != null ? driver.RoadDistanceTravelled : 0f;
+        obstacle.TrafficLight.Initialize(forcedState ??
+            TrafficObstacleRules.ChooseInitialState(distance, colorRandom.NextDouble()));
 
         activeObstacles.Add(obstacle);
+    }
+
+    public bool TryApplyShot(Collider hitCollider)
+    {
+        if (hitCollider == null) return false;
+        TrafficLightObstacle trafficLight = hitCollider.GetComponentInParent<TrafficLightObstacle>();
+        if (trafficLight == null || trafficLight.transform.parent != transform) return false;
+
+        Obstacle obstacle = activeObstacles.Find(item => item.Transform == trafficLight.transform);
+        if (obstacle == null) return false;
+
+        if (trafficLight.ApplyShot())
+        {
+            OutlawShooting shooting = car != null ? car.GetComponent<OutlawShooting>() : null;
+            ObstacleRewardSpawner.SpawnRedDestructionReward(trafficLight, shooting);
+            activeObstacles.Remove(obstacle);
+            pool.Release(obstacle);
+        }
+
+        return true;
     }
 
     private float GetSecondOffset(float firstOffset, float limit)
@@ -302,6 +408,8 @@ public sealed class ObstacleSpawner : MonoBehaviour
             GameObject = gameObject;
             Transform = gameObject.transform;
             Renderer = gameObject.GetComponentInChildren<Renderer>();
+            TrafficLight = gameObject.GetComponent<TrafficLightObstacle>();
+            if (TrafficLight == null) TrafficLight = gameObject.AddComponent<TrafficLightObstacle>();
             BaseScale = Transform.localScale;
             BaseWidth = Renderer.bounds.size.x;
         }
@@ -311,5 +419,6 @@ public sealed class ObstacleSpawner : MonoBehaviour
         public GameObject GameObject { get; }
         public Transform Transform { get; }
         public Renderer Renderer { get; }
+        public TrafficLightObstacle TrafficLight { get; }
     }
 }

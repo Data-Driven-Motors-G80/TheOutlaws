@@ -3,7 +3,7 @@ using UnityEngine;
 public sealed class OutlawProjectile : MonoBehaviour
 {
     private const float Speed = 34f;
-    private const float MaximumRange = 20f;
+    private const float MaximumRange = 30f;
     private bool targetsPolice;
     private CarPickupEffects pickupEffects;
     private ObstacleSpawner obstacles;
@@ -98,14 +98,10 @@ public sealed class OutlawProjectile : MonoBehaviour
             return;
         }
 
-        Transform obstacle = other.transform;
-        while (obstacle.parent != null && obstacle.parent != obstacles.transform)
+        if (obstacles.TryApplyShot(other))
         {
-            obstacle = obstacle.parent;
+            consumed = true;
+            Destroy(gameObject);
         }
-
-        consumed = true;
-        Destroy(obstacle.gameObject);
-        Destroy(gameObject);
     }
 }

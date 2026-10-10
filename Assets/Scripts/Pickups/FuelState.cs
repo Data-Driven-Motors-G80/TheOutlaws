@@ -32,6 +32,12 @@ public sealed class FuelState
         CurrentFuel = ClampFinite(CurrentFuel + amount, 0f, MaximumFuel);
     }
 
+    public void Consume(float amount)
+    {
+        if (!IsFinite(amount) || amount <= 0f) return;
+        CurrentFuel = ClampFinite(CurrentFuel - amount, 0f, MaximumFuel);
+    }
+
     public void RefillToFull()
     {
         CurrentFuel = MaximumFuel;
