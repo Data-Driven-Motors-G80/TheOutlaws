@@ -148,6 +148,14 @@ public sealed class CarPickupEffects : MonoBehaviour
         return isActiveAndEnabled && runState.TryRestorePursuitGap(distance);
     }
 
+    public RiskRunSnapshot CaptureRun() => runState.Capture();
+
+    public void RestoreRun(RiskRunSnapshot snapshot, float fuel)
+    {
+        runState.Restore(snapshot);
+        fuelState.Reset(fuel);
+    }
+
     public void Clear()
     {
         reverseCountdownRemaining = 0f;
