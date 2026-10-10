@@ -1107,8 +1107,8 @@ MonoBehaviour:
   environmentScenes:
   - Env_City
   - Env_Snow
-  minMinutes: 2
-  maxMinutes: 4
+  minMinutes: 1
+  maxMinutes: 2
   slideSeconds: 0.3
   transitionColor: {r: 0.627451, g: 0.72156864, b: 0.8, a: 0.8509804}
 --- !u!1 &695834107
@@ -2198,6 +2198,7 @@ GameObject:
   - component: {fileID: 1633598809}
   - component: {fileID: 1633598810}
   - component: {fileID: 1633598811}
+  - component: {fileID: 1633598812}
   m_Layer: 0
   m_Name: PlayerCar
   m_TagString: Untagged
@@ -2365,6 +2366,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4b6f64fbd0e24fb89e477ce54b46b705, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OutlawShooting
+--- !u!114 &1633598812
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1633598799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 01d6a47a55ba6f8429468e13b9ff51e0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SnowSlideEffect
+  road: {fileID: 371121412}
+  visual: {fileID: 1066005398}
+  driftSpeed: 1.5
+  extraTurnSpeed: 3
+  slideAcceleration: 6
+  edgeMargin: 1
+  extraYawAngle: 8
 --- !u!1 &1644551639
 GameObject:
   m_ObjectHideFlags: 0
