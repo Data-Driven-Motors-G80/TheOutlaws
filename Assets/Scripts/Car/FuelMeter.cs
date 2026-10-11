@@ -28,6 +28,17 @@ public sealed class FuelMeter : MonoBehaviour
     }
 
 
+    private void Start()
+    {
+        if (RunSession.TryGetPending(out RunSnapshot carried)) SetFuel(carried.MeterFuel);
+    }
+
+    public void SetFuel(float amount)
+    {
+        remainingFuel = Mathf.Clamp(amount, 0f, maxFuel);
+        if (bar != null) bar.fillAmount = NormalizedFuel;
+    }
+
     private void Update()
     {
         remainingFuel = Mathf.Max(0, remainingFuel - consumptionPerSecond * Time.deltaTime);

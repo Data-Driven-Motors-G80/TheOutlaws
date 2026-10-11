@@ -5,8 +5,6 @@ using UnityEngine.SceneManagement;
 [DefaultExecutionOrder(-200)]
 public sealed class OutlawGameManager : MonoBehaviour
 {
-    private const float SnowPortalDistance = 675f;
-
     [Header("Difficulty")]
     [SerializeField, Min(0f)] private float openingSeconds = 5f;
     [SerializeField, Min(1f)] private float difficultyRampSeconds = 70f;
@@ -26,10 +24,10 @@ public sealed class OutlawGameManager : MonoBehaviour
     private float elapsed;
     private float previousPursuitGap;
     private float policeAlertRemaining;
-    private bool portalSpawned;
+    private float carriedDistance;
 
     public OutlawGameState State { get; private set; } = OutlawGameState.Ready;
-    public float DistanceTravelled => driver != null ? driver.RoadDistanceTravelled : 0f;
+    public float DistanceTravelled => carriedDistance + (driver != null ? driver.RoadDistanceTravelled : 0f);
     public float ElapsedSeconds => elapsed;
     public OutlawShooting Shooting => shooting;
     public FuelMeter Fuel => fuel;
@@ -81,7 +79,45 @@ public sealed class OutlawGameManager : MonoBehaviour
 
         previousPursuitGap = pickupEffects.RunState.PursuitGap;
 
+        // A fresh run (not a continuation from another environment) restarts the switch timer.
+        if (!RunSession.HasPending) RunSession.NextSwitchAt = -1f;
+
         Time.timeScale = 0f;
+    }
+
+    private void Start()
+    {
+        // Continuing a run that was carried over from the previous environment scene.
+        if (!RunSession.TryGetPending(out RunSnapshot carried)) return;
+
+        elapsed = carried.Elapsed;
+        carriedDistance = carried.Distance;
+        shooting.SetAmmo(carried.Ammo);
+        pickupEffects.RestoreRun(carried.Risk, carried.StateFuel);
+        previousPursuitGap = pickupEffects.RunState.PursuitGap;
+
+        // No "press Enter" screen and no tutorial: the run is already underway.
+        UpdateDifficulty();
+        State = OutlawGameState.Running;
+        Time.timeScale = 1f;
+    }
+
+    /// <summary>Everything the next environment scene needs to continue this run.</summary>
+    public RunSnapshot CaptureRun()
+    {
+        ScoreMeter score = Object.FindFirstObjectByType<ScoreMeter>();
+        return new RunSnapshot
+        {
+            Elapsed = elapsed,
+            Distance = DistanceTravelled,
+            Score = score != null ? score.Score : 0f,
+            MeterFuel = fuel != null ? fuel.CurrentFuel : 0f,
+            StateFuel = pickupEffects.CurrentFuel,
+            ForwardSpeed = driver.ForwardSpeed,
+            SpeedTimer = driver.SpeedIncreaseTimer,
+            Ammo = shooting.CurrentAmmo,
+            Risk = pickupEffects.CaptureRun()
+        };
     }
 
     private bool ValidateRequiredSystems()
@@ -124,7 +160,6 @@ public sealed class OutlawGameManager : MonoBehaviour
         elapsed += Time.deltaTime;
         UpdateDifficulty();
         UpdatePoliceFeedback();
-        UpdateSnowPortal();
 
         if ((pickupEffects != null && pickupEffects.RunState.IsGameOver) ||
                  (fuel != null && fuel.IsEmpty))
@@ -195,38 +230,5 @@ public sealed class OutlawGameManager : MonoBehaviour
 
         State = result;
         Time.timeScale = 0f;
-    }
-
-    private void UpdateSnowPortal()
-    {
-        float remaining = SnowPortalDistance - DistanceTravelled;
-        if (portalSpawned || remaining > 90f) return;
-        if (TryGetPointAhead(Mathf.Max(0f, remaining), out RoadPathPoint point))
-        {
-            OutlawAreaPortal.Create(point, driver.transform, road, this);
-            portalSpawned = true;
-        }
-    }
-
-    private bool TryGetPointAhead(float distance, out RoadPathPoint point)
-    {
-        if (!road.TryGetPathPoint(driver.transform.position, out point))
-        {
-            return false;
-        }
-
-        float travelled = 0f;
-        while (travelled < distance)
-        {
-            float step = Mathf.Min(4f, distance - travelled);
-            Vector3 sample = point.Position + point.Forward * step;
-            if (!road.TryGetPathPoint(sample, out point))
-            {
-                return false;
-            }
-            travelled += step;
-        }
-
-        return true;
     }
 }

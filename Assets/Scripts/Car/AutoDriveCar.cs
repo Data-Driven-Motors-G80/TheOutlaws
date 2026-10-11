@@ -41,6 +41,15 @@ public sealed class AutoDriveCar : MonoBehaviour
         : Mathf.Min(forwardSpeed, maximumForwardSpeed);
     public float RoadDistanceTravelled { get; private set; }
     public bool IsDriveReady { get; private set; }
+    public float SpeedIncreaseTimer => speedIncreaseTimer;
+
+    /// <summary>Used when a run continues in another scene so the car keeps its current speed.</summary>
+    public void RestoreMotion(float currentSpeed, float increaseTimer)
+    {
+        currentForwardSpeed = Mathf.Clamp(
+            currentSpeed, Mathf.Min(forwardSpeed, maximumForwardSpeed), maximumForwardSpeed);
+        speedIncreaseTimer = Mathf.Max(0f, increaseTimer);
+    }
 
     private void Awake()
     {
@@ -72,6 +81,8 @@ public sealed class AutoDriveCar : MonoBehaviour
     {
         hasStarted = true;
         InitializeRoad();
+        if (RunSession.TryGetPending(out RunSnapshot carried))
+            RestoreMotion(carried.ForwardSpeed, carried.SpeedTimer);
     }
 
     private void InitializeRoad()

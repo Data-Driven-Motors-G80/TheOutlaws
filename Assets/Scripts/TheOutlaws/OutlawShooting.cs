@@ -36,6 +36,11 @@ public sealed class OutlawShooting : MonoBehaviour
         }
     }
 
+    public void SetAmmo(int amount)
+    {
+        CurrentAmmo = Mathf.Clamp(amount, 0, MaximumAmmoValue);
+    }
+
     public bool AddAmmo(int amount)
     {
         if (amount <= 0 || CurrentAmmo >= MaximumAmmoValue)

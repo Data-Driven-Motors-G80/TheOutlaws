@@ -234,6 +234,31 @@ public sealed class RiskRunState
         LastTickForwardDistance += previousForwardDistance;
     }
 
+    /// <summary>Copies everything that must survive a scene change (proximity, shield, nitro, effects).</summary>
+    public RiskRunSnapshot Capture()
+    {
+        return new RiskRunSnapshot(
+            (float)pursuitGap, shieldAvailable, shieldUseCount, HasNitro,
+            BankedPickupScore, PendingBonus,
+            Effects.ActiveEffect, Effects.RemainingSeconds,
+            (float)collisionProtectionRemaining, (float)recoveryWaitRemaining);
+    }
+
+    public void Restore(RiskRunSnapshot snapshot)
+    {
+        Reset();
+        pursuitGap = Math.Max(0d, Math.Min(MaximumPursuitGap, snapshot.PursuitGap));
+        shieldAvailable = snapshot.HasShield;
+        shieldUseCount = snapshot.ShieldUseCount;
+        HasNitro = snapshot.HasNitro;
+        BankedPickupScore = snapshot.BankedPickupScore;
+        PendingBonus = snapshot.PendingBonus;
+        collisionProtectionRemaining = snapshot.CollisionProtectionRemaining;
+        recoveryWaitRemaining = snapshot.RecoveryWaitRemaining;
+        if (snapshot.ActiveEffect != PickupEffectType.None && snapshot.EffectRemaining > 0f)
+            Effects.Apply(snapshot.ActiveEffect, snapshot.EffectRemaining);
+    }
+
     public void Reset()
     {
         pursuitGap = InitialPursuitGap;
@@ -267,5 +292,36 @@ public sealed class RiskRunState
     private static bool IsFinite(float value)
     {
         return !float.IsNaN(value) && !float.IsInfinity(value);
+    }
+}
+
+/// <summary>Plain-data copy of a RiskRunState, used to carry a run between scenes.</summary>
+public readonly struct RiskRunSnapshot
+{
+    public readonly float PursuitGap;
+    public readonly bool HasShield;
+    public readonly int ShieldUseCount;
+    public readonly bool HasNitro;
+    public readonly int BankedPickupScore;
+    public readonly int PendingBonus;
+    public readonly PickupEffectType ActiveEffect;
+    public readonly float EffectRemaining;
+    public readonly float CollisionProtectionRemaining;
+    public readonly float RecoveryWaitRemaining;
+
+    public RiskRunSnapshot(float pursuitGap, bool hasShield, int shieldUseCount, bool hasNitro,
+        int bankedPickupScore, int pendingBonus, PickupEffectType activeEffect, float effectRemaining,
+        float collisionProtectionRemaining, float recoveryWaitRemaining)
+    {
+        PursuitGap = pursuitGap;
+        HasShield = hasShield;
+        ShieldUseCount = shieldUseCount;
+        HasNitro = hasNitro;
+        BankedPickupScore = bankedPickupScore;
+        PendingBonus = pendingBonus;
+        ActiveEffect = activeEffect;
+        EffectRemaining = effectRemaining;
+        CollisionProtectionRemaining = collisionProtectionRemaining;
+        RecoveryWaitRemaining = recoveryWaitRemaining;
     }
 }
