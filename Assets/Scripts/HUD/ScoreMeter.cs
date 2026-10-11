@@ -34,6 +34,14 @@ public sealed class ScoreMeter : MonoBehaviour
         Refresh();
     }
 
+    private void Start()
+    {
+        if (!RunSession.TryGetPending(out RunSnapshot carried)) return;
+        Score = carried.Score;
+        previousCarPosition = car.position;
+        Refresh();
+    }
+
     private void Update()
     {
         Score += Vector3.Distance(car.position, previousCarPosition) * pointsPerUnit;

@@ -9,18 +9,6 @@ public sealed class RoadSegment : MonoBehaviour
     [SerializeField] private Transform[] waypoints = Array.Empty<Transform>();
     [SerializeField, Min(0.1f)] private float width = 10f;
 
-    // Only tint the authored road surface, leaving lane markings and props intact.
-    public void SetSurfaceColor(Color color)
-    {
-        Transform surface = FindChild("Road");
-        if (surface == null || !surface.TryGetComponent(out Renderer renderer)) return;
-        var properties = new MaterialPropertyBlock();
-        renderer.GetPropertyBlock(properties);
-        properties.SetColor("_BaseColor", color);
-        properties.SetColor("_Color", color);
-        renderer.SetPropertyBlock(properties);
-    }
-
     public float Width => width;
     public int PathPointCount => waypoints.Length + 2;
     public Pose ExitPose => new Pose(endPoint.position, endPoint.rotation);

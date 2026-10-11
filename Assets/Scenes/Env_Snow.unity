@@ -1025,6 +1025,7 @@ GameObject:
   - component: {fileID: 534353350}
   - component: {fileID: 534353349}
   - component: {fileID: 534353348}
+  - component: {fileID: 534353352}
   m_Layer: 0
   m_Name: The Outlaws Game Systems
   m_TagString: Untagged
@@ -1071,6 +1072,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 31b730fd8f5b4fd4bdd1324836b2e3f3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OutlawGameManager
+  openingSeconds: 5
+  difficultyRampSeconds: 70
+  maximumObstacleDensity: 1.4
+  maximumPoliceClosingSpeed: 0.65
 --- !u!4 &534353351
 Transform:
   m_ObjectHideFlags: 0
@@ -1087,6 +1092,25 @@ Transform:
   - {fileID: 991567477}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &534353352
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 534353347}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a66022c1c6e34c4eb1a6d1e09fc3c1d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnvironmentSwitcher
+  environmentScenes:
+  - Env_City
+  - Env_Snow
+  minMinutes: 1
+  maxMinutes: 2
+  slideSeconds: 0.3
+  transitionColor: {r: 0.627451, g: 0.72156864, b: 0.8, a: 0.8509804}
 --- !u!1 &695834107
 GameObject:
   m_ObjectHideFlags: 0
@@ -1660,9 +1684,13 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7762644551789330734, guid: 513a0b715227ac64096147a4d6382be4, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7762644551789330734, guid: 513a0b715227ac64096147a4d6382be4, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 00853f6693bb4c047b3089a0ca2fcdd2, type: 2}
+      objectReference: {fileID: 2100000, guid: fe4ad3d8e8baf4a4fb94debbb0664edd, type: 2}
     - target: {fileID: 8481174214447707493, guid: 513a0b715227ac64096147a4d6382be4, type: 3}
       propertyPath: m_Name
       value: RoadSegment_Straight
@@ -2170,6 +2198,7 @@ GameObject:
   - component: {fileID: 1633598809}
   - component: {fileID: 1633598810}
   - component: {fileID: 1633598811}
+  - component: {fileID: 1633598812}
   m_Layer: 0
   m_Name: PlayerCar
   m_TagString: Untagged
@@ -2337,6 +2366,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4b6f64fbd0e24fb89e477ce54b46b705, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OutlawShooting
+--- !u!114 &1633598812
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1633598799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 01d6a47a55ba6f8429468e13b9ff51e0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SnowSlideEffect
+  road: {fileID: 371121412}
+  visual: {fileID: 1066005398}
+  driftSpeed: 1.5
+  extraTurnSpeed: 3
+  slideAcceleration: 6
+  edgeMargin: 1
+  extraYawAngle: 8
 --- !u!1 &1644551639
 GameObject:
   m_ObjectHideFlags: 0
@@ -3016,6 +3064,14 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 2100000, guid: 501c6a6cb11333845bff2491a0c61a3d, type: 2}
     - target: {fileID: 8310387557884137698, guid: 1c048551c4e148c4f9d65c40f8ab9b9e, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 1.76
+      objectReference: {fileID: 0}
+    - target: {fileID: 8310387557884137698, guid: 1c048551c4e148c4f9d65c40f8ab9b9e, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 3.08
+      objectReference: {fileID: 0}
+    - target: {fileID: 8310387557884137698, guid: 1c048551c4e148c4f9d65c40f8ab9b9e, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
       objectReference: {fileID: 0}
@@ -3054,14 +3110,6 @@ PrefabInstance:
     - target: {fileID: 8310387557884137698, guid: 1c048551c4e148c4f9d65c40f8ab9b9e, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8310387557884137698, guid: 1c048551c4e148c4f9d65c40f8ab9b9e, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 1.76
-      objectReference: {fileID: 0}
-    - target: {fileID: 8310387557884137698, guid: 1c048551c4e148c4f9d65c40f8ab9b9e, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 3.08
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
