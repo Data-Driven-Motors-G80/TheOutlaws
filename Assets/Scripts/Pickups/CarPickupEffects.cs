@@ -53,6 +53,25 @@ public sealed class CarPickupEffects : MonoBehaviour
 
     public bool TryApply(PickupEffectType effect, float duration = PickupEffectState.DefaultDurationSeconds)
     {
+        bool accepted = TryApplyCore(effect, duration);
+        if (accepted)
+        {
+            switch (LastOutcome)
+            {
+                case RandomPickupOutcome.Shield: RunAnalyticsState.Count("shield_pickups"); break;
+                case RandomPickupOutcome.Nitro: RunAnalyticsState.Count("nitro_pickups"); break;
+                case RandomPickupOutcome.ProximityRecovery: RunAnalyticsState.Count("recovery_pickups"); break;
+                case RandomPickupOutcome.ReverseSteering: RunAnalyticsState.Count("reverse_pickups"); break;
+                default:
+                    if (effect == PickupEffectType.ReverseSteering) RunAnalyticsState.Count("reverse_pickups");
+                    break;
+            }
+        }
+        return accepted;
+    }
+
+    private bool TryApplyCore(PickupEffectType effect, float duration)
+    {
         if (!isActiveAndEnabled) return false;
 
         LastOutcome = RandomPickupOutcome.None;

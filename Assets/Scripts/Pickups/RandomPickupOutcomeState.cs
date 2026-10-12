@@ -9,7 +9,7 @@ public enum RandomPickupOutcome
     Nitro = 4
 }
 
-/// <summary>Four equally likely outcomes; a seed makes editor tests reproducible.</summary>
+/// <summary>Reverse steering has a 10% chance; each helpful effect has 30%. Seeds support reproducible tests.</summary>
 public sealed class RandomPickupOutcomeState
 {
     private readonly Random random;
@@ -21,9 +21,9 @@ public sealed class RandomPickupOutcomeState
 
     public RandomPickupOutcome Next()
     {
-        int roll = random.Next(4);
+        int roll = random.Next(10);
         if (roll == 0) return RandomPickupOutcome.ReverseSteering;
-        if (roll == 1) return RandomPickupOutcome.Nitro;
-        return roll == 2 ? RandomPickupOutcome.ProximityRecovery : RandomPickupOutcome.Shield;
+        if (roll < 4) return RandomPickupOutcome.Nitro;
+        return roll < 7 ? RandomPickupOutcome.ProximityRecovery : RandomPickupOutcome.Shield;
     }
 }

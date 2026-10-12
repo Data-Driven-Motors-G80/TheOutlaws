@@ -3,6 +3,21 @@ using System;
 /// <summary>Bounded difficulty and periodic relief, driven by active gameplay seconds.</summary>
 public readonly struct RunDifficultyState
 {
+    public static int PressureSteps(float elapsedSeconds)
+    {
+        return (int)(Math.Max(0f, elapsedSeconds) / 25f);
+    }
+
+    public static float DrivingSpeed(float elapsedSeconds)
+    {
+        return Math.Min(30f, 15f + PressureSteps(elapsedSeconds));
+    }
+
+    public static float ObstacleDensity(float elapsedSeconds)
+    {
+        return Math.Min(1.6f, 1f + PressureSteps(elapsedSeconds) * 0.05f);
+    }
+
     public float Progress { get; }
     public float Relief { get; }
 

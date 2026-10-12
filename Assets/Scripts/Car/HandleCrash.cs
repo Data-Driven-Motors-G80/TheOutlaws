@@ -74,6 +74,9 @@ public sealed class HandleCrash : MonoBehaviour
         FuelTank tank = other.GetComponent<FuelTank>();
         if (tank != null)
         {
+            if (!other.enabled) return;
+            other.enabled = false;
+            RunAnalyticsState.Count("fuel_pickups");
             if (fuelMeter != null)
             {
                 fuelMeter.ChangeFuel(tank.FuelAmount);
@@ -129,6 +132,7 @@ public sealed class HandleCrash : MonoBehaviour
             }
 
             contactedObstacles[obstacle] = obstacle.position;
+            RunAnalyticsState.Count("obstacle_collisions");
             if (pickupEffects.TryConsumeShield())
             {
                 return;

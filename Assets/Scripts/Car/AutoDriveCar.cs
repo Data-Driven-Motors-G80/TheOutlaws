@@ -28,6 +28,13 @@ public sealed class AutoDriveCar : MonoBehaviour
     private InputAction steerAction;
     private CarPickupEffects pickupEffects;
     private float currentForwardSpeed;
+    private bool managedDifficulty;
+
+    public void SetDifficultySpeed(float speed)
+    {
+        managedDifficulty = true;
+        currentForwardSpeed = Mathf.Clamp(speed, forwardSpeed, maximumForwardSpeed);
+    }
     private float speedIncreaseTimer;
     private float lateralOffset;
     private float lateralSpeed;
@@ -126,7 +133,7 @@ public sealed class AutoDriveCar : MonoBehaviour
         if (Time.timeScale <= 0f) return;
         float deltaTime = Time.deltaTime;
 
-        UpdateForwardSpeed(deltaTime);
+        if (!managedDifficulty) UpdateForwardSpeed(deltaTime);
 
         float speedProgress = Mathf.InverseLerp(
             forwardSpeed,

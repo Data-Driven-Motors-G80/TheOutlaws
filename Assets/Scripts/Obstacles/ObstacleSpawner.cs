@@ -58,6 +58,10 @@ public sealed class ObstacleSpawner : MonoBehaviour
 
     private void Awake()
     {
+        if (RunSession.HasPending)
+        {
+            tutorialRowsSpawned = 2;
+        }
         random = new System.Random(19019);
         sizeRandom = new System.Random(19023);
         colorRandom = new System.Random(19029);
@@ -310,8 +314,10 @@ public sealed class ObstacleSpawner : MonoBehaviour
         Obstacle obstacle = activeObstacles.Find(item => item.Transform == trafficLight.transform);
         if (obstacle == null) return false;
 
+        RunAnalyticsState.Count("shots_hit");
         if (trafficLight.ApplyShot())
         {
+            RunAnalyticsState.Count("obstacles_destroyed");
             OutlawShooting shooting = car != null ? car.GetComponent<OutlawShooting>() : null;
             ObstacleRewardSpawner.SpawnRedDestructionReward(trafficLight, shooting);
             activeObstacles.Remove(obstacle);

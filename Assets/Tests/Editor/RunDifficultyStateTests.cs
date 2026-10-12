@@ -3,6 +3,27 @@ using NUnit.Framework;
 public sealed class RunDifficultyStateTests
 {
     [Test]
+    public void DrivingPressureStartsAtTwentyFiveSeconds()
+    {
+        Assert.That(RunDifficultyState.DrivingSpeed(15f), Is.EqualTo(15f));
+        Assert.That(RunDifficultyState.DrivingSpeed(24.9f), Is.EqualTo(15f));
+        Assert.That(RunDifficultyState.DrivingSpeed(25f), Is.EqualTo(16f));
+        Assert.That(RunDifficultyState.ObstacleDensity(50f), Is.EqualTo(1.1f).Within(0.001f));
+        Assert.That(RunDifficultyState.DrivingSpeed(9999f), Is.EqualTo(30f));
+        Assert.That(RunDifficultyState.ObstacleDensity(9999f), Is.EqualTo(1.6f));
+    }
+
+    [Test]
+    public void CarriedElapsedTimeKeepsDifficultyAcrossEnvironmentChanges()
+    {
+        // A switch at 74 seconds keeps the existing pressure, with the next step at 75.
+        Assert.That(RunDifficultyState.DrivingSpeed(74f), Is.EqualTo(17f));
+        Assert.That(RunDifficultyState.ObstacleDensity(74f), Is.EqualTo(1.1f).Within(0.001f));
+        Assert.That(RunDifficultyState.DrivingSpeed(75f), Is.EqualTo(18f));
+        Assert.That(RunDifficultyState.ObstacleDensity(75f), Is.EqualTo(1.15f).Within(0.001f));
+    }
+
+    [Test]
     public void OpeningIsForgivingAndRampCaps()
     {
         Assert.That(RunDifficultyState.Evaluate(0f).Progress, Is.Zero);

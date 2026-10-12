@@ -10,8 +10,8 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
     [SerializeField] private string[] environmentScenes = { "Env_City", "Env_Snow" };
 
     [Header("Timing (minutes of play)")]
-    [SerializeField, Min(0.1f)] private float minMinutes = 3f;
-    [SerializeField, Min(0.1f)] private float maxMinutes = 5f;
+    [SerializeField, Min(0.1f)] private float minMinutes = 50f / 60f;
+    [SerializeField, Min(0.1f)] private float maxMinutes = 2f;
 
     [Header("Transition")]
     [SerializeField, Min(0.1f)] private float slideSeconds = 0.6f;
@@ -62,12 +62,11 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
         if (environmentScenes == null || environmentScenes.Length == 0)
             return;
 
-        string picked = environmentScenes[Random.Range(0, environmentScenes.Length)];
-
-        if (picked == SceneManager.GetActiveScene().name)
-            return;
-
-        StartSwitch(picked);
+        string current = SceneManager.GetActiveScene().name;
+        string[] alternatives = System.Array.FindAll(environmentScenes,
+            name => !string.IsNullOrEmpty(name) && name != current);
+        if (alternatives.Length > 0)
+            StartSwitch(alternatives[Random.Range(0, alternatives.Length)]);
     }
 
     private float NextInterval()

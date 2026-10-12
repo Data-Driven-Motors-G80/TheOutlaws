@@ -48,21 +48,14 @@ public sealed class TrafficObstacleRulesTests
     }
 
     [Test]
-    public void AmmoSpacingTightensInLateGame()
+    public void AmmoSpacingPreservesOpeningAndBecomesScarcer()
     {
-        Assert.That(AmmoSpawnSchedule.GetMinimumSpacing(800f),
-            Is.LessThan(AmmoSpawnSchedule.GetMinimumSpacing(0f)));
-        Assert.That(AmmoSpawnSchedule.GetMaximumSpacing(800f),
-            Is.LessThan(AmmoSpawnSchedule.GetMaximumSpacing(0f)));
-    }
-
-    [Test]
-    public void MidGameAmmoIsMoreFrequentThanEarlyGame()
-    {
-        Assert.That(AmmoSpawnSchedule.GetMinimumSpacing(400f),
-            Is.LessThan(AmmoSpawnSchedule.GetMinimumSpacing(0f)));
-        Assert.That(AmmoSpawnSchedule.GetMaximumSpacing(400f),
-            Is.LessThan(AmmoSpawnSchedule.GetMaximumSpacing(0f)));
+        Assert.That(AmmoSpawnSchedule.GetMinimumSpacing(0f), Is.EqualTo(180));
+        Assert.That(AmmoSpawnSchedule.GetMaximumSpacing(299f), Is.EqualTo(260));
+        Assert.That(AmmoSpawnSchedule.GetMinimumSpacing(300f), Is.EqualTo(300));
+        Assert.That(AmmoSpawnSchedule.GetMaximumSpacing(699f), Is.EqualTo(450));
+        Assert.That(AmmoSpawnSchedule.GetMinimumSpacing(700f), Is.EqualTo(400));
+        Assert.That(AmmoSpawnSchedule.GetMaximumSpacing(10000f), Is.EqualTo(600));
     }
 
     [Test]

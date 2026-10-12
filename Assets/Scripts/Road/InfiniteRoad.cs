@@ -7,6 +7,7 @@ public sealed class InfiniteRoad : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private Transform car;
+    [SerializeField] private Material roadSurfaceMaterial;
 
     [Header("Segments")]
     [SerializeField] private RoadSegment[] segmentPrefabs;
@@ -138,6 +139,12 @@ public sealed class InfiniteRoad : MonoBehaviour
     {
         ObjectPool<RoadSegment> pool = GetPool(SelectPrefab());
         RoadSegment segment = pool.Get();
+
+        // Apply the scene's palette to every streamed segment, including reused ones.
+        Transform surface = segment.transform.Find("Road");
+        if (roadSurfaceMaterial != null && surface != null &&
+            surface.TryGetComponent(out Renderer surfaceRenderer))
+            surfaceRenderer.sharedMaterial = roadSurfaceMaterial;
 
         segment.AlignStartTo(nextEntry);
         nextEntry = segment.ExitPose;

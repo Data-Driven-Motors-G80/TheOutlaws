@@ -5,11 +5,6 @@ using UnityEngine.SceneManagement;
 [DefaultExecutionOrder(-200)]
 public sealed class OutlawGameManager : MonoBehaviour
 {
-    [Header("Difficulty")]
-    [SerializeField, Min(0f)] private float openingSeconds = 5f;
-    [SerializeField, Min(1f)] private float difficultyRampSeconds = 70f;
-    [SerializeField, Range(1f, 2f)] private float maximumObstacleDensity = 1.4f;
-    [SerializeField, Range(0f, 1f)] private float maximumPoliceClosingSpeed = 0.65f;
 
     private AutoDriveCar driver;
     private CarPickupEffects pickupEffects;
@@ -157,6 +152,7 @@ public sealed class OutlawGameManager : MonoBehaviour
             return;
         }
 
+        RunAnalyticsState.Tick(Time.deltaTime, SceneManager.GetActiveScene().name == "Env_Snow");
         elapsed += Time.deltaTime;
         UpdateDifficulty();
         UpdatePoliceFeedback();
@@ -170,15 +166,13 @@ public sealed class OutlawGameManager : MonoBehaviour
 
     private void UpdateDifficulty()
     {
-        RunDifficultyState difficulty = RunDifficultyState.Evaluate(
-            elapsed, openingSeconds, difficultyRampSeconds);
+        // Total run time carries across scenes: changing environments never resets pressure.
+        int steps = RunDifficultyState.PressureSteps(elapsed);
+        driver.SetDifficultySpeed(RunDifficultyState.DrivingSpeed(elapsed));
         obstacles.ConfigureDifficulty(
-            Mathf.Lerp(1.2f, maximumObstacleDensity, difficulty.Progress) *
-            Mathf.Lerp(1f, 0.7f, difficulty.Relief),
-            Mathf.Lerp(0.25f, 0.35f, difficulty.Progress) * (1f - difficulty.Relief));
-        pursuit.SetClosingSpeed(Mathf.Lerp(
-            Mathf.Lerp(0.25f, maximumPoliceClosingSpeed, difficulty.Progress),
-            -0.35f, difficulty.Relief));
+            RunDifficultyState.ObstacleDensity(elapsed),
+            Mathf.Min(0.35f, 0.15f + steps * 0.025f));
+        pursuit.SetClosingSpeed(Mathf.Min(0.65f, 0.15f + steps * 0.05f));
     }
 
     private void UpdatePoliceFeedback()
@@ -203,6 +197,7 @@ public sealed class OutlawGameManager : MonoBehaviour
         }
 
         UpdateDifficulty();
+        RunAnalyticsState.Begin();
         trafficTutorial.BeginTutorial();
         State = OutlawGameState.Running;
         Time.timeScale = 1f;
@@ -228,6 +223,7 @@ public sealed class OutlawGameManager : MonoBehaviour
             return;
         }
 
+        GoogleFormsAnalytics.Complete(this);
         State = result;
         Time.timeScale = 0f;
     }

@@ -70,7 +70,10 @@ public sealed class FuelAndRandomPickupTests
             }
         }
 
-        Assert.That(reverse, Is.GreaterThan(0));
+        Assert.That(reverse, Is.InRange(60, 140));
+        Assert.That(reverse, Is.LessThan(proximity));
+        Assert.That(reverse, Is.LessThan(shield));
+        Assert.That(reverse, Is.LessThan(nitro));
         Assert.That(proximity, Is.GreaterThan(0));
         Assert.That(shield, Is.GreaterThan(0));
         Assert.That(nitro, Is.GreaterThan(0));

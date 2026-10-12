@@ -1,0 +1,87 @@
+{
+  "enabled": true,
+  "sendFromEditor": false,
+  "formResponseUrl": "https://docs.google.com/forms/d/e/1FAIpQLSc8UeCdqpW6c4m92D5FwDEJajsFwMqhJYGwBnN6OnwUJ2mGzQ/formResponse",
+  "fields": [
+    {
+      "metric": "session_id",
+      "entry": "entry.258244360"
+    },
+    {
+      "metric": "run_id",
+      "entry": "entry.729526105"
+    },
+    {
+      "metric": "survival_seconds",
+      "entry": "entry.634067350"
+    },
+    {
+      "metric": "shots_fired",
+      "entry": "entry.1676754034"
+    },
+    {
+      "metric": "shots_hit",
+      "entry": "entry.2016144270"
+    },
+    {
+      "metric": "obstacles_destroyed",
+      "entry": "entry.2087744203"
+    },
+    {
+      "metric": "obstacle_collisions",
+      "entry": "entry.752250523"
+    },
+    {
+      "metric": "fuel_pickups",
+      "entry": "entry.1217038268"
+    },
+    {
+      "metric": "ammo_pickups",
+      "entry": "entry.812508092"
+    },
+    {
+      "metric": "shield_pickups",
+      "entry": "entry.512336891"
+    },
+    {
+      "metric": "nitro_pickups",
+      "entry": "entry.2126819006"
+    },
+    {
+      "metric": "recovery_pickups",
+      "entry": "entry.1438454481"
+    },
+    {
+      "metric": "reverse_pickups",
+      "entry": "entry.1640545681"
+    },
+    {
+      "metric": "death_reason",
+      "entry": "entry.983113650"
+    },
+    {
+      "metric": "game_version",
+      "entry": "entry.857812026"
+    },
+    {
+      "metric": "distance_metres",
+      "entry": "entry.545009390"
+    },
+    {
+      "metric": "environment",
+      "entry": "entry.1714416898"
+    },
+    {
+      "metric": "city_seconds",
+      "entry": "entry.592316364"
+    },
+    {
+      "metric": "snow_seconds",
+      "entry": "entry.1689690157"
+    },
+    {
+      "metric": "ammo_remaining",
+      "entry": "entry.2064401778"
+    }
+  ]
+}

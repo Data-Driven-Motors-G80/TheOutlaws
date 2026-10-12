@@ -78,7 +78,7 @@ public sealed class PickupSpawner : MonoBehaviour
             if (BlockedByObstacle(position)) continue;
 
             PickupItem item = Instantiate(pickupPrefab, position, Quaternion.identity, transform);
-            // Four equally likely outcomes: nitro, jammer, shield, or reverse steering.
+            // Weighted outcomes: 30% each for nitro, recovery and shield; 10% reverse steering.
             item.Configure(PickupEffectType.RandomFuelOrReverse, effectDuration);
             active.Add(item);
             spawnCount++;

@@ -13,6 +13,7 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
     private OutlawShooting shooting;
     private CarPickupEffects pickupEffects;
     private float nextSpawnAt;
+    private float carriedDistance;
     private int spawnIndex;
     private System.Random spacingRandom;
 
@@ -34,6 +35,7 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
             pickup.gameObject.SetActive(false);
             Destroy(pickup.gameObject);
         }
+        carriedDistance = RunSession.TryGetPending(out RunSnapshot carried) ? carried.Distance : 0f;
         spawnIndex = 0;
         // Independent entropy keeps ammo unpredictable on restart without changing
         // the seeded obstacle layouts or power-up outcomes.
@@ -85,7 +87,7 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
 
     private float NextSpawnSpacing()
     {
-        float distance = driver != null ? driver.RoadDistanceTravelled : 0f;
+        float distance = carriedDistance + (driver != null ? driver.RoadDistanceTravelled : 0f);
         int minimum = AmmoSpawnSchedule.GetMinimumSpacing(distance);
         int maximum = AmmoSpawnSchedule.GetMaximumSpacing(distance);
         return spacingRandom.Next(minimum, maximum + 1);

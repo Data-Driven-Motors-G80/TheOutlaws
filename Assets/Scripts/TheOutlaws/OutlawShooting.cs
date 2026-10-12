@@ -70,6 +70,7 @@ public sealed class OutlawShooting : MonoBehaviour
             GetComponentsInChildren<Collider>());
 
         CurrentAmmo--;
+        RunAnalyticsState.Count("shots_fired");
         nextFireTime = Time.time + FireCooldown;
     }
 }

@@ -57,6 +57,7 @@ public sealed class OutlawAmmoPickup : MonoBehaviour
         {
             // Destroy is deferred; multiple car colliders can enter this frame.
             collected = true;
+            RunAnalyticsState.Count("ammo_pickups");
             GetComponent<Collider>().enabled = false;
             Destroy(gameObject);
         }
