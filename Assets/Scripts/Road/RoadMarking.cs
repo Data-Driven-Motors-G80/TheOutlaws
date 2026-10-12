@@ -15,6 +15,7 @@ public sealed class RoadMarking : MonoBehaviour
     [SerializeField, Min(0f)] private float gapLength = 2f;
     [SerializeField, Min(0f)] private float height = 0.01f;
 
+    private Mesh ownedMesh;
     private readonly List<Vector3> vertices = new List<Vector3>();
     private readonly List<Vector2> uvs = new List<Vector2>();
     private readonly List<int> triangles = new List<int>();
@@ -26,10 +27,7 @@ public sealed class RoadMarking : MonoBehaviour
 
     private void OnEnable()
     {
-        if (GetComponent<MeshFilter>().sharedMesh == null)
-        {
-            Rebuild();
-        }
+        Rebuild();
     }
 
     private void OnValidate()
@@ -39,25 +37,13 @@ public sealed class RoadMarking : MonoBehaviour
 
     private void OnDestroy()
     {
-        MeshFilter filter = GetComponent<MeshFilter>();
-
-        if (filter == null || filter.sharedMesh == null || filter.sharedMesh.name != MeshName)
-        {
-            return;
-        }
-
-        if (Application.isPlaying)
-        {
-            Destroy(filter.sharedMesh);
-        }
-        else
-        {
-            DestroyImmediate(filter.sharedMesh);
-        }
+        if (ownedMesh == null) return;
+        if (Application.isPlaying) Destroy(ownedMesh);
+        else DestroyImmediate(ownedMesh);
     }
 
     [ContextMenu("Rebuild Markings")]
-    private void Rebuild()
+    public void Rebuild()
     {
         if (!gameObject.scene.IsValid())
         {
@@ -79,11 +65,11 @@ public sealed class RoadMarking : MonoBehaviour
 
         float spacing = stripLength + gapLength;
         float dividerOffset = road.Width / LaneCount * 0.5f;
-        int stripCount = Mathf.Max(0, Mathf.FloorToInt((GetPathLength(road) - stripLength) / spacing + 0.0001f) + 1);
+        int stripCount = Mathf.Max(0, Mathf.FloorToInt((road.Length - stripLength) / spacing + 0.0001f) + 1);
 
         for (int i = 0; i < stripCount; i++)
         {
-            RoadPathPoint point = SamplePath(road, i * spacing + stripLength * 0.5f);
+            RoadPathPoint point = road.Sample(i * spacing + stripLength * 0.5f);
 
             AddStrip(point, -dividerOffset);
             AddStrip(point, dividerOffset);
@@ -121,61 +107,11 @@ public sealed class RoadMarking : MonoBehaviour
         triangles.Add(first + 1);
     }
 
-    private static Mesh GetOrCreateMesh(MeshFilter filter)
+    private Mesh GetOrCreateMesh(MeshFilter filter)
     {
-        Mesh mesh = filter.sharedMesh;
-
-        if (mesh == null || mesh.name != MeshName)
-        {
-            mesh = new Mesh { name = MeshName, hideFlags = HideFlags.HideAndDontSave };
-            filter.sharedMesh = mesh;
-        }
-
-        return mesh;
-    }
-
-    private static float GetPathLength(RoadSegment road)
-    {
-        float length = 0f;
-        Vector3 from = road.GetPathPoint(0);
-
-        for (int i = 1; i < road.PathPointCount; i++)
-        {
-            Vector3 to = road.GetPathPoint(i);
-            length += Vector3.Distance(from, to);
-            from = to;
-        }
-
-        return length;
-    }
-
-    private static RoadPathPoint SamplePath(RoadSegment road, float distance)
-    {
-        Vector3 from = road.GetPathPoint(0);
-        Vector3 direction = Vector3.forward;
-        float remaining = distance;
-
-        for (int i = 1; i < road.PathPointCount; i++)
-        {
-            Vector3 to = road.GetPathPoint(i);
-            Vector3 delta = to - from;
-            float length = delta.magnitude;
-
-            if (length > Mathf.Epsilon)
-            {
-                direction = delta / length;
-
-                if (remaining <= length)
-                {
-                    return new RoadPathPoint(from + direction * remaining, direction, road.Width);
-                }
-
-                remaining -= length;
-            }
-
-            from = to;
-        }
-
-        return new RoadPathPoint(from, direction, road.Width);
+        if (ownedMesh == null)
+            ownedMesh = new Mesh { name = MeshName, hideFlags = HideFlags.HideAndDontSave };
+        filter.sharedMesh = ownedMesh;
+        return ownedMesh;
     }
 }

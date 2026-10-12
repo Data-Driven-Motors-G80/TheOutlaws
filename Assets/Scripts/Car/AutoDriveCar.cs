@@ -47,6 +47,7 @@ public sealed class AutoDriveCar : MonoBehaviour
         ? currentForwardSpeed
         : Mathf.Min(forwardSpeed, maximumForwardSpeed);
     public float RoadDistanceTravelled { get; private set; }
+    public float RoadPositionDistance { get; private set; }
     public bool IsDriveReady { get; private set; }
     public float SpeedIncreaseTimer => speedIncreaseTimer;
 
@@ -107,6 +108,9 @@ public sealed class AutoDriveCar : MonoBehaviour
             enabled = false;
             return;
         }
+
+        road.TryGetDistance(transform.position, out float initialDistance);
+        RoadPositionDistance = initialDistance;
 
         Vector3 offset =
             transform.position - start.Position;
@@ -197,24 +201,10 @@ public sealed class AutoDriveCar : MonoBehaviour
             lateralSpeed = 0f;
         }
 
-        if (!road.TryGetPathPoint(
-                transform.position,
-                out RoadPathPoint current))
-        {
-            return;
-        }
-
-        Vector3 lookAhead =
-            current.Position +
-            current.Forward *
-            forwardDistance;
-
-        if (!road.TryGetPathPoint(
-                lookAhead,
-                out RoadPathPoint next))
-        {
-            return;
-        }
+        // Advance by arc length, not by projecting a tangent step back onto
+        // the road. Projection can stall at corners and lets weaving alter speed.
+        float nextDistance = RoadPositionDistance + forwardDistance;
+        if (!road.TrySample(nextDistance, out RoadPathPoint next)) return;
 
         float limit = Mathf.Max(
             0f,
@@ -245,7 +235,8 @@ public sealed class AutoDriveCar : MonoBehaviour
 
         // Count only forward road travel. Lateral weaving must not farm score
         // or pickup spawn distance.
-        RoadDistanceTravelled += Vector3.Distance(current.Position, next.Position);
+        RoadPositionDistance = nextDistance;
+        RoadDistanceTravelled += forwardDistance;
 
         ApplyRotation(
             next,

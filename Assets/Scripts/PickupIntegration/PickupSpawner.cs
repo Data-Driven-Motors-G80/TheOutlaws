@@ -48,7 +48,7 @@ public sealed class PickupSpawner : MonoBehaviour
         for (int i = active.Count - 1; i >= 0; i--)
         {
             PickupItem item = active[i];
-            if (item != null && Vector3.Dot(car.position - item.transform.position, car.forward) > 20f)
+            if (item != null && road.IsBehind(item.transform.position, car.position, 20f))
                 Destroy(item.gameObject);
             else if (item != null) continue;
             active.RemoveAt(i);
@@ -98,14 +98,6 @@ public sealed class PickupSpawner : MonoBehaviour
 
     private bool TryGetPointAhead(float distance, out RoadPathPoint point)
     {
-        if (!road.TryGetPathPoint(car.position, out point)) return false;
-        for (float travelled = 0f; travelled < distance; travelled += 5f)
-        {
-            float step = Mathf.Min(5f, distance - travelled);
-            Vector3 previous = point.Position;
-            if (!road.TryGetPathPoint(previous + point.Forward * step, out point)
-                || Vector3.Distance(previous, point.Position) < step * 0.5f) return false;
-        }
-        return true;
+        return road.TryGetPointAhead(car.position, distance, out point);
     }
 }

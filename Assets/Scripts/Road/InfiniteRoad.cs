@@ -16,6 +16,21 @@ public sealed class InfiniteRoad : MonoBehaviour
     [SerializeField, Min(2)] private int segmentCount = 8;
     [SerializeField, Min(0f)] private float behindBuffer = 20f;
 
+    [Header("Curves")]
+    [SerializeField] private bool enableCurves;
+    [SerializeField, Min(40f)] private float curveLength = 80f;
+    [SerializeField, Range(5f, 30f)] private float bendAngle = 25f;
+    [SerializeField, Range(20f, 50f)] private float maximumHeading = 35f;
+    [SerializeField, Min(0f)] private float straightIntroDistance = 160f;
+    [SerializeField, Min(100f)] private float aheadBuffer = 180f;
+
+    private float nextDistance;
+    private float routeHeading;
+    private int curveIndex;
+    private bool lastWasCurve;
+    public float FirstDistance => activeSegments.Count > 0 ? activeSegments.Peek().StartDistance : 0f;
+    public float LastDistance => nextDistance;
+
     private readonly Queue<ActiveSegment> activeSegments = new Queue<ActiveSegment>();
     private readonly Dictionary<RoadSegment, ObjectPool<RoadSegment>> pools = new Dictionary<RoadSegment, ObjectPool<RoadSegment>>();
     private System.Random random;
@@ -45,10 +60,14 @@ public sealed class InfiniteRoad : MonoBehaviour
             Destroy(segment.gameObject);
         }
         pools.Clear();
+        nextDistance = 0f;
+        routeHeading = 0f;
+        curveIndex = 0;
+        lastWasCurve = false;
         Vector3 origin = new Vector3(transform.position.x, transform.position.y, car.position.z - behindBuffer);
         nextEntry = new Pose(origin, Quaternion.identity);
 
-        for (int i = 0; i < segmentCount; i++)
+        while (activeSegments.Count < segmentCount || nextDistance < behindBuffer + aheadBuffer)
         {
             SpawnSegment();
         }
@@ -57,50 +76,59 @@ public sealed class InfiniteRoad : MonoBehaviour
     private void Update()
     {
         EnsureInitialized();
-        while (activeSegments.Count > 0 && activeSegments.Peek().Segment.DistancePastEnd(car.position) > behindBuffer)
-        {
+        if (!TryGetDistance(car.position, out float carDistance)) return;
+        // Use progress along the route: an end-point plane is unsafe on bends.
+        while (activeSegments.Count > 1 && activeSegments.Peek().EndDistance < carDistance - behindBuffer)
             activeSegments.Dequeue().Release();
+        while (activeSegments.Count < segmentCount || nextDistance < carDistance + aheadBuffer)
             SpawnSegment();
-        }
     }
 
-    public bool TryGetPathPoint(Vector3 worldPosition, out RoadPathPoint pathPoint)
+    public bool TryGetDistance(Vector3 worldPosition, out float distance)
     {
         EnsureInitialized();
-        pathPoint = default;
+        distance = 0f;
         float closestSqrDistance = float.MaxValue;
-        bool found = false;
-
         foreach (ActiveSegment active in activeSegments)
         {
-            RoadSegment segment = active.Segment;
-            Vector3 from = segment.GetPathPoint(0);
-
-            for (int i = 1; i < segment.PathPointCount; i++)
-            {
-                Vector3 to = segment.GetPathPoint(i);
-                Vector3 direction = to - from;
-                float sqrLength = direction.sqrMagnitude;
-
-                if (sqrLength > Mathf.Epsilon)
-                {
-                    float t = Mathf.Clamp01(Vector3.Dot(worldPosition - from, direction) / sqrLength);
-                    Vector3 closest = from + direction * t;
-                    float sqrDistance = (worldPosition - closest).sqrMagnitude;
-
-                    if (sqrDistance < closestSqrDistance)
-                    {
-                        closestSqrDistance = sqrDistance;
-                        pathPoint = new RoadPathPoint(closest, direction / Mathf.Sqrt(sqrLength), segment.Width);
-                        found = true;
-                    }
-                }
-
-                from = to;
-            }
+            float local = active.Segment.ProjectDistance(worldPosition, out float sqrDistance);
+            if (sqrDistance >= closestSqrDistance) continue;
+            closestSqrDistance = sqrDistance;
+            distance = active.StartDistance + local;
         }
+        return closestSqrDistance < float.MaxValue;
+    }
 
-        return found;
+    public bool TrySample(float distance, out RoadPathPoint point)
+    {
+        EnsureInitialized();
+        point = default;
+        if (distance < FirstDistance - 0.001f || distance > nextDistance + 0.001f) return false;
+        foreach (ActiveSegment active in activeSegments)
+        {
+            if (distance > active.EndDistance) continue;
+            point = active.Segment.Sample(distance - active.StartDistance);
+            return true;
+        }
+        return false;
+    }
+
+    public bool TryGetPathPoint(Vector3 worldPosition, out RoadPathPoint point)
+    {
+        point = default;
+        return TryGetDistance(worldPosition, out float distance) && TrySample(distance, out point);
+    }
+
+    public bool TryGetPointAhead(Vector3 worldPosition, float distance, out RoadPathPoint point)
+    {
+        point = default;
+        return TryGetDistance(worldPosition, out float from) && TrySample(from + distance, out point);
+    }
+
+    public bool IsBehind(Vector3 worldPosition, Vector3 reference, float margin)
+    {
+        return TryGetDistance(worldPosition, out float at) && TryGetDistance(reference, out float from)
+            && from - at > margin;
     }
 
     private bool HasValidSetup()
@@ -130,6 +158,11 @@ public sealed class InfiniteRoad : MonoBehaviour
                 LogError($"'{prefab.name}' has a missing start point, end point or waypoint.", prefab);
                 return false;
             }
+            if (prefab.Length <= 0.01f)
+            {
+                LogError($"'{prefab.name}' needs a path with nonzero length.", prefab);
+                return false;
+            }
         }
 
         return true;
@@ -146,10 +179,29 @@ public sealed class InfiniteRoad : MonoBehaviour
             surface.TryGetComponent(out Renderer surfaceRenderer))
             surfaceRenderer.sharedMaterial = roadSurfaceMaterial;
 
+        if (enableCurves)
+        {
+            float angle = 0f;
+            bool sCurve = false;
+            float length = 20f;
+            if (nextDistance >= behindBuffer + straightIntroDistance && !lastWasCurve)
+            {
+                sCurve = curveIndex++ % 3 == 1;
+                float sign = routeHeading > 5f ? -1f : routeHeading < -5f ? 1f
+                    : random.Next(2) == 0 ? -1f : 1f;
+                angle = sign * Mathf.Min(bendAngle, maximumHeading - sign * routeHeading);
+                length = Mathf.Max(40f, curveLength);
+                if (!sCurve) routeHeading += angle;
+                lastWasCurve = true;
+            }
+            else lastWasCurve = false;
+            segment.ConfigureCurve(length, angle, sCurve);
+        }
         segment.AlignStartTo(nextEntry);
         nextEntry = segment.ExitPose;
 
-        activeSegments.Enqueue(new ActiveSegment(segment, pool));
+        activeSegments.Enqueue(new ActiveSegment(segment, pool, nextDistance));
+        nextDistance += segment.Length;
     }
 
     private RoadSegment SelectPrefab()
@@ -173,10 +225,26 @@ public sealed class InfiniteRoad : MonoBehaviour
             createFunc: () => Instantiate(prefab, transform),
             actionOnGet: segment => segment.gameObject.SetActive(true),
             actionOnRelease: segment => segment.gameObject.SetActive(false),
-            actionOnDestroy: segment => Destroy(segment.gameObject));
+            actionOnDestroy: DestroySegment);
 
         pools.Add(prefab, pool);
         return pool;
+    }
+
+    private static void DestroySegment(RoadSegment segment)
+    {
+        // Scene unloading may destroy pooled children before Unity clears its
+        // pool registry, especially with domain reload disabled in the editor.
+        if (segment == null) return;
+        if (Application.isPlaying) Destroy(segment.gameObject);
+        else DestroyImmediate(segment.gameObject);
+    }
+
+    private void OnDestroy()
+    {
+        foreach (ObjectPool<RoadSegment> pool in pools.Values) pool.Clear();
+        pools.Clear();
+        activeSegments.Clear();
     }
 
     private void LogError(string message, Object context = null)
@@ -188,13 +256,16 @@ public sealed class InfiniteRoad : MonoBehaviour
     {
         private readonly ObjectPool<RoadSegment> pool;
 
-        public ActiveSegment(RoadSegment segment, ObjectPool<RoadSegment> pool)
+        public ActiveSegment(RoadSegment segment, ObjectPool<RoadSegment> pool, float startDistance)
         {
             Segment = segment;
+            StartDistance = startDistance;
             this.pool = pool;
         }
 
         public RoadSegment Segment { get; }
+        public float StartDistance { get; }
+        public float EndDistance => StartDistance + Segment.Length;
 
         public void Release()
         {

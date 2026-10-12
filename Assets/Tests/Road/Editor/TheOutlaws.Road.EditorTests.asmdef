@@ -1,0 +1,12 @@
+{
+    "name": "TheOutlaws.Road.EditorTests",
+    "references": [
+        "TheOutlaws.Road"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ]
+}

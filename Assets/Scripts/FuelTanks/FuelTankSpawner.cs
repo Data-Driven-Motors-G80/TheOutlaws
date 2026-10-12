@@ -16,6 +16,9 @@ public class FuelTankSpawner : MonoBehaviour
 
 
     [SerializeField] private float heightOffset = 0.8f;
+    private InfiniteRoad road;
+    private AutoDriveCar driver;
+    private float previousRoadDistance;
     private Vector3 previousCarPosition;
     private float distanceUntilSpawn;
 
@@ -29,6 +32,9 @@ public class FuelTankSpawner : MonoBehaviour
             return;
         }
 
+        road = FindFirstObjectByType<InfiniteRoad>();
+        driver = car.GetComponent<AutoDriveCar>();
+        previousRoadDistance = driver != null ? driver.RoadDistanceTravelled : 0f;
         previousCarPosition = car.position;
         distanceUntilSpawn = spawnSpacing;
 
@@ -39,19 +45,28 @@ public class FuelTankSpawner : MonoBehaviour
 
     private void Update()
     {
-        distanceUntilSpawn -= Vector3.Distance(car.position, previousCarPosition);
+        distanceUntilSpawn -= driver != null
+            ? Mathf.Max(0f, driver.RoadDistanceTravelled - previousRoadDistance)
+            : Vector3.Distance(car.position, previousCarPosition);
+        if (driver != null) previousRoadDistance = driver.RoadDistanceTravelled;
         previousCarPosition = car.position;
 
         if (distanceUntilSpawn <= 0f)
         {
-            SpawnFuelTank();
-            distanceUntilSpawn = spawnSpacing;
+            if (SpawnFuelTank()) distanceUntilSpawn = spawnSpacing;
         }
     }
 
-    private void SpawnFuelTank()
+    private bool SpawnFuelTank()
     {
-        GameObject tank = Instantiate(fuelTankPrefab, car.position + car.forward * spawnDistance + car.up * heightOffset, Quaternion.identity);
-        Destroy(tank, lifetime); // Destroy the fuel tank after it has been passed by the car
+        if (road == null || !road.TryGetPointAhead(car.position, spawnDistance, out RoadPathPoint point)) return false;
+        road.TryGetPathPoint(car.position, out RoadPathPoint current);
+        float lateral = Mathf.Clamp(Vector3.Dot(car.position - current.Position, current.Right),
+            -point.Width * 0.5f + 1f, point.Width * 0.5f - 1f);
+        GameObject tank = Instantiate(fuelTankPrefab,
+            point.Position + point.Right * lateral + point.Up * heightOffset,
+            Quaternion.LookRotation(point.Forward, point.Up));
+        Destroy(tank, lifetime);
+        return true;
     }
 }
