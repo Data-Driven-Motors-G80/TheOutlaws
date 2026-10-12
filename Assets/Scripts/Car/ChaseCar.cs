@@ -3,7 +3,6 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class ChaseCar : MonoBehaviour
 {
-    private const float SampleStep = 2f;
 
     [Header("References")]
     [SerializeField] private InfiniteRoad road;
@@ -341,31 +340,7 @@ public sealed class ChaseCar : MonoBehaviour
         float distance,
         out RoadPathPoint result)
     {
-        result = from;
-        float travelled = 0f;
-
-        while (travelled < distance)
-        {
-            float step = Mathf.Min(
-                SampleStep,
-                distance - travelled
-            );
-
-            Vector3 samplePosition =
-                result.Position -
-                result.Forward * step;
-
-            if (!road.TryGetPathPoint(
-                    samplePosition,
-                    out result))
-            {
-                return false;
-            }
-
-            travelled += step;
-        }
-
-        return true;
+        return road.TryGetPointAhead(from.Position, -distance, out result);
     }
 
     private bool HasValidSetup()

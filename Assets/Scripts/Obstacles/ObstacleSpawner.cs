@@ -5,7 +5,6 @@ using UnityEngine.Pool;
 [DisallowMultipleComponent]
 public sealed class ObstacleSpawner : MonoBehaviour
 {
-    private const float SampleStep = 5f;
 
     [Header("References")]
     [SerializeField] private InfiniteRoad road;
@@ -349,27 +348,8 @@ public sealed class ObstacleSpawner : MonoBehaviour
 
     private bool TryGetPointAhead(out RoadPathPoint point)
     {
-        if (!road.TryGetPathPoint(car.position, out point))
-        {
-            return false;
-        }
-
-        float travelled = 0f;
-
         float distanceAhead = useFairRows ? Mathf.Min(spawnDistance, 50f) : spawnDistance;
-        while (travelled < distanceAhead)
-        {
-            float step = Mathf.Min(SampleStep, distanceAhead - travelled);
-
-            if (!road.TryGetPathPoint(point.Position + point.Forward * step, out point))
-            {
-                return false;
-            }
-
-            travelled += step;
-        }
-
-        return true;
+        return road.TryGetPointAhead(car.position, distanceAhead, out point);
     }
 
     private void RecycleBehindCar()
@@ -384,7 +364,7 @@ public sealed class ObstacleSpawner : MonoBehaviour
                 continue;
             }
 
-            if (Vector3.Dot(car.position - obstacle.Transform.position, car.forward) > despawnDistance)
+            if (road.IsBehind(obstacle.Transform.position, car.position, despawnDistance))
             {
                 pool.Release(obstacle);
                 activeObstacles.RemoveAt(i);

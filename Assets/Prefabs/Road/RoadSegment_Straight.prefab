@@ -335,7 +335,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e7fd817173285a74f9a5fc591262a536, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RoadSegment
+  m_EditorClassIdentifier: TheOutlaws.Road::RoadSegment
   startPoint: {fileID: 3806413146877772182}
   endPoint: {fileID: 2035458033903148588}
   waypoints: []

@@ -58,14 +58,7 @@ public sealed class TrafficObstacleTutorial : MonoBehaviour
 
     private bool TryGetPointAhead(float distance, out RoadPathPoint point)
     {
-        if (!road.TryGetPathPoint(player.position, out point)) return false;
-        for (float travelled = 0f; travelled < distance; travelled += 4f)
-        {
-            float step = Mathf.Min(4f, distance - travelled);
-            if (!road.TryGetPathPoint(point.Position + point.Forward * step, out point))
-                return false;
-        }
-        return true;
+        return road.TryGetPointAhead(player.position, distance, out point);
     }
 
     private void OnDestroy()
