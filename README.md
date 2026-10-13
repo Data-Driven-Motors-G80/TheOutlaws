@@ -13,8 +13,9 @@ selected gameplay ideas from Team 21's **Redline Run** into one cohesive game.
   and your missions (completed / 10, the current mission and the next two).
 - **Tutorial (show, don't tell):** one small box with one short instruction (LEFT AND RIGHT, AVOID OBSTACLES, GRAB FUEL, GRAB AMMO, SHOOT)
   that stays until you do it; A / Left Arrow and D / Right Arrow are labelled LEFT and RIGHT. A miss flashes "TRY AGAIN!" for a second. Order: move both ways → dodge a block → fuel plunges
-  (never empties) and the F waits in the open lane past a block → collect A boxes → shoot a "2" wall (driving into it resets:
-  collect ammo again, then a new wall). The car drives at 14 m/s, the police can close in but never catch you, and nothing
+  (never empties) and the F waits in the open lane past a block → collect at least 3 rounds from A boxes → destroy a "1" wall
+  with one shot, then a "2" wall with two shots. The shooting prompt explains that the number on a block is the shots needed;
+  hitting a wall requires collecting ammo again and retrying that wall. The car drives at 14 m/s, the police can close in but never catch you, and nothing
   counts. The real run then starts seamlessly with a "GO!" chip and distance counting from 0.
 - The fuel bar turns red under 30%.
 - Blocks show the shots needed on their front face (green 1, yellow 2). Pickups are labelled on their front face:
@@ -33,7 +34,7 @@ selected gameplay ideas from Team 21's **Redline Run** into one cohesive game.
 - Pickups never spawn on top of each other or inside/just behind a block.
 - **Portals:** a giant glowing gate fills the whole road (no way around it). The first, to the mountains (snow), stands at
   500 m; each environment lasts another 500 m before the next gate. Arriving shows "PORTAL! YOU ENTERED THE MOUNTAINS"
-  (or "BACK TO THE CITY").
+  (or "BACK TO THE CITY"). A live "PORTAL IN ... m" countdown sits beneath the distance and messages during the real run.
 - The top-right rear camera shows the roof of your car and the police behind it; its border turns red as they close in.
 - Mystery boxes: none for the first 500 m, then roughly every 320 m. Reverse steering 10%, nitro, shield and police
   jammer 30% each. Only one power-up at a time: no new ? box appears while one is active or another is still on the road. Grabbing one shows a single centred message
