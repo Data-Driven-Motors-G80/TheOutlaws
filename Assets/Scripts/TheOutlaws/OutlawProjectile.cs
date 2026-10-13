@@ -27,9 +27,9 @@ public sealed class OutlawProjectile : MonoBehaviour
         projectile.transform.localScale = Vector3.one * 0.28f;
 
         Renderer renderer = projectile.GetComponent<Renderer>();
-        renderer.material.color = targetsPolice
+        renderer.sharedMaterial = RuntimeMaterials.Coloured(targetsPolice
             ? new Color(0.2f, 0.75f, 1f)
-            : new Color(1f, 0.75f, 0.05f);
+            : new Color(1f, 0.75f, 0.05f));
 
         SphereCollider projectileCollider = projectile.GetComponent<SphereCollider>();
         projectileCollider.isTrigger = true;

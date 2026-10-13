@@ -3,9 +3,6 @@ using UnityEngine;
 
 public sealed class PortalGate : MonoBehaviour
 {
-    private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
-    private static readonly int ColorId = Shader.PropertyToID("_Color");
-
     public static PortalGate Create(RoadPathPoint point, Color colour, string label)
     {
         GameObject gate = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -18,10 +15,7 @@ public sealed class PortalGate : MonoBehaviour
         gate.transform.localScale = new Vector3(point.Width + 12f, height, 0.6f);
 
         Renderer renderer = gate.GetComponent<Renderer>();
-        var block = new MaterialPropertyBlock();
-        block.SetColor(BaseColorId, colour);
-        block.SetColor(ColorId, colour);
-        renderer.SetPropertyBlock(block);
+        renderer.sharedMaterial = RuntimeMaterials.Coloured(colour);
         renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 
         WorldLabel text = WorldLabel.AttachToFrontFace(renderer, gate.transform, label, Color.white);

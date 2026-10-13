@@ -22,9 +22,7 @@ public sealed class OutlawAmmoPickup : MonoBehaviour
         else Object.DestroyImmediate(visualObject.GetComponent<Collider>());
 
         Renderer renderer = visualObject.GetComponent<Renderer>();
-        Material material = new Material(renderer.sharedMaterial);
-        material.color = new Color(0.12f, 0.55f, 1f);
-        renderer.sharedMaterial = material;
+        renderer.sharedMaterial = RuntimeMaterials.Coloured(new Color(0.12f, 0.55f, 1f));
 
         CapsuleCollider trigger = pickup.AddComponent<CapsuleCollider>();
         trigger.isTrigger = true;
