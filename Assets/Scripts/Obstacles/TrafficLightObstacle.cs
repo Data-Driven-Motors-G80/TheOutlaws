@@ -13,8 +13,17 @@ public sealed class TrafficLightObstacle : MonoBehaviour
     private Renderer[] renderers;
     private MaterialPropertyBlock propertyBlock;
 
+    private WorldLabel shotLabel;
+
     public TrafficObstacleState CurrentState { get; private set; }
+    public TrafficObstacleState InitialState { get; private set; }
     public bool StartedRed { get; private set; }
+    /// <summary>The car drove into this block (shielded or not).</summary>
+    public bool WasHit { get; private set; }
+
+    public void MarkHit() => WasHit = true;
+    /// <summary>Shots still needed to clear this block (green 1, yellow 2, red 3).</summary>
+    public int ShotsRemaining => (int)CurrentState + 1;
     public float ProximityDrain => TrafficObstacleRules.GetProximityDrain(CurrentState);
     public float FuelPenaltyFraction => TrafficObstacleRules.GetFuelPenaltyFraction(CurrentState);
 
@@ -22,15 +31,25 @@ public sealed class TrafficLightObstacle : MonoBehaviour
     {
         CacheRenderers();
         CurrentState = initialState;
+        InitialState = initialState;
+        WasHit = false;
         StartedRed = initialState == TrafficObstacleState.Red;
         ApplyVisualState();
+        PlaceShotLabel();
     }
 
     /// <summary>Returns true when this shot destroys the green obstacle.</summary>
     public bool ApplyShot()
     {
+        TrafficObstacleState before = CurrentState;
         CurrentState = TrafficObstacleRules.ApplyShot(CurrentState, out bool destroyed);
         if (!destroyed) ApplyVisualState();
+        GameEvents.RaiseObstacleShot(before, destroyed);
+        if (destroyed)
+        {
+            GameEvents.RaiseObstacleDestroyed(InitialState);
+            if (shotLabel != null) shotLabel.SetVisible(false);
+        }
         return destroyed;
     }
 
@@ -71,5 +90,32 @@ public sealed class TrafficLightObstacle : MonoBehaviour
             propertyBlock.SetColor(ColorId, color);
             obstacleRenderer.SetPropertyBlock(propertyBlock);
         }
+
+        if (shotLabel != null) shotLabel.SetText(ShotsRemaining.ToString());
+    }
+
+    private void PlaceShotLabel()
+    {
+        if (!Application.isPlaying || renderers.Length == 0 || renderers[0] == null) return;
+        // The shot count is printed on the face the player drives towards.
+        if (shotLabel == null)
+            shotLabel = WorldLabel.AttachToFrontFace(renderers[0], transform, ShotsRemaining.ToString(), Color.white);
+        shotLabel.SetText(ShotsRemaining.ToString());
+        shotLabel.SetVisible(true);
+    }
+
+    private void OnEnable()
+    {
+        if (shotLabel != null) shotLabel.SetVisible(true);
+    }
+
+    private void OnDisable()
+    {
+        if (shotLabel != null) shotLabel.SetVisible(false);
+    }
+
+    private void OnDestroy()
+    {
+        if (shotLabel != null) Destroy(shotLabel.gameObject);
     }
 }

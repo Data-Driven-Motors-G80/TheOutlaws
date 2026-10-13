@@ -2,8 +2,9 @@ using UnityEngine;
 
 public sealed class OutlawProjectile : MonoBehaviour
 {
-    private const float Speed = 34f;
-    private const float MaximumRange = 30f;
+    // Effectively unlimited range: the shot flies until it hits a block or leaves the visible road.
+    private const float Speed = 70f;
+    private const float MaximumRange = 200f;
     private bool targetsPolice;
     private CarPickupEffects pickupEffects;
     private ObstacleSpawner obstacles;
@@ -47,7 +48,7 @@ public sealed class OutlawProjectile : MonoBehaviour
         behaviour.targetsPolice = targetsPolice;
         behaviour.pickupEffects = effects;
         behaviour.obstacles = obstacleSpawner;
-        Object.Destroy(projectile, 3f);
+        Object.Destroy(projectile, MaximumRange / Speed + 0.5f);
     }
 
     private void Update()
@@ -63,14 +64,33 @@ public sealed class OutlawProjectile : MonoBehaviour
         {
             OnTriggerEnter(hit.collider);
             if (consumed) return;
+            if (HitsWall(hit))
+            {
+                // Bullets stop at the roadside walls instead of passing through them.
+                transform.position += direction * hit.distance;
+                if (!targetsPolice) GameEvents.RaiseShotMissed();
+                consumed = true;
+                Destroy(gameObject);
+                return;
+            }
         }
         transform.position += direction * distance;
         distanceTravelled += distance;
         if (distanceTravelled >= MaximumRange)
         {
+            if (!targetsPolice) GameEvents.RaiseShotMissed();
             consumed = true;
             Destroy(gameObject);
         }
+    }
+
+    /// <summary>A solid, roughly vertical surface that isn't the player's car (walls and barriers).</summary>
+    private static bool HitsWall(RaycastHit hit)
+    {
+        Collider collider = hit.collider;
+        if (collider == null || collider.isTrigger || hit.distance <= 0f) return false;
+        if (collider.GetComponentInParent<OutlawShooting>() != null) return false;
+        return Mathf.Abs(hit.normal.y) < 0.6f;
     }
 
     private void OnTriggerEnter(Collider other)

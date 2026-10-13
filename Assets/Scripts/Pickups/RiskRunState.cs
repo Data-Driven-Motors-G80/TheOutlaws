@@ -25,6 +25,13 @@ public sealed class RiskRunState
     // This run is the sole clock owner; callers read Effects but advance it through Tick.
     public PickupEffectState Effects { get; } = new PickupEffectState();
     public float PursuitGap => (float)pursuitGap;
+    /// <summary>While above zero (the tutorial), hits and closing speed can never end the run.</summary>
+    public float MinimumPursuitGap { get; set; }
+    /// <summary>
+    /// When the player is faster than the police, the gap only grows back up to this distance
+    /// (the police tail you rather than vanishing). Bonuses like the jammer can still exceed it.
+    /// </summary>
+    public float RecoveryCap { get; set; } = MaximumPursuitGap;
     public bool IsGameOver { get; private set; }
     public bool HasNitro { get; private set; }
     public float ForwardSpeedMultiplier => HasNitro ? 1.35f : Effects.ForwardSpeedMultiplier;
@@ -134,7 +141,7 @@ public sealed class RiskRunState
         // from the current distance so every hit costs the same number of
         // metres, including after the player has earned recovery distance.
         pursuitGap = Math.Max(
-            0d,
+            MinimumPursuitGap,
             pursuitGap - InitialPursuitGap * clampedDrain);
         if (pursuitGap <= 0d)
         {
@@ -195,7 +202,7 @@ public sealed class RiskRunState
                 relativeSpeed = 0d;
 
             // Resolve capture before ticking Effects: an expiry at the capture instant earns no bonus.
-            if (relativeSpeed < 0d && pursuitGap / -relativeSpeed <= step)
+            if (MinimumPursuitGap <= 0f && relativeSpeed < 0d && pursuitGap / -relativeSpeed <= step)
             {
                 double timeUntilCapture = pursuitGap / -relativeSpeed;
                 LastTickForwardDistance += (float)(forwardSpeed * timeUntilCapture);
@@ -208,7 +215,14 @@ public sealed class RiskRunState
             }
 
             LastTickForwardDistance += (float)(forwardSpeed * step);
-            pursuitGap = Math.Min(MaximumPursuitGap, pursuitGap + relativeSpeed * step);
+            double next = pursuitGap + relativeSpeed * step;
+            if (relativeSpeed > 0d)
+            {
+                // Pulling away only recovers the gap up to the cap (never shrinks a bigger, bonus gap).
+                double cap = Math.Min(RecoveryCap, MaximumPursuitGap);
+                next = pursuitGap >= cap ? pursuitGap : Math.Min(cap, next);
+            }
+            pursuitGap = Math.Max(MinimumPursuitGap, Math.Min(MaximumPursuitGap, next));
             AdvanceCrashTimers(step);
             Effects.Tick((float)step);
             remaining -= step;
@@ -259,9 +273,21 @@ public sealed class RiskRunState
             Effects.Apply(snapshot.ActiveEffect, snapshot.EffectRemaining);
     }
 
+    /// <summary>Starts the real chase from the opening gap without touching pickups or effects.</summary>
+    public void ResetPursuit()
+    {
+        if (IsGameOver) return;
+        pursuitGap = InitialPursuitGap;
+        MinimumPursuitGap = 0f;
+        crashSlowRemaining = 0d;
+        collisionProtectionRemaining = 0d;
+        recoveryWaitRemaining = 0d;
+    }
+
     public void Reset()
     {
         pursuitGap = InitialPursuitGap;
+        MinimumPursuitGap = 0f;
         IsGameOver = false;
         HasNitro = false;
         crashSlowRemaining = 0d;

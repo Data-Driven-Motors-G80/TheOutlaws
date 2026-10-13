@@ -76,7 +76,8 @@ public sealed class HandleCrash : MonoBehaviour
         {
             if (!other.enabled) return;
             other.enabled = false;
-            RunAnalyticsState.Count("fuel_pickups");
+            tank.MarkCollected();
+            GameEvents.RaisePickupCollected(PickupKind.Fuel);
             if (fuelMeter != null)
             {
                 fuelMeter.ChangeFuel(tank.FuelAmount);
@@ -94,6 +95,7 @@ public sealed class HandleCrash : MonoBehaviour
 
         if (chaseCar != null)
         {
+            GameEvents.RaisePoliceContact();
             if (pickupEffects != null && pickupEffects.isActiveAndEnabled)
             {
                 if (pickupEffects.TryConsumeShield())
@@ -132,13 +134,18 @@ public sealed class HandleCrash : MonoBehaviour
             }
 
             contactedObstacles[obstacle] = obstacle.position;
-            RunAnalyticsState.Count("obstacle_collisions");
+            TrafficLightObstacle trafficLight = obstacle.GetComponent<TrafficLightObstacle>();
+            TrafficObstacleState impactState = trafficLight != null
+                ? trafficLight.CurrentState
+                : TrafficObstacleState.Green;
+            if (trafficLight != null) trafficLight.MarkHit();
             if (pickupEffects.TryConsumeShield())
             {
+                GameEvents.RaiseObstacleCollision(impactState, true);
                 return;
             }
 
-            TrafficLightObstacle trafficLight = obstacle.GetComponent<TrafficLightObstacle>();
+            GameEvents.RaiseObstacleCollision(impactState, false);
             float proximityDrain = trafficLight != null
                 ? trafficLight.ProximityDrain
                 : crashDrainAmount;

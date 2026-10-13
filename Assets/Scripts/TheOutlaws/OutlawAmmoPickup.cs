@@ -5,6 +5,7 @@ public sealed class OutlawAmmoPickup : MonoBehaviour
     [SerializeField] private OutlawShooting shooting;
     [SerializeField] private Transform visual;
     private bool collected;
+    private bool reportedFull;
 
     public static GameObject Create(Vector3 position, Vector3 up, OutlawShooting playerShooting)
     {
@@ -13,10 +14,10 @@ public sealed class OutlawAmmoPickup : MonoBehaviour
         pickup.transform.position = position;
         pickup.transform.up = up;
 
-        GameObject visualObject = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        GameObject visualObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
         visualObject.name = "Ammo Visual";
         visualObject.transform.SetParent(pickup.transform, false);
-        visualObject.transform.localScale = new Vector3(1f, 0.32f, 1f);
+        visualObject.transform.localScale = new Vector3(0.9f, 0.9f, 0.9f);
         if (Application.isPlaying) Object.Destroy(visualObject.GetComponent<Collider>());
         else Object.DestroyImmediate(visualObject.GetComponent<Collider>());
 
@@ -36,6 +37,8 @@ public sealed class OutlawAmmoPickup : MonoBehaviour
         OutlawAmmoPickup behaviour = pickup.AddComponent<OutlawAmmoPickup>();
         behaviour.shooting = playerShooting;
         behaviour.visual = visualObject.transform;
+        if (Application.isPlaying)
+            WorldLabel.Attach(renderer, "A", Color.white);
         return pickup;
     }
 
@@ -46,20 +49,30 @@ public sealed class OutlawAmmoPickup : MonoBehaviour
             return;
         }
 
-        visual.Rotate(Vector3.up, 90f * Time.deltaTime, Space.Self);
-        visual.localPosition = Vector3.up * (Mathf.Sin(Time.time * 3f) * 0.15f);
+        visual.localPosition = Vector3.up * (0.3f + Mathf.Sin(Time.time * 3f) * 0.15f);
+    }
+
+    public bool Collected => collected;
+
+    private void Start()
+    {
+        PickupPlacement.EnsureClear(transform);
     }
 
     private void OnTriggerEnter(Collider other)
     {
-        if (!collected && shooting != null &&
-            other.GetComponentInParent<OutlawShooting>() == shooting && shooting.AddAmmo(1))
+        if (collected || shooting == null || other.GetComponentInParent<OutlawShooting>() != shooting) return;
+        if (!shooting.AddAmmo(1))
         {
-            // Destroy is deferred; multiple car colliders can enter this frame.
-            collected = true;
-            RunAnalyticsState.Count("ammo_pickups");
-            GetComponent<Collider>().enabled = false;
-            Destroy(gameObject);
+            if (!reportedFull) GameEvents.RaiseAmmoPickupWastedFull();
+            reportedFull = true;
+            return;
         }
+
+        // Destroy is deferred; multiple car colliders can enter this frame.
+        collected = true;
+        GameEvents.RaisePickupCollected(PickupKind.Ammo);
+        GetComponent<Collider>().enabled = false;
+        Destroy(gameObject);
     }
 }

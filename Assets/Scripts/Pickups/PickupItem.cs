@@ -8,6 +8,8 @@ public sealed class PickupItem : MonoBehaviour
     [SerializeField, Min(0.1f)] private float duration = 5f;
     private bool collected;
 
+    public bool Collected => collected;
+
     public void Configure(PickupEffectType type, float seconds)
     {
         effect = type;

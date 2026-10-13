@@ -1,0 +1,7 @@
+{
+  "enabled": true,
+  "sendFromEditor": true,
+  "endpointUrl": "https://script.google.com/macros/s/AKfycbxIxSZSZbiykE_nbv98UgLfep7z0b_A8lZmpBXTbB_oN5DRPDuwiA1usbDhupFYDTRI/exec",
+  "buildTag": "weewoo-1.1",
+  "flushSeconds": 12
+}

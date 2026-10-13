@@ -26,12 +26,27 @@ public static class RunSession
 
     public static float NextSwitchAt = -1f;
 
+    /// <summary>The first switch (city to snow) happens at a random run distance, well after 1,000 m.</summary>
+    public static float FirstSwitchDistance = -1f;
+    public static bool FirstSwitchDone;
+
+    /// <summary>Run distance at which the next portal gate stands (-1 = not scheduled yet).</summary>
+    public static float NextPortalDistance = -1f;
+
+    public static void ResetSwitchSchedule()
+    {
+        NextSwitchAt = -1f;
+        FirstSwitchDistance = -1f;
+        FirstSwitchDone = false;
+        NextPortalDistance = -1f;
+    }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
     {
         pending = default;
         HasPending = false;
-        NextSwitchAt = -1f;
+        ResetSwitchSchedule();
     }
 
     public static void SetPending(RunSnapshot snapshot)

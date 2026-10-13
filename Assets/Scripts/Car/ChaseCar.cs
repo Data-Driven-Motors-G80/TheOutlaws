@@ -242,13 +242,19 @@ public sealed class ChaseCar : MonoBehaviour
 
     private void UpdateVisibility()
     {
+        // The HUD's rear-view camera always shows the police, so they are never hidden
+        // (when no rear view exists, the original hide-while-far behaviour applies).
+        bool alwaysVisible = RearViewActive;
         float normalizedGap = effects != null && effects.isActiveAndEnabled
             ? effects.RunState.PursuitGap / RiskRunState.MaximumPursuitGap
             : meter != null ? meter.Value : 1f;
         foreach (Renderer policeRenderer in policeRenderers)
             if (policeRenderer != null)
-                policeRenderer.forceRenderingOff = normalizedGap > visibleBelowMeterValue;
+                policeRenderer.forceRenderingOff = !alwaysVisible && normalizedGap > visibleBelowMeterValue;
     }
+
+    /// <summary>Set by the rear-view camera while it exists.</summary>
+    public static bool RearViewActive { get; set; }
 
     private void OnDisable()
     {

@@ -5,7 +5,8 @@ using UnityEngine.InputSystem;
 public sealed class OutlawShooting : MonoBehaviour
 {
     private const int MaximumAmmoValue = 5;
-    private const float FireCooldown = 0.3f;
+    // No cooldown: every Space press fires (as long as there is ammo).
+    private const float FireCooldown = 0f;
 
     private AutoDriveCar driver;
     private CarPickupEffects pickupEffects;
@@ -59,6 +60,7 @@ public sealed class OutlawShooting : MonoBehaviour
     {
         if (CurrentAmmo <= 0)
         {
+            GameEvents.RaiseDryFire();
             return;
         }
 
@@ -74,7 +76,7 @@ public sealed class OutlawShooting : MonoBehaviour
             GetComponentsInChildren<Collider>());
 
         CurrentAmmo--;
-        RunAnalyticsState.Count("shots_fired");
+        GameEvents.RaiseShotFired();
         nextFireTime = Time.time + FireCooldown;
     }
 }

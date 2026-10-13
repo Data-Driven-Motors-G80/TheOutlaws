@@ -1,26 +1,81 @@
 using System;
 
-/// <summary>Bounded difficulty and periodic relief, driven by active gameplay seconds.</summary>
+/// <summary>Smooth, bounded difficulty driven by active gameplay seconds.</summary>
 public readonly struct RunDifficultyState
 {
+    public const float StartSpeed = 20f;
+    public const float TopSpeed = 30f;
+    /// <summary>Seconds of real-run time until every curve reaches its cap.</summary>
+    public const float RampSeconds = 90f;
+
+    public static float Ramp(float elapsedSeconds)
+    {
+        return Math.Min(1f, Math.Max(0f, elapsedSeconds) / RampSeconds);
+    }
+
+    /// <summary>Retained for code that still reasons in 25-second steps.</summary>
     public static int PressureSteps(float elapsedSeconds)
     {
         return (int)(Math.Max(0f, elapsedSeconds) / 25f);
     }
 
+    /// <summary>20 m/s at the start, rising steadily to 30 m/s at 90 s.</summary>
     public static float DrivingSpeed(float elapsedSeconds)
     {
-        return Math.Min(30f, 15f + PressureSteps(elapsedSeconds));
+        return StartSpeed + (TopSpeed - StartSpeed) * Ramp(elapsedSeconds);
     }
 
+    /// <summary>Seconds of gentle warm-up at the start of every run.</summary>
+    public const float WarmUpSeconds = 30f;
+    /// <summary>Seconds after the warm-up until obstacles reach their densest.</summary>
+    public const float BuildUpSeconds = 120f;
+
+    /// <summary>
+    /// How tightly obstacle rows are packed: a gentle 0.6 at the start, 1.3 after the
+    /// 30 s warm-up, then building to 2.4 over the next two minutes. Spacing still respects speed.
+    /// </summary>
     public static float ObstacleDensity(float elapsedSeconds)
     {
-        return Math.Min(1.6f, 1f + PressureSteps(elapsedSeconds) * 0.08f);
+        // Never stops growing: after the build-up, +0.5 density per minute (up to 4.5).
+        return Math.Min(4.5f, Phase(elapsedSeconds, 0.6f, 1.3f, 2.4f) + LateMinutes(elapsedSeconds) * 0.5f);
     }
 
+    /// <summary>Minutes driven after the warm-up and build-up (keeps difficulty rising all run).</summary>
+    public static float LateMinutes(float elapsedSeconds)
+    {
+        return Math.Max(0f, elapsedSeconds - WarmUpSeconds - BuildUpSeconds) / 60f;
+    }
+
+    /// <summary>Half-width of the guaranteed open gap: roomy at first, tighter (never closed) later on.</summary>
+    public static float GapHalfWidth(float elapsedSeconds, double roll)
+    {
+        float tightness = Math.Min(1f, Math.Max(0f, elapsedSeconds) / 240f);
+        float widest = 1.5f - 0.25f * tightness;
+        float narrowest = 1.25f - 0.12f * tightness;
+        return narrowest + (widest - narrowest) * (float)Math.Max(0d, Math.Min(1d, roll));
+    }
+
+    /// <summary>Chance that a row blocks two lanes instead of one (always leaves a lane open).</summary>
+    public static float DoubleRowChance(float elapsedSeconds)
+    {
+        return Math.Min(0.9f, Phase(elapsedSeconds, 0.1f, 0.3f, 0.65f) + LateMinutes(elapsedSeconds) * 0.1f);
+    }
+
+    private static float Phase(float elapsedSeconds, float start, float afterWarmUp, float maximum)
+    {
+        float t = Math.Max(0f, elapsedSeconds);
+        if (t < WarmUpSeconds) return start + (afterWarmUp - start) * (t / WarmUpSeconds);
+        return afterWarmUp + (maximum - afterWarmUp) * Math.Min(1f, (t - WarmUpSeconds) / BuildUpSeconds);
+    }
+
+    /// <summary>
+    /// Police speed minus player speed. Always negative: a player who stops getting hit always pulls
+    /// away again. You pull away at 1.5 m/s at first, slowing to 0.6 m/s after 150 s, so later on
+    /// hits close together are what gets you caught.
+    /// </summary>
     public static float PoliceClosingSpeed(float elapsedSeconds)
     {
-        return Math.Min(0.8f, 0.15f + PressureSteps(elapsedSeconds) * 0.08f);
+        return -Math.Max(0.6f, 1.5f - Math.Max(0f, elapsedSeconds) * 0.006f);
     }
 
     public float Progress { get; }

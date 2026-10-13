@@ -3,33 +3,61 @@ using NUnit.Framework;
 public sealed class RunDifficultyStateTests
 {
     [Test]
-    public void DrivingPressureStartsAtTwentyFiveSeconds()
+    public void SpeedAndDensityRampSmoothlyToTheirCaps()
     {
-        Assert.That(RunDifficultyState.DrivingSpeed(15f), Is.EqualTo(15f));
-        Assert.That(RunDifficultyState.DrivingSpeed(24.9f), Is.EqualTo(15f));
-        Assert.That(RunDifficultyState.DrivingSpeed(25f), Is.EqualTo(16f));
-        Assert.That(RunDifficultyState.ObstacleDensity(50f), Is.EqualTo(1.16f).Within(0.001f));
+        Assert.That(RunDifficultyState.DrivingSpeed(0f), Is.EqualTo(20f));
+        Assert.That(RunDifficultyState.DrivingSpeed(45f), Is.EqualTo(25f).Within(0.001f));
+        Assert.That(RunDifficultyState.DrivingSpeed(90f), Is.EqualTo(30f));
         Assert.That(RunDifficultyState.DrivingSpeed(9999f), Is.EqualTo(30f));
-        Assert.That(RunDifficultyState.ObstacleDensity(9999f), Is.EqualTo(1.6f));
+        Assert.That(RunDifficultyState.ObstacleDensity(0f), Is.EqualTo(0.6f));
+        Assert.That(RunDifficultyState.ObstacleDensity(9999f), Is.EqualTo(4.5f).Within(0.001f));
+        Assert.That(RunDifficultyState.DoubleRowChance(9999f), Is.EqualTo(0.9f).Within(0.001f));
+        // Warm-up: sparse at first, normal after 30 s, densest after another two minutes.
+        Assert.That(RunDifficultyState.ObstacleDensity(30f), Is.EqualTo(1.3f).Within(0.001f));
+        Assert.That(RunDifficultyState.ObstacleDensity(90f), Is.EqualTo(1.85f).Within(0.001f));
+        Assert.That(RunDifficultyState.DoubleRowChance(0f), Is.EqualTo(0.1f).Within(0.001f));
+        // Keeps rising after the build-up: denser at 4 minutes than at 3.
+        Assert.That(RunDifficultyState.ObstacleDensity(240f), Is.GreaterThan(RunDifficultyState.ObstacleDensity(180f)));
     }
 
     [Test]
-    public void CarriedElapsedTimeKeepsDifficultyAcrossEnvironmentChanges()
+    public void DifficultyNeverDecreasesOverTime()
     {
-        // A switch at 74 seconds keeps the existing pressure, with the next step at 75.
-        Assert.That(RunDifficultyState.DrivingSpeed(74f), Is.EqualTo(17f));
-        Assert.That(RunDifficultyState.ObstacleDensity(74f), Is.EqualTo(1.16f).Within(0.001f));
-        Assert.That(RunDifficultyState.DrivingSpeed(75f), Is.EqualTo(18f));
-        Assert.That(RunDifficultyState.ObstacleDensity(75f), Is.EqualTo(1.24f).Within(0.001f));
+        for (float t = 0f; t < 300f; t += 1f)
+        {
+            Assert.That(RunDifficultyState.DrivingSpeed(t + 1f), Is.GreaterThanOrEqualTo(RunDifficultyState.DrivingSpeed(t)));
+            Assert.That(RunDifficultyState.ObstacleDensity(t + 1f), Is.GreaterThanOrEqualTo(RunDifficultyState.ObstacleDensity(t)));
+            Assert.That(RunDifficultyState.PoliceClosingSpeed(t + 1f), Is.GreaterThanOrEqualTo(RunDifficultyState.PoliceClosingSpeed(t)));
+        }
     }
 
     [Test]
-    public void PolicePressureKeepsOpeningThenRampsToNewCap()
+    public void PlayerAlwaysOutpacesThePoliceButLessSoLater()
     {
-        Assert.That(RunDifficultyState.PoliceClosingSpeed(24.9f), Is.EqualTo(0.15f));
-        Assert.That(RunDifficultyState.PoliceClosingSpeed(25f), Is.EqualTo(0.23f).Within(0.001f));
-        Assert.That(RunDifficultyState.PoliceClosingSpeed(100f), Is.EqualTo(0.47f).Within(0.001f));
-        Assert.That(RunDifficultyState.PoliceClosingSpeed(9999f), Is.EqualTo(0.8f));
+        Assert.That(RunDifficultyState.PoliceClosingSpeed(0f), Is.EqualTo(-1.5f));
+        Assert.That(RunDifficultyState.PoliceClosingSpeed(100f), Is.EqualTo(-0.9f).Within(0.001f));
+        Assert.That(RunDifficultyState.PoliceClosingSpeed(9999f), Is.EqualTo(-0.6f));
+        for (float t = 0f; t < 600f; t += 10f)
+            Assert.That(RunDifficultyState.PoliceClosingSpeed(t), Is.LessThan(0f));
+    }
+
+    [Test]
+    public void OneHitIsRecoveredButHitsCloseTogetherAreFatal()
+    {
+        // One red hit, then clean driving: the gap recovers to the start (and no further).
+        var run = new RiskRunState { RecoveryCap = RiskRunState.InitialPursuitGap };
+        run.TryCrash(TrafficObstacleRules.RedProximityDrain);
+        Assert.That(run.PursuitGap, Is.LessThan(RiskRunState.InitialPursuitGap));
+        for (int i = 0; i < 600; i++) run.Tick(0.1f, 25f, 25f - 0.6f);
+        Assert.That(run.IsGameOver, Is.False);
+        Assert.That(run.PursuitGap, Is.EqualTo(RiskRunState.InitialPursuitGap).Within(0.001f));
+
+        // Two red hits a couple of seconds apart: caught.
+        var careless = new RiskRunState { RecoveryCap = RiskRunState.InitialPursuitGap };
+        careless.TryCrash(TrafficObstacleRules.RedProximityDrain);
+        careless.Tick(1.5f, 25f, 25f - 0.6f);
+        careless.TryCrash(TrafficObstacleRules.RedProximityDrain);
+        Assert.That(careless.IsGameOver, Is.True);
     }
 
     [Test]

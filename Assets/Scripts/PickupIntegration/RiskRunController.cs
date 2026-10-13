@@ -14,11 +14,12 @@ public sealed class RiskRunController : MonoBehaviour
     private bool restarting;
     private float slowedUntil;
     private bool hasShooting;
+    private bool restartOwnedByGame;
 
     // The manager owns the gameplay clock; preserve shot slowdown on top of difficulty.
     public void SetClosingSpeed(float metresPerSecond)
     {
-        policeClosingSpeed = Mathf.Clamp(metresPerSecond, -0.5f, 1f);
+        policeClosingSpeed = Mathf.Clamp(metresPerSecond, -3f, 1f);
     }
 
     public void ApplyShotSlowdown()
@@ -34,6 +35,8 @@ public sealed class RiskRunController : MonoBehaviour
         car = GetComponent<AutoDriveCar>();
         hasShooting = GetComponent<OutlawShooting>() != null;
         effects = GetComponent<CarPickupEffects>();
+        // The Outlaws game manager owns restarts (it returns to the title screen).
+        restartOwnedByGame = Object.FindFirstObjectByType<OutlawGameManager>() != null;
         ConfigureSpeeds();
     }
 
@@ -46,7 +49,7 @@ public sealed class RiskRunController : MonoBehaviour
         if (keyboard == null) return;
         if (effects.RunState.IsGameOver)
         {
-            if (!restarting && keyboard.rKey.wasPressedThisFrame)
+            if (!restartOwnedByGame && !restarting && keyboard.rKey.wasPressedThisFrame)
             {
                 restarting = true;
                 Scene activeScene = SceneManager.GetActiveScene();

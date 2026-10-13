@@ -40,6 +40,13 @@ public sealed class AutoDriveCar : MonoBehaviour
         managedDifficulty = true;
         currentForwardSpeed = Mathf.Clamp(speed, forwardSpeed, maximumForwardSpeed);
     }
+
+    /// <summary>The tutorial may drive slower than the run's starting speed.</summary>
+    public void SetTutorialSpeed(float speed)
+    {
+        managedDifficulty = true;
+        currentForwardSpeed = Mathf.Clamp(speed, 1f, maximumForwardSpeed);
+    }
     private float speedIncreaseTimer;
     private float lateralOffset;
     private float lateralSpeed;

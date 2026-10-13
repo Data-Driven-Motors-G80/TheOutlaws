@@ -1,5 +1,7 @@
 # Google Forms gameplay analytics
 
+> **Superseded** by `ANALYTICS.md` (Apps Script + Sheet). The game no longer submits to the form.
+
 Status: all 20 short-answer questions are created and published, field entry IDs are configured, and uploads are enabled for builds. An anonymous HTTP test submission was verified in Google Forms on 2026-10-11 with every field populated correctly. Unity gameplay-to-server and deployed WebGL receipt verification remain pending. Editor uploads remain disabled.
 
 Responses spreadsheet: https://docs.google.com/spreadsheets/d/1f3t5wuM9ULv2e6tuIEXRyRTaQqa7RzbFAPt0YLI8cF4/edit

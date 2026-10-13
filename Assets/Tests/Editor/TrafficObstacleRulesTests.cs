@@ -29,33 +29,32 @@ public sealed class TrafficObstacleRulesTests
         Assert.That(TrafficObstacleRules.GetFuelPenaltyFraction(TrafficObstacleState.Red),
             Is.EqualTo(0.2f));
         Assert.That(TrafficObstacleRules.GetFuelPenaltyFraction(TrafficObstacleState.Yellow),
+            Is.EqualTo(0.1f));
+        Assert.That(TrafficObstacleRules.GetFuelPenaltyFraction(TrafficObstacleState.Green),
             Is.Zero);
     }
 
     [Test]
-    public void EarlyGameNeverChoosesRedAndLateGameCanChooseEveryState()
+    public void ColourMixStaysTheSameAllRun()
     {
-        Assert.That(TrafficObstacleRules.ChooseInitialState(0f, 0.1d),
-            Is.EqualTo(TrafficObstacleState.Green));
-        Assert.That(TrafficObstacleRules.ChooseInitialState(0f, 0.9d),
-            Is.EqualTo(TrafficObstacleState.Yellow));
-        Assert.That(TrafficObstacleRules.ChooseInitialState(800f, 0.1d),
-            Is.EqualTo(TrafficObstacleState.Green));
-        Assert.That(TrafficObstacleRules.ChooseInitialState(800f, 0.4d),
-            Is.EqualTo(TrafficObstacleState.Yellow));
-        Assert.That(TrafficObstacleRules.ChooseInitialState(800f, 0.9d),
-            Is.EqualTo(TrafficObstacleState.Red));
+        foreach (float distance in new[] { 0f, 800f, 5000f })
+        {
+            Assert.That(TrafficObstacleRules.ChooseInitialState(distance, 0.1d), Is.EqualTo(TrafficObstacleState.Green));
+            Assert.That(TrafficObstacleRules.ChooseInitialState(distance, 0.7d), Is.EqualTo(TrafficObstacleState.Yellow));
+            Assert.That(TrafficObstacleRules.ChooseInitialState(distance, 0.9d), Is.EqualTo(TrafficObstacleState.Red));
+            Assert.That(TrafficRoadblockRules.ChoosePattern(distance, 0.9d), Is.EqualTo(TrafficRoadblockPattern.SplitChoice));
+        }
     }
 
     [Test]
     public void AmmoSpacingPreservesOpeningAndBecomesScarcer()
     {
-        Assert.That(AmmoSpawnSchedule.GetMinimumSpacing(0f), Is.EqualTo(180));
-        Assert.That(AmmoSpawnSchedule.GetMaximumSpacing(299f), Is.EqualTo(260));
-        Assert.That(AmmoSpawnSchedule.GetMinimumSpacing(300f), Is.EqualTo(300));
-        Assert.That(AmmoSpawnSchedule.GetMaximumSpacing(699f), Is.EqualTo(450));
-        Assert.That(AmmoSpawnSchedule.GetMinimumSpacing(700f), Is.EqualTo(400));
-        Assert.That(AmmoSpawnSchedule.GetMaximumSpacing(10000f), Is.EqualTo(600));
+        Assert.That(AmmoSpawnSchedule.GetMinimumSpacing(0f), Is.EqualTo(90));
+        Assert.That(AmmoSpawnSchedule.GetMaximumSpacing(299f), Is.EqualTo(140));
+        Assert.That(AmmoSpawnSchedule.GetMinimumSpacing(300f), Is.EqualTo(120));
+        Assert.That(AmmoSpawnSchedule.GetMaximumSpacing(699f), Is.EqualTo(180));
+        Assert.That(AmmoSpawnSchedule.GetMinimumSpacing(700f), Is.EqualTo(150));
+        Assert.That(AmmoSpawnSchedule.GetMaximumSpacing(10000f), Is.EqualTo(220));
     }
 
     [Test]
@@ -75,27 +74,23 @@ public sealed class TrafficObstacleRulesTests
     [Test]
     public void MidGameFavorsTwoLaneGreenAndYellowRoadblocks()
     {
-        Assert.That(TrafficRoadblockRules.GetNextSpacing(400f, 0d), Is.EqualTo(240f));
-        Assert.That(TrafficRoadblockRules.GetNextSpacing(400f, 0.999d), Is.LessThan(330f));
-        Assert.That(TrafficRoadblockRules.ChoosePattern(400f, 0.37d),
+        Assert.That(TrafficRoadblockRules.GetNextSpacing(400f, 0d), Is.EqualTo(140f));
+        Assert.That(TrafficRoadblockRules.GetNextSpacing(400f, 0.999d), Is.LessThan(196f));
+        Assert.That(TrafficRoadblockRules.ChoosePattern(400f, 0.30d),
             Is.EqualTo(TrafficRoadblockPattern.TwoLaneGreen));
-        Assert.That(TrafficRoadblockRules.ChoosePattern(400f, 0.70d),
+        Assert.That(TrafficRoadblockRules.ChoosePattern(400f, 0.60d),
             Is.EqualTo(TrafficRoadblockPattern.TwoLaneYellow));
-        Assert.That(TrafficRoadblockRules.ChoosePattern(400f, 0.80d),
-            Is.EqualTo(TrafficRoadblockPattern.FullGreen));
+        Assert.That(TrafficRoadblockRules.ChoosePattern(400f, 0.90d),
+            Is.EqualTo(TrafficRoadblockPattern.SplitChoice));
     }
 
     [Test]
-    public void UltraLateGameProducesMoreFullWallsAtShorterIntervals()
+    public void UltraLateGameUsesShorterIntervalsWithoutFullWidthWalls()
     {
-        Assert.That(TrafficRoadblockRules.GetNextSpacing(2100f, 0d), Is.EqualTo(160f));
-        Assert.That(TrafficRoadblockRules.GetNextSpacing(2100f, 0.999d), Is.LessThan(240f));
-        Assert.That(TrafficRoadblockRules.ChoosePattern(2100f, 0.2d),
-            Is.EqualTo(TrafficRoadblockPattern.FullGreen));
-        Assert.That(TrafficRoadblockRules.ChoosePattern(2100f, 0.6d),
-            Is.EqualTo(TrafficRoadblockPattern.FullYellow));
-        Assert.That(TrafficRoadblockRules.ChoosePattern(2100f, 0.9d),
-            Is.EqualTo(TrafficRoadblockPattern.MixedRedYellowGreen));
+        Assert.That(TrafficRoadblockRules.GetNextSpacing(2100f, 0d), Is.EqualTo(97.5f));
+        Assert.That(TrafficRoadblockRules.GetNextSpacing(4000f, 0d), Is.LessThan(TrafficRoadblockRules.GetNextSpacing(2100f, 0d)));
+        foreach (string name in System.Enum.GetNames(typeof(TrafficRoadblockPattern)))
+            Assert.That(name.StartsWith("Full"), Is.False, "Roadblocks must always leave a lane open.");
     }
 
 }

@@ -1,4 +1,4 @@
-# The Outlaws
+# Wee Woo Run (The Outlaws)
 
 A fast-paced Unity police-chase game where players weave through traffic,
 manage limited fuel and ammunition, shoot obstacles, and
@@ -9,19 +9,47 @@ selected gameplay ideas from Team 21's **Redline Run** into one cohesive game.
 
 ## Gameplay
 
-- Drive through Team 19's infinite-road environment.
-- Avoid or shoot traffic-light obstacles in front of the car. Red obstacles require three hits, yellow require two, and green require one. Collisions cost 18 m, 11.25 m, or 5.625 m of police distance respectively; hitting a red obstacle also removes 20% of maximum fuel. Fully destroying an obstacle that started red drops one ammo pickup just beyond it. Shots travel up to 30 metres and hit the nearest obstacle in their path.
-- Carry up to five rounds, starting with two. The opening tutorial places three extra ammo pickups before a full-width green and then yellow teaching barrier. Later ammo pickups grant one round and are visible 55 m ahead. Random spacing is 180–260 m before 300 m, 300–450 m from 300–700 m, and 400–600 m after 700 m. Spacing tiers use total run distance across environment changes.
-- From 330 m onward, roadblocks appear every 240–330 m and favor two-lane green/yellow walls, with occasional full-width and red/yellow/green choice walls; no all-red wall is generated. After 2,000 m, roadblocks appear every 160–240 m and 70% are full-width green or yellow walls.
-- Both scenes start at 20 m/s. The game manager uses a speed curve of 15 + 1 m/s per 25 seconds, clamped to the car’s starting speed and capped at 30 m/s; with the current settings, speed first rises above 20 m/s at 150 seconds. Obstacle density increases by 8 percentage points every 25 seconds, capped at 1.6, with speed-aware escape spacing. The car’s Inspector speed interval applies only when the game manager is not controlling difficulty.
-- Police closing speed starts at 0.15 m/s and rises by 0.08 m/s every 25 seconds, capped at 0.8 m/s.
-- Switch to a different environment at randomized intervals of 50–120 seconds. Speed, obstacle density, and police pressure continue using total run time, without a transition reset or relief period. Fuel, ammo, distance, and score carry over; opening teaching barriers do not repeat.
-- Snow steering uses 90% acceleration while steering and 30% while releasing, so even short steering taps leave noticeable sideways drift. Steering against the slide uses full braking grip until sideways motion reverses. A four-second ice notice appears on entry; city steering returns to full grip.
-- City roads are dark gray and snow roads are ice blue. Press F9 during gameplay in the Editor or a development build to test the transition.
-- Random special pickups give reverse steering a 10% chance; nitro, shield, and police distance recovery each have a 30% chance.
-- Drive as far as possible: there is no finish gate or automatic win at 1,350 m.
-- Fuel drains at 4 units per second from a 100-unit tank. Fuel pickups appear every 125 metres and restore 35 units in both city and snow; a full tank lasts 25 seconds without pickups.
-- Running out of fuel or letting the police catch you ends the run.
+- **Title screen:** *Wee Woo Run*, your best distance, a tutorial ON/OFF switch (ON for a browser's first game, OFF after)
+  and your missions (completed / 10, the current mission and the next two).
+- **Tutorial (show, don't tell):** one small box with one short instruction (STEER, DODGE, GRAB FUEL, GRAB AMMO, SHOOT)
+  that stays until you do it; a miss flashes "TRY AGAIN!" for a second. Order: steer both ways → dodge a block → fuel plunges
+  (never empties) and the F waits in the open lane past a block → collect A boxes → shoot a "2" wall (driving into it resets:
+  collect ammo again, then a new wall). The car drives at 14 m/s, the police can close in but never catch you, and nothing
+  counts. The real run then starts seamlessly with a "GO!" chip and distance counting from 0.
+- The fuel bar turns red under 30%.
+- Blocks show the shots needed on their front face (green 1, yellow 2, red 3). Pickups are labelled on their front face:
+  **A** ammo, **F** fuel, **?** mystery. Ammo is shown as one blue square per round (max 5, start with 2). Shots fly down
+  the whole visible road (stopping at walls) and there is no fire delay: every Space press fires. Blocks are bigger and gaps are sometimes tight.
+- Hitting blocks costs police distance (green 9 m, yellow 15.75 m plus 10% fuel, red 24.75 m plus 20% fuel). Destroying a
+  red block drops an A box.
+- Roadblocks start at 200 m and come every 150–210 m (90–130 m after 2,000 m). The mix of blocks never changes
+  (55% green 1s, 30% yellow 2s, 15% red 3s); only how many there are increases. Every row and roadblock still **leaves one
+  lane open**, so ammo is the practical shortcut, never a requirement. A boxes come every 90–220 m to match.
+- Difficulty: speed rises 20 → 30 m/s over 90 s. Obstacles start sparse during a 30 s warm-up, build up over two minutes,
+  then **keep getting denser for the whole run** (more rows, more double-lane rows, tighter gaps, roadblocks from 210 m
+  apart down to ~55 m apart). Blocks that would sit side by side are merged into one bigger block.
+- **The police can only catch you through mistakes.** You are always slightly faster: after a hit they close in, then
+  you pull away again (back to the starting 45 m gap, never further). You pull away at 1.5 m/s at first and 0.6 m/s after
+  2.5 minutes, so it's several hits close together, not clean driving, that gets you caught.
+- Pickups never spawn on top of each other or inside/just behind a block.
+- **Portals:** a giant glowing gate fills the whole road (no way around it). The first, to the mountains (snow), stands at a
+  random 1,200–1,800 m; the mountains last 1,000 m, then a gate leads back to the city; the next trip comes 1,200–2,000 m
+  later. Arriving shows "PORTAL! YOU ENTERED THE MOUNTAINS" (or "BACK TO THE CITY").
+- The top-right rear camera shows the roof of your car and the police behind it; its border turns red as they close in.
+- Mystery boxes: none for the first 500 m, then roughly every 320 m. Reverse steering 10%, nitro, shield and police
+  jammer 30% each. Only one power-up at a time: no new ? box appears while one is active or another is still on the road. Grabbing one shows a single centred message
+  ("NITRO ACTIVATED!", "SHIELD ACTIVATED!", "POLICE JAMMED!"; reverse counts down "CONTROLS SWAP IN 3, 2, 1"). Only one
+  message shows at a time and the newest replaces the last. The active power-up is a single tile under the rear camera.
+- Blocks and pickups appear about 95 m ahead, so nothing is a surprise.
+- Pickups (F, A, ?) never spawn inside or just behind a block; a row of blocks moves any pickup it would cover into its
+  open lane. Collecting every F always keeps you fuelled (tanks every 125 m give more than you burn).
+- Fuel drains 4/s from 100; F tanks every 125 m restore 35. Running out of fuel or being caught ends the run.
+- **Missions:** 10 missions, 3 held at a time (listed in order). After an easy starter ("Reach 1,000 m"), every mission is a
+  challenge you can retry each run ("Reach 750 m without getting hit", "Destroy 5 blocks in one run", "Reach the
+  mountains without missing an F"...). Only the 3 you start a run with can be completed in that run; finished ones are
+  replaced from the next run. The game-over card lists the run's missions with ticks; live progress is in the pause menu.
+- **High score:** best distance per browser, shown on the title and game-over screens ("NEW BEST!").
+- **Analytics:** see `Docs/ANALYTICS.md`.
 
 ## Controls
 
@@ -30,18 +58,18 @@ selected gameplay ideas from Team 21's **Redline Run** into one cohesive game.
 | Steer | `A` / `D` or Left / Right Arrow |
 | Shoot forward | Space |
 | Start | Enter or the Start button |
-| Restart | `R` or the Restart button |
+| Tutorial on/off (title) | `T` or the switch |
+| Pause / resume | `Esc` or `P` (also pauses automatically when the tab loses focus) |
+| Restart | `R` / Enter or the Restart button |
 
 ## Unity setup
 
 1. Install Unity `6000.3.23f1` through Unity Hub.
 2. Add this repository as a Unity project.
-3. Open `Assets/Scenes/GetawayChase.unity`.
+3. Open `Assets/Scenes/Env_City.unity`.
 4. Enter Play mode.
 
-The integration systems and HUD layout are saved in `GetawayChase`. The HUD
-keeps Team 19's bars and adds clear `FUEL`, `AMMO`, and `POLICE DISTANCE`
-labels. Team 21's unwanted visual-effect system is not included.
+The game starts in `Assets/Scenes/Env_City.unity` (build index 0) and switches to `Env_Snow` during a run.
 
 ## Source projects
 

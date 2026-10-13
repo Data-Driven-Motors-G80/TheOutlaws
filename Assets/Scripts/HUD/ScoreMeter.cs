@@ -13,6 +13,8 @@ public sealed class ScoreMeter : MonoBehaviour
 
     private Vector3 previousCarPosition;
     private int displayedScore = -1;
+    private OutlawGameManager game;
+    private string shownStatus;
 
     public float Score { get; private set; }
 
@@ -31,6 +33,7 @@ public sealed class ScoreMeter : MonoBehaviour
         }
 
         previousCarPosition = car.position;
+        game = Object.FindFirstObjectByType<OutlawGameManager>();
         Refresh();
     }
 
@@ -44,8 +47,26 @@ public sealed class ScoreMeter : MonoBehaviour
 
     private void Update()
     {
-        Score += Vector3.Distance(car.position, previousCarPosition) * pointsPerUnit;
-        previousCarPosition = car.position;
+        if (game != null)
+        {
+            // The run's distance is the score; the tutorial earns nothing.
+            Score = game.DistanceTravelled * pointsPerUnit;
+            previousCarPosition = car.position;
+            if (game.IsTutorial || game.State == OutlawGameState.Ready)
+            {
+                string status = game.IsTutorial ? "TUTORIAL" : "";
+                if (shownStatus != status) label.SetText(status);
+                shownStatus = status;
+                displayedScore = -1;
+                return;
+            }
+            shownStatus = null;
+        }
+        else
+        {
+            Score += Vector3.Distance(car.position, previousCarPosition) * pointsPerUnit;
+            previousCarPosition = car.position;
+        }
 
         Refresh();
     }
@@ -60,6 +81,6 @@ public sealed class ScoreMeter : MonoBehaviour
         }
 
         displayedScore = wholeScore;
-        label.SetText("Score: {0:0}", wholeScore);
+        label.SetText(game != null ? "{0:0} m" : "Score: {0:0}", wholeScore);
     }
 }

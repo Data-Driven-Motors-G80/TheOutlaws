@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class FuelTankSpawner : MonoBehaviour
@@ -21,6 +22,16 @@ public class FuelTankSpawner : MonoBehaviour
     private float previousRoadDistance;
     private Vector3 previousCarPosition;
     private float distanceUntilSpawn;
+    private readonly List<FuelTank> tracked = new List<FuelTank>();
+
+    /// <summary>While true (the tutorial), tanks only appear through <see cref="SpawnAhead"/>.</summary>
+    public bool Suppressed { get; set; }
+
+    public void BeginRealRun()
+    {
+        Suppressed = false;
+        distanceUntilSpawn = spawnSpacing;
+    }
 
 
     private void Awake()
@@ -50,23 +61,56 @@ public class FuelTankSpawner : MonoBehaviour
             : Vector3.Distance(car.position, previousCarPosition);
         if (driver != null) previousRoadDistance = driver.RoadDistanceTravelled;
         previousCarPosition = car.position;
+        TrackMissedTanks();
+        if (Suppressed || Time.timeScale <= 0f)
+        {
+            distanceUntilSpawn = Mathf.Max(distanceUntilSpawn, 0f);
+            return;
+        }
 
         if (distanceUntilSpawn <= 0f)
         {
-            if (SpawnFuelTank()) distanceUntilSpawn = spawnSpacing;
+            if (SpawnAhead(Mathf.Max(spawnDistance, PickupLookAhead.Distance)) != null) distanceUntilSpawn = spawnSpacing;
         }
     }
 
-    private bool SpawnFuelTank()
+    private void TrackMissedTanks()
     {
-        if (road == null || !road.TryGetPointAhead(car.position, spawnDistance, out RoadPathPoint point)) return false;
+        for (int i = tracked.Count - 1; i >= 0; i--)
+        {
+            FuelTank tank = tracked[i];
+            // A destroyed tank's managed object still reports whether it was collected.
+            if (tank.Collected)
+            {
+                tracked.RemoveAt(i);
+            }
+            else if (tank == null || (road != null && road.IsBehind(tank.transform.position, car.position, 4f)))
+            {
+                tracked.RemoveAt(i);
+                GameEvents.RaisePickupMissed(PickupKind.Fuel);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Places a tank <paramref name="distanceAhead"/> metres ahead: in the car's current lane,
+    /// or at <paramref name="lateralOverride"/> metres from the road centre.
+    /// </summary>
+    public GameObject SpawnAhead(float distanceAhead, float? lateralOverride = null)
+    {
+        if (road == null || !road.TryGetPointAhead(car.position, distanceAhead, out RoadPathPoint point)) return null;
         road.TryGetPathPoint(car.position, out RoadPathPoint current);
-        float lateral = Mathf.Clamp(Vector3.Dot(car.position - current.Position, current.Right),
+        float lateral = Mathf.Clamp(lateralOverride ?? Vector3.Dot(car.position - current.Position, current.Right),
             -point.Width * 0.5f + 1f, point.Width * 0.5f - 1f);
+        // Never inside or right behind a block: every tank must be collectable.
+        if (lateralOverride == null) lateral = PickupPlacement.ClearLateral(point, lateral);
         GameObject tank = Instantiate(fuelTankPrefab,
             point.Position + point.Right * lateral + point.Up * heightOffset,
             Quaternion.LookRotation(point.Forward, point.Up));
-        Destroy(tank, lifetime);
-        return true;
+        Destroy(tank, Mathf.Max(lifetime, 14f));
+        FuelTank fuelTank = tank.GetComponent<FuelTank>();
+        if (fuelTank != null) tracked.Add(fuelTank);
+        GameEvents.RaisePickupSpawned(PickupKind.Fuel);
+        return tank;
     }
 }

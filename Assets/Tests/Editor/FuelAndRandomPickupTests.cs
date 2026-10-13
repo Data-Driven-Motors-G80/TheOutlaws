@@ -32,8 +32,10 @@ public sealed class FuelAndRandomPickupTests
         var fuel = new FuelState();
         fuel.Tick(10f, 4f);
 
-        fuel.Refill(50f);
+        fuel.Refill(30f);
         Assert.That(fuel.CurrentFuel, Is.EqualTo(90f));
+        fuel.Refill(50f);
+        Assert.That(fuel.CurrentFuel, Is.EqualTo(FuelState.MaximumFuel));
 
         fuel.RefillToFull();
         Assert.That(fuel.CurrentFuel, Is.EqualTo(FuelState.MaximumFuel));

@@ -21,6 +21,9 @@ public sealed class CarPickupEffects : MonoBehaviour
     [SerializeField, Min(0f)] private float fuelConsumptionPerSecond = FuelState.DefaultConsumptionPerSecond;
 
     public RiskRunState RunState => runState;
+    /// <summary>Any power-up in play (including a pending control swap): no new ? boxes until it ends.</summary>
+    public bool HasActivePowerUp => ActiveEffect != PickupEffectType.None || reverseCountdownRemaining > 0f
+        || runState.HasNitro || runState.HasShield;
     public FuelState FuelState => fuelState;
     public bool SimulationActive => simulationActive;
     public PickupEffectType ActiveEffect => runState.Effects.ActiveEffect;
@@ -56,16 +59,10 @@ public sealed class CarPickupEffects : MonoBehaviour
         bool accepted = TryApplyCore(effect, duration);
         if (accepted)
         {
-            switch (LastOutcome)
-            {
-                case RandomPickupOutcome.Shield: RunAnalyticsState.Count("shield_pickups"); break;
-                case RandomPickupOutcome.Nitro: RunAnalyticsState.Count("nitro_pickups"); break;
-                case RandomPickupOutcome.ProximityRecovery: RunAnalyticsState.Count("recovery_pickups"); break;
-                case RandomPickupOutcome.ReverseSteering: RunAnalyticsState.Count("reverse_pickups"); break;
-                default:
-                    if (effect == PickupEffectType.ReverseSteering) RunAnalyticsState.Count("reverse_pickups");
-                    break;
-            }
+            string outcome = LastOutcome != RandomPickupOutcome.None ? LastOutcome.ToString()
+                : effect == PickupEffectType.ReverseSteering ? RandomPickupOutcome.ReverseSteering.ToString()
+                : effect.ToString();
+            GameEvents.RaisePickupCollected(PickupKind.Mystery, outcome);
         }
         return accepted;
     }
@@ -217,8 +214,8 @@ public sealed class CarPickupEffects : MonoBehaviour
 
         runState.TryBailOut();
         pendingReverseDuration = reverseControlDuration;
-        // Show 3 immediately, 2 after one second, then activate as 1 appears.
-        reverseCountdownRemaining = 2f;
+        // A full "3, 2, 1" warning before the controls swap.
+        reverseCountdownRemaining = 3f;
         return true;
     }
 

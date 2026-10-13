@@ -54,7 +54,7 @@ public sealed class PickupHUD : MonoBehaviour
         if (effects.ReverseActivationCount != shownReverseActivationCount)
         {
             shownReverseActivationCount = effects.ReverseActivationCount;
-            popupMessage = "1 — CONTROLS REVERSED!";
+            popupMessage = "CONTROLS SWAPPED!";
             popupHint = "A / Left: move right     D / Right: move left";
             popupRemaining = PopupDuration;
         }
@@ -62,7 +62,7 @@ public sealed class PickupHUD : MonoBehaviour
         if (effects.ReverseExtensionCount != shownReverseExtensionCount)
         {
             shownReverseExtensionCount = effects.ReverseExtensionCount;
-            popupMessage = $"REVERSED CONTROLS +{effects.ReverseExtensionSeconds:0.#} SECONDS";
+            popupMessage = $"SWAPPED CONTROLS +{effects.ReverseExtensionSeconds:0.#}s";
             popupHint = $"{Mathf.CeilToInt(effects.RemainingSeconds)} seconds remaining";
             popupRemaining = PopupDuration;
         }
@@ -106,16 +106,17 @@ public sealed class PickupHUD : MonoBehaviour
             popupText = new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.MiddleCenter,
-                fontSize = 30,
+                fontSize = 22,
                 fontStyle = FontStyle.Bold,
-                wordWrap = true,
+                wordWrap = false,
+                clipping = TextClipping.Overflow,
                 normal = { textColor = Color.white }
             };
             popupDetail = new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.MiddleCenter,
-                fontSize = 18,
-                wordWrap = true,
+                fontSize = 15,
+                wordWrap = false,
                 normal = { textColor = Color.white }
             };
         }
@@ -133,8 +134,8 @@ public sealed class PickupHUD : MonoBehaviour
         if (popupRemaining > 0f || countingDown || returningToNormal)
         {
             const float margin = 24f;
-            const float popupHeight = 100f;
-            float popupWidth = Mathf.Min(620f, width - margin * 2f);
+            const float popupHeight = 74f;
+            float popupWidth = Mathf.Min(440f, width - margin * 2f);
             Rect popupRect = new Rect(
                 width - popupWidth - margin,
                 height - popupHeight - margin,
@@ -142,11 +143,11 @@ public sealed class PickupHUD : MonoBehaviour
                 popupHeight
             );
             DrawPanel(popupRect);
-            GUI.Label(new Rect(popupRect.x, popupRect.y + 4f, popupWidth, 52f),
+            GUI.Label(new Rect(popupRect.x, popupRect.y + 4f, popupWidth, 36f),
                 countingDown ? $"CONTROLS REVERSE IN {Mathf.CeilToInt(effects.ReverseCountdownRemaining) + 1}"
                     : returningToNormal ? $"NORMAL CONTROLS IN {Mathf.CeilToInt(effects.RemainingSeconds)}"
                     : popupMessage, popupText);
-            GUI.Label(new Rect(popupRect.x + 12f, popupRect.y + 56f, popupWidth - 24f, 40f),
+            GUI.Label(new Rect(popupRect.x + 12f, popupRect.y + 42f, popupWidth - 24f, 26f),
                 countingDown ? "Get ready — steering is still normal"
                     : returningToNormal ? "Get ready — steering is still reversed"
                     : popupHint, popupDetail);
