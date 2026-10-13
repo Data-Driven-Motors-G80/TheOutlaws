@@ -93,10 +93,11 @@ function onOpen() {
 function refreshDashboard() {
   var book = SpreadsheetApp.getActiveSpreadsheet();
   // Editor play ("-editor") and setup/test rows stay in the tabs but are left out of the numbers.
-  var runs = real(table(book, 'runs'));
-  var events = real(table(book, 'events'));
-  var tutorials = real(table(book, 'tutorials'));
-  var sessions = real(table(book, 'sessions'));
+  // Retried uploads can occasionally land twice, so each tab is de-duplicated by its natural key.
+  var runs = dedupe(real(table(book, 'runs')), function (r) { return r.run_id; });
+  var events = dedupe(real(table(book, 'events')), function (r) { return r.session_id + '#' + r.seq; });
+  var tutorials = dedupe(real(table(book, 'tutorials')), function (r) { return r.session_id + '#' + r.status + '#' + r.seconds; });
+  var sessions = dedupe(real(table(book, 'sessions')), function (r) { return r.session_id; });
   var out = [];
 
   function section(title) { out.push(['']); out.push([title]); }
@@ -277,6 +278,16 @@ function table(book, name) {
     var o = {};
     headers.forEach(function (h, i) { o[h] = r[i]; });
     return o;
+  });
+}
+function dedupe(rows, key) {
+  var seen = {};
+  return rows.filter(function (r) {
+    var k = key(r);
+    if (k === undefined || k === '' || k === 'undefined#undefined') return true;
+    if (seen[k]) return false;
+    seen[k] = true;
+    return true;
   });
 }
 function real(rows) {
