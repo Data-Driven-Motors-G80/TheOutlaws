@@ -6,9 +6,8 @@ public sealed class TrafficLightObstacle : MonoBehaviour
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
     private static readonly int ColorId = Shader.PropertyToID("_Color");
 
-    private static readonly Color GreenColor = new Color(0.08f, 0.8f, 0.16f);
-    private static readonly Color YellowColor = new Color(1f, 0.72f, 0.04f);
-    private static readonly Color RedColor = new Color(0.9f, 0.03f, 0.03f);
+    private static readonly Color BarrierOrange = new Color(1f, 0.54f, 0f);
+    private static readonly Color WarningBlack = new Color(0.125f, 0.14f, 0.17f);
 
     private Renderer[] renderers;
     private MaterialPropertyBlock propertyBlock;
@@ -22,7 +21,7 @@ public sealed class TrafficLightObstacle : MonoBehaviour
     public bool WasHit { get; private set; }
 
     public void MarkHit() => WasHit = true;
-    /// <summary>Shots still needed to clear this block (green 1, yellow 2, red 3).</summary>
+    /// <summary>Shots still needed to clear this block.</summary>
     public int ShotsRemaining => (int)CurrentState + 1;
     public float ProximityDrain => TrafficObstacleRules.GetProximityDrain(CurrentState);
     public float FuelPenaltyFraction => TrafficObstacleRules.GetFuelPenaltyFraction(CurrentState);
@@ -38,7 +37,7 @@ public sealed class TrafficLightObstacle : MonoBehaviour
         PlaceShotLabel();
     }
 
-    /// <summary>Returns true when this shot destroys the green obstacle.</summary>
+    /// <summary>Returns true when this shot destroys the one-shot obstacle.</summary>
     public bool ApplyShot()
     {
         TrafficObstacleState before = CurrentState;
@@ -74,20 +73,42 @@ public sealed class TrafficLightObstacle : MonoBehaviour
         if (renderers != null) return;
         renderers = GetComponentsInChildren<Renderer>(true);
         propertyBlock = new MaterialPropertyBlock();
+        if (Application.isPlaying) CreateWarningBands();
+    }
+
+    private void CreateWarningBands()
+    {
+        // Cache only body renderers before adding decorations, so tinting never turns the bands orange.
+        foreach (Renderer body in renderers)
+        {
+            if (body == null) continue;
+            Bounds bounds = body.localBounds;
+            foreach (float offset in new[] { -0.3f, 0.3f })
+            {
+                GameObject band = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                band.name = "Black Warning Band";
+                band.layer = body.gameObject.layer;
+                band.transform.SetParent(body.transform, false);
+                band.transform.localPosition = bounds.center + Vector3.up * (bounds.size.y * offset);
+                band.transform.localScale = new Vector3(bounds.size.x * 1.01f, bounds.size.y * 0.16f, bounds.size.z * 1.01f);
+                Collider collider = band.GetComponent<Collider>();
+                collider.enabled = false;
+                Destroy(collider);
+                Renderer bandRenderer = band.GetComponent<Renderer>();
+                bandRenderer.sharedMaterial = RuntimeMaterials.Coloured(WarningBlack);
+                bandRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+        }
     }
 
     private void ApplyVisualState()
     {
-        Color color = CurrentState == TrafficObstacleState.Red
-            ? RedColor
-            : CurrentState == TrafficObstacleState.Yellow ? YellowColor : GreenColor;
-
         foreach (Renderer obstacleRenderer in renderers)
         {
             if (obstacleRenderer == null) continue;
             obstacleRenderer.GetPropertyBlock(propertyBlock);
-            propertyBlock.SetColor(BaseColorId, color);
-            propertyBlock.SetColor(ColorId, color);
+            propertyBlock.SetColor(BaseColorId, BarrierOrange);
+            propertyBlock.SetColor(ColorId, BarrierOrange);
             obstacleRenderer.SetPropertyBlock(propertyBlock);
         }
 
@@ -99,7 +120,10 @@ public sealed class TrafficLightObstacle : MonoBehaviour
         if (!Application.isPlaying || renderers.Length == 0 || renderers[0] == null) return;
         // The shot count is printed on the face the player drives towards.
         if (shotLabel == null)
+        {
             shotLabel = WorldLabel.AttachToFrontFace(renderers[0], transform, ShotsRemaining.ToString(), Color.white);
+            shotLabel.SetBackground(WarningBlack);
+        }
         shotLabel.SetText(ShotsRemaining.ToString());
         shotLabel.SetVisible(true);
     }
