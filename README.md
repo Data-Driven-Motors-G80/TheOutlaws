@@ -13,7 +13,7 @@ selected gameplay ideas from Team 21's **Redline Run** into one cohesive game.
   and your missions (completed / 10, the current mission and the next two).
 - **Tutorial (show, don't tell):** one small box with one short instruction (LEFT AND RIGHT, AVOID OBSTACLES, GRAB FUEL, GRAB AMMO, SHOOT)
   that stays until you do it; A / Left Arrow and D / Right Arrow are labelled LEFT and RIGHT. A miss flashes "TRY AGAIN!" for a second. Order: move both ways → dodge a block → fuel plunges
-  (never empties) and the F waits in the open lane past a block → collect at least 3 rounds from A boxes → destroy a "1" wall
+  (never empties) and an F immediately appears 35 m ahead in the car's path, with no obstacles → collect at least 3 rounds from A boxes → destroy a "1" wall
   with one shot, then a "2" wall with two shots. The shooting prompt explains that the number on a block is the shots needed;
   hitting a wall requires collecting ammo again and retrying that wall. The car drives at 14 m/s, the police can close in but never catch you, and nothing
   counts. The real run then starts seamlessly with a "GO!" chip and distance counting from 0.
