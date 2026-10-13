@@ -32,9 +32,10 @@ selected gameplay ideas from Team 21's **Redline Run** into one cohesive game.
   you pull away again (back to the starting 45 m gap, never further). You pull away at 1.5 m/s at first and 0.6 m/s after
   2.5 minutes, so it's several hits close together, not clean driving, that gets you caught.
 - Pickups never spawn on top of each other or inside/just behind a block.
-- **Portals:** a giant glowing gate fills the whole road (no way around it). The first, to the mountains (snow), stands at
-  500 m; each environment lasts another 500 m before the next gate. Arriving shows "PORTAL! YOU ENTERED THE MOUNTAINS"
-  (or "BACK TO THE CITY"). A live "PORTAL IN ... m" countdown sits beneath the distance and messages during the real run.
+- **Portals:** a giant glowing gate fills the whole road (no way around it). A gate appears 95 m ahead after 60 seconds of
+  active gameplay in each environment; pauses and the tutorial do not count. Drive through it to switch environments.
+  Arriving shows "PORTAL! YOU ENTERED THE MOUNTAINS" (or "BACK TO THE CITY"). A live "PORTAL IN ... s" countdown sits
+  beneath the distance and messages during the real run, changing to "PORTAL AHEAD" when the timer reaches zero.
 - The top-right rear camera shows the roof of your car and the police behind it; its border turns red as they close in.
 - Mystery boxes: none for the first 500 m, then roughly every 320 m. Reverse steering 10%, nitro, shield and police
   jammer 30% each. Only one power-up at a time: no new ? box appears while one is active or another is still on the road. Grabbing one shows a single centred message
