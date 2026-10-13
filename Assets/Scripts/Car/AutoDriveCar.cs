@@ -21,6 +21,11 @@ public sealed class AutoDriveCar : MonoBehaviour
     [SerializeField, Min(0.01f)] private float maximumLateralAcceleration = 45f;
     [SerializeField, Min(0f)] private float edgeMargin = 1f;
 
+    [Header("Ice Steering")]
+    [SerializeField] private bool icyRoad;
+    [SerializeField, Range(0.5f, 1f)] private float iceSteeringGrip = 0.9f;
+    [SerializeField, Range(0.1f, 1f)] private float iceReleaseGrip = 0.3f;
+
     [Header("Feel")]
     [SerializeField, Range(0f, 45f)] private float maxSteerAngle = 20f;
     [SerializeField, Min(0f)] private float turnSharpness = 12f;
@@ -41,6 +46,9 @@ public sealed class AutoDriveCar : MonoBehaviour
     private float heightOffset;
     private bool hasStarted;
 
+    // Weapons follow the visible car, including its drift yaw.
+    public Transform FiringFrame => visual != null ? visual : transform;
+    public bool IsOnIce => icyRoad;
     public float SteerInput { get; private set; }
     public float ForwardSpeed => currentForwardSpeed;
     public float BaseForwardSpeed => currentForwardSpeed > 0f
@@ -50,6 +58,10 @@ public sealed class AutoDriveCar : MonoBehaviour
     public float RoadPositionDistance { get; private set; }
     public bool IsDriveReady { get; private set; }
     public float SpeedIncreaseTimer => speedIncreaseTimer;
+    public float StartingSpeed => forwardSpeed;
+    public float MaximumSpeed => maximumForwardSpeed;
+    public float SpeedIncreaseAmount => speedIncreaseAmount;
+    public float SpeedIncreaseInterval => speedIncreaseInterval;
 
     /// <summary>Used when a run continues in another scene so the car keeps its current speed.</summary>
     public void RestoreMotion(float currentSpeed, float increaseTimer)
@@ -61,6 +73,15 @@ public sealed class AutoDriveCar : MonoBehaviour
 
     private void Awake()
     {
+        // Restore the run settings before any Start/Update can apply scene defaults.
+        if (RunSession.TryGetPending(out RunSnapshot carried) && carried.MaximumSpeed > 0f)
+        {
+            forwardSpeed = carried.StartingSpeed;
+            maximumForwardSpeed = carried.MaximumSpeed;
+            speedIncreaseAmount = carried.SpeedIncreaseAmount;
+            speedIncreaseInterval = carried.SpeedIncreaseInterval;
+            RestoreMotion(carried.ForwardSpeed, carried.SpeedTimer);
+        }
         steerAction = CreateSteerAction();
         pickupEffects = GetComponent<CarPickupEffects>();
     }
@@ -190,10 +211,21 @@ public sealed class AutoDriveCar : MonoBehaviour
 
         SteerInput = steerInput;
 
+        // Ice retains momentum on release; countersteering has stronger grip
+        // so a player can still recover. Forward speed and road-edge limits stay intact.
+        float surfaceGrip = 1f;
+        if (icyRoad)
+        {
+            bool releasedSteering = Mathf.Abs(steerInput) < 0.01f;
+            bool countersteering = steerInput * lateralSpeed < 0f;
+            surfaceGrip = releasedSteering ? iceReleaseGrip
+                : countersteering ? 1f : iceSteeringGrip;
+        }
+
         lateralSpeed = Mathf.MoveTowards(
             lateralSpeed,
             steerInput * currentMaxLateralSpeed,
-            currentLateralAcceleration * accelerationMultiplier * deltaTime
+            currentLateralAcceleration * accelerationMultiplier * surfaceGrip * deltaTime
         );
 
         if (captured)

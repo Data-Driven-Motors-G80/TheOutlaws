@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class FuelTank : MonoBehaviour
 {
-    [SerializeField, Min(0f)] private float fuelAmount = 50f;
+    [SerializeField, Min(0f)] private float fuelAmount = 35f;
     public float FuelAmount => fuelAmount;
 
     private float bobHeight = 0.12f;

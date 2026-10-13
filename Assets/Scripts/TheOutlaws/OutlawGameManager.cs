@@ -27,6 +27,7 @@ public sealed class OutlawGameManager : MonoBehaviour
     public OutlawShooting Shooting => shooting;
     public FuelMeter Fuel => fuel;
     public CarPickupEffects PickupEffects => pickupEffects;
+    public bool IsOnIce => driver != null && driver.IsOnIce;
     public bool PoliceAlertActive => policeAlertRemaining > 0f;
     public int PoliceCarCount => policeCars != null ? policeCars.Length : 0;
     public string TutorialMessage => trafficTutorial != null
@@ -110,6 +111,10 @@ public sealed class OutlawGameManager : MonoBehaviour
             StateFuel = pickupEffects.CurrentFuel,
             ForwardSpeed = driver.ForwardSpeed,
             SpeedTimer = driver.SpeedIncreaseTimer,
+            StartingSpeed = driver.StartingSpeed,
+            MaximumSpeed = driver.MaximumSpeed,
+            SpeedIncreaseAmount = driver.SpeedIncreaseAmount,
+            SpeedIncreaseInterval = driver.SpeedIncreaseInterval,
             Ammo = shooting.CurrentAmmo,
             Risk = pickupEffects.CaptureRun()
         };
@@ -172,7 +177,7 @@ public sealed class OutlawGameManager : MonoBehaviour
         obstacles.ConfigureDifficulty(
             RunDifficultyState.ObstacleDensity(elapsed),
             Mathf.Min(0.35f, 0.15f + steps * 0.025f));
-        pursuit.SetClosingSpeed(Mathf.Min(0.65f, 0.15f + steps * 0.05f));
+        pursuit.SetClosingSpeed(RunDifficultyState.PoliceClosingSpeed(elapsed));
     }
 
     private void UpdatePoliceFeedback()

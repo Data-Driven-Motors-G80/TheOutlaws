@@ -125,3 +125,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b6abba725fbd54ef58db798f67d7190d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FuelTank
+  fuelAmount: 35

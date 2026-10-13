@@ -10,6 +10,10 @@ public struct RunSnapshot
     public float StateFuel;
     public float ForwardSpeed;
     public float SpeedTimer;
+    public float StartingSpeed;
+    public float MaximumSpeed;
+    public float SpeedIncreaseAmount;
+    public float SpeedIncreaseInterval;
     public int Ammo;
     public RiskRunSnapshot Risk;
 }

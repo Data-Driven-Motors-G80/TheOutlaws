@@ -15,7 +15,12 @@ public readonly struct RunDifficultyState
 
     public static float ObstacleDensity(float elapsedSeconds)
     {
-        return Math.Min(1.6f, 1f + PressureSteps(elapsedSeconds) * 0.05f);
+        return Math.Min(1.6f, 1f + PressureSteps(elapsedSeconds) * 0.08f);
+    }
+
+    public static float PoliceClosingSpeed(float elapsedSeconds)
+    {
+        return Math.Min(0.8f, 0.15f + PressureSteps(elapsedSeconds) * 0.08f);
     }
 
     public float Progress { get; }

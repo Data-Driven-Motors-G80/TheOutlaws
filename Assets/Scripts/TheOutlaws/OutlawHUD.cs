@@ -8,6 +8,7 @@ public sealed class OutlawHUD : MonoBehaviour
     [SerializeField] private Image ammoBar;
     [SerializeField] private TMP_Text ammoLabel;
     [SerializeField] private TMP_Text extractionLabel;
+    private float iceWarningRemaining;
     private GUIStyle titleStyle;
     private GUIStyle bodyStyle;
     private GUIStyle buttonStyle;
@@ -16,6 +17,7 @@ public sealed class OutlawHUD : MonoBehaviour
     public void Configure(OutlawGameManager manager)
     {
         game = manager;
+        iceWarningRemaining = game.IsOnIce ? 4f : 0f;
         // Bind saved UI without rebuilding or repositioning it during Play.
         if (ammoBar == null) ammoBar = FindImage("AmmoBar");
         if (ammoLabel == null)
@@ -28,6 +30,8 @@ public sealed class OutlawHUD : MonoBehaviour
 
     private void Update()
     {
+        if (game != null && game.State == OutlawGameState.Running)
+            iceWarningRemaining = Mathf.Max(0f, iceWarningRemaining - Time.deltaTime);
         if (extractionLabel != null && game != null)
             extractionLabel.SetText("DISTANCE: {0:0} m", game.DistanceTravelled);
         if (ammoBar != null && game != null && game.Shooting != null)
@@ -202,6 +206,13 @@ public sealed class OutlawHUD : MonoBehaviour
 
     private void DrawRunningHUD(float width)
     {
+        if (game.IsOnIce && iceWarningRemaining > 0f)
+        {
+            Rect iceNotice = new Rect((width - 460f) * 0.5f, 100f, 460f, 54f);
+            DrawPanel(iceNotice);
+            GUI.Label(iceNotice, "ICE — expect some drift", bodyStyle);
+        }
+
         if (!string.IsNullOrEmpty(game.TutorialMessage))
         {
             Rect tutorial = new Rect((width - 760f) * 0.5f, 245f, 760f, 68f);

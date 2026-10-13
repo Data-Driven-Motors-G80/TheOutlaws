@@ -8,7 +8,7 @@ public sealed class RunDifficultyStateTests
         Assert.That(RunDifficultyState.DrivingSpeed(15f), Is.EqualTo(15f));
         Assert.That(RunDifficultyState.DrivingSpeed(24.9f), Is.EqualTo(15f));
         Assert.That(RunDifficultyState.DrivingSpeed(25f), Is.EqualTo(16f));
-        Assert.That(RunDifficultyState.ObstacleDensity(50f), Is.EqualTo(1.1f).Within(0.001f));
+        Assert.That(RunDifficultyState.ObstacleDensity(50f), Is.EqualTo(1.16f).Within(0.001f));
         Assert.That(RunDifficultyState.DrivingSpeed(9999f), Is.EqualTo(30f));
         Assert.That(RunDifficultyState.ObstacleDensity(9999f), Is.EqualTo(1.6f));
     }
@@ -18,9 +18,18 @@ public sealed class RunDifficultyStateTests
     {
         // A switch at 74 seconds keeps the existing pressure, with the next step at 75.
         Assert.That(RunDifficultyState.DrivingSpeed(74f), Is.EqualTo(17f));
-        Assert.That(RunDifficultyState.ObstacleDensity(74f), Is.EqualTo(1.1f).Within(0.001f));
+        Assert.That(RunDifficultyState.ObstacleDensity(74f), Is.EqualTo(1.16f).Within(0.001f));
         Assert.That(RunDifficultyState.DrivingSpeed(75f), Is.EqualTo(18f));
-        Assert.That(RunDifficultyState.ObstacleDensity(75f), Is.EqualTo(1.15f).Within(0.001f));
+        Assert.That(RunDifficultyState.ObstacleDensity(75f), Is.EqualTo(1.24f).Within(0.001f));
+    }
+
+    [Test]
+    public void PolicePressureKeepsOpeningThenRampsToNewCap()
+    {
+        Assert.That(RunDifficultyState.PoliceClosingSpeed(24.9f), Is.EqualTo(0.15f));
+        Assert.That(RunDifficultyState.PoliceClosingSpeed(25f), Is.EqualTo(0.23f).Within(0.001f));
+        Assert.That(RunDifficultyState.PoliceClosingSpeed(100f), Is.EqualTo(0.47f).Within(0.001f));
+        Assert.That(RunDifficultyState.PoliceClosingSpeed(9999f), Is.EqualTo(0.8f));
     }
 
     [Test]

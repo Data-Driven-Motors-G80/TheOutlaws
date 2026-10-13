@@ -7,6 +7,7 @@ public sealed class OutlawShooting : MonoBehaviour
     private const int MaximumAmmoValue = 5;
     private const float FireCooldown = 0.3f;
 
+    private AutoDriveCar driver;
     private CarPickupEffects pickupEffects;
     private ObstacleSpawner obstacles;
     private float nextFireTime;
@@ -17,13 +18,15 @@ public sealed class OutlawShooting : MonoBehaviour
 
     public void Configure(CarPickupEffects effects, ObstacleSpawner obstacleSpawner)
     {
+        driver = GetComponent<AutoDriveCar>();
         pickupEffects = effects;
         obstacles = obstacleSpawner;
         CurrentAmmo = 2;
         nextFireTime = 0f;
     }
 
-    private void Update()
+    // Read the final visible pose after AutoDriveCar.Update applies drift and road rotation.
+    private void LateUpdate()
     {
         if (Time.timeScale <= 0f || Keyboard.current == null || Time.time < nextFireTime)
         {
@@ -59,8 +62,9 @@ public sealed class OutlawShooting : MonoBehaviour
             return;
         }
 
-        Vector3 direction = transform.forward;
-        Vector3 position = transform.position + direction * 2.2f + transform.up * 0.55f;
+        Transform firingFrame = driver != null ? driver.FiringFrame : transform;
+        Vector3 direction = firingFrame.forward;
+        Vector3 position = firingFrame.position + direction * 2.2f + firingFrame.up * 0.55f;
         OutlawProjectile.Create(
             position,
             direction,

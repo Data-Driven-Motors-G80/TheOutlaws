@@ -720,7 +720,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FuelTankSpawner
   car: {fileID: 1633598803}
-  spawnSpacing: 75
+  spawnSpacing: 125
   spawnDistance: 50
   fuelTankPrefab: {fileID: 4882813726840004750, guid: 09dcac4f01cdc45b9946155c79139d1b, type: 3}
   lifetime: 10
@@ -2240,15 +2240,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AutoDriveCar
   road: {fileID: 371121412}
   visual: {fileID: 1066005398}
-  forwardSpeed: 15
-  maximumForwardSpeed: 30
-  speedIncreaseAmount: 0.75
+  forwardSpeed: 20
+  maximumForwardSpeed: 100
+  speedIncreaseAmount: 1
   speedIncreaseInterval: 30
   minimumLateralSpeed: 8
   maximumLateralSpeed: 12
   minimumLateralAcceleration: 30
   maximumLateralAcceleration: 45
   edgeMargin: 1
+  icyRoad: 1
+  iceSteeringGrip: 0.9
+  iceReleaseGrip: 0.3
   maxSteerAngle: 20
   turnSharpness: 12
 --- !u!114 &1633598805

@@ -7,7 +7,7 @@ public class FuelTankSpawner : MonoBehaviour
 
     [Header("Spawning")]
     // Keep spacing independent of how far ahead the pickup appears.
-    [SerializeField, Min(1f)] private float spawnSpacing = 75f;
+    [SerializeField, Min(1f)] private float spawnSpacing = 125f;
     [SerializeField, Min(0f)] private float spawnDistance = 50f;
 
     [Header("Fuel Tank")]
