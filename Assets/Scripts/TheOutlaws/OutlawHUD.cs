@@ -377,6 +377,7 @@ public sealed class OutlawHUD : MonoBehaviour
         DrawRearView(width);
         DrawPowerUps(width);
         DrawMessage(width);
+        DrawPortalDistance(width);
 
         if (game.IsTutorial) DrawTutorial(width, height);
 
@@ -395,6 +396,18 @@ public sealed class OutlawHUD : MonoBehaviour
                 $"<b><color={Hex(Good)}>{missionToastHeading}</color></b>", line);
             GUI.Label(new Rect(toast.x + 14f, toast.y + 30f, toast.width, 26f), missionToastTitle, line);
         }
+    }
+
+    private void DrawPortalDistance(float width)
+    {
+        if (game.IsTutorial || RunSession.NextPortalDistance < 0f ||
+            (game.State != OutlawGameState.Running && game.State != OutlawGameState.Paused))
+            return;
+
+        int metres = Mathf.CeilToInt(Mathf.Max(0f, RunSession.NextPortalDistance - game.DistanceTravelled));
+        Rect panel = new Rect((width - 280f) * 0.5f, 112f, 280f, 34f);
+        DrawPanel(panel);
+        GUI.Label(panel, $"<color={Hex(ShieldCyan)}>PORTAL IN {metres:N0} m</color>", bodyStyle);
     }
 
     /// <summary>One centred message under the distance; the most recent event replaces the last.</summary>
@@ -534,7 +547,7 @@ public sealed class OutlawHUD : MonoBehaviour
         bool showKeys = steering || shooting;
 
         // One box with one instruction; "TRY AGAIN!" briefly takes its place after a miss.
-        float panelHeight = showKeys ? 160f : 80f;
+        float panelHeight = shooting ? 220f : showKeys ? 160f : 80f;
         Rect panel = new Rect((width - 520f) * 0.5f, height - panelHeight - 60f, 520f, panelHeight);
         DrawPanel(panel);
         bool retry = tutorial.FeedbackRemaining > 0f && !string.IsNullOrEmpty(tutorial.Feedback);
@@ -555,8 +568,10 @@ public sealed class OutlawHUD : MonoBehaviour
         }
         else if (shooting)
         {
+            GUI.Label(new Rect(panel.x + 20f, panel.y + 70f, panel.width - 40f, 58f),
+                "Number on block = shots to destroy\n1 = 1 shot    2 = 2 shots", bodyStyle);
             bool held = keys != null && keys.spaceKey.isPressed;
-            DrawKey(new Rect(panel.center.x - 150f, panel.y + 80f, 300f, 60f), "SPACE", held);
+            DrawKey(new Rect(panel.center.x - 150f, panel.y + 140f, 300f, 60f), "SPACE", held);
         }
 
         GUI.Label(new Rect(0f, height - 42f, width, 30f), "TUTORIAL   (Esc: pause)", smallStyle);

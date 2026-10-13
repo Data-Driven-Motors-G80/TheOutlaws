@@ -53,6 +53,7 @@ public sealed class TutorialDirector : MonoBehaviour
     private bool tankCollected;
     private readonly List<GameObject> ammoBoxes = new List<GameObject>();
     private TrafficLightObstacle wall;
+    private TrafficObstacleState shootWallState;
     private List<TrafficLightObstacle> dodgeRow = new List<TrafficLightObstacle>();
     private bool dodgeHit;
     private bool stepSucceeded;
@@ -200,7 +201,8 @@ public sealed class TutorialDirector : MonoBehaviour
                 break;
             case TutorialStep.Shoot:
                 reloading = false;
-                wall = obstacles.SpawnTutorialWall(SpawnAhead + 10f, TrafficObstacleState.Yellow);
+                shootWallState = TrafficObstacleState.Green;
+                wall = obstacles.SpawnTutorialWall(SpawnAhead + 10f, shootWallState);
                 break;
             case TutorialStep.Dodge:
                 SpawnDodgeRow();
@@ -309,7 +311,8 @@ public sealed class TutorialDirector : MonoBehaviour
             if (box != null && !road.IsBehind(box.transform.position, player.position, 2f))
                 anyAhead = true;
 
-        if (shooting.CurrentAmmo >= 3 || (!anyAhead && shooting.CurrentAmmo >= 2))
+        // The shooting lesson needs three rounds: one for the 1 block, two for the 2 block.
+        if (shooting.CurrentAmmo >= 3)
         {
             ClearAmmoBoxes();
             Succeed();
@@ -340,7 +343,8 @@ public sealed class TutorialDirector : MonoBehaviour
             foreach (GameObject box in ammoBoxes)
                 if (box != null && !road.IsBehind(box.transform.position, player.position, 2f))
                     anyAhead = true;
-            if (shooting.CurrentAmmo >= 2 && (!anyAhead || shooting.CurrentAmmo >= 3))
+            int requiredAmmo = shootWallState == TrafficObstacleState.Green ? 3 : 2;
+            if (shooting.CurrentAmmo >= requiredAmmo && (!anyAhead || shooting.CurrentAmmo >= 3))
             {
                 ClearAmmoBoxes();
                 reloading = false;
@@ -358,18 +362,26 @@ public sealed class TutorialDirector : MonoBehaviour
         {
             waitRemaining -= dt;
             if (waitRemaining > 0f) return;
-            wall = obstacles.SpawnTutorialWall(SpawnAhead + 10f, TrafficObstacleState.Yellow);
+            wall = obstacles.SpawnTutorialWall(SpawnAhead + 10f, shootWallState);
             return;
         }
 
-        if (!obstacles.IsActive(wall))
+        if (!obstacles.IsActive(wall) && !wall.WasHit)
         {
             wall = null;
-            Succeed(0.4f);
+            if (shootWallState == TrafficObstacleState.Green)
+            {
+                shootWallState = TrafficObstacleState.Yellow;
+                waitRemaining = 1.2f;
+            }
+            else
+            {
+                Succeed(0.4f);
+            }
             return;
         }
 
-        if (road.IsBehind(wall.transform.position, player.position, 1f))
+        if (!obstacles.IsActive(wall) || road.IsBehind(wall.transform.position, player.position, 1f))
         {
             wall = null;
             Retry("hit_wall");
