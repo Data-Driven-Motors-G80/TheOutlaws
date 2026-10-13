@@ -550,8 +550,8 @@ public sealed class OutlawHUD : MonoBehaviour
                 : keys != null && (keys.aKey.isPressed || keys.leftArrowKey.isPressed);
             bool right = tutorial.Step == TutorialStep.Steer ? tutorial.RightDone
                 : keys != null && (keys.dKey.isPressed || keys.rightArrowKey.isPressed);
-            DrawKey(new Rect(panel.center.x - 160f, keyY, 140f, 60f), "<  A", left);
-            DrawKey(new Rect(panel.center.x + 20f, keyY, 140f, 60f), "D  >", right);
+            DrawKey(new Rect(panel.center.x - 230f, keyY, 220f, 60f), "A / ← LEFT", left);
+            DrawKey(new Rect(panel.center.x + 10f, keyY, 220f, 60f), "RIGHT D / →", right);
         }
         else if (shooting)
         {

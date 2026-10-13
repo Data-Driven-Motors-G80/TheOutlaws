@@ -273,19 +273,15 @@ public sealed class ObstacleSpawner : MonoBehaviour
                     previousOpenLane = openLane;
                     break;
                 }
-                TrafficObstacleState[] states =
-                {
-                    TrafficObstacleState.Red,
-                    TrafficObstacleState.Yellow,
-                    TrafficObstacleState.Green
-                };
-                int skip = roadblockRandom.Next(3);
+                // Split choice offers one- and two-shot blocks, with no three-shot blocks.
+                bool greenFirst = roadblockRandom.Next(2) == 0;
                 int stateIndex = 0;
                 for (int lane = 0; lane < 3; lane++)
                 {
                     if (lane == openLane) continue;
-                    if (stateIndex == skip) stateIndex++;
-                    PlaceObstacle(point, (lane - 1) * laneWidth, laneWidth - 0.3f, states[stateIndex % 3]);
+                    TrafficObstacleState state = (stateIndex == 0) == greenFirst
+                        ? TrafficObstacleState.Green : TrafficObstacleState.Yellow;
+                    PlaceObstacle(point, (lane - 1) * laneWidth, laneWidth - 0.3f, state);
                     stateIndex++;
                 }
                 previousOpenLane = openLane;

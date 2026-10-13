@@ -92,8 +92,8 @@ public sealed class TutorialDirector : MonoBehaviour
         {
             switch (Step)
             {
-                case TutorialStep.Steer: return "STEER";
-                case TutorialStep.Dodge: return "DODGE";
+                case TutorialStep.Steer: return "LEFT AND RIGHT";
+                case TutorialStep.Dodge: return "AVOID OBSTACLES";
                 case TutorialStep.Fuel: return "GRAB FUEL";
                 case TutorialStep.Ammo: return "GRAB AMMO";
                 case TutorialStep.Shoot: return reloading ? "GRAB AMMO" : "SHOOT";

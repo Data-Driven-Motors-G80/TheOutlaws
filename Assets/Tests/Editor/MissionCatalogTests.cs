@@ -34,6 +34,18 @@ public sealed class MissionCatalogTests
     }
 
     [Test]
+    public void FifthMissionCanCompleteWithoutRedBlocks()
+    {
+        var stats = new MissionRunStats { ObstaclesDestroyed = 9, RedDestroyed = 0 };
+        MissionDefinition mission = MissionCatalog.Find(5);
+        Assert.That(mission.IsComplete(stats), Is.False);
+        Assert.That(mission.Progress(stats), Is.EqualTo("9 / 10"));
+        stats.ObstaclesDestroyed++;
+        Assert.That(mission.IsComplete(stats), Is.True);
+        Assert.That(mission.Progress(stats), Is.EqualTo("10 / 10"));
+    }
+
+    [Test]
     public void ConditionMissionsFailWhenTheConditionBreaks()
     {
         var stats = new MissionRunStats { Distance = 1600f };
