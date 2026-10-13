@@ -377,7 +377,7 @@ public sealed class OutlawHUD : MonoBehaviour
         DrawRearView(width);
         DrawPowerUps(width);
         DrawMessage(width);
-        DrawPortalDistance(width);
+        DrawPortalCountdown(width);
 
         if (game.IsTutorial) DrawTutorial(width, height);
 
@@ -398,16 +398,17 @@ public sealed class OutlawHUD : MonoBehaviour
         }
     }
 
-    private void DrawPortalDistance(float width)
+    private void DrawPortalCountdown(float width)
     {
-        if (game.IsTutorial || RunSession.NextPortalDistance < 0f ||
+        if (game.IsTutorial ||
             (game.State != OutlawGameState.Running && game.State != OutlawGameState.Paused))
             return;
 
-        int metres = Mathf.CeilToInt(Mathf.Max(0f, RunSession.NextPortalDistance - game.DistanceTravelled));
+        int seconds = Mathf.CeilToInt(RunSession.SecondsUntilPortal(game.ElapsedSeconds));
+        string label = seconds > 0 ? $"PORTAL IN {seconds} s" : "PORTAL AHEAD";
         Rect panel = new Rect((width - 280f) * 0.5f, 112f, 280f, 34f);
         DrawPanel(panel);
-        GUI.Label(panel, $"<color={Hex(ShieldCyan)}>PORTAL IN {metres:N0} m</color>", bodyStyle);
+        GUI.Label(panel, $"<color={Hex(ShieldCyan)}>{label}</color>", bodyStyle);
     }
 
     /// <summary>One centred message under the distance; the most recent event replaces the last.</summary>

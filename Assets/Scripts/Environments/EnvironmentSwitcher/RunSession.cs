@@ -24,21 +24,25 @@ public static class RunSession
 
     public static bool HasPending { get; private set; }
 
-    public static float NextSwitchAt = -1f;
+    public const float PortalIntervalSeconds = 60f;
 
-    /// <summary>The first switch (city to snow) happens at a random run distance, well after 1,000 m.</summary>
-    public static float FirstSwitchDistance = -1f;
-    public static bool FirstSwitchDone;
+    /// <summary>Active run time when the next gate appears (-1 = not scheduled yet).</summary>
+    public static float NextPortalAt = -1f;
 
-    /// <summary>Run distance at which the next portal gate stands (-1 = not scheduled yet).</summary>
-    public static float NextPortalDistance = -1f;
+    public static void ScheduleNextPortal(float elapsedSeconds)
+    {
+        NextPortalAt = elapsedSeconds + PortalIntervalSeconds;
+    }
+
+    public static float SecondsUntilPortal(float elapsedSeconds)
+    {
+        float scheduledAt = NextPortalAt < 0f ? PortalIntervalSeconds : NextPortalAt;
+        return System.Math.Max(0f, scheduledAt - elapsedSeconds);
+    }
 
     public static void ResetSwitchSchedule()
     {
-        NextSwitchAt = -1f;
-        FirstSwitchDistance = -1f;
-        FirstSwitchDone = false;
-        NextPortalDistance = -1f;
+        NextPortalAt = -1f;
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]

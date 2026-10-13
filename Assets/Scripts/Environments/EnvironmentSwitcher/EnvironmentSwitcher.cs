@@ -13,7 +13,6 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
     [SerializeField, Min(0.1f)] private float slideSeconds = 0.6f;
     [SerializeField] private Color transitionColor = new Color(0.88f, 0.94f, 1f, 1f);
 
-    private const float PortalSpacingMetres = 500f;
     private const float PortalLeadMetres = 95f;
 
     private OutlawGameManager game;
@@ -51,7 +50,7 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
                 );
 
                 string target = environmentScenes[(index + 1) % environmentScenes.Length];
-                RunSession.NextPortalDistance = game.DistanceTravelled + PortalSpacingMetres;
+                RunSession.ScheduleNextPortal(game.ElapsedSeconds);
                 StartSwitch(target);
             }
 
@@ -63,21 +62,19 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
     }
 
     /// <summary>
-    /// Portals are physical gates across the road. The first stands at 500 m;
-    /// each environment lasts another 500 m before the next gate.
+    /// A gate appears ahead after 60 seconds of active gameplay in each environment.
+    /// Pauses and the tutorial do not count; driving through the gate switches scenes.
     /// </summary>
     private void UpdatePortal()
     {
-        float distance = game.DistanceTravelled;
-        if (RunSession.NextPortalDistance < 0f)
-            RunSession.NextPortalDistance = PortalSpacingMetres;
+        if (RunSession.NextPortalAt < 0f)
+            RunSession.ScheduleNextPortal(0f);
 
         if (portal == null)
         {
-            float ahead = RunSession.NextPortalDistance - distance;
-            if (ahead > PortalLeadMetres) return;
+            if (RunSession.SecondsUntilPortal(game.ElapsedSeconds) > 0f) return;
             if (road == null || player == null ||
-                !road.TryGetPointAhead(player.position, Mathf.Max(ahead, 30f), out RoadPathPoint point))
+                !road.TryGetPointAhead(player.position, PortalLeadMetres, out RoadPathPoint point))
                 return;
             portalTarget = PickOtherEnvironment();
             bool toMountains = portalTarget == "Env_Snow";
@@ -93,7 +90,6 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
         }
 
         if (!road.IsBehind(portal.transform.position, player.position, 0.5f)) return;
-        RunSession.NextPortalDistance = distance + PortalSpacingMetres;
         Destroy(portal.gameObject);
         portal = null;
         StartSwitch(portalTarget);
@@ -120,7 +116,12 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
             slideSeconds,
             transitionColor,
             canProceed: () => game != null && game.State == OutlawGameState.Running,
-            capture: () => RunSession.SetPending(game.CaptureRun()),
+            capture: () =>
+            {
+                // Start the next environment's minute from the carried run time.
+                RunSession.ScheduleNextPortal(game.ElapsedSeconds);
+                RunSession.SetPending(game.CaptureRun());
+            },
             onCancelled: () => switching = false
         );
     }
