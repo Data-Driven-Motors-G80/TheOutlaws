@@ -11,19 +11,21 @@ selected gameplay ideas from Team 21's **Redline Run** into one cohesive game.
 
 - **Title screen:** *Wee Woo Run*, your best distance, a tutorial ON/OFF switch (ON for a browser's first game, OFF after)
   and your missions (completed / 10, the current mission and the next two).
-- **Tutorial (show, don't tell):** one small box with one short instruction (LEFT AND RIGHT, AVOID OBSTACLES, GRAB FUEL, GRAB AMMO, SHOOT)
+- **Tutorial (show, don't tell):** one small box with one short instruction (LEFT AND RIGHT, AVOID THIS BLOCK, GRAB FUEL, GRAB AMMO, SHOOT)
   that stays until you do it; A / Left Arrow and D / Right Arrow are labelled LEFT and RIGHT. A miss flashes "TRY AGAIN!" for a second. Order: move both ways → dodge a block → fuel plunges
   (never empties) and an F immediately appears 35 m ahead in the car's path, with no obstacles → collect at least 3 rounds from A boxes → destroy a "1" wall
   with one shot, then a "2" wall with two shots. The shooting prompt explains that the number on a block is the shots needed;
   hitting a wall requires collecting ammo again and retrying that wall. The car drives at 14 m/s, the police can close in but never catch you, and nothing
   counts. The real run then starts seamlessly with a "GO!" chip and distance counting from 0.
 - The fuel bar turns red under 30%.
-- Blocks show the shots needed on their front face (green 1, yellow 2). Pickups are labelled on their front face:
+- Obstacles look like orange road barriers with black warning bands made from simple geometry. Both types show a large
+  white shot count (1 or 2) on a dark front panel; shooting a 2 changes its label to 1 while keeping the warning appearance.
+  Pickups are labelled on their front face:
   **A** ammo, **F** fuel, **?** mystery. Ammo is shown as one blue square per round (max 5, start with 2). Shots fly down
   the whole visible road (stopping at walls) and there is no fire delay: every Space press fires. Blocks are bigger and gaps are sometimes tight.
-- Hitting blocks costs police distance (green 9 m, yellow 15.75 m plus 10% fuel).
+- Hitting blocks costs police distance (one-shot 9 m, two-shot 15.75 m plus 10% fuel).
 - Roadblocks start at 200 m and come every 150–210 m (90–130 m after 2,000 m). The mix of blocks never changes
-  (55% green 1s, 45% yellow 2s); only how many there are increases. Every row and roadblock still **leaves one
+  (55% one-shot, 45% two-shot); only how many there are increases. Every row and roadblock still **leaves one
   lane open**, so ammo is the practical shortcut, never a requirement. A boxes come every 90–220 m to match.
 - Difficulty: speed rises 20 → 30 m/s over 90 s. Obstacles start sparse during a 30 s warm-up, build up over two minutes,
   then **keep getting denser for the whole run** (more rows, more double-lane rows, tighter gaps, roadblocks from 210 m

@@ -13,6 +13,7 @@ public sealed class WorldLabel : MonoBehaviour
 
     private Renderer target;
     private TextMeshPro text;
+    private Renderer background;
     /// <summary>When set, the face this label sits on never changes (obstacles).</summary>
     private Transform fixedFace;
     private bool hidden;
@@ -61,10 +62,31 @@ public sealed class WorldLabel : MonoBehaviour
         if (text != null && text.text != value) text.text = value;
     }
 
+    public void SetBackground(Color colour)
+    {
+        if (background == null)
+        {
+            GameObject panel = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            panel.name = "Label Background";
+            panel.layer = target.gameObject.layer;
+            panel.transform.SetParent(transform, false);
+            // The label faces into the box, so positive local Z sits just behind the text.
+            panel.transform.localPosition = Vector3.forward * 0.01f;
+            Collider collider = panel.GetComponent<Collider>();
+            collider.enabled = false;
+            Destroy(collider);
+            background = panel.GetComponent<Renderer>();
+            background.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+        background.sharedMaterial = RuntimeMaterials.Coloured(colour);
+        LateUpdate();
+    }
+
     public void SetVisible(bool visible)
     {
         hidden = !visible;
         if (text != null) text.enabled = visible && target != null && target.gameObject.activeInHierarchy;
+        if (background != null) background.enabled = text != null && text.enabled;
     }
 
     private void LateUpdate()
@@ -77,6 +99,7 @@ public sealed class WorldLabel : MonoBehaviour
 
         bool visible = !hidden && target.enabled && target.gameObject.activeInHierarchy;
         if (text.enabled != visible) text.enabled = visible;
+        if (background != null) background.enabled = visible;
         if (!visible) return;
 
         // Work in the box's own axes so the label sits exactly on a real face.
@@ -115,7 +138,10 @@ public sealed class WorldLabel : MonoBehaviour
         // TextMeshPro cap height is roughly a tenth of its font size, in metres.
         float letters = Mathf.Max(1, text.text.Length);
         float size = Mathf.Min(faceHeight * FaceFill, faceWidth * FaceFill / (0.7f * letters));
-        text.fontSize = Mathf.Clamp(size, 0.2f, MaximumSize) * 10f;
+        size = Mathf.Clamp(size, 0.2f, MaximumSize);
+        text.fontSize = size * 10f;
+        if (background != null)
+            background.transform.localScale = new Vector3(size * (0.7f * letters + 0.3f), size * 1.15f, 1f);
 
         transform.position = centre + outward * (depth + SurfaceOffset);
         // TextMeshPro reads correctly when its forward points into the face.
