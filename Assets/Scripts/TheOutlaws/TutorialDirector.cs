@@ -29,6 +29,7 @@ public enum TutorialHighlight
 public sealed class TutorialDirector : MonoBehaviour
 {
     private const float SpawnAhead = 75f;
+    private const float FuelSpawnAhead = 35f;
     private const float SteerHoldSeconds = 0.2f;
 
     private InfiniteRoad road;
@@ -190,9 +191,9 @@ public sealed class TutorialDirector : MonoBehaviour
         {
             case TutorialStep.Fuel:
                 fuel.DrainMode = FuelDrainMode.TutorialPlunge;
-                // Let the player watch the gauge fall before the tank appears.
-                waitRemaining = 1.4f;
-                tank = null;
+                // Teach collecting fuel on its own, with a clear road and the F straight ahead.
+                obstacles.ClearNear(player.position, SpawnAhead + 20f);
+                tank = fuelTanks.SpawnAhead(FuelSpawnAhead, PlayerLateral());
                 tankCollected = false;
                 break;
             case TutorialStep.Ammo:
@@ -274,9 +275,7 @@ public sealed class TutorialDirector : MonoBehaviour
         {
             waitRemaining -= dt;
             if (waitRemaining > 0f) return;
-            // The F sits in the open lane just past a block: steer around it to choose the fuel.
-            obstacles.SpawnTutorialDodgeRow(SpawnAhead, out float openLateral);
-            tank = fuelTanks.SpawnAhead(SpawnAhead + 8f, openLateral);
+            tank = fuelTanks.SpawnAhead(FuelSpawnAhead, PlayerLateral());
             return;
         }
 
