@@ -18,14 +18,13 @@ public static class TrafficObstacleRules
     public const float MidGameDistance = 300f;
     public const float LateGameDistance = 700f;
 
-    /// <summary>The same mix of 1s, 2s and 3s for the whole run: 55% green, 30% yellow, 15% red.</summary>
+    /// <summary>The same mix all run: 55% green (one shot), 45% yellow (two shots).</summary>
     public static TrafficObstacleState ChooseInitialState(float distanceTravelled, double roll)
     {
         if (double.IsNaN(roll) || double.IsInfinity(roll)) roll = 0d;
         roll = System.Math.Max(0d, System.Math.Min(0.999999d, roll));
         if (roll < 0.55d) return TrafficObstacleState.Green;
-        if (roll < 0.85d) return TrafficObstacleState.Yellow;
-        return TrafficObstacleState.Red;
+        return TrafficObstacleState.Yellow;
     }
 
     public static float GetProximityDrain(TrafficObstacleState state)

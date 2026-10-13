@@ -41,9 +41,24 @@ public sealed class TrafficObstacleRulesTests
         {
             Assert.That(TrafficObstacleRules.ChooseInitialState(distance, 0.1d), Is.EqualTo(TrafficObstacleState.Green));
             Assert.That(TrafficObstacleRules.ChooseInitialState(distance, 0.7d), Is.EqualTo(TrafficObstacleState.Yellow));
-            Assert.That(TrafficObstacleRules.ChooseInitialState(distance, 0.9d), Is.EqualTo(TrafficObstacleState.Red));
+            Assert.That(TrafficObstacleRules.ChooseInitialState(distance, 0.9d), Is.EqualTo(TrafficObstacleState.Yellow));
             Assert.That(TrafficRoadblockRules.ChoosePattern(distance, 0.9d), Is.EqualTo(TrafficRoadblockPattern.SplitChoice));
         }
+    }
+
+    [Test]
+    public void RegularBlocksNeverRequireThreeShots()
+    {
+        foreach (float distance in new[] { 0f, 800f, 5000f })
+        {
+            for (int i = 0; i <= 1000; i++)
+                Assert.That(TrafficObstacleRules.ChooseInitialState(distance, i / 1000d),
+                    Is.Not.EqualTo(TrafficObstacleState.Red));
+            foreach (double roll in new[] { double.NaN, double.NegativeInfinity, double.PositiveInfinity, -1d, 2d })
+                Assert.That(TrafficObstacleRules.ChooseInitialState(distance, roll),
+                    Is.Not.EqualTo(TrafficObstacleState.Red));
+        }
+        Assert.That(TrafficObstacleRules.ChooseInitialState(0f, 0.55d), Is.EqualTo(TrafficObstacleState.Yellow));
     }
 
     [Test]

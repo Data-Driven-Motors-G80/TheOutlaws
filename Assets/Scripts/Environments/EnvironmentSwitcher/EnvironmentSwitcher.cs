@@ -13,11 +13,8 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
     [SerializeField, Min(0.1f)] private float slideSeconds = 0.6f;
     [SerializeField] private Color transitionColor = new Color(0.88f, 0.94f, 1f, 1f);
 
-    private const float FirstSwitchMinimumMetres = 1200f;
-    private const float FirstSwitchMaximumMetres = 1800f;
-
+    private const float PortalSpacingMetres = 500f;
     private const float PortalLeadMetres = 95f;
-    private const float MountainMetres = 1000f;
 
     private OutlawGameManager game;
     private bool switching;
@@ -26,7 +23,6 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
     private InfiniteRoad road;
     private Transform player;
     private ObstacleSpawner obstacles;
-    private readonly System.Random firstSwitchRandom = new System.Random(System.Guid.NewGuid().GetHashCode());
 
     private void Awake()
     {
@@ -55,7 +51,7 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
                 );
 
                 string target = environmentScenes[(index + 1) % environmentScenes.Length];
-                RunSession.NextPortalDistance = game.DistanceTravelled + (target == "Env_Snow" ? MountainMetres : 1500f);
+                RunSession.NextPortalDistance = game.DistanceTravelled + PortalSpacingMetres;
                 StartSwitch(target);
             }
 
@@ -67,14 +63,14 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
     }
 
     /// <summary>
-    /// Portals are physical gates across the road. The first one (to the mountains) stands at a random
-    /// 1,200-1,800 m; the mountains last 1,000 m before a gate back; the next trip comes 1,200-2,000 m later.
+    /// Portals are physical gates across the road. The first stands at 500 m;
+    /// each environment lasts another 500 m before the next gate.
     /// </summary>
     private void UpdatePortal()
     {
         float distance = game.DistanceTravelled;
         if (RunSession.NextPortalDistance < 0f)
-            RunSession.NextPortalDistance = Range(FirstSwitchMinimumMetres, FirstSwitchMaximumMetres);
+            RunSession.NextPortalDistance = PortalSpacingMetres;
 
         if (portal == null)
         {
@@ -97,16 +93,10 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
         }
 
         if (!road.IsBehind(portal.transform.position, player.position, 0.5f)) return;
-        bool enteringMountains = portalTarget == "Env_Snow";
-        RunSession.NextPortalDistance = distance + (enteringMountains ? MountainMetres : Range(1200f, 2000f));
+        RunSession.NextPortalDistance = distance + PortalSpacingMetres;
         Destroy(portal.gameObject);
         portal = null;
         StartSwitch(portalTarget);
-    }
-
-    private float Range(float minimum, float maximum)
-    {
-        return minimum + (maximum - minimum) * (float)firstSwitchRandom.NextDouble();
     }
 
     private string PickOtherEnvironment()

@@ -11,19 +11,18 @@ selected gameplay ideas from Team 21's **Redline Run** into one cohesive game.
 
 - **Title screen:** *Wee Woo Run*, your best distance, a tutorial ON/OFF switch (ON for a browser's first game, OFF after)
   and your missions (completed / 10, the current mission and the next two).
-- **Tutorial (show, don't tell):** one small box with one short instruction (STEER, DODGE, GRAB FUEL, GRAB AMMO, SHOOT)
-  that stays until you do it; a miss flashes "TRY AGAIN!" for a second. Order: steer both ways → dodge a block → fuel plunges
+- **Tutorial (show, don't tell):** one small box with one short instruction (LEFT AND RIGHT, AVOID OBSTACLES, GRAB FUEL, GRAB AMMO, SHOOT)
+  that stays until you do it; A / Left Arrow and D / Right Arrow are labelled LEFT and RIGHT. A miss flashes "TRY AGAIN!" for a second. Order: move both ways → dodge a block → fuel plunges
   (never empties) and the F waits in the open lane past a block → collect A boxes → shoot a "2" wall (driving into it resets:
   collect ammo again, then a new wall). The car drives at 14 m/s, the police can close in but never catch you, and nothing
   counts. The real run then starts seamlessly with a "GO!" chip and distance counting from 0.
 - The fuel bar turns red under 30%.
-- Blocks show the shots needed on their front face (green 1, yellow 2, red 3). Pickups are labelled on their front face:
+- Blocks show the shots needed on their front face (green 1, yellow 2). Pickups are labelled on their front face:
   **A** ammo, **F** fuel, **?** mystery. Ammo is shown as one blue square per round (max 5, start with 2). Shots fly down
   the whole visible road (stopping at walls) and there is no fire delay: every Space press fires. Blocks are bigger and gaps are sometimes tight.
-- Hitting blocks costs police distance (green 9 m, yellow 15.75 m plus 10% fuel, red 24.75 m plus 20% fuel). Destroying a
-  red block drops an A box.
+- Hitting blocks costs police distance (green 9 m, yellow 15.75 m plus 10% fuel).
 - Roadblocks start at 200 m and come every 150–210 m (90–130 m after 2,000 m). The mix of blocks never changes
-  (55% green 1s, 30% yellow 2s, 15% red 3s); only how many there are increases. Every row and roadblock still **leaves one
+  (55% green 1s, 45% yellow 2s); only how many there are increases. Every row and roadblock still **leaves one
   lane open**, so ammo is the practical shortcut, never a requirement. A boxes come every 90–220 m to match.
 - Difficulty: speed rises 20 → 30 m/s over 90 s. Obstacles start sparse during a 30 s warm-up, build up over two minutes,
   then **keep getting denser for the whole run** (more rows, more double-lane rows, tighter gaps, roadblocks from 210 m
@@ -32,9 +31,9 @@ selected gameplay ideas from Team 21's **Redline Run** into one cohesive game.
   you pull away again (back to the starting 45 m gap, never further). You pull away at 1.5 m/s at first and 0.6 m/s after
   2.5 minutes, so it's several hits close together, not clean driving, that gets you caught.
 - Pickups never spawn on top of each other or inside/just behind a block.
-- **Portals:** a giant glowing gate fills the whole road (no way around it). The first, to the mountains (snow), stands at a
-  random 1,200–1,800 m; the mountains last 1,000 m, then a gate leads back to the city; the next trip comes 1,200–2,000 m
-  later. Arriving shows "PORTAL! YOU ENTERED THE MOUNTAINS" (or "BACK TO THE CITY").
+- **Portals:** a giant glowing gate fills the whole road (no way around it). The first, to the mountains (snow), stands at
+  500 m; each environment lasts another 500 m before the next gate. Arriving shows "PORTAL! YOU ENTERED THE MOUNTAINS"
+  (or "BACK TO THE CITY").
 - The top-right rear camera shows the roof of your car and the police behind it; its border turns red as they close in.
 - Mystery boxes: none for the first 500 m, then roughly every 320 m. Reverse steering 10%, nitro, shield and police
   jammer 30% each. Only one power-up at a time: no new ? box appears while one is active or another is still on the road. Grabbing one shows a single centred message
@@ -55,7 +54,8 @@ selected gameplay ideas from Team 21's **Redline Run** into one cohesive game.
 
 | Action | Controls |
 | --- | --- |
-| Steer | `A` / `D` or Left / Right Arrow |
+| Move left | `A` or Left Arrow |
+| Move right | `D` or Right Arrow |
 | Shoot forward | Space |
 | Start | Enter or the Start button |
 | Tutorial on/off (title) | `T` or the switch |
