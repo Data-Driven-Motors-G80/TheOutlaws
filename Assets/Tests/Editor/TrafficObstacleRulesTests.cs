@@ -20,18 +20,38 @@ public sealed class TrafficObstacleRulesTests
     }
 
     [Test]
-    public void CollisionPenaltiesIncreaseWithDanger()
+    public void CollisionPenaltiesMatchOrangeAndRedDistanceCostsWithoutFuelLoss()
     {
-        Assert.That(TrafficObstacleRules.GreenProximityDrain,
-            Is.LessThan(TrafficObstacleRules.YellowProximityDrain));
-        Assert.That(TrafficObstacleRules.YellowProximityDrain,
-            Is.LessThan(TrafficObstacleRules.RedProximityDrain));
+        // Internal Green is the one-shot orange obstacle; Yellow is the two-shot red obstacle.
+        Assert.That(TrafficObstacleRules.GreenProximityDrain, Is.EqualTo(1f / 3f));
+        Assert.That(TrafficObstacleRules.YellowProximityDrain, Is.EqualTo(0.5f));
+        Assert.That(TrafficObstacleRules.RedProximityDrain, Is.EqualTo(0.5f));
         Assert.That(TrafficObstacleRules.GetFuelPenaltyFraction(TrafficObstacleState.Red),
-            Is.EqualTo(0.2f));
+            Is.Zero);
         Assert.That(TrafficObstacleRules.GetFuelPenaltyFraction(TrafficObstacleState.Yellow),
-            Is.EqualTo(0.1f));
+            Is.Zero);
         Assert.That(TrafficObstacleRules.GetFuelPenaltyFraction(TrafficObstacleState.Green),
             Is.Zero);
+    }
+
+    [Test]
+    public void OrangeAndRedCollisionsUsePursuitDistanceRatherThanHitCounters()
+    {
+        var orangeRun = new RiskRunState();
+        Assert.That(orangeRun.TryCrash(TrafficObstacleRules.GreenProximityDrain), Is.True);
+        orangeRun.Tick(1.1f, 15f, 15f);
+        Assert.That(orangeRun.TryCrash(TrafficObstacleRules.GreenProximityDrain), Is.True);
+        orangeRun.Tick(1.1f, 15f, 15f);
+        Assert.That(orangeRun.IsGameOver, Is.False);
+        Assert.That(orangeRun.TryCrash(TrafficObstacleRules.GreenProximityDrain), Is.True);
+        Assert.That(orangeRun.IsGameOver, Is.True);
+
+        var redRun = new RiskRunState();
+        Assert.That(redRun.TryCrash(TrafficObstacleRules.YellowProximityDrain), Is.True);
+        redRun.Tick(1.1f, 15f, 15f);
+        Assert.That(redRun.IsGameOver, Is.False);
+        Assert.That(redRun.TryCrash(TrafficObstacleRules.YellowProximityDrain), Is.True);
+        Assert.That(redRun.IsGameOver, Is.True);
     }
 
     [Test]

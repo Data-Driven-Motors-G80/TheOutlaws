@@ -6,7 +6,8 @@ public sealed class TrafficLightObstacle : MonoBehaviour
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
     private static readonly int ColorId = Shader.PropertyToID("_Color");
 
-    private static readonly Color BarrierOrange = new Color(1f, 0.54f, 0f);
+    private static readonly Color BarrierOrange = new Color(1f, 0.42f, 0f);
+    private static readonly Color BarrierRed = new Color(0.9f, 0.04f, 0.02f);
     private static readonly Color WarningBlack = new Color(0.125f, 0.14f, 0.17f);
 
     private Renderer[] renderers;
@@ -103,12 +104,18 @@ public sealed class TrafficLightObstacle : MonoBehaviour
 
     private void ApplyVisualState()
     {
+        // The current project only spawns one- and two-shot obstacles during the
+        // normal run. Show those as orange and red respectively; shooting a red
+        // obstacle once visibly lowers it to the orange state.
+        Color barrierColour = CurrentState == TrafficObstacleState.Green
+            ? BarrierOrange
+            : BarrierRed;
         foreach (Renderer obstacleRenderer in renderers)
         {
             if (obstacleRenderer == null) continue;
             obstacleRenderer.GetPropertyBlock(propertyBlock);
-            propertyBlock.SetColor(BaseColorId, BarrierOrange);
-            propertyBlock.SetColor(ColorId, BarrierOrange);
+            propertyBlock.SetColor(BaseColorId, barrierColour);
+            propertyBlock.SetColor(ColorId, barrierColour);
             obstacleRenderer.SetPropertyBlock(propertyBlock);
         }
 

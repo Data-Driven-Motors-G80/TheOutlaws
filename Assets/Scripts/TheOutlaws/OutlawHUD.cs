@@ -9,7 +9,7 @@ public sealed class OutlawHUD : MonoBehaviour
     private const float RearViewSize = 230f;
     private const float Margin = 20f;
     private const float MissionRowHeight = 50f;
-    private const float LowFuelFraction = 0.3f;
+    private const float LowFuelFraction = 0.25f;
 
     private static readonly Color AmmoBlue = new Color(0.12f, 0.55f, 1f);
     private static readonly Color PanelColour = new Color(0.03f, 0.04f, 0.06f, 0.96f);
@@ -381,6 +381,8 @@ public sealed class OutlawHUD : MonoBehaviour
 
         if (game.IsTutorial) DrawTutorial(width, height);
 
+        DrawLowFuelWarning(width, height);
+
         // Mission toasts sit in the top-left corner, under the ammo, away from the road.
         if (missionToastRemaining > 0f && game.State == OutlawGameState.Running)
         {
@@ -444,6 +446,32 @@ public sealed class OutlawHUD : MonoBehaviour
     }
 
     private bool FuelLow => game.Fuel != null && game.Fuel.NormalizedFuel < LowFuelFraction;
+
+    /// <summary>A pulsing edge vignette that communicates danger without covering the road.</summary>
+    private void DrawLowFuelWarning(float width, float height)
+    {
+        if (!FuelLow || game.State != OutlawGameState.Running) return;
+
+        float pulse = (Mathf.Sin(Time.unscaledTime * 5f) + 1f) * 0.5f;
+        float edge = Mathf.Lerp(28f, 46f, pulse);
+        Color vignette = new Color(LowFuelRed.r, LowFuelRed.g, LowFuelRed.b,
+            Mathf.Lerp(0.08f, 0.22f, pulse));
+
+        DrawRect(new Rect(0f, 0f, width, edge), vignette);
+        DrawRect(new Rect(0f, height - edge, width, edge), vignette);
+        DrawRect(new Rect(0f, edge, edge, Mathf.Max(0f, height - edge * 2f)), vignette);
+        DrawRect(new Rect(width - edge, edge, edge, Mathf.Max(0f, height - edge * 2f)), vignette);
+
+        GUIStyle warning = new GUIStyle(leftStyle)
+        {
+            fontSize = 18,
+            fontStyle = FontStyle.Bold,
+            alignment = TextAnchor.MiddleLeft
+        };
+        warning.normal.textColor = new Color(1f, 0.22f, 0.18f,
+            Mathf.Lerp(0.72f, 1f, pulse));
+        GUI.Label(new Rect(304f, 42f, 180f, 30f), "LOW FUEL", warning);
+    }
 
     /// <summary>Top-left column, all left-aligned: FUEL label, fuel bar, AMMO label, one square per bullet.</summary>
     private void DrawAmmoSquares()

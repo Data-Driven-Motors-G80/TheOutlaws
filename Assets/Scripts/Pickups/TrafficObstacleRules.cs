@@ -8,12 +8,14 @@ public enum TrafficObstacleState
 /// <summary>Scene-independent tuning rules for traffic-light obstacles.</summary>
 public static class TrafficObstacleRules
 {
-    // Fractions of the 45 m starting gap: green 9 m, yellow 15.75 m, red 24.75 m.
-    public const float GreenProximityDrain = 0.2f;
-    public const float YellowProximityDrain = 0.35f;
-    public const float RedProximityDrain = 0.55f;
-    public const float YellowFuelPenaltyFraction = 0.1f;
-    public const float RedFuelPenaltyFraction = 0.2f;
+    // The internal states still describe shots remaining, while the player-facing
+    // colours are orange for the one-shot state and red for the two-shot state.
+    // Fractions are taken from the 45 m starting gap: orange costs 15 m and red 22.5 m.
+    public const float GreenProximityDrain = 1f / 3f;
+    public const float YellowProximityDrain = 0.5f;
+    public const float RedProximityDrain = 0.5f;
+    public const float YellowFuelPenaltyFraction = 0f;
+    public const float RedFuelPenaltyFraction = 0f;
 
     public const float MidGameDistance = 300f;
     public const float LateGameDistance = 700f;
