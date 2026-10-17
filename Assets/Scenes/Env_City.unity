@@ -1458,9 +1458,9 @@ MonoBehaviour:
   playerCollider: {fileID: 0}
   turnSharpness: 8
   edgeMargin: 1
-  maximumVisualGap: 8
+  maximumVisualGap: 4.5
   minimumVisualGap: 0.35
-  visualGapChangeSpeed: 2.5
+  visualGapChangeSpeed: 5
   visibleBelowMeterValue: 0.5
 --- !u!1 &980293025
 GameObject:
@@ -2071,9 +2071,9 @@ MonoBehaviour:
   playerCollider: {fileID: 0}
   turnSharpness: 8
   edgeMargin: 1
-  maximumVisualGap: 8
+  maximumVisualGap: 4.5
   minimumVisualGap: 0.35
-  visualGapChangeSpeed: 2.5
+  visualGapChangeSpeed: 5
   visibleBelowMeterValue: 0.5
 --- !u!1 &1551234747
 GameObject:
@@ -2238,7 +2238,7 @@ MonoBehaviour:
   road: {fileID: 371121412}
   visual: {fileID: 1066005398}
   forwardSpeed: 20
-  maximumForwardSpeed: 100
+  maximumForwardSpeed: 55
   speedIncreaseAmount: 1
   speedIncreaseInterval: 30
   minimumLateralSpeed: 8

@@ -56,7 +56,7 @@ public sealed class PickupEffectStateTests
     }
 
     [TestCase(PickupEffectType.ReverseSteering, -1f, 1f, 1f)]
-    [TestCase(PickupEffectType.Boost, 1f, 1.35f, 1f)]
+    [TestCase(PickupEffectType.Boost, 1f, 1.2f, 1f)]
     [TestCase(PickupEffectType.SlipperySteering, 1f, 1f, 0.3f)]
     public void Pickup_ChangesOnlyItsIntendedDrivingProperty(
         PickupEffectType effect, float steering, float speed, float acceleration)
@@ -122,7 +122,7 @@ public sealed class PickupEffectStateTests
 
         Assert.That(state.RemainingSeconds, Is.EqualTo(4f));
         Assert.That(state.SteeringMultiplier, Is.EqualTo(1f));
-        Assert.That(state.ForwardSpeedMultiplier, Is.EqualTo(1.35f));
+        Assert.That(state.ForwardSpeedMultiplier, Is.EqualTo(1.2f));
         Assert.That(state.LateralAccelerationMultiplier, Is.EqualTo(1f));
 
         state.Apply(PickupEffectType.SlipperySteering);
@@ -160,7 +160,7 @@ public sealed class PickupEffectStateTests
 
         state.Apply(PickupEffectType.Boost);
         Assert.That(state.RemainingSeconds, Is.EqualTo(5f));
-        Assert.That(state.ForwardSpeedMultiplier, Is.EqualTo(1.35f));
+        Assert.That(state.ForwardSpeedMultiplier, Is.EqualTo(1.2f));
     }
 
     [TestCase(0f)]
@@ -219,9 +219,14 @@ public sealed class PickupEffectStateTests
         {
             var effects = car.AddComponent<CarPickupEffects>();
             effects.Apply(PickupEffectType.ReverseSteering);
+            Assert.That(effects.ReverseCountdownRemaining, Is.EqualTo(3f));
+            Assert.That(effects.SteeringMultiplier, Is.EqualTo(1f));
+            // Exercise active-effect cleanup as well as the pending warning.
+            effects.RunState.Effects.Apply(PickupEffectType.ReverseSteering);
             Assert.That(effects.SteeringMultiplier, Is.EqualTo(-1f));
 
             effects.enabled = false;
+            Assert.That(effects.ReverseCountdownRemaining, Is.Zero);
             Assert.That(effects.ActiveEffect, Is.EqualTo(PickupEffectType.None));
             Assert.That(effects.RemainingSeconds, Is.Zero);
             Assert.That(effects.SteeringMultiplier, Is.EqualTo(1f));

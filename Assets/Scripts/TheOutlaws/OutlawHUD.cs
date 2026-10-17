@@ -155,7 +155,8 @@ public sealed class OutlawHUD : MonoBehaviour
             }
         }
         bool banner = game.RunStartBannerRemaining > 0f && !game.IsTutorial;
-        if (banner && !wasBanner) ShowMessage("GO! ESCAPE THE COPS!", Gold, 2f);
+        if (banner && !wasBanner) ShowMessage(game.StartedAfterTutorial
+            ? "YOU’RE READY — KEEP GOING!" : "GO! ESCAPE THE COPS!", Gold, 2f);
         wasBanner = banner;
         bool alert = game.PoliceAlertActive && !game.IsTutorial;
         if (alert && !wasPoliceAlert) ShowMessage("POLICE CLOSING IN!", PoliceRed, 2f);
@@ -423,7 +424,13 @@ public sealed class OutlawHUD : MonoBehaviour
         // The control-swap countdown is live, so it always shows its current number.
         if (effects != null && effects.ReverseCountdownRemaining > 0f)
         {
-            text = $"CONTROLS SWAP IN {Mathf.CeilToInt(effects.ReverseCountdownRemaining)}";
+            text = $"CONTROLS FLIP IN {Mathf.CeilToInt(effects.ReverseCountdownRemaining)}";
+            colour = ReversePurple;
+        }
+        else if (effects != null && effects.ActiveEffect == PickupEffectType.ReverseSteering
+            && !game.IsTutorial)
+        {
+            text = $"← RIGHT   → LEFT   {Mathf.CeilToInt(effects.RemainingSeconds)}s";
             colour = ReversePurple;
         }
         else if (messageRemaining <= 0f) return;
@@ -573,7 +580,8 @@ public sealed class OutlawHUD : MonoBehaviour
         Keyboard keys = Keyboard.current;
         bool steering = tutorial.Step == TutorialStep.Steer || tutorial.Step == TutorialStep.Dodge;
         bool shooting = tutorial.Step == TutorialStep.Shoot && tutorial.Highlight != TutorialHighlight.Ammo;
-        bool showKeys = steering || shooting;
+        bool reverse = tutorial.Step == TutorialStep.Reverse && tutorial.Title == "TRY BOTH DIRECTIONS";
+        bool showKeys = steering || shooting || reverse;
 
         // One box with one instruction; "TRY AGAIN!" briefly takes its place after a miss.
         float panelHeight = shooting ? 220f : showKeys ? 160f : 80f;
@@ -583,9 +591,15 @@ public sealed class OutlawHUD : MonoBehaviour
         string heading = retry
             ? $"<color={Hex(Bad)}>{tutorial.Feedback}</color>"
             : $"<color={Hex(Gold)}>{tutorial.Title}</color>";
-        GUI.Label(new Rect(panel.x, panel.y + 12f, panel.width, 56f), heading, bigStyle);
+        FitLabel(new Rect(panel.x + 24f, panel.y + 12f, panel.width - 48f, 56f), heading, bigStyle, 24);
 
-        if (steering)
+        if (reverse)
+        {
+            float keyY = panel.y + 80f;
+            DrawKey(new Rect(panel.center.x - 230f, keyY, 220f, 60f), "A / ←  RIGHT", tutorial.LeftDone);
+            DrawKey(new Rect(panel.center.x + 10f, keyY, 220f, 60f), "D / →  LEFT", tutorial.RightDone);
+        }
+        else if (steering)
         {
             float keyY = panel.y + 80f;
             bool left = tutorial.Step == TutorialStep.Steer ? tutorial.LeftDone
@@ -653,7 +667,7 @@ public sealed class OutlawHUD : MonoBehaviour
 
     /// <summary>
     /// "MISSIONS n/10" and a list of missions in order (lowest number on top).
-    /// Title: the current missions. During/after a run: the missions the run started with,
+    /// Title: fresh missions. During/after a run: the current unlocked missions,
     /// ticked when completed, otherwise with live progress.
     /// </summary>
     private float DrawMissionList(Rect area, bool forRun)

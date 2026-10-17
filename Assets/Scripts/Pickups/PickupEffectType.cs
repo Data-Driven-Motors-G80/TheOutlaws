@@ -5,5 +5,6 @@ public enum PickupEffectType
     Boost = 2,
     SlipperySteering = 3,
     RandomFuelOrReverse = 4,
-    Shield = 7
+    Shield = 7,
+    ProximityRecovery = 8
 }

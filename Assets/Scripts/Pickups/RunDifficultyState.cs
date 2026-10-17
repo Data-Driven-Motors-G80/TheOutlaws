@@ -4,14 +4,8 @@ using System;
 public readonly struct RunDifficultyState
 {
     public const float StartSpeed = 20f;
-    public const float TopSpeed = 30f;
-    /// <summary>Seconds of real-run time until every curve reaches its cap.</summary>
-    public const float RampSeconds = 90f;
-
-    public static float Ramp(float elapsedSeconds)
-    {
-        return Math.Min(1f, Math.Max(0f, elapsedSeconds) / RampSeconds);
-    }
+    public const float MaximumSpeed = 55f;
+    public const float SpeedBlendSeconds = 2.5f;
 
     /// <summary>Retained for code that still reasons in 25-second steps.</summary>
     public static int PressureSteps(float elapsedSeconds)
@@ -19,10 +13,31 @@ public readonly struct RunDifficultyState
         return (int)(Math.Max(0f, elapsedSeconds) / 25f);
     }
 
-    /// <summary>20 m/s at the start, rising steadily to 30 m/s at 90 s.</summary>
-    public static float DrivingSpeed(float elapsedSeconds)
+    /// <summary>A seeded schedule keeps the same timing across frames and scene changes.</summary>
+    public static float SpeedIncreaseInterval(int seed, int step)
     {
-        return StartSpeed + (TopSpeed - StartSpeed) * Ramp(elapsedSeconds);
+        uint value = unchecked((uint)seed + (uint)(step + 1) * 0x9E3779B9u);
+        value = unchecked((value ^ (value >> 16)) * 0x85EBCA6Bu);
+        value = unchecked((value ^ (value >> 13)) * 0xC2B2AE35u);
+        value ^= value >> 16;
+        return 30f + (value & 0xFFFFFFu) / 16777215f * 15f;
+    }
+
+    /// <summary>Gain 1 m/s every 30–45 seconds, blended over 2.5 seconds, capped at 55.</summary>
+    public static float DrivingSpeed(float elapsedSeconds, int seed = 1)
+    {
+        if (float.IsNaN(elapsedSeconds) || float.IsInfinity(elapsedSeconds)) return StartSpeed;
+        float nextIncrease = 0f;
+        float speed = StartSpeed;
+        for (int step = 0; step < (int)(MaximumSpeed - StartSpeed); step++)
+        {
+            nextIncrease += SpeedIncreaseInterval(seed, step);
+            if (elapsedSeconds < nextIncrease) break;
+            float progress = Math.Min(1f, (elapsedSeconds - nextIncrease) / SpeedBlendSeconds);
+            speed = StartSpeed + step + progress;
+            if (progress < 1f) break;
+        }
+        return speed;
     }
 
     /// <summary>Seconds of gentle warm-up at the start of every run.</summary>

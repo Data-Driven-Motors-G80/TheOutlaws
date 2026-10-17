@@ -3,6 +3,32 @@ using NUnit.Framework;
 public sealed class RiskRunStateTests
 {
     [Test]
+    public void TutorialNitroOpensCloseGapAndHitsRemainNonfatal()
+    {
+        var run = new RiskRunState();
+        run.BeginTutorialPursuit();
+        Assert.That(run.PursuitGap, Is.EqualTo(18f));
+        run.Tick(3f, 14f, 14f);
+        Assert.That(run.PursuitGap, Is.EqualTo(18f));
+        run.TryActivateNitro();
+        run.Tick(3f, 14f, 14f);
+        Assert.That(run.PursuitGap, Is.EqualTo(26.4f).Within(0.01f));
+        run.LoseNitro();
+        for (int i = 0; i < 10; i++)
+        {
+            run.TryCrash(TrafficObstacleRules.YellowProximityDrain);
+            run.Tick(1.1f, 14f, 14f);
+        }
+        Assert.That(run.PursuitGap, Is.EqualTo(6f));
+        Assert.That(run.IsGameOver, Is.False);
+        run.ResetPursuit();
+        Assert.That(run.MinimumPursuitGap, Is.Zero);
+        Assert.That(run.PursuitGap, Is.EqualTo(RiskRunState.InitialPursuitGap));
+        run.TryCrash(1f);
+        Assert.That(run.IsGameOver, Is.True);
+    }
+
+    [Test]
     public void Nitro_PersistsThroughTimeAndReverseEffectsUntilLost()
     {
         var run = new RiskRunState();
@@ -10,9 +36,9 @@ public sealed class RiskRunStateTests
         run.TryCollectWithoutReward(PickupEffectType.ReverseSteering, 8f);
         run.Tick(30f);
         Assert.That(run.HasNitro, Is.True);
-        Assert.That(run.ForwardSpeedMultiplier, Is.EqualTo(1.35f));
+        Assert.That(run.ForwardSpeedMultiplier, Is.EqualTo(1.2f));
         run.TryActivateNitro();
-        Assert.That(run.ForwardSpeedMultiplier, Is.EqualTo(1.35f));
+        Assert.That(run.ForwardSpeedMultiplier, Is.EqualTo(1.2f));
         run.LoseNitro();
         Assert.That(run.ForwardSpeedMultiplier, Is.EqualTo(1f));
         run.TryActivateNitro();
@@ -188,8 +214,8 @@ public sealed class RiskRunStateTests
         run.TryCollect(PickupEffectType.Boost, 2f);
         run.Tick(3f);
 
-        // Two seconds at 20.25 - 14, then one second at 15 - 14.
-        Assert.That(run.PursuitGap, Is.EqualTo(58.5f).Within(0.0001f));
+        // Two seconds at 18 - 14, then one second at 15 - 14.
+        Assert.That(run.PursuitGap, Is.EqualTo(54f).Within(0.0001f));
         Assert.That(run.Effects.ActiveEffect, Is.EqualTo(PickupEffectType.None));
     }
 
@@ -200,7 +226,7 @@ public sealed class RiskRunStateTests
         run.TryCollect(PickupEffectType.Boost, 0.1f);
         run.Tick(0.2f);
         Assert.That(run.LastTickForwardDistance,
-            Is.EqualTo(20.25f * 0.1f + 15f * 0.1f).Within(0.0001f));
+            Is.EqualTo(18f * 0.1f + 15f * 0.1f).Within(0.0001f));
     }
 
     [Test]
@@ -248,7 +274,7 @@ public sealed class RiskRunStateTests
         run.Tick(2.6f);
         Assert.That(run.PursuitGap, Is.EqualTo(36f).Within(0.0001f));
         run.Tick(1f);
-        Assert.That(run.PursuitGap, Is.EqualTo(42.25f).Within(0.0001f));
+        Assert.That(run.PursuitGap, Is.EqualTo(40f).Within(0.0001f));
     }
 
     [Test]

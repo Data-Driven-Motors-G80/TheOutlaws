@@ -4,6 +4,7 @@ using UnityEngine;
 public struct RunSnapshot
 {
     public float Elapsed;
+    public int SpeedScheduleSeed;
     public float Distance;
     public float Score;
     public float MeterFuel;

@@ -105,6 +105,24 @@ public sealed class PickupSpawner : MonoBehaviour
         untilNext = Mathf.Max(spacing, MinimumSpacing);
     }
 
+    public PickupItem SpawnTutorialNitro(float distance, float lateral)
+    {
+        return SpawnTutorialMystery(distance, lateral, PickupEffectType.Boost);
+    }
+
+    public PickupItem SpawnTutorialMystery(float distance, float lateral, PickupEffectType outcome)
+    {
+        if (pickupPrefab == null || !TryGetPointAhead(distance, out RoadPathPoint point)) return null;
+        float limit = Mathf.Max(0f, point.Width * 0.5f - 1.2f);
+        Vector3 position = point.Position + point.Right * Mathf.Clamp(lateral, -limit, limit)
+            + point.Up * 0.6f;
+        PickupItem item = Instantiate(pickupPrefab, position, Quaternion.identity, transform);
+        item.Configure(outcome, effectDuration);
+        Renderer box = item.GetComponentInChildren<Renderer>();
+        if (box != null) WorldLabel.Attach(box, "?", new Color(1f, 0.85f, 0.2f));
+        return item;
+    }
+
     private void SpawnAhead(float distance)
     {
         if (active.Count >= 8 || !TryGetPointAhead(distance, out RoadPathPoint point)) return;

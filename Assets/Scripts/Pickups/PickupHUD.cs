@@ -34,7 +34,7 @@ public sealed class PickupHUD : MonoBehaviour
                 : null;
             popupHint = proximity ? "Police distance recovered"
                 : shield ? "Next hit is blocked"
-                : nitro ? "35% faster until an unshielded obstacle hit"
+                : nitro ? "20% faster until an unshielded obstacle hit"
                 : reverse ? "A / Left: move right     D / Right: move left"
                 : null;
             popupRemaining = popupMessage != null && !effects.RunState.IsGameOver ? PopupDuration : 0f;

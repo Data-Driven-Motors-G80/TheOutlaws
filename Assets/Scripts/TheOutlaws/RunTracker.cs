@@ -125,6 +125,7 @@ public static class RunTracker
         Stats.TotalDistance = baseTotalDistance = OutlawProfile.TotalDistance;
         Stats.TotalDestroyed = OutlawProfile.TotalDestroyed;
         Stats.TotalAmmoPickups = OutlawProfile.TotalAmmoPickups;
+        OutlawProfile.ResetRunMissions();
         ActiveMissions.Clear();
         ActiveMissions.AddRange(OutlawProfile.VisibleMissions());
         CompletedThisRun.Clear();
@@ -260,19 +261,25 @@ public static class RunTracker
     }
 
     /// <summary>
-    /// Only the missions the run started with can be completed (any of them, in any order).
-    /// Missions unlocked by finishing one become active from the next run.
+    /// Completed missions unlock replacements during this run. All ten reset on restart.
     /// </summary>
     public static void CheckMissions()
     {
+        bool unlocked = false;
         foreach (MissionDefinition mission in ActiveMissions)
         {
             if (CompletedThisRun.Contains(mission) || !mission.IsComplete(Stats)) continue;
             CompletedThisRun.Add(mission);
+            unlocked = true;
             OutlawProfile.CompleteMission(mission.Id);
             WeeWooAnalytics.Track("mission_complete", "mission_id", mission.Id, "mission", mission.Title,
                 "run_number_total", OutlawProfile.TotalRuns);
             MissionCompleted?.Invoke(mission);
+        }
+        if (unlocked)
+        {
+            ActiveMissions.Clear();
+            ActiveMissions.AddRange(OutlawProfile.VisibleMissions());
         }
     }
 

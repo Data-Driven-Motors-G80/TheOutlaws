@@ -16,15 +16,18 @@ public sealed class ChaseCar : MonoBehaviour
     [SerializeField, Min(0f)] private float edgeMargin = 1f;
 
     [Header("Visible Pursuit Range")]
-    [SerializeField, Min(1f)] private float maximumVisualGap = 8f;
+    [SerializeField, Min(1f)] private float maximumVisualGap = 4.5f;
     [SerializeField, Min(0f)] private float minimumVisualGap = 0.35f;
-    [SerializeField, Min(0f)] private float visualGapChangeSpeed = 2.5f;
+    [SerializeField, Min(0f)] private float visualGapChangeSpeed = 5f;
     [SerializeField, Range(0f, 1f)] private float visibleBelowMeterValue = 0.5f;
     private Renderer[] policeRenderers;
 
     private float startingBumperGap;
     private float displayedBumperGap;
     private float relativeLateralOffset;
+    private float previousLateralOffset;
+    private AutoDriveCar playerDriver;
+    private OutlawGameManager game;
     private float heightOffset;
     private CarPickupEffects effects;
 
@@ -38,8 +41,13 @@ public sealed class ChaseCar : MonoBehaviour
 
     private void Awake()
     {
+        game = FindFirstObjectByType<OutlawGameManager>();
         policeRenderers = GetComponentsInChildren<Renderer>(true);
-        if (player != null) effects = player.GetComponent<CarPickupEffects>();
+        if (player != null)
+        {
+            effects = player.GetComponent<CarPickupEffects>();
+            playerDriver = player.GetComponent<AutoDriveCar>();
+        }
         if (chaseCollider == null)
         {
             chaseCollider =
@@ -79,49 +87,16 @@ public sealed class ChaseCar : MonoBehaviour
             return;
         }
 
-        float centerDistance = Vector3.Distance(
-            transform.position,
-            player.position
-        );
-
-        float chaseFrontLength = GetColliderExtent(
-            chaseCollider,
-            chasePoint.Forward
-        );
-
-        float playerBackLength = GetColliderExtent(
-            playerCollider,
-            playerPoint.Forward
-        );
-
-        float sceneBumperGap = Mathf.Max(
-            0f,
-            centerDistance - chaseFrontLength - playerBackLength);
-
-        // The gameplay model begins with a 45 m pursuit gap, while the scene
-        // cars were originally placed only a few metres apart. Use a readable
-        // visual range so a collision produces an obvious police advance.
-        startingBumperGap = Mathf.Max(sceneBumperGap, maximumVisualGap);
+        // Scene placement must not override the configured visible pursuit range.
+        startingBumperGap = Mathf.Max(minimumVisualGap, maximumVisualGap);
         displayedBumperGap = GetTargetBumperGap();
         DistanceToPlayer = displayedBumperGap;
 
         Vector3 chaseOffset =
             transform.position - chasePoint.Position;
 
-        Vector3 playerOffset =
-            player.position - playerPoint.Position;
-
-        float chaseLateralOffset = Vector3.Dot(
-            chaseOffset,
-            chasePoint.Right
-        );
-
-        float playerLateralOffset = Vector3.Dot(
-            playerOffset,
-            playerPoint.Right
-        );
-
         relativeLateralOffset = 0f;
+        previousLateralOffset = Vector3.Dot(chaseOffset, chasePoint.Right);
 
         heightOffset = Vector3.Dot(
             chaseOffset,
@@ -157,7 +132,8 @@ public sealed class ChaseCar : MonoBehaviour
         displayedBumperGap = Mathf.MoveTowards(
             displayedBumperGap,
             GetTargetBumperGap(),
-            visualGapChangeSpeed * Time.deltaTime);
+            (game != null && game.IsTutorialHandoff
+                ? Mathf.Min(visualGapChangeSpeed, 0.8f) : visualGapChangeSpeed) * Time.deltaTime);
 
         float centerFollowDistance =
             displayedBumperGap +
@@ -200,31 +176,20 @@ public sealed class ChaseCar : MonoBehaviour
             target.Right * desiredLateralOffset +
             target.Up * heightOffset;
 
-        Vector3 movement =
-            targetPosition - transform.position;
-
         transform.position = targetPosition;
 
-        Vector3 movementDirection =
-            Vector3.ProjectOnPlane(
-                movement,
-                target.Up
-            );
-
-        if (movementDirection.sqrMagnitude < 0.0001f)
-        {
-            movementDirection = target.Forward;
-        }
-        else
-        {
-            movementDirection.Normalize();
-        }
-
-        Quaternion targetRotation =
-            Quaternion.LookRotation(
-                movementDirection,
-                target.Up
-            );
+        // Turn into sideways movement like the player. Use road-relative lateral
+        // motion, not world displacement: a growing pursuit gap can move the police
+        // backwards temporarily, but must never make them face backwards.
+        float lateralVelocity = Time.deltaTime > 0f
+            ? (desiredLateralOffset - previousLateralOffset) / Time.deltaTime : 0f;
+        previousLateralOffset = desiredLateralOffset;
+        float forwardSpeed = playerDriver != null ? playerDriver.BaseForwardSpeed : 15f;
+        float steerAngle = Mathf.Clamp(
+            Mathf.Atan2(lateralVelocity, Mathf.Max(1f, forwardSpeed)) * Mathf.Rad2Deg,
+            -20f, 20f);
+        Quaternion targetRotation = Quaternion.LookRotation(target.Forward, target.Up)
+            * Quaternion.Euler(0f, steerAngle, 0f);
 
         float blend =
             1f - Mathf.Exp(
@@ -271,10 +236,26 @@ public sealed class ChaseCar : MonoBehaviour
             ? effects.RunState.PursuitGap / RiskRunState.InitialPursuitGap
             : meter.Value;
 
-        return Mathf.LerpUnclamped(
+        // Start the tutorial at the normal visual spacing after two basic hits.
+        // Preserve the normal visual response to jammer, crashes and nitro;
+        // this offset never changes the gameplay pursuit gap.
+        if (game != null && game.IsTutorial)
+        {
+            float twoHitRatio = 1f - 2f * TrafficObstacleRules.GreenProximityDrain;
+            pursuitRatio += twoHitRatio
+                - RiskRunState.TutorialInitialPursuitGap / RiskRunState.InitialPursuitGap;
+        }
+        float normalGap = Mathf.Max(minimumVisualGap, Mathf.LerpUnclamped(
             minimumVisualGap,
             startingBumperGap,
-            pursuitRatio);
+            pursuitRatio));
+
+        // Visual opening only: never change the gameplay pursuit gap. Active run
+        // time survives environment changes and stops while paused.
+        if (game == null || game.IsTutorial || game.StartedAfterTutorial) return normalGap;
+        float openingBlend = Mathf.SmoothStep(0f, 1f,
+            Mathf.InverseLerp(3f, 10f, game.ElapsedSeconds));
+        return Mathf.Lerp(Mathf.Min(normalGap, 1f), normalGap, openingBlend);
     }
 
     private float GetColliderExtent(

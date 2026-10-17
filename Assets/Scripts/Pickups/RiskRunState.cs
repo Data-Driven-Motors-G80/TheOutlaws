@@ -4,6 +4,7 @@ using System;
 public sealed class RiskRunState
 {
     public const float InitialPursuitGap = 45f;
+    public const float TutorialInitialPursuitGap = 18f;
     public const float MaximumPursuitGap = 75f;
     public const float PickupProximityRecovery = MaximumPursuitGap * 0.5f;
     // Collisions drain the proximity bar but do not slow the car.
@@ -34,7 +35,7 @@ public sealed class RiskRunState
     public float RecoveryCap { get; set; } = MaximumPursuitGap;
     public bool IsGameOver { get; private set; }
     public bool HasNitro { get; private set; }
-    public float ForwardSpeedMultiplier => HasNitro ? 1.35f : Effects.ForwardSpeedMultiplier;
+    public float ForwardSpeedMultiplier => HasNitro ? 1.2f : Effects.ForwardSpeedMultiplier;
 
     public bool TryActivateNitro()
     {
@@ -273,6 +274,15 @@ public sealed class RiskRunState
             Effects.Apply(snapshot.ActiveEffect, snapshot.EffectRemaining);
     }
 
+    /// <summary>Close, nonfatal pursuit for demonstrating the opening nitro pickup.</summary>
+    public void BeginTutorialPursuit()
+    {
+        Reset();
+        pursuitGap = TutorialInitialPursuitGap;
+        MinimumPursuitGap = 6f;
+        RecoveryCap = InitialPursuitGap;
+    }
+
     /// <summary>Starts the real chase from the opening gap without touching pickups or effects.</summary>
     public void ResetPursuit()
     {
@@ -288,6 +298,7 @@ public sealed class RiskRunState
     {
         pursuitGap = InitialPursuitGap;
         MinimumPursuitGap = 0f;
+        RecoveryCap = MaximumPursuitGap;
         IsGameOver = false;
         HasNitro = false;
         crashSlowRemaining = 0d;

@@ -10,7 +10,6 @@ public static class OutlawProfile
 {
     private const string PlayerIdKey = "WeeWoo.PlayerId";
     private const string StartedKey = "WeeWoo.HasStartedGame";
-    private const string MissionsKey = "WeeWoo.MissionsDone";
     private const string RunsKey = "WeeWoo.TotalRuns";
     private const string SessionsKey = "WeeWoo.Sessions";
     private const string TutorialDoneKey = "WeeWoo.TutorialCompleted";
@@ -85,9 +84,12 @@ public static class OutlawProfile
     public static void CompleteMission(int id)
     {
         LoadMissions();
-        if (!missionsDone.Add(id)) return;
-        PlayerPrefs.SetString(MissionsKey, string.Join(",", missionsDone));
-        PlayerPrefs.Save();
+        if (MissionCatalog.Find(id) != null) missionsDone.Add(id);
+    }
+
+    public static void ResetRunMissions()
+    {
+        missionsDone = new HashSet<int>();
     }
 
     public static List<MissionDefinition> VisibleMissions() => MissionCatalog.Visible(IsMissionDone);
@@ -136,8 +138,8 @@ public static class OutlawProfile
     {
         if (missionsDone != null) return;
         missionsDone = new HashSet<int>();
-        foreach (string part in PlayerPrefs.GetString(MissionsKey, "").Split(','))
-            if (int.TryParse(part, out int id)) missionsDone.Add(id);
+        // Mission completion belongs to this run. Ignore legacy saved completions;
+        // best distance, tutorial preference and lifetime statistics remain saved.
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]

@@ -6,7 +6,6 @@ using UnityEngine.SceneManagement;
 [DefaultExecutionOrder(-200)]
 public sealed class OutlawGameManager : MonoBehaviour
 {
-    private const float TutorialPoliceFloor = 30f;
     private const float TutorialSpeed = 14f;
     private const int StartingAmmo = 2;
 
@@ -30,6 +29,7 @@ public sealed class OutlawGameManager : MonoBehaviour
     private ChaseCar[] policeCars;
     private float elapsed;
     private float previousPursuitGap;
+    private int speedScheduleSeed;
     private float policeAlertRemaining;
     private float carriedDistance;
     private float distanceOrigin;
@@ -42,6 +42,8 @@ public sealed class OutlawGameManager : MonoBehaviour
     /// <summary>Real-run distance: excludes the tutorial and carries across environment scenes.</summary>
     public float DistanceTravelled => carriedDistance + (driver != null ? driver.RoadDistanceTravelled - distanceOrigin : 0f);
     public float ElapsedSeconds => elapsed;
+    public bool StartedAfterTutorial { get; private set; }
+    public bool IsTutorialHandoff => StartedAfterTutorial && elapsed < 4f;
     public OutlawShooting Shooting => shooting;
     public FuelMeter Fuel => fuel;
     public CarPickupEffects PickupEffects => pickupEffects;
@@ -102,6 +104,7 @@ public sealed class OutlawGameManager : MonoBehaviour
         tutorial.Configure(road, player.transform, shooting, obstacles, fuelTanks, fuel);
         tutorial.Completed += () => StartRealRun(true);
 
+        if (!RunSession.HasPending) OutlawProfile.ResetRunMissions();
         TutorialSelected = OutlawProfile.TutorialDefault;
         WeeWooAnalytics.EnsureStarted();
         WeeWooAnalytics.ContextProvider = AnalyticsContext;
@@ -136,6 +139,7 @@ public sealed class OutlawGameManager : MonoBehaviour
         }
 
         elapsed = carried.Elapsed;
+        speedScheduleSeed = carried.SpeedScheduleSeed;
         carriedDistance = carried.Distance;
         shooting.SetAmmo(carried.Ammo);
         pickupEffects.RestoreRun(carried.Risk, carried.StateFuel);
@@ -157,6 +161,7 @@ public sealed class OutlawGameManager : MonoBehaviour
         return new RunSnapshot
         {
             Elapsed = elapsed,
+            SpeedScheduleSeed = speedScheduleSeed,
             Distance = DistanceTravelled,
             Score = score != null ? score.Score : 0f,
             MeterFuel = fuel != null ? fuel.CurrentFuel : 0f,
@@ -277,7 +282,12 @@ public sealed class OutlawGameManager : MonoBehaviour
     private void UpdateDifficulty()
     {
         // Total run time carries across scenes: changing environments never resets pressure.
-        driver.SetDifficultySpeed(RunDifficultyState.DrivingSpeed(elapsed));
+        float targetSpeed = RunDifficultyState.DrivingSpeed(elapsed, speedScheduleSeed);
+        if (IsTutorialHandoff)
+            driver.SetTutorialSpeed(Mathf.Lerp(TutorialSpeed, targetSpeed,
+                Mathf.SmoothStep(0f, 1f, elapsed / 4f)));
+        else
+            driver.SetDifficultySpeed(targetSpeed);
         obstacles.ConfigureDifficulty(
             RunDifficultyState.ObstacleDensity(elapsed),
             RunDifficultyState.DoubleRowChance(elapsed),
@@ -332,7 +342,7 @@ public sealed class OutlawGameManager : MonoBehaviour
         fuelTanks.Suppressed = true;
         ammoSpawner.Suppressed = true;
         if (mysterySpawner != null) mysterySpawner.ClearAndSuppress();
-        pickupEffects.RunState.MinimumPursuitGap = TutorialPoliceFloor;
+        pickupEffects.RunState.BeginTutorialPursuit();
         pursuit.SetClosingSpeed(0f);
         driver.SetTutorialSpeed(TutorialSpeed);
         State = OutlawGameState.Running;
@@ -343,9 +353,11 @@ public sealed class OutlawGameManager : MonoBehaviour
     /// <summary>Starts counting the real run: from the title, or seamlessly after the tutorial.</summary>
     private void StartRealRun(bool afterTutorial)
     {
+        StartedAfterTutorial = afterTutorial;
         distanceOrigin = driver.RoadDistanceTravelled;
         carriedDistance = 0f;
         elapsed = 0f;
+        speedScheduleSeed = System.Guid.NewGuid().GetHashCode();
         pickupEffects.RunState.ResetPursuit();
         previousPursuitGap = pickupEffects.RunState.PursuitGap;
         fuel.SetFuel(fuel.MaximumFuel);

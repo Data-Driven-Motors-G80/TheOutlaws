@@ -7,7 +7,7 @@ public sealed class PickupEffectState
     public float RemainingSeconds { get; private set; }
 
     public float SteeringMultiplier => ActiveEffect == PickupEffectType.ReverseSteering ? -1f : 1f;
-    public float ForwardSpeedMultiplier => ActiveEffect == PickupEffectType.Boost ? 1.35f : 1f;
+    public float ForwardSpeedMultiplier => ActiveEffect == PickupEffectType.Boost ? 1.2f : 1f;
     public float LateralAccelerationMultiplier => ActiveEffect == PickupEffectType.SlipperySteering ? 0.3f : 1f;
 
     /// <summary>A new pickup replaces the current effect, including its remaining time.</summary>

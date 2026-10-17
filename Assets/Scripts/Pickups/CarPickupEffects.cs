@@ -107,6 +107,15 @@ public sealed class CarPickupEffects : MonoBehaviour
                 return collected;
 
 
+            case PickupEffectType.ProximityRecovery:
+                bool recovered = runState.TryRestorePursuitGap(RiskRunState.PickupProximityRecovery);
+                if (recovered)
+                {
+                    LastOutcome = RandomPickupOutcome.ProximityRecovery;
+                    PickupCount++;
+                }
+                return recovered;
+
             case PickupEffectType.Shield:
                 bool shieldedPickup = runState.TryGrantShield();
                 if (shieldedPickup)

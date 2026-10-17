@@ -9,8 +9,8 @@ public sealed class AutoDriveCar : MonoBehaviour
     [SerializeField] private Transform visual;
 
     [Header("Forward Movement")]
-    [SerializeField, Min(0.01f)] private float forwardSpeed = 15f;
-    [SerializeField, Min(0.01f)] private float maximumForwardSpeed = 30f;
+    [SerializeField, Min(0.01f)] private float forwardSpeed = RunDifficultyState.StartSpeed;
+    [SerializeField, Min(0.01f)] private float maximumForwardSpeed = RunDifficultyState.MaximumSpeed;
     [SerializeField, Min(0f)] private float speedIncreaseAmount = 0.75f;
     [SerializeField, Min(0.01f)] private float speedIncreaseInterval = 30f;
 

@@ -10,7 +10,12 @@ public enum TutorialStep
     Fuel,
     Ammo,
     Shoot,
-    Done
+    Done,
+    Nitro, // Appended to preserve existing tutorial analytics indices.
+    Reverse,
+    Shield,
+    Recovery,
+    PursuitCollision
 }
 
 public enum TutorialHighlight
@@ -38,6 +43,19 @@ public sealed class TutorialDirector : MonoBehaviour
     private ObstacleSpawner obstacles;
     private FuelTankSpawner fuelTanks;
     private FuelMeter fuel;
+    private PickupSpawner powerups;
+    private PickupItem nitro;
+    private bool fuelLessonStarted;
+    private CarPickupEffects effects;
+    private float previousReverseLateral;
+    private float reversePracticeSeconds;
+    private const float ReversePracticeMinimumSeconds = 8f;
+    private const float ReverseDirectionHoldSeconds = 0.6f;
+    private PickupItem lessonMystery;
+    private bool reverseCollected;
+    private bool lessonCollected;
+    private bool shieldDemonstrated;
+    private bool pursuitCollisionDemonstrated;
 
     private float stepStartedAt;
     private float tutorialStartedAt;
@@ -81,7 +99,10 @@ public sealed class TutorialDirector : MonoBehaviour
                 case TutorialStep.Fuel: return TutorialHighlight.Fuel;
                 case TutorialStep.Ammo: return TutorialHighlight.Ammo;
                 case TutorialStep.Shoot: return reloading ? TutorialHighlight.Ammo : TutorialHighlight.None;
-                case TutorialStep.Dodge: return TutorialHighlight.RearView;
+                case TutorialStep.Dodge:
+                case TutorialStep.Nitro:
+                case TutorialStep.Recovery:
+                case TutorialStep.PursuitCollision: return TutorialHighlight.RearView;
                 default: return TutorialHighlight.None;
             }
         }
@@ -96,7 +117,16 @@ public sealed class TutorialDirector : MonoBehaviour
             {
                 case TutorialStep.Steer: return "LEFT AND RIGHT";
                 case TutorialStep.Dodge: return "AVOID THIS BLOCK";
-                case TutorialStep.Fuel: return "GRAB FUEL";
+                case TutorialStep.Fuel: return fuelLessonStarted ? "GRAB FUEL" : "FUEL DRAINS OVER TIME";
+                case TutorialStep.Reverse: return stepSucceeded ? "CONTROLS NORMAL"
+                    : !reverseCollected ? "GRAB THE MYSTERY BOX"
+                    : effects.ReverseCountdownRemaining > 0f ? "GET READY" : "TRY BOTH DIRECTIONS";
+                case TutorialStep.Shield: return stepSucceeded ? "SHIELD SAVED YOU"
+                    : lessonCollected ? "SHIELD: HIT THE BLOCK" : "GRAB THE MYSTERY BOX";
+                case TutorialStep.Recovery: return lessonCollected ? "JAMMER: MORE SPACE" : "GRAB THE MYSTERY BOX";
+                case TutorialStep.Nitro: return stepSucceeded ? "NITRO: PULL AWAY" : "GRAB THE MYSTERY BOX";
+                case TutorialStep.PursuitCollision: return pursuitCollisionDemonstrated
+                    ? "HITS BRING POLICE CLOSER" : "TRY HITTING THIS BLOCK";
                 case TutorialStep.Ammo: return "GRAB AMMO";
                 case TutorialStep.Shoot: return reloading ? "GRAB AMMO" : "SHOOT";
                 default: return null;
@@ -113,6 +143,8 @@ public sealed class TutorialDirector : MonoBehaviour
         obstacles = obstacleSpawner;
         fuelTanks = fuelSpawner;
         fuel = fuelMeter;
+        powerups = FindFirstObjectByType<PickupSpawner>();
+        effects = player.GetComponent<CarPickupEffects>();
     }
 
     public void Begin()
@@ -169,6 +201,11 @@ public sealed class TutorialDirector : MonoBehaviour
         switch (Step)
         {
             case TutorialStep.Steer: UpdateSteer(dt); break;
+            case TutorialStep.Nitro: UpdateNitro(dt); break;
+            case TutorialStep.Reverse: UpdateReverse(dt); break;
+            case TutorialStep.Shield: UpdateShield(); break;
+            case TutorialStep.Recovery: UpdateRecovery(); break;
+            case TutorialStep.PursuitCollision: UpdatePursuitCollision(); break;
             case TutorialStep.Fuel: UpdateFuel(dt); break;
             case TutorialStep.Ammo: UpdateAmmo(dt); break;
             case TutorialStep.Shoot: UpdateShoot(dt); break;
@@ -190,11 +227,40 @@ public sealed class TutorialDirector : MonoBehaviour
         switch (step)
         {
             case TutorialStep.Fuel:
-                fuel.DrainMode = FuelDrainMode.TutorialPlunge;
-                // Teach collecting fuel on its own, with a clear road and the F straight ahead.
+                // Separate the fuel lesson from the preceding collision/dodge feedback.
+                fuel.DrainMode = FuelDrainMode.Frozen;
+                fuelLessonStarted = false;
+                waitRemaining = 2f;
                 obstacles.ClearNear(player.position, SpawnAhead + 20f);
-                tank = fuelTanks.SpawnAhead(FuelSpawnAhead, PlayerLateral());
                 tankCollected = false;
+                break;
+            case TutorialStep.Shield:
+            case TutorialStep.Recovery:
+                obstacles.ClearNear(player.position, SpawnAhead + 20f);
+                lessonCollected = false;
+                shieldDemonstrated = false;
+                wall = null;
+                lessonMystery = powerups.SpawnTutorialMystery(35f, PlayerLateral(),
+                    step == TutorialStep.Shield ? PickupEffectType.Shield : PickupEffectType.ProximityRecovery);
+                break;
+            case TutorialStep.PursuitCollision:
+                obstacles.ClearNear(player.position, SpawnAhead + 20f);
+                pursuitCollisionDemonstrated = false;
+                wall = obstacles.SpawnTutorialWall(45f, TrafficObstacleState.Yellow);
+                break;
+            case TutorialStep.Reverse:
+                obstacles.ClearNear(player.position, SpawnAhead + 20f);
+                ClearAmmoBoxes();
+                fuel.DrainMode = FuelDrainMode.Frozen;
+                LeftDone = RightDone = false;
+                leftHeld = rightHeld = 0f;
+                previousReverseLateral = PlayerLateral();
+                reverseCollected = false;
+                reversePracticeSeconds = 0f;
+                lessonMystery = powerups.SpawnTutorialMystery(35f, PlayerLateral(), PickupEffectType.ReverseSteering);
+                break;
+            case TutorialStep.Nitro:
+                nitro = powerups.SpawnTutorialNitro(35f, PlayerLateral());
                 break;
             case TutorialStep.Ammo:
                 shooting.SetAmmo(0);
@@ -246,7 +312,12 @@ public sealed class TutorialDirector : MonoBehaviour
 
     private void Advance()
     {
-        EnterStep(Step + 1);
+        EnterStep(Step == TutorialStep.Shoot ? TutorialStep.Shield
+            : Step == TutorialStep.Shield ? TutorialStep.Reverse
+            : Step == TutorialStep.Reverse ? TutorialStep.Recovery
+            : Step == TutorialStep.Recovery ? TutorialStep.PursuitCollision
+            : Step == TutorialStep.PursuitCollision ? TutorialStep.Nitro
+            : Step == TutorialStep.Nitro ? TutorialStep.Done : Step + 1);
     }
 
     private void UpdateSteer(float dt)
@@ -260,8 +331,133 @@ public sealed class TutorialDirector : MonoBehaviour
         if (LeftDone && RightDone) Succeed(0.6f);
     }
 
+    private void RespawnLessonBox(PickupEffectType outcome)
+    {
+        if (lessonMystery != null && !road.IsBehind(lessonMystery.transform.position, player.position, 3f)) return;
+        if (lessonMystery != null) Destroy(lessonMystery.gameObject);
+        lessonMystery = powerups.SpawnTutorialMystery(35f, PlayerLateral(), outcome);
+    }
+
+    private void UpdateShield()
+    {
+        if (!lessonCollected)
+        {
+            RespawnLessonBox(PickupEffectType.Shield);
+            return;
+        }
+        if (shieldDemonstrated)
+        {
+            obstacles.ClearNear(player.position, SpawnAhead + 20f);
+            Succeed(1.5f);
+            return;
+        }
+        if (wall == null || !obstacles.IsActive(wall) || road.IsBehind(wall.transform.position, player.position, 3f))
+        {
+            obstacles.ClearNear(player.position, SpawnAhead + 20f);
+            wall = obstacles.SpawnTutorialWall(45f, TrafficObstacleState.Green);
+        }
+    }
+
+    private void UpdateRecovery()
+    {
+        if (!lessonCollected)
+        {
+            RespawnLessonBox(PickupEffectType.ProximityRecovery);
+            return;
+        }
+        // Leave room for the final nitro lesson to visibly open the gap further.
+        effects.RunState.RecoveryCap = RiskRunState.MaximumPursuitGap;
+        Succeed(3f);
+    }
+
+    private void UpdatePursuitCollision()
+    {
+        if (pursuitCollisionDemonstrated)
+        {
+            obstacles.ClearNear(player.position, SpawnAhead + 20f);
+            Succeed(3f);
+            return;
+        }
+        // Shooting or missing the demonstration must not leave the lesson stuck.
+        if (wall == null || !obstacles.IsActive(wall) || road.IsBehind(wall.transform.position, player.position, 3f))
+        {
+            obstacles.ClearNear(player.position, SpawnAhead + 20f);
+            wall = obstacles.SpawnTutorialWall(45f, TrafficObstacleState.Yellow);
+        }
+    }
+
+    private void UpdateReverse(float dt)
+    {
+        if (!reverseCollected)
+        {
+            if (effects.ReverseCountdownRemaining > 0f || effects.ActiveEffect == PickupEffectType.ReverseSteering)
+            {
+                reverseCollected = true;
+                previousReverseLateral = PlayerLateral();
+            }
+            else
+            {
+                if (lessonMystery == null || road.IsBehind(lessonMystery.transform.position, player.position, 3f))
+                {
+                    if (lessonMystery != null) Destroy(lessonMystery.gameObject);
+                    lessonMystery = powerups.SpawnTutorialMystery(35f, PlayerLateral(), PickupEffectType.ReverseSteering);
+                }
+                return;
+            }
+        }
+        float lateral = PlayerLateral();
+        float movement = lateral - previousReverseLateral;
+        previousReverseLateral = lateral;
+        if (effects.ReverseCountdownRemaining > 0f) return;
+        reversePracticeSeconds += dt;
+        // Keep this safe practice active until the player has felt both directions.
+        if (effects.RemainingSeconds < 1f)
+            effects.RunState.Effects.Apply(PickupEffectType.ReverseSteering, 2f);
+        Keyboard keys = Keyboard.current;
+        if (keys == null) return;
+        if ((keys.leftArrowKey.isPressed || keys.aKey.isPressed) && movement > 0f)
+            leftHeld += dt;
+        if ((keys.rightArrowKey.isPressed || keys.dKey.isPressed) && movement < 0f)
+            rightHeld += dt;
+        LeftDone = leftHeld >= ReverseDirectionHoldSeconds;
+        RightDone = rightHeld >= ReverseDirectionHoldSeconds;
+        if (!LeftDone || !RightDone || reversePracticeSeconds < ReversePracticeMinimumSeconds) return;
+        effects.Clear();
+        Succeed(1.5f);
+    }
+
+    private void UpdateNitro(float dt)
+    {
+        if (player.GetComponent<CarPickupEffects>().RunState.HasNitro)
+        {
+            // Allow time to see the gradual retreat, unlike the instant jammer bonus.
+            Succeed(5f);
+            return;
+        }
+        if (nitro == null)
+        {
+            waitRemaining -= dt;
+            if (waitRemaining <= 0f) nitro = powerups.SpawnTutorialNitro(35f, PlayerLateral());
+        }
+        else if (road.IsBehind(nitro.transform.position, player.position, 3f))
+        {
+            Destroy(nitro.gameObject);
+            nitro = null;
+            waitRemaining = 1f;
+            Retry("missed_nitro");
+        }
+    }
+
     private void UpdateFuel(float dt)
     {
+        if (!fuelLessonStarted)
+        {
+            waitRemaining -= dt;
+            if (waitRemaining > 0f) return;
+            fuelLessonStarted = true;
+            fuel.DrainMode = FuelDrainMode.TutorialPlunge;
+            tank = fuelTanks.SpawnAhead(FuelSpawnAhead, PlayerLateral());
+        }
         if (tankCollected)
         {
             fuel.SetFuel(fuel.MaximumFuel);
@@ -448,11 +644,17 @@ public sealed class TutorialDirector : MonoBehaviour
     private void OnPickupCollected(PickupKind kind, string outcome)
     {
         if (Active && Step == TutorialStep.Fuel && kind == PickupKind.Fuel) tankCollected = true;
+        if (!Active || kind != PickupKind.Mystery) return;
+        if ((Step == TutorialStep.Shield && outcome == RandomPickupOutcome.Shield.ToString())
+            || (Step == TutorialStep.Recovery && outcome == RandomPickupOutcome.ProximityRecovery.ToString()))
+            lessonCollected = true;
     }
 
     private void OnObstacleCollision(TrafficObstacleState colour, bool shielded)
     {
         if (Active && Step == TutorialStep.Dodge) dodgeHit = true;
+        if (Active && Step == TutorialStep.Shield && shielded) shieldDemonstrated = true;
+        if (Active && Step == TutorialStep.PursuitCollision && !shielded) pursuitCollisionDemonstrated = true;
     }
 
     private void OnShotFired()
