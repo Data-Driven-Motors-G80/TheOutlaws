@@ -2627,7 +2627,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1802903150}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a510265ee40b1e240b0c7779ae29405c, type: 3}
+  m_Script: {fileID: 11500000, guid: dd09e8f88ec87174f9df4c506ea47017, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ObstacleSpawner
   road: {fileID: 371121412}
@@ -2640,6 +2640,9 @@ MonoBehaviour:
   minRowSeparation: 4
   edgeMargin: 1
   despawnDistance: 15
+  rowSpacingMultiplier: 1.7
+  roadblockSpacingMultiplier: 1.7
+  autoAddFog: 1
 --- !u!4 &1802903152
 Transform:
   m_ObjectHideFlags: 0
