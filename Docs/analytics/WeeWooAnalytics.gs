@@ -27,7 +27,7 @@ function doPost(e) {
   // Group by sheet so each sheet is written with a single setValues call.
   var bySheet = {};
   rows.forEach(function (row) {
-    if (!row || SHEETS.indexOf(row.sheet) < 0 || typeof row.data !== 'object') return;
+    if (!row || SHEETS.indexOf(row.sheet) < 0 || !row.data || typeof row.data !== 'object' || Array.isArray(row.data)) return;
     (bySheet[row.sheet] = bySheet[row.sheet] || []).push(row.data);
   });
 
@@ -39,7 +39,14 @@ function doPost(e) {
     Object.keys(bySheet).forEach(function (name) {
       written += appendRows(book, name, bySheet[name]);
     });
-    return reply({ ok: true, written: written });
+    // Only summary uploads refresh reports; frequent event batches remain inexpensive.
+    // A report failure must not reject already-saved rows and provoke duplicate uploads.
+    var reportError = '';
+    if (bySheet.runs || bySheet.tutorials) {
+      try { updateMetricTabs(book); }
+      catch (err) { reportError = String(err); console.error(reportError); }
+    }
+    return reply({ ok: true, written: written, metricTabsError: reportError });
   } finally {
     lock.releaseLock();
   }
@@ -85,6 +92,7 @@ function appendRows(book, name, records) {
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Wee Woo Analytics')
+    .addItem('Create / refresh metric tabs', 'refreshMetricTabs')
     .addItem('Refresh dashboard', 'refreshDashboard')
     .addToUi();
 }
@@ -265,6 +273,153 @@ function refreshDashboard() {
   sheet.setColumnWidth(1, 380);
   sheet.setColumnWidth(2, 220);
   sheet.setColumnWidth(3, 420);
+}
+
+// ---------------------------------------------------------------- automatic metric tabs
+
+var METRIC_TAB_MARKER = 'WeeWoo managed metric report v1';
+
+/** Run once from the editor to backfill existing records; doPost then keeps these current. */
+function refreshMetricTabs() {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(25000);
+  try { updateMetricTabs(SpreadsheetApp.getActiveSpreadsheet()); }
+  finally { lock.releaseLock(); }
+}
+
+function metricRuns(rows) {
+  var byId = {}, anonymous = [];
+  metricReal(rows).forEach(function (r) {
+    if (!r.run_id) { anonymous.push(r); return; }
+    var previous = byId[r.run_id];
+    // A page-close beacon can overlap a normal run-end upload.
+    if (!previous || (previous.end_reason === 'quit_tab_closed' && r.end_reason !== 'quit_tab_closed')) {
+      byId[r.run_id] = r;
+    }
+  });
+  return Object.keys(byId).map(function (id) { return byId[id]; }).concat(anonymous);
+}
+
+function metricReal(rows) {
+  return rows.filter(function (r) { return r.build && !/editor|test|ignore/i.test(String(r.build)); });
+}
+
+function metricNumbers(rows, key) {
+  return rows.filter(function (r) { return r[key] !== '' && r[key] !== undefined && r[key] !== null; })
+    .map(function (r) { return Number(r[key]); }).filter(function (n) { return isFinite(n) && n >= 0; });
+}
+
+function metricReports(runRows, tutorialRows) {
+  var runs = metricRuns(runRows);
+  var deaths = runs.filter(function (r) { return r.end_reason === 'fuel' || r.end_reason === 'police'; });
+  var tutorials = dedupe(metricReal(tutorialRows), function (r) {
+    return r.ts ? r.session_id + '#' + r.ts + '#' + r.status : '';
+  });
+  function total(key) { return sum(metricNumbers(deaths, key)); }
+  function avg(key) { return mean(metricNumbers(deaths, key)); }
+  function count(reason) { return filter(deaths, 'end_reason', reason).length; }
+  var base = [['run_id', 'Run ID'], ['ts', 'Timestamp (UTC)'], ['build', 'Build'], ['end_reason', 'Run end']];
+  function report(name, summary, fields, rows) {
+    return { name: name, summary: summary, fields: fields || [], rows: rows || [] };
+  }
+  var notes = 'Summary: non-test runs ended by fuel or police. Detail rows also include quits/restarts. Builds are pooled; use Build to compare versions.';
+  var reports = [
+    report('Overview', [
+      ['Recorded non-test runs', runs.length], ['Death-ended runs', deaths.length],
+      ['Quits / restarts / other endings', runs.length - deaths.length],
+      ['Median survival (seconds)', median(metricNumbers(deaths, 'survival_s'))],
+      ['Mean survival (seconds)', avg('survival_s')], ['Mean distance (metres)', avg('distance_m')],
+      ['Fuel deaths', count('fuel')], ['Police deaths', count('police')],
+      ['Shooting accuracy (total hits / total shots)', pct(total('shots_hit'), total('shots_fired'))],
+      ['Tutorial attempts recorded', tutorials.length],
+      ['Tutorial completion rate', pct(filter(tutorials, 'status', 'completed').length, tutorials.length)]
+    ]),
+    report('Survival & Progression', [
+      ['Median survival (seconds)', median(metricNumbers(deaths, 'survival_s'))],
+      ['Mean distance (metres)', avg('distance_m')],
+      ['Runs under 30 seconds', metricNumbers(deaths, 'survival_s').filter(function (s) { return s < 30; }).length],
+      ['Runs reaching snow', deaths.filter(function (r) { return truthy(r.reached_snow) || r.reached_snow === 1 || r.reached_snow === '1'; }).length]
+    ], base.concat([['survival_s', 'Survival (seconds)'], ['distance_m', 'Distance (metres)'], ['reached_snow', 'Reached snow'], ['city_s', 'City (seconds)'], ['snow_s', 'Snow (seconds)']]), runs),
+    report('Shooting & Ammo', [
+      ['Shots fired', total('shots_fired')], ['Successful hits', total('shots_hit')],
+      ['Pooled accuracy', pct(total('shots_hit'), total('shots_fired'))],
+      ['Obstacles destroyed', total('destroyed_green') + total('destroyed_yellow') + total('destroyed_red')],
+      ['1-hit obstacles destroyed (Orange)', total('destroyed_green')],
+      ['2-hit obstacles destroyed (Red)', total('destroyed_yellow')],
+      ['Legacy 3-hit obstacles destroyed', total('destroyed_red')],
+      ['Ammo pickups collected', total('ammo_collected')],
+      ['Ammo pickups touched while full', total('ammo_wasted_full')]
+    ], base.concat([['shots_fired', 'Shots fired'], ['shots_hit', 'Shots hit'], ['accuracy_pct', 'Accuracy (%)'], ['destroyed_green', '1-hit obstacles destroyed (Orange)'], ['destroyed_yellow', '2-hit obstacles destroyed (Red)'], ['destroyed_red', 'Legacy 3-hit obstacles destroyed'], ['ammo_collected', 'Ammo collected'], ['ammo_wasted_full', 'Ammo pickups touched while full'], ['ammo_end', 'Ammo remaining']]), runs),
+    report('Collisions & Police', [
+      ['Obstacle collisions', total('hits_total')], ['Mean collisions per run', avg('hits_total')],
+      ['Police contacts', total('police_contacts')], ['Police deaths', count('police')]
+    ], base.concat([['hits_total', 'Obstacle collisions'], ['police_contacts', 'Police contacts'], ['min_police_gap', 'Minimum police gap'], ['hits_shielded', 'Shielded hits'], ['hits_while_reversed', 'Hits while reversed']]), runs),
+    report('Fuel', [
+      ['Fuel pickups collected', total('fuel_collected')], ['Fuel pickups missed', total('fuel_missed')],
+      ['Fuel deaths', count('fuel')], ['Share of deaths caused by fuel', pct(count('fuel'), deaths.length)]
+    ], base.concat([['fuel_collected', 'Fuel collected'], ['fuel_missed', 'Fuel missed'], ['min_fuel_pct', 'Minimum fuel (%)'], ['s_below_25_fuel', 'Seconds below 25% fuel'], ['fuel_pct_at_end', 'Fuel at end (%)']]), runs),
+    report('Mystery Pickups', [
+      ['Mystery boxes collected', total('mystery_collected')], ['Shield outcomes', total('mystery_shield')],
+      ['Nitro outcomes', total('mystery_nitro')], ['Police recovery outcomes', total('mystery_recovery')],
+      ['Reverse outcomes', total('mystery_reverse')], ['Hits blocked by shield', total('hits_shielded')]
+    ], base.concat([['mystery_collected', 'Mystery boxes collected'], ['mystery_shield', 'Shield outcomes'], ['mystery_nitro', 'Nitro outcomes'], ['mystery_recovery', 'Recovery outcomes'], ['mystery_reverse', 'Reverse outcomes'], ['s_reversed', 'Seconds reversed'], ['s_nitro', 'Seconds nitro']]), runs),
+    report('Tutorial Summary', [
+      ['Recorded attempts', tutorials.length], ['Completed', filter(tutorials, 'status', 'completed').length],
+      ['Restarted', filter(tutorials, 'status', 'restarted').length], ['Abandoned', filter(tutorials, 'status', 'abandoned').length],
+      ['Completion rate', pct(filter(tutorials, 'status', 'completed').length, tutorials.length)],
+      ['Median completed duration (seconds)', median(metricNumbers(filter(tutorials, 'status', 'completed'), 'seconds'))]
+    ], [['ts', 'Timestamp (UTC)'], ['session_id', 'Session ID'], ['build', 'Build'], ['status', 'Outcome'], ['seconds', 'Duration (seconds)'], ['retries', 'Retries'], ['quit_step', 'Exit step']].concat(
+      ['steer', 'dodge', 'fuel', 'ammo', 'shoot', 'shield', 'reverse', 'recovery', 'pursuitcollision', 'nitro'].map(function (step) { return [step + '_s', step + ' (seconds)']; })
+    ), tutorials)
+  ];
+  reports.forEach(function (r) {
+    r.note = r.name === 'Tutorial Summary' ? 'Non-test recorded tutorial attempts, not unique people. Missing lessons remain blank.' : notes;
+    if (r.name === 'Mystery Pickups') r.note += ' Outcome counts describe collection, not necessarily successful use.';
+    if (r.name === 'Shooting & Ammo') r.note += ' Destroyed counts use starting strength. Orange/Red are current visual colours for 1-hit/2-hit obstacles; older builds may use different colours. Legacy 3-hit counts remain separate. -1 means not applicable. Ammo pickups touched while full (ammo_wasted_full) can overlap missed pickups; do not add those counts together.';
+  });
+  return reports;
+}
+
+function updateMetricTabs(book) {
+  var reports = metricReports(table(book, 'runs'), table(book, 'tutorials'));
+  // Avoid replacing someone else's manually created tabs. Check all names before writing.
+  reports.forEach(function (r) {
+    var sheet = book.getSheetByName(r.name);
+    if (sheet && sheet.getLastRow() && sheet.getRange(1, 1).getNote() !== METRIC_TAB_MARKER) {
+      throw new Error('Rename the existing "' + r.name + '" tab to preserve it, then run refreshMetricTabs. Raw uploads are saved.');
+    }
+  });
+  var refreshed = new Date().toISOString();
+  reports.forEach(function (r) {
+    var sheet = book.getSheetByName(r.name) || book.insertSheet(r.name);
+    var output = [[r.name, 'Updated ' + refreshed], [r.note], [], ['Metric', 'Value']].concat(r.summary);
+    var detailHeader = 0;
+    if (r.fields.length) {
+      output.push([]);
+      output.push(r.fields.map(function (f) { return f[1]; }));
+      detailHeader = output.length;
+      r.rows.forEach(function (record) {
+        output.push(r.fields.map(function (f) { return record[f[0]] === undefined ? '' : record[f[0]]; }));
+      });
+    }
+    var width = Math.max(2, r.fields.length);
+    if (sheet.getMaxRows() < output.length) sheet.insertRowsAfter(sheet.getMaxRows(), output.length - sheet.getMaxRows());
+    if (sheet.getMaxColumns() < width) sheet.insertColumnsAfter(sheet.getMaxColumns(), width - sheet.getMaxColumns());
+    sheet.clearContents();
+    sheet.getRange(1, 1).setNote(METRIC_TAB_MARKER);
+    sheet.getRange(1, 1, output.length, width).setValues(output.map(function (row) {
+      while (row.length < width) row.push('');
+      // Treat uploaded text as text, never as spreadsheet formulas.
+      return row.map(function (v) { return typeof v === 'string' && v.charAt(0) === '=' ? "'" + v : v; });
+    }));
+    sheet.getRange(1, 1, 1, width).setBackground('#24476A').setFontColor('#FFFFFF').setFontWeight('bold');
+    sheet.getRange(4, 1, 1, 2).setFontWeight('bold');
+    if (detailHeader) sheet.getRange(detailHeader, 1, 1, width).setBackground('#DCE7F2').setFontWeight('bold').setWrap(true);
+    sheet.setFrozenRows(detailHeader || 4);
+    sheet.setColumnWidths(1, width, 170);
+    sheet.setColumnWidth(1, 330);
+    sheet.getRange(2, 1).setWrap(true);
+  });
 }
 
 // ---------------------------------------------------------------- helpers

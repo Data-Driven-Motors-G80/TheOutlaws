@@ -14,6 +14,8 @@
 # See: https://github.com/github/gitignore/tree/main/Global
 #
 .utmp/
+.DS_Store
+__pycache__/
 /[Ll]ibrary/
 /[Tt]emp/
 /[Oo]bj/

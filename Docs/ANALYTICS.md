@@ -10,7 +10,43 @@ Google Apps Script web app, which writes them into four tabs of a Google Sheet a
 3. **Deploy → New deployment → Web app**. Execute as: **Me**. Who has access: **Anyone**. Authorize when asked.
 4. Copy the URL ending in `/exec` into `Assets/Resources/WeeWooAnalytics.json` → `"endpointUrl"`.
 5. Rebuild the WebGL build. Opening the `/exec` URL in a browser should show `{"ok":true,...}`.
-6. In the Sheet, reload and use **Wee Woo Analytics → Refresh dashboard** whenever you want updated numbers.
+6. Run **refreshMetricTabs** once in Apps Script to organize existing data, or finish a game run.
+   Seven metric tabs are created and refreshed automatically on subsequent run/tutorial summary uploads.
+   The older `dashboard` remains a separate manual report (menu: **Wee Woo Analytics → Refresh dashboard**).
+
+## Updating an existing installation for automatic metric tabs
+
+1. In the existing Google Sheet, open **Extensions → Apps Script**.
+2. Replace the receiver code with the updated `Docs/analytics/WeeWooAnalytics.gs` and save.
+3. Run **refreshMetricTabs** once and authorize if prompted. This backfills existing records.
+4. Choose **Deploy → Manage deployments → Edit → New version → Deploy** for the existing web app.
+   Keep its existing `/exec` URL. No Unity rebuild or endpoint change is needed when that URL stays the same.
+5. Finish a non-editor game run. Check the new raw row in `runs` and the refreshed timestamp in `Overview`.
+
+The generated tabs are `Overview`, `Survival & Progression`, `Shooting & Ammo`, `Collisions & Police`,
+`Fuel`, `Mystery Pickups`, and `Tutorial Summary`. Each has summaries; category tabs also include
+relevant per-run/per-attempt columns. Editor/test/ignore and missing-build records remain raw but are
+excluded from these reports. Run summary statistics use fuel/police deaths; detail tables include quits
+and restarts. Builds are pooled and identified in detail rows. Pickup outcomes measure collection,
+not necessarily successful use. Missing or negative sentinel numbers are excluded from averages.
+`Shooting & Ammo` includes `ammo_wasted_full` as **Ammo pickups touched while full**, both in its
+death-ended-run summary and per-run details. These are rejected collection attempts when ammo is full,
+not inferred intentional avoidance. They can overlap `ammo_missed`; do not sum the two counts.
+Destroyed obstacles are labelled **1-hit obstacles destroyed (Orange)** and **2-hit obstacles destroyed
+(Red)** in this report, using their starting strength. The underlying `destroyed_green` and
+`destroyed_yellow` keys remain unchanged for compatibility. Historical `destroyed_red` records are
+shown separately as **Legacy 3-hit obstacles destroyed**; they are not the current red two-hit type.
+Colour labels describe the current game; compare older versions by strength rather than colour.
+
+Reports deduplicate runs by `run_id`, preferring a normal ending over a tab-close beacon. Tutorial
+records are deduplicated by session, timestamp and status, preserving separate attempts. Raw data is
+not removed. Existing nonempty tabs with these names are preserved: rename them before running setup
+if they were created manually. Generated tabs are script-owned and rewritten on refresh.
+
+Event-only uploads do not rebuild reports. A report-generation error is logged and returned in
+`metricTabsError`, while successfully saved raw rows still receive `ok: true`. After fixing the error,
+run **refreshMetricTabs** to backfill. This is intended for class playtests; report generation reads
+all run/tutorial summaries, so larger datasets may eventually need scheduled rather than per-run refreshes.
 
 Editor play also uploads (`sendFromEditor: true`) with the build tag suffixed `-editor`, and prints each server reply as
 `[Analytics] Uploaded: {"ok":true,"written":N}`. The dashboard ignores builds containing `editor`, `test` or `ignore`.
@@ -35,6 +71,24 @@ Change `buildTag` for each new playtest build so the versions can be separated.
 | `sessions` | page close | session length, runs this session, where they quit (title, tutorial, mid-run, game over) |
 | `dashboard` | — | computed summary (menu: Wee Woo Analytics → Refresh dashboard) |
 
+## Data visualization with Python and Matplotlib
+
+Export the Google Sheet as Microsoft Excel (.xlsx). From the repository root, run:
+
+```bash
+python3 -m pip install -r Docs/analytics/requirements.txt
+python3 Docs/analytics/create_metric_charts.py "path/to/analytics.xlsx" --output "path/to/charts"
+```
+
+On Windows, use `python` or `py` instead of `python3` if needed. The script reads the `runs` tab,
+excludes editor/test/ignore and missing-build records, deduplicates run IDs, and charts fuel/police-ended
+runs. It generates survival, death-cause, shooting-accuracy, and pickup-collection PNGs. Dates, totals,
+and histogram limits come from the export. It does not access the live sheet or change the workbook.
+Re-export and rerun to include newer data. Dependencies are Python 3 and Matplotlib.
+
+These are actual-data charts for the implemented visualization pipeline. The GDD mockup sketches use
+invented values and are separate artifacts; they should not be described as measured playtest results.
+
 ## Events
 
 `session_start` (browser, screen size, returning player, prior runs) · `title_shown` · `tutorial_toggled` ·
@@ -51,8 +105,8 @@ hit_wall, hit_block) · `tutorial_complete` · `run_start` · `checkpoint` every
 GET returns `{"ok":true}`, a labelled POST wrote one row (build `SETUP_TEST_IGNORE`) and an editor run uploaded rows
 with build `editor-test-ignore`. Filter out both builds. The real build tag is `weewoo-1.1`.
 
-After pasting a new version of `WeeWooAnalytics.gs`, just save: `doPost` is unchanged, so no redeploy is needed for the
-dashboard. (If `doPost` ever changes: Deploy → Manage deployments → Edit → New version.)
+The automatic metric-tab update changes `doPost`, so saving alone is not enough: update the existing
+web-app deployment to a new version using the steps above.
 
 ## Run columns added for death and bullet analysis
 
@@ -92,5 +146,5 @@ dashboard. (If `doPost` ever changes: Deploy → Manage deployments → Edit →
 ## Notes
 
 - `-1` means "not applicable" (e.g. `accuracy_pct` with no shots, `first_hit_m` with no hits).
-- Apps Script can't deduplicate. In rare cases a beacon and a normal upload can overlap; deduplicate `runs` by `run_id`
-  (keep the row whose `end_reason` is not `quit_tab_closed`).
+- Raw uploads can overlap. Automatic metric reports deduplicate `runs` by `run_id`, preferring the row
+  whose `end_reason` is not `quit_tab_closed`; raw rows remain available for inspection.
