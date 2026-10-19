@@ -71,6 +71,19 @@ Change `buildTag` for each new playtest build so the versions can be separated.
 | `sessions` | page close | session length, runs this session, where they quit (title, tutorial, mid-run, game over) |
 | `dashboard` | — | computed summary (menu: Wee Woo Analytics → Refresh dashboard) |
 
+## Visualizations tab (date range charts in the Sheet)
+
+`Docs/analytics/Visualizations.gs` builds a `Visualizations` tab: pick a start date and time (optional end),
+choose All builds / WebGL only / Editor only, and about 40 charts redraw for that range. Sections: survival,
+cause of death, shooting, pickups (the four GDD metrics), obstacles, power-ups and progression, tutorial,
+engagement. Headline numbers sit above them; the chart source tables are to the right (column N onwards).
+
+Setup once: in **Extensions → Apps Script** add a new script file (**+ → Script**), paste the file, save, select
+`setupVisualizations`, click **Run** and authorize. Setup also orders and colours the tabs and styles raw-tab
+headers (formatting only). It installs two triggers: editing a filter cell redraws the tab, and a 5-minute timer
+redraws it after new uploads. No redeploy is needed; it does not change the web app. Counting follows the metric
+tabs: runs deduplicated by `run_id`, "deaths" are fuel/police endings, and times are in the Sheet's time zone.
+
 ## Data visualization with Python and Matplotlib
 
 Export the Google Sheet as Microsoft Excel (.xlsx). From the repository root, run:
