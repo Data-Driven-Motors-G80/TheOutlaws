@@ -22,6 +22,7 @@ public sealed class OutlawHUD : MonoBehaviour
     private static readonly Color PoliceBlue = new Color(0.18f, 0.48f, 1f);
     private static readonly Color ShieldCyan = new Color(0.3f, 0.9f, 1f);
     private static readonly Color ReversePurple = new Color(0.78f, 0.35f, 1f);
+    private static readonly Color SunnyGold = new Color(1f, 0.85f, 0.2f);
     private static readonly Color NitroOrange = new Color(1f, 0.55f, 0.1f);
 
     private OutlawGameManager game;
@@ -132,6 +133,7 @@ public sealed class OutlawHUD : MonoBehaviour
             if (outcome == RandomPickupOutcome.Nitro) ShowMessage("NITRO ACTIVATED!", NitroOrange);
             else if (outcome == RandomPickupOutcome.Shield) ShowMessage("SHIELD ACTIVATED!", ShieldCyan);
             else if (outcome == RandomPickupOutcome.ProximityRecovery) ShowMessage("POLICE JAMMED!", Good);
+            else if (outcome == RandomPickupOutcome.SunnyDay) ShowMessage("SUNNY DAY! FOG CLEARED", SunnyGold);
         }
 
         if (game.PickupEffects != null && game.PickupEffects.ShieldUseCount != shownShieldUses)
@@ -378,7 +380,6 @@ public sealed class OutlawHUD : MonoBehaviour
         DrawRearView(width);
         DrawPowerUps(width);
         DrawMessage(width);
-        DrawPortalCountdown(width);
 
         if (game.IsTutorial) DrawTutorial(width, height);
 
@@ -399,19 +400,6 @@ public sealed class OutlawHUD : MonoBehaviour
                 $"<b><color={Hex(Good)}>{missionToastHeading}</color></b>", line);
             GUI.Label(new Rect(toast.x + 14f, toast.y + 30f, toast.width, 26f), missionToastTitle, line);
         }
-    }
-
-    private void DrawPortalCountdown(float width)
-    {
-        if (game.IsTutorial ||
-            (game.State != OutlawGameState.Running && game.State != OutlawGameState.Paused))
-            return;
-
-        int seconds = Mathf.CeilToInt(RunSession.SecondsUntilPortal(game.ElapsedSeconds));
-        string label = seconds > 0 ? $"PORTAL IN {seconds} s" : "PORTAL AHEAD";
-        Rect panel = new Rect((width - 280f) * 0.5f, 112f, 280f, 34f);
-        DrawPanel(panel);
-        GUI.Label(panel, $"<color={Hex(ShieldCyan)}>{label}</color>", bodyStyle);
     }
 
     /// <summary>One centred message under the distance; the most recent event replaces the last.</summary>
@@ -556,6 +544,12 @@ public sealed class OutlawHUD : MonoBehaviour
         {
             label = "SHIELD";
             colour = ShieldCyan;
+        }
+        else if (effects.SunnyDayActive)
+        {
+            label = "SUNNY DAY";
+            seconds = Mathf.CeilToInt(effects.SunnyDayRemaining) + "s";
+            colour = SunnyGold;
         }
         if (label == null) return;
 

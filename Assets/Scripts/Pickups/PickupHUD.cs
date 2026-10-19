@@ -27,14 +27,17 @@ public sealed class PickupHUD : MonoBehaviour
             bool proximity = effects.LastOutcome == RandomPickupOutcome.ProximityRecovery;
             bool shield = effects.LastOutcome == RandomPickupOutcome.Shield;
             bool nitro = effects.LastOutcome == RandomPickupOutcome.Nitro;
+            bool sunny = effects.LastOutcome == RandomPickupOutcome.SunnyDay;
             popupMessage = proximity ? "POLICE JAMMER DEPLOYED"
                 : shield ? "SHIELD READY!"
                 : nitro ? "NITRO ACTIVATED!"
+                : sunny ? "SUNNY DAY!"
                 : reverse ? "CONTROLS REVERSED!"
                 : null;
             popupHint = proximity ? "Police distance recovered"
                 : shield ? "Next hit is blocked"
                 : nitro ? "20% faster until an unshielded obstacle hit"
+                : sunny ? "All fog is cleared"
                 : reverse ? "A / Left: move right     D / Right: move left"
                 : null;
             popupRemaining = popupMessage != null && !effects.RunState.IsGameOver ? PopupDuration : 0f;

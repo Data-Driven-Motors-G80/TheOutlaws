@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.Pool;
 
 [DisallowMultipleComponent]
-public sealed class ObstacleSpawner : MonoBehaviour
+public class ObstacleSpawner : MonoBehaviour
 {
 
     [Header("References")]
@@ -113,16 +113,23 @@ public sealed class ObstacleSpawner : MonoBehaviour
         difficultRowChance = Mathf.Clamp01(twoObstacleChance);
     }
 
+    protected virtual float RowSpacingMultiplier => 1f;
+    protected virtual float RoadblockSpacingMultiplier => 1f;
+    protected virtual float ExtraClosingSpeed => 0f;
+    protected virtual void OnObstacleCreated(GameObject instance) { }
+    protected virtual void OnObstaclePlaced(Transform obstacle, RoadPathPoint point, float lateralOffset, float halfHeight) { }
+    protected InfiniteRoad Road => road;
+
     private float NextSpacing()
     {
-        if (!useFairRows) return NextRange(minSpacing, maxSpacing);
+        if (!useFairRows) return NextRange(minSpacing, maxSpacing) * RowSpacingMultiplier;
         // Allow steering and the length of both vehicles, even as the car speeds up.
         float speed = driver != null ? driver.ForwardSpeed : 15f;
         if (driver != null && driver.TryGetComponent(out CarPickupEffects effects))
             speed *= effects.RunState.ForwardSpeedMultiplier;
         // Still leaves about a second between rows to reach the (adjacent) open lane.
         // Rows can come about 0.85 s apart at most (the open lane is always the same or the next one over).
-        return Mathf.Max(NextRange(32f, 42f) / density, speed * 0.85f + 4f);
+        return Mathf.Max(NextRange(32f, 42f) / density, (speed + ExtraClosingSpeed) * 0.85f + 4f) * RowSpacingMultiplier;
     }
 
     private void Awake()
@@ -139,7 +146,7 @@ public sealed class ObstacleSpawner : MonoBehaviour
         }
 
         pool = new ObjectPool<Obstacle>(
-            createFunc: () => new Obstacle(Instantiate(obstaclePrefab, transform)),
+            createFunc: () => { GameObject instance = Instantiate(obstaclePrefab, transform); OnObstacleCreated(instance); return new Obstacle(instance); },
             actionOnGet: obstacle => obstacle.GameObject.SetActive(true),
             actionOnRelease: obstacle => obstacle.GameObject.SetActive(false),
             actionOnDestroy: obstacle => Destroy(obstacle.GameObject));
@@ -218,7 +225,7 @@ public sealed class ObstacleSpawner : MonoBehaviour
             PickupPlacement.ClearRow(point, (previousOpenLane - 1) * point.Width / 3f);
             GameEvents.RaiseRoadblockSpawned(pattern);
             nextRoadblockAt = distance + TrafficRoadblockRules.GetNextSpacing(
-                distance, roadblockRandom.NextDouble());
+                distance, roadblockRandom.NextDouble()) * RoadblockSpacingMultiplier;
             return true;
         }
 
@@ -249,44 +256,44 @@ public sealed class ObstacleSpawner : MonoBehaviour
         {
             case TrafficRoadblockPattern.TwoLaneGreen:
             case TrafficRoadblockPattern.TwoLaneYellow:
-            {
-                TrafficObstacleState twoLaneState = pattern == TrafficRoadblockPattern.TwoLaneGreen
-                    ? TrafficObstacleState.Green
-                    : TrafficObstacleState.Yellow;
-                int openLane = previousOpenLane == 1
-                    ? (roadblockRandom.Next(2) == 0 ? 0 : 2)
-                    : previousOpenLane;
-                float side = openLane == 0 ? 1f : -1f;
-                PlaceObstacle(point, side * laneWidth * 0.5f, laneWidth * 2f, twoLaneState);
-                previousOpenLane = openLane;
-                break;
-            }
-            default:
-            {
-                int openLane = Mathf.Clamp(previousOpenLane + roadblockRandom.Next(3) - 1, 0, 2);
-                if (openLane != 1)
                 {
-                    // Neighbouring lanes are blocked: one big two-lane block of a single colour.
+                    TrafficObstacleState twoLaneState = pattern == TrafficRoadblockPattern.TwoLaneGreen
+                        ? TrafficObstacleState.Green
+                        : TrafficObstacleState.Yellow;
+                    int openLane = previousOpenLane == 1
+                        ? (roadblockRandom.Next(2) == 0 ? 0 : 2)
+                        : previousOpenLane;
                     float side = openLane == 0 ? 1f : -1f;
-                    PlaceObstacle(point, side * laneWidth * 0.5f, laneWidth * 2f,
-                        TrafficObstacleRules.ChooseInitialState(CurrentRunDistance, colorRandom.NextDouble()));
+                    PlaceObstacle(point, side * laneWidth * 0.5f, laneWidth * 2f, twoLaneState);
                     previousOpenLane = openLane;
                     break;
                 }
-                // Split choice offers one- and two-shot blocks, with no three-shot blocks.
-                bool greenFirst = roadblockRandom.Next(2) == 0;
-                int stateIndex = 0;
-                for (int lane = 0; lane < 3; lane++)
+            default:
                 {
-                    if (lane == openLane) continue;
-                    TrafficObstacleState state = (stateIndex == 0) == greenFirst
-                        ? TrafficObstacleState.Green : TrafficObstacleState.Yellow;
-                    PlaceObstacle(point, (lane - 1) * laneWidth, laneWidth - 0.3f, state);
-                    stateIndex++;
+                    int openLane = Mathf.Clamp(previousOpenLane + roadblockRandom.Next(3) - 1, 0, 2);
+                    if (openLane != 1)
+                    {
+                        // Neighbouring lanes are blocked: one big two-lane block of a single colour.
+                        float side = openLane == 0 ? 1f : -1f;
+                        PlaceObstacle(point, side * laneWidth * 0.5f, laneWidth * 2f,
+                            TrafficObstacleRules.ChooseInitialState(CurrentRunDistance, colorRandom.NextDouble()));
+                        previousOpenLane = openLane;
+                        break;
+                    }
+                    // Split choice offers one- and two-shot blocks, with no three-shot blocks.
+                    bool greenFirst = roadblockRandom.Next(2) == 0;
+                    int stateIndex = 0;
+                    for (int lane = 0; lane < 3; lane++)
+                    {
+                        if (lane == openLane) continue;
+                        TrafficObstacleState state = (stateIndex == 0) == greenFirst
+                            ? TrafficObstacleState.Green : TrafficObstacleState.Yellow;
+                        PlaceObstacle(point, (lane - 1) * laneWidth, laneWidth - 0.3f, state);
+                        stateIndex++;
+                    }
+                    previousOpenLane = openLane;
+                    break;
                 }
-                previousOpenLane = openLane;
-                break;
-            }
         }
     }
 
@@ -381,6 +388,7 @@ public sealed class ObstacleSpawner : MonoBehaviour
             TrafficObstacleRules.ChooseInitialState(CurrentRunDistance, colorRandom.NextDouble()));
 
         activeObstacles.Add(obstacle);
+        OnObstaclePlaced(obstacle.Transform, point, lateralOffset, halfHeight);
         return obstacle.TrafficLight;
     }
 

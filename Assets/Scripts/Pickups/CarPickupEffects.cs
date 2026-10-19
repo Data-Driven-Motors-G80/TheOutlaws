@@ -12,6 +12,8 @@ public sealed class CarPickupEffects : MonoBehaviour
     private bool simulationActive = true;
     private float reverseCountdownRemaining;
     private float pendingReverseDuration;
+    private float sunnyDayRemaining;
+    private float sunnyDaySeconds;
     public float ReverseCountdownRemaining => reverseCountdownRemaining;
     public int ReverseActivationCount { get; private set; }
     public int ReverseCompletionCount { get; private set; }
@@ -23,7 +25,9 @@ public sealed class CarPickupEffects : MonoBehaviour
     public RiskRunState RunState => runState;
     /// <summary>Any power-up in play (including a pending control swap): no new ? boxes until it ends.</summary>
     public bool HasActivePowerUp => ActiveEffect != PickupEffectType.None || reverseCountdownRemaining > 0f
-        || runState.HasNitro || runState.HasShield;
+        || runState.HasNitro || runState.HasShield || sunnyDayRemaining > 0f;
+    public bool SunnyDayActive => sunnyDayRemaining > 0f;
+    public float SunnyDayRemaining => sunnyDayRemaining;
     public FuelState FuelState => fuelState;
     public bool SimulationActive => simulationActive;
     public PickupEffectType ActiveEffect => runState.Effects.ActiveEffect;
@@ -42,6 +46,13 @@ public sealed class CarPickupEffects : MonoBehaviour
     {
         baseForwardSpeed = vehicleBaseSpeed;
         policeSpeed = pursuerSpeed;
+    }
+
+    public void ConfigureSunnyDay(float chance, float seconds)
+    {
+        randomOutcome.SunnyDayChance = Mathf.Clamp01(chance);
+        sunnyDaySeconds = Mathf.Max(0f, seconds);
+        if (randomOutcome.SunnyDayChance <= 0f) sunnyDayRemaining = 0f;
     }
 
     public void SetSimulationActive(bool active)
@@ -76,6 +87,13 @@ public sealed class CarPickupEffects : MonoBehaviour
         {
             case PickupEffectType.RandomFuelOrReverse:
                 RandomPickupOutcome outcome = randomOutcome.Next();
+                if (outcome == RandomPickupOutcome.SunnyDay)
+                {
+                    sunnyDayRemaining = sunnyDaySeconds;
+                    LastOutcome = outcome;
+                    PickupCount++;
+                    return true;
+                }
                 if (outcome == RandomPickupOutcome.ProximityRecovery)
                 {
                     bool restored = runState.TryRestorePursuitGap(RiskRunState.PickupProximityRecovery);
@@ -231,6 +249,7 @@ public sealed class CarPickupEffects : MonoBehaviour
     private void Update()
     {
         if (!simulationActive || Time.timeScale <= 0f) return;
+        if (sunnyDayRemaining > 0f) sunnyDayRemaining = Mathf.Max(0f, sunnyDayRemaining - Time.deltaTime);
         bool reverseWasActive = ActiveEffect == PickupEffectType.ReverseSteering;
         int activationsBeforeTick = ReverseActivationCount;
         float elapsed = Time.deltaTime;
@@ -266,6 +285,7 @@ public sealed class CarPickupEffects : MonoBehaviour
         PickupCount = 0;
         reverseCountdownRemaining = 0f;
         pendingReverseDuration = 0f;
+        sunnyDayRemaining = 0f;
         ReverseActivationCount = 0;
         ReverseCompletionCount = 0;
         ReverseExtensionCount = 0;
