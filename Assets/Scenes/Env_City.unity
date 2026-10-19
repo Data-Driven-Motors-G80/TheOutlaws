@@ -2237,7 +2237,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AutoDriveCar
   road: {fileID: 371121412}
   visual: {fileID: 1066005398}
-  forwardSpeed: 20
+  forwardSpeed: 25
   maximumForwardSpeed: 55
   speedIncreaseAmount: 1
   speedIncreaseInterval: 30

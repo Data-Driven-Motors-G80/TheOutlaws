@@ -60,6 +60,8 @@ public sealed class SnowFogObstacle : MonoBehaviour
     private Vector3 previousCarPosition;
     private float distanceUntilSpawn;
     private Texture2D[] cloudTextures;
+    private CarPickupEffects pickupEffects;
+    private bool blocksHidden;
 
     private void Awake()
     {
@@ -72,11 +74,16 @@ public sealed class SnowFogObstacle : MonoBehaviour
             if (driver != null) car = driver.transform;
         }
         distanceUntilSpawn = firstFogDistance;
-        if (car != null) previousCarPosition = car.position;
+        if (car != null)
+        {
+            previousCarPosition = car.position;
+            pickupEffects = car.GetComponent<CarPickupEffects>();
+        }
     }
 
     private void OnDisable()
     {
+        blocksHidden = false;
         foreach (FogBlock block in active) block.Root.SetActive(false);
         spare.AddRange(active);
         active.Clear();
@@ -105,8 +112,15 @@ public sealed class SnowFogObstacle : MonoBehaviour
         float travelled = Mathf.Min((car.position - previousCarPosition).magnitude, 10f);
         previousCarPosition = car.position;
 
+        bool sunny = pickupEffects != null && pickupEffects.SunnyDayActive;
+        if (sunny != blocksHidden)
+        {
+            blocksHidden = sunny;
+            foreach (FogBlock block in active) block.Root.SetActive(!sunny);
+        }
+
         bool suppressed = spawner != null && spawner.SuppressAutoSpawn;
-        if (!suppressed)
+        if (!suppressed && !sunny)
         {
             distanceUntilSpawn -= travelled;
             if (distanceUntilSpawn <= 0f && active.Count < maxActive && TrySpawn())

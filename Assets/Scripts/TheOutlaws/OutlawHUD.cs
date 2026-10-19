@@ -22,6 +22,7 @@ public sealed class OutlawHUD : MonoBehaviour
     private static readonly Color PoliceBlue = new Color(0.18f, 0.48f, 1f);
     private static readonly Color ShieldCyan = new Color(0.3f, 0.9f, 1f);
     private static readonly Color ReversePurple = new Color(0.78f, 0.35f, 1f);
+    private static readonly Color SunnyGold = new Color(1f, 0.85f, 0.2f);
     private static readonly Color NitroOrange = new Color(1f, 0.55f, 0.1f);
 
     private OutlawGameManager game;
@@ -132,6 +133,7 @@ public sealed class OutlawHUD : MonoBehaviour
             if (outcome == RandomPickupOutcome.Nitro) ShowMessage("NITRO ACTIVATED!", NitroOrange);
             else if (outcome == RandomPickupOutcome.Shield) ShowMessage("SHIELD ACTIVATED!", ShieldCyan);
             else if (outcome == RandomPickupOutcome.ProximityRecovery) ShowMessage("POLICE JAMMED!", Good);
+            else if (outcome == RandomPickupOutcome.SunnyDay) ShowMessage("SUNNY DAY! FOG CLEARED", SunnyGold);
         }
 
         if (game.PickupEffects != null && game.PickupEffects.ShieldUseCount != shownShieldUses)
@@ -556,6 +558,12 @@ public sealed class OutlawHUD : MonoBehaviour
         {
             label = "SHIELD";
             colour = ShieldCyan;
+        }
+        else if (effects.SunnyDayActive)
+        {
+            label = "SUNNY DAY";
+            seconds = Mathf.CeilToInt(effects.SunnyDayRemaining) + "s";
+            colour = SunnyGold;
         }
         if (label == null) return;
 

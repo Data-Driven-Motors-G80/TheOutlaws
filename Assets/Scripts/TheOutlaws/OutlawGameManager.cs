@@ -571,6 +571,7 @@ public sealed class OutlawGameManager : MonoBehaviour
             ["mystery_nitro"] = Outcome("Nitro"),
             ["mystery_recovery"] = Outcome("ProximityRecovery"),
             ["mystery_reverse"] = Outcome("ReverseSteering"),
+            ["mystery_sunny"] = Outcome("SunnyDay"),
             ["roadblocks"] = RunTracker.Roadblocks,
             ["min_fuel_pct"] = Mathf.RoundToInt(RunTracker.Stats.MinFuelFraction * 100f),
             ["s_below_25_fuel"] = RunTracker.Round(RunTracker.SecondsBelowQuarterFuel),

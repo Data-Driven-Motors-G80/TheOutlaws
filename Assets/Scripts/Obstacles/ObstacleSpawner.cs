@@ -115,6 +115,9 @@ public class ObstacleSpawner : MonoBehaviour
 
     protected virtual float RowSpacingMultiplier => 1f;
     protected virtual float RoadblockSpacingMultiplier => 1f;
+    protected virtual float ExtraClosingSpeed => 0f;
+    protected virtual void OnObstacleCreated(GameObject instance) { }
+    protected virtual void OnObstaclePlaced(Transform obstacle, RoadPathPoint point, float lateralOffset, float halfHeight) { }
     protected InfiniteRoad Road => road;
 
     private float NextSpacing()
@@ -126,7 +129,7 @@ public class ObstacleSpawner : MonoBehaviour
             speed *= effects.RunState.ForwardSpeedMultiplier;
         // Still leaves about a second between rows to reach the (adjacent) open lane.
         // Rows can come about 0.85 s apart at most (the open lane is always the same or the next one over).
-        return Mathf.Max(NextRange(32f, 42f) / density, speed * 0.85f + 4f) * RowSpacingMultiplier;
+        return Mathf.Max(NextRange(32f, 42f) / density, (speed + ExtraClosingSpeed) * 0.85f + 4f) * RowSpacingMultiplier;
     }
 
     private void Awake()
@@ -143,7 +146,7 @@ public class ObstacleSpawner : MonoBehaviour
         }
 
         pool = new ObjectPool<Obstacle>(
-            createFunc: () => new Obstacle(Instantiate(obstaclePrefab, transform)),
+            createFunc: () => { GameObject instance = Instantiate(obstaclePrefab, transform); OnObstacleCreated(instance); return new Obstacle(instance); },
             actionOnGet: obstacle => obstacle.GameObject.SetActive(true),
             actionOnRelease: obstacle => obstacle.GameObject.SetActive(false),
             actionOnDestroy: obstacle => Destroy(obstacle.GameObject));
@@ -385,6 +388,7 @@ public class ObstacleSpawner : MonoBehaviour
             TrafficObstacleRules.ChooseInitialState(CurrentRunDistance, colorRandom.NextDouble()));
 
         activeObstacles.Add(obstacle);
+        OnObstaclePlaced(obstacle.Transform, point, lateralOffset, halfHeight);
         return obstacle.TrafficLight;
     }
 
