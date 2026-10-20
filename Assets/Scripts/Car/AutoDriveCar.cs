@@ -80,11 +80,13 @@ public sealed class AutoDriveCar : MonoBehaviour
 
     private void Awake()
     {
+        // Scenes serialize an older cap; never clamp below the difficulty schedule's top speed.
+        maximumForwardSpeed = Mathf.Max(maximumForwardSpeed, RunDifficultyState.MaximumSpeed);
         // Restore the run settings before any Start/Update can apply scene defaults.
         if (RunSession.TryGetPending(out RunSnapshot carried) && carried.MaximumSpeed > 0f)
         {
             forwardSpeed = carried.StartingSpeed;
-            maximumForwardSpeed = carried.MaximumSpeed;
+            maximumForwardSpeed = Mathf.Max(carried.MaximumSpeed, RunDifficultyState.MaximumSpeed);
             speedIncreaseAmount = carried.SpeedIncreaseAmount;
             speedIncreaseInterval = carried.SpeedIncreaseInterval;
             RestoreMotion(carried.ForwardSpeed, carried.SpeedTimer);

@@ -11,6 +11,8 @@ public sealed class RiskRunState
     public const float CrashSlowDuration = 0f;
     // 20% of the initial 45 m gap, so each collision costs 9 m.
     public const float DefaultCrashProximityDrain = 0.2f;
+    // A hit that leaves the police this close (or closer) gets the player caught.
+    public const float CaptureDistance = 12f;
     public const float CollisionProtectionDuration = 1f;
     public const float RecoveryWaitDuration = 2.6f;
     public const int PickupReward = 10;
@@ -34,6 +36,11 @@ public sealed class RiskRunState
     /// </summary>
     public float RecoveryCap { get; set; } = MaximumPursuitGap;
     public bool IsGameOver { get; private set; }
+    /// <summary>
+    /// After a fatal hit the run is lost, but the police still have to drive into the car:
+    /// the car keeps moving until the chase car reports contact.
+    /// </summary>
+    public bool AwaitingCaptureContact { get; private set; }
     public bool HasNitro { get; private set; }
     public float ForwardSpeedMultiplier => HasNitro ? 1.2f : Effects.ForwardSpeedMultiplier;
 
@@ -144,9 +151,11 @@ public sealed class RiskRunState
         pursuitGap = Math.Max(
             MinimumPursuitGap,
             pursuitGap - InitialPursuitGap * clampedDrain);
-        if (pursuitGap <= 0d)
+        if (pursuitGap <= 0d || (MinimumPursuitGap <= 0f && pursuitGap <= CaptureDistance))
         {
+            pursuitGap = 0d;
             IsGameOver = true;
+            AwaitingCaptureContact = true;
             Effects.Clear();
             PendingBonus = 0;
             return true;
@@ -156,6 +165,12 @@ public sealed class RiskRunState
         collisionProtectionRemaining = CollisionProtectionDuration;
         recoveryWaitRemaining = RecoveryWaitDuration;
         return true;
+    }
+
+    /// <summary>The police have reached the car after a fatal hit; the run can now end.</summary>
+    public void ConfirmCaptureContact()
+    {
+        AwaitingCaptureContact = false;
     }
 
     /// <summary>Ends the run immediately for non-collision failures such as fuel depletion.</summary>
@@ -179,9 +194,17 @@ public sealed class RiskRunState
     public void Tick(float elapsedSeconds, float baseForwardSpeed = 15f, float policeSpeed = 14f)
     {
         LastTickForwardDistance = 0f;
-        if (IsGameOver || !IsFinite(elapsedSeconds) || elapsedSeconds <= 0f
+        if (!IsFinite(elapsedSeconds) || elapsedSeconds <= 0f
             || !IsFinite(baseForwardSpeed) || baseForwardSpeed < 0f
             || !IsFinite(policeSpeed) || policeSpeed < 0f)
+            return;
+        // Keep driving while the police close the last metres for the capture.
+        if (AwaitingCaptureContact)
+        {
+            LastTickForwardDistance = baseForwardSpeed * elapsedSeconds;
+            return;
+        }
+        if (IsGameOver)
             return;
 
         double remaining = elapsedSeconds;
@@ -300,6 +323,7 @@ public sealed class RiskRunState
         MinimumPursuitGap = 0f;
         RecoveryCap = MaximumPursuitGap;
         IsGameOver = false;
+        AwaitingCaptureContact = false;
         HasNitro = false;
         crashSlowRemaining = 0d;
         collisionProtectionRemaining = 0d;

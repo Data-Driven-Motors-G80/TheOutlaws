@@ -7,6 +7,7 @@ using UnityEngine.SceneManagement;
 public sealed class OutlawGameManager : MonoBehaviour
 {
     private const float TutorialSpeed = 14f;
+    private const float CaptureContactTimeout = 2f;
     private const int StartingAmmo = 2;
 
     private static int runsThisSession;
@@ -28,6 +29,7 @@ public sealed class OutlawGameManager : MonoBehaviour
     private PickupSpawner mysterySpawner;
     private ChaseCar[] policeCars;
     private float elapsed;
+    private float captureContactElapsed;
     private float previousPursuitGap;
     private int speedScheduleSeed;
     private float policeAlertRemaining;
@@ -238,6 +240,16 @@ public sealed class OutlawGameManager : MonoBehaviour
             pursuit.SetClosingSpeed(0f);
             return;
         }
+
+        // A fatal hit: the police drive into the car and the run ends on contact.
+        // The timeout only guards against a missing or stuck chase car.
+        if (pickupEffects != null && pickupEffects.RunState.AwaitingCaptureContact)
+        {
+            captureContactElapsed += Time.deltaTime;
+            if (captureContactElapsed < CaptureContactTimeout) return;
+            pickupEffects.RunState.ConfirmCaptureContact();
+        }
+        captureContactElapsed = 0f;
 
         elapsed += Time.deltaTime;
         UpdateDifficulty();

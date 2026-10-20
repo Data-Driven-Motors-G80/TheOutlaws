@@ -27,12 +27,13 @@ selected gameplay ideas from Team 21's **Redline Run** into one cohesive game.
 - Roadblocks start at 200 m and come every 150–210 m (90–130 m after 2,000 m). The mix of blocks never changes
   (55% one-shot, 45% two-shot); only how many there are increases. Every row and roadblock still **leaves one
   lane open**, so ammo is the practical shortcut, never a requirement. A boxes come every 90–220 m to match.
-- Difficulty: base speed starts at 20 m/s and rises by 1 m/s at independently randomized 30–45-second intervals. Each increase blends in over 2.5 seconds; base speed caps at 55 m/s. The schedule uses active real-run time, pauses during tutorials/pauses, and carries across environment changes. Nitro multiplies speed by 1.2 (24 m/s at the opening, 66 m/s at the cap). Obstacles start sparse during a 30 s warm-up, build up over two minutes,
+- Difficulty: base speed starts at 20 m/s and rises by 1.5 m/s at independently randomized 12–18-second intervals (about 32 m/s at two minutes, 44 m/s at four). Each increase blends in over 2.5 seconds; base speed caps at 60 m/s. The schedule uses active real-run time, pauses during tutorials/pauses, and carries across environment changes. Nitro multiplies speed by 1.2 (24 m/s at the opening, 72 m/s at the cap). Obstacles start sparse during a 30 s warm-up, build up over two minutes,
   then **keep getting denser for the whole run** (more rows, more double-lane rows, tighter gaps, roadblocks from 210 m
   apart down to ~55 m apart). Blocks that would sit side by side are merged into one bigger block.
 - **The police can only catch you through mistakes.** You are always slightly faster: after a hit they close in, then
   you pull away again (back to the starting 45 m gap, never further). You pull away at 1.5 m/s at first and 0.6 m/s after
-  2.5 minutes, so it's several hits close together, not clean driving, that gets you caught.
+  2.5 minutes, so it's several hits close together, not clean driving, that gets you caught. A hit that leaves the police 12 m or closer is fatal: the police car
+  drives into yours and the run ends on contact.
 - Pickups never spawn on top of each other or inside/just behind a block.
 - **Portals:** a giant glowing gate fills the whole road (no way around it). A gate appears 95 m ahead after 60 seconds of
   active gameplay in each environment; pauses and the tutorial do not count. Drive through it to switch environments.

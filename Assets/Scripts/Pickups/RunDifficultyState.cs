@@ -4,8 +4,11 @@ using System;
 public readonly struct RunDifficultyState
 {
     public const float StartSpeed = 20f;
-    public const float MaximumSpeed = 55f;
+    public const float MaximumSpeed = 60f;
+    public const float SpeedStep = 1.5f;
     public const float SpeedBlendSeconds = 2.5f;
+    public const float MinimumIncreaseInterval = 12f;
+    public const float MaximumIncreaseInterval = 18f;
 
     /// <summary>Retained for code that still reasons in 25-second steps.</summary>
     public static int PressureSteps(float elapsedSeconds)
@@ -20,21 +23,26 @@ public readonly struct RunDifficultyState
         value = unchecked((value ^ (value >> 16)) * 0x85EBCA6Bu);
         value = unchecked((value ^ (value >> 13)) * 0xC2B2AE35u);
         value ^= value >> 16;
-        return 30f + (value & 0xFFFFFFu) / 16777215f * 15f;
+        return MinimumIncreaseInterval + (value & 0xFFFFFFu) / 16777215f
+            * (MaximumIncreaseInterval - MinimumIncreaseInterval);
     }
 
-    /// <summary>Gain 1 m/s every 30–45 seconds, blended over 2.5 seconds, capped at 55.</summary>
+    /// <summary>
+    /// Gain 1.5 m/s every 12–18 seconds, blended over 2.5 seconds, capped at 60
+    /// (about 32 m/s at two minutes, 44 m/s at four, the cap after roughly seven).
+    /// </summary>
     public static float DrivingSpeed(float elapsedSeconds, int seed = 1)
     {
         if (float.IsNaN(elapsedSeconds) || float.IsInfinity(elapsedSeconds)) return StartSpeed;
         float nextIncrease = 0f;
         float speed = StartSpeed;
-        for (int step = 0; step < (int)(MaximumSpeed - StartSpeed); step++)
+        int steps = (int)Math.Ceiling((MaximumSpeed - StartSpeed) / SpeedStep);
+        for (int step = 0; step < steps; step++)
         {
             nextIncrease += SpeedIncreaseInterval(seed, step);
             if (elapsedSeconds < nextIncrease) break;
             float progress = Math.Min(1f, (elapsedSeconds - nextIncrease) / SpeedBlendSeconds);
-            speed = StartSpeed + step + progress;
+            speed = Math.Min(MaximumSpeed, StartSpeed + (step + progress) * SpeedStep);
             if (progress < 1f) break;
         }
         return speed;

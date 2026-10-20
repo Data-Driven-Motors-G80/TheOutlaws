@@ -446,10 +446,47 @@ public sealed class RiskRunStateTests
         Assert.That(run.BankedPickupScore, Is.EqualTo(10));
     }
 
+    [Test]
+    public void HitLeavingPoliceWithinCaptureDistance_IsFatalButWaitsForContact()
+    {
+        var run = new RiskRunState();
+        run.TryCrash(TrafficObstacleRules.GreenProximityDrain);
+        run.Tick(1.1f, 15f, 15f);
+        // 30 m minus a red hit's 22.5 m leaves 7.5 m: inside the capture distance.
+        run.TryCrash(TrafficObstacleRules.YellowProximityDrain);
+        Assert.That(run.IsGameOver, Is.True);
+        Assert.That(run.AwaitingCaptureContact, Is.True);
+        Assert.That(run.PursuitGap, Is.Zero);
+        Assert.That(run.TryGrantShield(), Is.False);
+
+        // The car keeps driving until the police reach it.
+        run.Tick(0.5f, 20f, 20f);
+        Assert.That(run.LastTickForwardDistance, Is.EqualTo(10f).Within(0.0001f));
+        run.ConfirmCaptureContact();
+        Assert.That(run.AwaitingCaptureContact, Is.False);
+        run.Tick(1f, 20f, 20f);
+        Assert.That(run.LastTickForwardDistance, Is.Zero);
+        run.Reset();
+        Assert.That(run.AwaitingCaptureContact, Is.False);
+    }
+
+    [Test]
+    public void HitLeavingPoliceBeyondCaptureDistance_IsNotFatal()
+    {
+        var run = new RiskRunState();
+        run.TryCrash(TrafficObstacleRules.GreenProximityDrain);
+        run.Tick(1.1f, 15f, 15f);
+        run.TryCrash(TrafficObstacleRules.GreenProximityDrain);
+        Assert.That(run.PursuitGap, Is.EqualTo(15f).Within(0.001f));
+        Assert.That(run.PursuitGap, Is.GreaterThan(RiskRunState.CaptureDistance));
+        Assert.That(run.IsGameOver, Is.False);
+    }
+
     private static void AssertReset(RiskRunState run)
     {
         Assert.That(run.PursuitGap, Is.EqualTo(45f));
         Assert.That(run.IsGameOver, Is.False);
+        Assert.That(run.AwaitingCaptureContact, Is.False);
         Assert.That(run.CrashSlowRemaining, Is.Zero);
         Assert.That(run.CollisionProtectionRemaining, Is.Zero);
         Assert.That(run.RecoveryWaitRemaining, Is.Zero);

@@ -8,14 +8,14 @@ public sealed class RunDifficultyStateTests
         Assert.That(RunDifficultyState.DrivingSpeed(0f), Is.EqualTo(20f));
         float first = RunDifficultyState.SpeedIncreaseInterval(1, 0);
         Assert.That(RunDifficultyState.DrivingSpeed(first - 0.01f), Is.EqualTo(20f));
-        Assert.That(RunDifficultyState.DrivingSpeed(first + 1.25f), Is.EqualTo(20.5f).Within(0.001f));
-        Assert.That(RunDifficultyState.DrivingSpeed(first + 2.5f), Is.EqualTo(21f));
-        Assert.That(RunDifficultyState.DrivingSpeed(1600f), Is.EqualTo(55f));
-        Assert.That(RunDifficultyState.DrivingSpeed(9999f), Is.EqualTo(55f));
+        Assert.That(RunDifficultyState.DrivingSpeed(first + 1.25f), Is.EqualTo(20.75f).Within(0.001f));
+        Assert.That(RunDifficultyState.DrivingSpeed(first + 2.5f), Is.EqualTo(21.5f).Within(0.001f));
+        Assert.That(RunDifficultyState.DrivingSpeed(1600f), Is.EqualTo(60f));
+        Assert.That(RunDifficultyState.DrivingSpeed(9999f), Is.EqualTo(60f));
         for (int step = 0; step < 25; step++)
         {
-            Assert.That(RunDifficultyState.SpeedIncreaseInterval(1, step), Is.InRange(30f, 45f));
-            Assert.That(RunDifficultyState.SpeedIncreaseInterval(82, step), Is.InRange(30f, 45f));
+            Assert.That(RunDifficultyState.SpeedIncreaseInterval(1, step), Is.InRange(12f, 18f));
+            Assert.That(RunDifficultyState.SpeedIncreaseInterval(82, step), Is.InRange(12f, 18f));
         }
         Assert.That(RunDifficultyState.SpeedIncreaseInterval(1, 0),
             Is.Not.EqualTo(RunDifficultyState.SpeedIncreaseInterval(82, 0)));
