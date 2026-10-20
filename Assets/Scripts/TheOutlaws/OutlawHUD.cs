@@ -563,7 +563,7 @@ public sealed class OutlawHUD : MonoBehaviour
     {
         TutorialDirector tutorial = game.Tutorial;
         if (tutorial.Title == null) return;
-        bool steering = tutorial.Step == TutorialStep.Steer && !tutorial.Catching;
+        bool steering = tutorial.SteerKeysShown;
         // The practice shot gets the big SPACE key; once a wall is out, shooting stays one line tall
         // so the wall ahead is never hidden.
         bool shootIntro = tutorial.ShootPracticePending;
@@ -580,13 +580,13 @@ public sealed class OutlawHUD : MonoBehaviour
         float panelHeight = showBody ? 160f : 80f;
         Rect panel = new Rect((width - 520f) * 0.5f, 60f, 520f, panelHeight);
         DrawPanel(panel);
-        bool missed = !tutorial.Catching && tutorial.FeedbackRemaining > 0f && !string.IsNullOrEmpty(tutorial.Feedback);
-        string text = missed ? tutorial.Feedback : tutorial.Title;
-        Color colour = tutorial.Catching || missed ? Bad
+        string text = tutorial.Title;
+        // "TRY AGAIN!" pulses so the failure is unmistakable even though the car keeps driving.
+        Color colour = tutorial.Catching ? Color.Lerp(Bad, Color.white, (Mathf.Sin(Time.unscaledTime * 16f) + 1f) * 0.25f)
             : tutorial.TitleFlashing ? Color.Lerp(LowFuelRed, Gold, (Mathf.Sin(Time.unscaledTime * 12f) + 1f) * 0.5f)
             : Gold;
         string heading = $"<color={Hex(colour)}>{text}</color>";
-        if (inlineSubtitle && !missed) heading += $"  <size=22><color=#FFFFFF>{subtitle}</color></size>";
+        if (inlineSubtitle) heading += $"  <size=22><color=#FFFFFF>{subtitle}</color></size>";
         FitLabel(new Rect(panel.x + 24f, panel.y + 12f, panel.width - 48f, 56f), heading, bigStyle, 24);
 
         float bodyY = panel.y + 80f;

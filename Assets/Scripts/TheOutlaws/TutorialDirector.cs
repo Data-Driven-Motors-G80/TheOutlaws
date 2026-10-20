@@ -34,9 +34,9 @@ public enum TutorialHighlight
 /// Short show-don't-tell tutorial: one instruction at a time, and a step only ends once the
 /// player has done it. Each lesson's objects are laid out on the road well ahead (never popping in
 /// near the car), and the car speeds up while the next lesson is still far away so there is no
-/// waiting. Blocks in lessons guide the player towards the pickups. A hit stops the car, the police
-/// drive into it ("TRY AGAIN!") and the lesson is laid out again; a missed pickup just flashes
-/// "TRY AGAIN!" and lays the lesson out again without stopping. Nothing here counts towards the real run.
+/// waiting. Blocks in lessons guide the player towards the pickups. A failure (a hit or a missed pickup)
+/// never stops the car: "TRY AGAIN!" shows, the police speed up right behind it, and the lesson is laid
+/// out again ahead. Nothing here counts towards the real run.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class TutorialDirector : MonoBehaviour
@@ -66,8 +66,12 @@ public sealed class TutorialDirector : MonoBehaviour
     private const float FuelTankGap = 6f;
     private const float NitroMessageSeconds = 1.6f;
     private const float CompleteMessageSeconds = 1.6f;
-    /// <summary>A quick crash: the car stops, the police bump it, and the lesson is laid out again.</summary>
-    private const float CatchSeconds = 0.7f;
+    /// <summary>After a failure "TRY AGAIN!" shows this long while the police ride right behind the car.</summary>
+    private const float CatchSeconds = 1.2f;
+    /// <summary>The nitro box makes the car much faster than the real run; it eases off after the handoff.</summary>
+    private const float NitroSpeedMultiplier = 2f;
+    /// <summary>Room after the dizzy box to practise moving left and right before the nitro lesson.</summary>
+    private const float DizzyPracticeGap = 80f;
     /// <summary>"HIT BLOCKED!" stays up this long after ramming the wall with the shield.</summary>
     private const float HitBlockedSeconds = 2.3f;
     /// <summary>A failed attempt lays its lesson out a little closer than a new lesson, so retries come quickly.</summary>
@@ -147,22 +151,25 @@ public sealed class TutorialDirector : MonoBehaviour
     private GameObject spareAmmo;
     private float catchRemaining;
     private bool stepSucceeded;
+    private float dizzyPracticeSeconds;
 
     public bool Active { get; private set; }
     public TutorialStep Step { get; private set; }
     public bool LeftDone { get; private set; }
     public bool RightDone { get; private set; }
-    public string Feedback { get; private set; }
-    public float FeedbackRemaining { get; private set; }
-    public bool FeedbackIsGood { get; private set; }
     public float SecondsInTutorial => Active ? Time.time - tutorialStartedAt : 0f;
-    /// <summary>After a failure: the car stops and the police drive into it before the lesson restarts.</summary>
+    /// <summary>After a failure: "TRY AGAIN!" while the police close right up behind the car (it keeps driving).</summary>
     public bool Catching { get; private set; }
-    /// <summary>Scales the tutorial driving speed: zero while caught, faster while the next lesson is far.</summary>
+    /// <summary>Scales the tutorial driving speed: faster while the next lesson is far, much faster on nitro.</summary>
     public float SpeedMultiplier { get; private set; } = 1f;
     public bool TitleFlashing => Step == TutorialStep.Fuel && tanksCollected == 0 && !Catching;
     /// <summary>The first shooting lesson starts with a practice shot at an empty road; the first wall follows it.</summary>
     public bool ShootPracticePending => Step == TutorialStep.Shoot && !shootPracticed && !Catching;
+    /// <summary>After the dizzy box: move left and move right with the reversed controls.</summary>
+    public bool DizzyPracticePending => Step == TutorialStep.MysteryDizzy && dizzyCollected && !stepSucceeded && !Catching
+        && !(stats.TryGetValue(TutorialStep.MysteryDizzy, out StepStats dizzy) && dizzy.Completions > 0);
+    /// <summary>The LEFT / RIGHT keys light up (first steering lesson, and again after the dizzy box).</summary>
+    public bool SteerKeysShown => (Step == TutorialStep.Steer && !Catching) || DizzyPracticePending;
 
     public event Action Completed;
 
@@ -326,10 +333,9 @@ public sealed class TutorialDirector : MonoBehaviour
     {
         if (!Active || Time.timeScale <= 0f) return;
         float dt = Time.deltaTime;
-        if (FeedbackRemaining > 0f) FeedbackRemaining = Mathf.Max(0f, FeedbackRemaining - dt);
         // Lesson time includes police catches but not pauses or the breather after succeeding.
         if (!stepSucceeded) Stats.Seconds += dt;
-        SpeedMultiplier = Mathf.MoveTowards(SpeedMultiplier, TargetSpeedMultiplier(), (Catching ? 5f : 1.5f) * dt);
+        SpeedMultiplier = Mathf.MoveTowards(SpeedMultiplier, TargetSpeedMultiplier(), (NitroCollected ? 3f : 1.5f) * dt);
 
         if (Catching)
         {
@@ -357,14 +363,15 @@ public sealed class TutorialDirector : MonoBehaviour
             case TutorialStep.Shoot:
             case TutorialStep.ShootTwice: UpdateShoot(); break;
             case TutorialStep.Shield: UpdateShield(); break;
-            case TutorialStep.MysteryDizzy: UpdateDizzy(); break;
+            case TutorialStep.MysteryDizzy: UpdateDizzy(dt); break;
             case TutorialStep.Nitro: UpdateNitro(); break;
         }
     }
 
     private float TargetSpeedMultiplier()
     {
-        if (Catching) return 0f;
+        // Nitro: far faster than the real run, so the boost is unmistakable.
+        if (NitroCollected) return NitroSpeedMultiplier;
         // The shooting lessons drive a steady 20% slower, to give time to aim. No catch-up there: shots
         // reach the wall from any distance, and easing off the boost while shooting (just as the spare
         // A box pops up) felt like the car was being slowed down.
@@ -426,6 +433,9 @@ public sealed class TutorialDirector : MonoBehaviour
                 break;
             case TutorialStep.MysteryDizzy:
                 dizzyCollected = false;
+                LeftDone = RightDone = false;
+                leftHeld = rightHeld = 0f;
+                dizzyPracticeSeconds = 0f;
                 break;
             case TutorialStep.Done:
                 Finish();
@@ -460,6 +470,7 @@ public sealed class TutorialDirector : MonoBehaviour
         if (Step == TutorialStep.Ammo) stepRecord["ammo_boxes_collected"] = ammoBoxesCollected;
         if (Step == TutorialStep.Shoot || Step == TutorialStep.ShootTwice) stepRecord[name + "_spare_ammo"] = current.SpareAmmo;
         if (Step == TutorialStep.Shield) stepRecord["shield_blocked_hit"] = shieldDemonstrated;
+        if (Step == TutorialStep.MysteryDizzy) stepRecord["dizzy_practice_s"] = RunTracker.Round(dizzyPracticeSeconds);
         WeeWooAnalytics.Track("tutorial_step_complete", "step", Step.ToString(), "step_index", (int)Step,
             "seconds", RunTracker.Round(current.Seconds), "attempts", current.Retries + 1, "first_try", current.Retries == 0,
             "retries", current.Retries, "hits", current.Hits, "misses", current.Misses,
@@ -513,8 +524,8 @@ public sealed class TutorialDirector : MonoBehaviour
             case TutorialStep.ShootTwice: return 30f;
             // Room after the shield wall before the dizzy box.
             case TutorialStep.Shield: return 50f;
-            // A stretch of reversed steering before the gap with the nitro box.
-            case TutorialStep.MysteryDizzy: return 45f;
+            // Moving left and right with reversed steering, then the gap with the nitro box.
+            case TutorialStep.MysteryDizzy: return DizzyPracticeGap;
             default: return 35f;
         }
     }
@@ -710,9 +721,22 @@ public sealed class TutorialDirector : MonoBehaviour
     /// <summary>A crash: <paramref name="obstacle"/> names the block that was hit.</summary>
     private void StartCatch(string obstacle)
     {
+        Fail("hit", "hit_block", obstacle);
+    }
+
+    /// <summary>
+    /// A failed attempt never stops the car: "TRY AGAIN!" shows, the police speed up right behind it,
+    /// and the lesson is laid out again ahead straight away.
+    /// </summary>
+    private void Fail(string kind, string reason, string what)
+    {
+        RecordFail(kind, reason, what);
         Catching = true;
         catchRemaining = CatchSeconds;
-        RecordFail("hit", "hit_block", obstacle);
+        ClearSections();
+        effects.Clear();
+        effects.RunState.BeginTutorialPursuit();
+        EnterStep(RetryStep(), restart: true);
     }
 
     /// <summary>
@@ -754,16 +778,10 @@ public sealed class TutorialDirector : MonoBehaviour
         return nearest;
     }
 
-    /// <summary>Lays the failed lesson out again far ahead; the catch-up speed brings it back quickly.</summary>
+    /// <summary>The police drop back to their usual distance.</summary>
     private void EndCatch()
     {
         Catching = false;
-        // Back to full speed straight away rather than slowly accelerating from a stop.
-        SpeedMultiplier = 1f;
-        ClearSections();
-        effects.Clear();
-        effects.RunState.BeginTutorialPursuit();
-        EnterStep(RetryStep(), restart: true);
     }
 
     /// <summary>Failing the reversed-steering stretch starts again from the dizzy box.</summary>
@@ -772,17 +790,10 @@ public sealed class TutorialDirector : MonoBehaviour
         return Step == TutorialStep.Nitro ? TutorialStep.MysteryDizzy : Step;
     }
 
-    /// <summary>A missed pickup is not punished: flash "TRY AGAIN!" and lay the lesson out again ahead.</summary>
+    /// <summary>A missed pickup: the same "TRY AGAIN!" as a crash.</summary>
     private void RelayLesson(string reason, string what)
     {
-        Feedback = "TRY AGAIN!";
-        FeedbackIsGood = false;
-        FeedbackRemaining = 1.2f;
-        RecordFail("miss", reason, what);
-        ClearSections();
-        TutorialStep retry = RetryStep();
-        if (retry != Step) effects.Clear();
-        EnterStep(retry, restart: true);
+        Fail("miss", reason, what);
     }
 
     // ---------------------------------------------------------------- steps
@@ -880,7 +891,7 @@ public sealed class TutorialDirector : MonoBehaviour
         if (section.End - CarDistance < -1f) Succeed(shieldDemonstrated ? HitBlockedSeconds : 0f);
     }
 
-    private void UpdateDizzy()
+    private void UpdateDizzy(float dt)
     {
         if (!dizzyCollected)
         {
@@ -890,8 +901,31 @@ public sealed class TutorialDirector : MonoBehaviour
                 RelayLesson("missed_box", "dizzy_box");
             return;
         }
-        // Controls are reversed straight away for the nitro lesson.
-        Succeed(0f);
+        // Already shown after a failed nitro stretch: straight on to the nitro box.
+        if (Stats.Completions > 0)
+        {
+            Succeed(0f);
+            return;
+        }
+        // Prove the reversed controls are understood: move left and right (either order), measured by
+        // which way the car actually steers once the controls have flipped.
+        KeepReversed();
+        if (effects.ReverseCountdownRemaining > 0f || effects.ActiveEffect != PickupEffectType.ReverseSteering) return;
+        dizzyPracticeSeconds += dt;
+        float steer = driver != null ? driver.SteerInput : 0f;
+        if (steer < -0.5f) leftHeld += dt;
+        if (steer > 0.5f) rightHeld += dt;
+        LeftDone = leftHeld >= SteerHoldSeconds;
+        RightDone = rightHeld >= SteerHoldSeconds;
+        if (LeftDone && RightDone) Succeed(0.3f);
+    }
+
+    /// <summary>Keeps the controls reversed from the dizzy box until the nitro box (also after a retry).</summary>
+    private void KeepReversed()
+    {
+        if (effects.ReverseCountdownRemaining <= 0f
+            && (effects.ActiveEffect != PickupEffectType.ReverseSteering || effects.RemainingSeconds < 1f))
+            effects.RunState.Effects.Apply(PickupEffectType.ReverseSteering, 2f);
     }
 
     private void UpdateNitro()
@@ -903,10 +937,7 @@ public sealed class TutorialDirector : MonoBehaviour
             Succeed(NitroMessageSeconds + CompleteMessageSeconds);
             return;
         }
-        // Keep the controls reversed until the nitro box (also after a retry).
-        if (effects.ReverseCountdownRemaining <= 0f
-            && (effects.ActiveEffect != PickupEffectType.ReverseSteering || effects.RemainingSeconds < 1f))
-            effects.RunState.Effects.Apply(PickupEffectType.ReverseSteering, 2f);
+        KeepReversed();
         if (AllPickupsPassed(TutorialStep.Nitro)) RelayLesson("missed_nitro", "nitro_box");
     }
 

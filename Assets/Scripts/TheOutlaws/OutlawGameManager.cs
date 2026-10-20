@@ -6,10 +6,12 @@ using UnityEngine.SceneManagement;
 [DefaultExecutionOrder(-200)]
 public sealed class OutlawGameManager : MonoBehaviour
 {
-    private const float TutorialSpeed = 14f;
+    private const float TutorialSpeed = 16f;
     private const float CaptureContactTimeout = 2f;
-    /// <summary>The tutorial's final nitro lasts this long into the real run, then normal speed.</summary>
+    /// <summary>The tutorial's final nitro lasts this long into the real run at full nitro speed.</summary>
     private const float HandoffNitroSeconds = 3f;
+    /// <summary>Then the car eases down from nitro speed to the run's normal speed over this long.</summary>
+    private const float HandoffSlowSeconds = 2.5f;
     private const int StartingAmmo = 2;
 
     private static int runsThisSession;
@@ -33,6 +35,8 @@ public sealed class OutlawGameManager : MonoBehaviour
     private float elapsed;
     private float captureContactElapsed;
     private float handoffNitroRemaining;
+    /// <summary>The tutorial's nitro speed when the real run took over.</summary>
+    private float handoffStartSpeed;
     private float previousPursuitGap;
     private int speedScheduleSeed;
     private float policeAlertRemaining;
@@ -48,7 +52,7 @@ public sealed class OutlawGameManager : MonoBehaviour
     public float DistanceTravelled => carriedDistance + (driver != null ? driver.RoadDistanceTravelled - distanceOrigin : 0f);
     public float ElapsedSeconds => elapsed;
     public bool StartedAfterTutorial { get; private set; }
-    public bool IsTutorialHandoff => StartedAfterTutorial && elapsed < 4f;
+    public bool IsTutorialHandoff => StartedAfterTutorial && elapsed < HandoffNitroSeconds + HandoffSlowSeconds;
     public OutlawShooting Shooting => shooting;
     public FuelMeter Fuel => fuel;
     public CarPickupEffects PickupEffects => pickupEffects;
@@ -304,9 +308,11 @@ public sealed class OutlawGameManager : MonoBehaviour
     {
         // Total run time carries across scenes: changing environments never resets pressure.
         float targetSpeed = RunDifficultyState.DrivingSpeed(elapsed, speedScheduleSeed);
+        // After the tutorial: full nitro speed (faster than the run), then it wears off and the car
+        // slows down to the run's normal speed.
         if (IsTutorialHandoff)
-            driver.SetTutorialSpeed(Mathf.Lerp(TutorialSpeed, targetSpeed,
-                Mathf.SmoothStep(0f, 1f, elapsed / 4f)));
+            driver.SetTutorialSpeed(Mathf.Lerp(handoffStartSpeed, targetSpeed,
+                Mathf.SmoothStep(0f, 1f, (elapsed - HandoffNitroSeconds) / HandoffSlowSeconds)));
         else
             driver.SetDifficultySpeed(targetSpeed);
         obstacles.ConfigureDifficulty(
@@ -376,6 +382,7 @@ public sealed class OutlawGameManager : MonoBehaviour
     {
         StartedAfterTutorial = afterTutorial;
         handoffNitroRemaining = afterTutorial ? HandoffNitroSeconds : 0f;
+        handoffStartSpeed = driver.ForwardSpeed;
         distanceOrigin = driver.RoadDistanceTravelled;
         carriedDistance = 0f;
         elapsed = 0f;
