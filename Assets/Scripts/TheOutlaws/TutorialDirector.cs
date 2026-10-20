@@ -72,6 +72,8 @@ public sealed class TutorialDirector : MonoBehaviour
     private const float HitBlockedSeconds = 2.3f;
     /// <summary>A failed attempt lays its lesson out a little closer than a new lesson, so retries come quickly.</summary>
     private const float RetryAhead = 70f;
+    /// <summary>The shooting walls appear this far ahead (the first one right after the practice shot).</summary>
+    private const float ShootAhead = 70f;
 
     /// <summary>One lesson's objects, with the road distances they span.</summary>
     private sealed class Section
@@ -506,6 +508,8 @@ public sealed class TutorialDirector : MonoBehaviour
         {
             // Room for "FUEL LOW" to sink in before the tanks (driven at normal speed).
             case TutorialStep.Dodge: return 75f;
+            // Between the 1 wall and the 2 wall.
+            case TutorialStep.Shoot: return 25f;
             case TutorialStep.ShootTwice: return 30f;
             // Room after the shield wall before the dizzy box.
             case TutorialStep.Shield: return 50f;
@@ -521,11 +525,12 @@ public sealed class TutorialDirector : MonoBehaviour
         // Nothing appears until the player has steered both ways, and no wall before the practice shot.
         if (!HasSection(Step) || ShootPracticePending) return;
         if (!sections.ContainsKey(Step))
-            SpawnSection(Step, relaid ? RetryAhead : PrespawnAhead);
+            SpawnSection(Step, relaid ? RetryAhead : Step == TutorialStep.Shoot ? ShootAhead : PrespawnAhead);
         if (!sections.TryGetValue(Step, out Section placed)) return;
         TutorialStep next = NextSectionStep(Step);
         if (next == TutorialStep.Done || next == TutorialStep.Shoot || sections.ContainsKey(next)) return;
-        SpawnSection(next, Mathf.Max(PrespawnAhead, placed.End + GapAfter(Step) - CarDistance));
+        float minimumAhead = next == TutorialStep.ShootTwice ? ShootAhead : PrespawnAhead;
+        SpawnSection(next, Mathf.Max(minimumAhead, placed.End + GapAfter(Step) - CarDistance));
     }
 
     /// <summary>Places a lesson's objects <paramref name="ahead"/> metres up the road (retried until the road exists).</summary>
