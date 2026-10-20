@@ -73,7 +73,7 @@ public sealed class TutorialDirector : MonoBehaviour
     /// <summary>A failed attempt lays its lesson out a little closer than a new lesson, so retries come quickly.</summary>
     private const float RetryAhead = 70f;
     /// <summary>The shooting walls appear this far ahead (the first one right after the practice shot).</summary>
-    private const float ShootAhead = 70f;
+    private const float ShootAhead = 50f;
 
     /// <summary>One lesson's objects, with the road distances they span.</summary>
     private sealed class Section
