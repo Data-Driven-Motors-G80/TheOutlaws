@@ -6,20 +6,17 @@ using UnityEngine.TestTools;
 public sealed class PickupEffectStateTests
 {
     [Test]
-    public void RepeatedReversePickup_DuringCountdownQueuesTimeWithoutRestartingCountdown()
+    public void ReversePickup_SwapsControlsImmediatelyWithoutCountdown()
     {
-        var car = new GameObject("Reverse countdown test");
+        var car = new GameObject("Reverse pickup test");
         try
         {
             var effects = car.AddComponent<CarPickupEffects>();
-            effects.TryApply(PickupEffectType.ReverseSteering);
-            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
-            typeof(CarPickupEffects).GetField("reverseCountdownRemaining", flags).SetValue(effects, 0.5f);
             Assert.That(effects.TryApply(PickupEffectType.ReverseSteering), Is.True);
-            Assert.That(effects.ReverseCountdownRemaining, Is.EqualTo(0.5f));
-            Assert.That(effects.SteeringMultiplier, Is.EqualTo(1f));
-            Assert.That(typeof(CarPickupEffects).GetField("pendingReverseDuration", flags).GetValue(effects), Is.EqualTo(16f));
-            Assert.That(effects.ReverseCompletionCount, Is.Zero);
+            Assert.That(effects.ReverseCountdownRemaining, Is.Zero);
+            Assert.That(effects.ActiveEffect, Is.EqualTo(PickupEffectType.ReverseSteering));
+            Assert.That(effects.SteeringMultiplier, Is.EqualTo(-1f));
+            Assert.That(effects.ReverseActivationCount, Is.EqualTo(1));
         }
         finally { Object.DestroyImmediate(car); }
     }
@@ -218,11 +215,9 @@ public sealed class PickupEffectStateTests
         try
         {
             var effects = car.AddComponent<CarPickupEffects>();
+            // Reverse steering swaps the controls immediately, with no countdown.
             effects.Apply(PickupEffectType.ReverseSteering);
-            Assert.That(effects.ReverseCountdownRemaining, Is.EqualTo(3f));
-            Assert.That(effects.SteeringMultiplier, Is.EqualTo(1f));
-            // Exercise active-effect cleanup as well as the pending warning.
-            effects.RunState.Effects.Apply(PickupEffectType.ReverseSteering);
+            Assert.That(effects.ReverseCountdownRemaining, Is.Zero);
             Assert.That(effects.SteeringMultiplier, Is.EqualTo(-1f));
 
             effects.enabled = false;

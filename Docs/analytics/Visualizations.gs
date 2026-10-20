@@ -545,22 +545,26 @@ function vizCompute(data, opts, tz) {
   ]};
 
   // Tutorial
-  var lessons = [];
-  tutorials.forEach(function (t) {
-    Object.keys(t).forEach(function (k) {
-      var m = /^(.+)_s$/.exec(k);
-      if (m && k !== 'session_s' && lessons.indexOf(m[1]) < 0) lessons.push(m[1]);
-    });
-  });
-  function lessonName(l) { return l === 'pursuitcollision' ? 'Police collision' : l.charAt(0).toUpperCase() + l.slice(1); }
+  var lessons = TUTORIAL_LESSONS.filter(function (l) { return tutorialLessonRows(tutorials, l[1]).length; });
   var quits = tutorials.filter(function (t) { return t.status === 'abandoned' || t.status === 'restarted'; });
-  var tutorialSection = { title: 'Tutorial', subtitle: 'completion and where players struggle', charts: [
+  var lessonLabels = {};
+  TUTORIAL_LESSONS.forEach(function (l) { lessonLabels[l[0]] = l[2]; });
+  var tutorialSection = { title: 'Tutorial', subtitle: 'completion, tries per lesson and where players fail', charts: [
     chart('Tutorial outcomes', 'pie', ['Outcome', 'Attempts'], vizCount(tutorials, 'status'), { colors: ['#4C947B', '#C2553A', '#D8A35A'] }),
     chart('Average seconds per lesson', 'bar', ['Lesson', 'Seconds'],
-      lessons.map(function (l) { return [lessonName(l), vizMean(tutorials, l + '_s')]; }), { yTitle: 'Seconds' }),
-    chart('Retries per lesson (total)', 'bar', ['Lesson', 'Retries'],
-      lessons.map(function (l) { return [lessonName(l), vizSum(tutorials, l + '_retries')]; }), { yTitle: 'Retries' }),
-    chart('Where players left the tutorial', 'bar', ['Lesson', 'Attempts'], vizCount(quits, 'quit_step'), { yTitle: 'Attempts' })
+      lessons.map(function (l) { return [l[2], vizMean(tutorials, l[1] + '_s')]; }), { yTitle: 'Seconds' }),
+    chart('Average tries per lesson', 'bar', ['Lesson', 'Tries'],
+      lessons.map(function (l) { return [l[2], vizMean(tutorials, l[1] + '_attempts')]; }), { yTitle: 'Tries' }),
+    chart('Passed on the first try (%)', 'bar', ['Lesson', '% first try'],
+      lessons.map(function (l) {
+        var firstTry = tutorialFirstTryPct(tutorialLessonRows(tutorials, l[1]), l[1]);
+        return [l[2], isFinite(firstTry) ? Math.round(firstTry * 10) / 10 : 0];
+      }), { yTitle: '%' }),
+    chart('Where players failed (lesson: object)', 'bar', ['Failure point', 'Failures'],
+      tutorialLogCounts(tutorials, 'fail_log').slice(0, 15), { yTitle: 'Failures' }),
+    chart('How players got past each object', 'bar', ['Object', 'Times'],
+      tutorialLogCounts(tutorials, 'pass_log').slice(0, 20), { yTitle: 'Times' }),
+    chart('Where players left the tutorial', 'bar', ['Lesson', 'Attempts'], vizCount(quits, 'quit_step', lessonLabels), { yTitle: 'Attempts' })
   ]};
 
   // Engagement

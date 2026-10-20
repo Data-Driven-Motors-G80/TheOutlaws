@@ -8,6 +8,8 @@ public sealed class OutlawGameManager : MonoBehaviour
 {
     private const float TutorialSpeed = 14f;
     private const float CaptureContactTimeout = 2f;
+    /// <summary>The tutorial's final nitro lasts this long into the real run, then normal speed.</summary>
+    private const float HandoffNitroSeconds = 3f;
     private const int StartingAmmo = 2;
 
     private static int runsThisSession;
@@ -30,6 +32,7 @@ public sealed class OutlawGameManager : MonoBehaviour
     private ChaseCar[] policeCars;
     private float elapsed;
     private float captureContactElapsed;
+    private float handoffNitroRemaining;
     private float previousPursuitGap;
     private int speedScheduleSeed;
     private float policeAlertRemaining;
@@ -236,7 +239,8 @@ public sealed class OutlawGameManager : MonoBehaviour
         if (IsTutorial)
         {
             // The tutorial never ends the run: the police hold position and fuel cannot empty.
-            driver.SetTutorialSpeed(TutorialSpeed);
+            // After a hit the car rolls to a stop while the police catch it.
+            driver.SetTutorialSpeed(TutorialSpeed * tutorial.SpeedMultiplier);
             pursuit.SetClosingSpeed(0f);
             return;
         }
@@ -252,6 +256,11 @@ public sealed class OutlawGameManager : MonoBehaviour
         captureContactElapsed = 0f;
 
         elapsed += Time.deltaTime;
+        if (handoffNitroRemaining > 0f)
+        {
+            handoffNitroRemaining -= Time.deltaTime;
+            if (handoffNitroRemaining <= 0f) pickupEffects.RunState.LoseNitro();
+        }
         UpdateDifficulty();
         UpdatePoliceFeedback();
         RunTracker.Tick(TickContext());
@@ -366,6 +375,7 @@ public sealed class OutlawGameManager : MonoBehaviour
     private void StartRealRun(bool afterTutorial)
     {
         StartedAfterTutorial = afterTutorial;
+        handoffNitroRemaining = afterTutorial ? HandoffNitroSeconds : 0f;
         distanceOrigin = driver.RoadDistanceTravelled;
         carriedDistance = 0f;
         elapsed = 0f;

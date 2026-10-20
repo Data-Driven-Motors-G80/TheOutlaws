@@ -11,12 +11,22 @@ selected gameplay ideas from Team 21's **Redline Run** into one cohesive game.
 
 - **Title screen:** *Wee Woo Run*, your best distance, a tutorial ON/OFF switch (ON for a browser's first game, OFF after)
   and your missions (completed / 10, the current mission and the next two).
-- **Tutorial (show, don't tell):** one small box with one short instruction (LEFT AND RIGHT, AVOID THIS BLOCK, GRAB FUEL, GRAB AMMO, SHOOT, TRY BOTH DIRECTIONS, GRAB THE MYSTERY BOX)
-  that stays until you do it; A / Left Arrow and D / Right Arrow are labelled LEFT and RIGHT. A miss flashes "TRY AGAIN!" for a second. Order: move both ways → dodge a block → a separate fuel lesson begins after a two-second pause and fuel plunges
-  (never empties) and an F immediately appears 35 m ahead in the car's path, with no obstacles → collect at least 3 rounds from A boxes → destroy a "1" wall
-  with one shot, then a "2" wall with two shots → shield → reverse steering → police jammer → a nonfatal collision demonstration → nitro. Each power-up is collected from a mystery box. The shooting prompt explains that the number on a block is the shots needed;
-  hitting a wall requires collecting ammo again and retrying that wall. The car drives at 14 m/s, the police can close in but never catch you, and nothing
-  counts. The real run then starts with nitro retained, a "YOU’RE READY — KEEP GOING!" message, and distance counting from 0; base speed blends from 14 to 20 m/s over four seconds.
+- **Tutorial (show, don't tell):** one instruction at a time in a box at the top centre of the screen (where the
+  distance shows during a run): ESCAPE THE COPS! (2.5 s) → STEER (← LEFT / RIGHT →; nothing spawns until both are
+  done) → AVOID OBSTACLES (two rows 45 m apart: go left, then right) → FUEL LOW, flashing until you grab fuel (fuel
+  drains the whole time; right after the second row it drops into the red as FUEL LOW appears; two tanks one behind the other in the
+  right lane, each filling half the bar (one is enough to continue), a block behind them guiding you there) → GRAB 3 AMMO (you start the tutorial with 2; collecting all three boxes is what counts; one behind the other in the middle lane, following the road's curve,
+  then a small "2" block in the right lane) → SHOOT A BULLET (the shooting lessons drive a steady 20% slower with no catch-up boost; SPACE key shown; the first wall appears after it) → DESTROY THE OBSTACLE (a 1 wall)
+  → DESTROY THE OBSTACLE (a 2 wall; shoot freely: at zero rounds an ammo box appears right in front of the car) → MYSTERY BOX: SHIELD! PROTECTS FROM A HIT (then a full-width wall to ram with it: HIT BLOCKED!, shown for about 2 s) → MYSTERY BOX: DIZZY! (right lane, level with the second obstacle: a narrow block on the far left edge, then a row leaving only the right lane open; CONTROLS REVERSED
+  immediately) → steer through the wide gap between two narrow edge blocks to the last box: NITRO! SPEED BOOST, then TUTORIAL COMPLETE on its own (failing the
+  reversed stretch starts again from the dizzy box, laid out a little closer, 70 m ahead) The
+  real run starts with 3 s of nitro. Each lesson is laid out at least 95 m ahead (nothing appears near the car), and
+  the car speeds up to 1.5x while the next lesson is still more than 50 m away (never during the fuel warning). Any
+  hit stops the car, the police drive into it ("TRY AGAIN!") and the lesson is laid out again; a missed pickup just
+  flashes "TRY AGAIN!" and lays the lesson out again without stopping. The car drives at 14 m/s and nothing counts.
+- **Power-up visuals:** a blue circle in front of the car while a shield is ready (it bursts when a hit uses it),
+  big purple spirals at both sides of the screen while controls are reversed, and lightning bolts during nitro
+  (static for now; animation ideas are in `FORLATER.md`).
 - The fuel bar turns red under 30%.
 - Obstacles look like orange road barriers with black warning bands made from simple geometry. Both types show a large
   white shot count (1 or 2) on a dark front panel; shooting a 2 changes its label to 1 while keeping the warning appearance.
@@ -43,7 +53,7 @@ selected gameplay ideas from Team 21's **Redline Run** into one cohesive game.
 - The top-right rear camera shows the roof of your car and the police behind it; its border turns red as they close in.
 - Mystery boxes: none for the first 500 m, then roughly every 320 m. Reverse steering 10%, nitro, shield and police
   jammer 30% each. Only one power-up at a time: no new ? box appears while one is active or another is still on the road. Grabbing one shows a single centred message
-  ("NITRO ACTIVATED!", "SHIELD ACTIVATED!", "POLICE JAMMED!"; reverse counts down "CONTROLS SWAP IN 3, 2, 1"). Only one
+  ("NITRO ACTIVATED!", "SHIELD ACTIVATED!", "POLICE JAMMED!"; reverse steering swaps the controls immediately). Only one
   message shows at a time and the newest replaces the last. The active power-up is a single tile under the rear camera.
 - Blocks and pickups appear about 95 m ahead, so nothing is a surprise.
 - Pickups (F, A, ?) never spawn inside or just behind a block; a row of blocks moves any pickup it would cover into its
@@ -82,9 +92,3 @@ The game starts in `Assets/Scenes/Env_City.unity` (build index 0) and switches t
 - [Team 21 — Redline Run](https://github.com/CSCI-526/Team21-He_Ali)
 
 See `Docs/INTEGRATION.md` for the feature and code mapping.
-
-Reversed-steering practice comes before the final nitro lesson: a three-second warning precedes at least eight seconds of safe practice, with 0.6 seconds of movement required in each direction, followed by normal controls. Regular runs show the reversed direction mapping and remaining effect time.
-
-The tutorial demonstrates all four mystery-box outcomes in a fixed order: shield (block one collision), reverse steering (practice both directions), police-distance recovery, and nitro. All use the same ? box appearance, reveal a short outcome cue on collection, and respawn if missed. Regular-run outcome probabilities are unchanged.
-
-After the tutorial jammer pickup, players hit a nonfatal obstacle to see the police close in, then collect nitro to pull away again. Three-second observation pauses separate jammer and collision feedback; nitro gets five seconds before the seamless run handoff. The camera is unchanged.

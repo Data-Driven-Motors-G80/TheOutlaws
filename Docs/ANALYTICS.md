@@ -67,7 +67,7 @@ Change `buildTag` for each new playtest build so the versions can be separated.
 | --- | --- | --- |
 | `events` | gameplay event | `ev`, `state`, `scene`, `run_t`, `dist`, plus event-specific fields |
 | `runs` | real run (tutorial excluded) | ~70 columns: distance, end reason, shooting, pickups, hits by colour, fuel, steering, pauses, missions |
-| `tutorials` | completed / abandoned / restarted tutorial | status, quit step, seconds and retries per step |
+| `tutorials` | completed / abandoned / restarted tutorial | status, lessons passed (and on the first try), per lesson: seconds, tries (`<lesson>_attempts`), `_first_try`, retries, hits, misses, shots; `fail_log` (where each failure happened), `pass_log` (how each object was passed); for quits: the lesson, its try number and what that try got past |
 | `sessions` | page close | session length, runs this session, where they quit (title, tutorial, mid-run, game over) |
 | `dashboard` | — | computed summary (menu: Wee Woo Analytics → Refresh dashboard) |
 
@@ -106,8 +106,10 @@ invented values and are separate artifacts; they should not be described as meas
 
 `session_start` (browser, screen size, returning player, prior runs) · `title_shown` · `tutorial_toggled` ·
 `start_pressed` (tutorial on/default/toggled, seconds on title) · `tutorial_start` · `tutorial_step_start` /
-`tutorial_step_complete` (seconds, retries, shots, dry fires) · `tutorial_retry` (missed_fuel, missed_ammo,
-hit_wall, hit_block) · `tutorial_complete` · `run_start` · `checkpoint` every 250 m (gap, fuel, ammo, speed, hits) ·
+`tutorial_step_complete` (seconds, tries, first try, retries, hits, misses, shots, dry fires) · `tutorial_retry`
+(each failure: lesson, hit or miss, the object crashed into or missed, try number, what that try got past, ammo, fuel,
+reversed, shield) · `tutorial_object` (each tutorial block dodged / shot / shielded and each pickup collected / missed,
+with the try number) · `tutorial_complete` · `run_start` · `checkpoint` every 250 m (gap, fuel, ammo, speed, hits) ·
 `collision` (colour, shielded, reversed controls, ammo, **could_shoot**) · `obstacle_destroyed` · `pickup` /
 `pickup_missed` (fuel, ammo, mystery + outcome) · `dry_fire_first` · `low_fuel` · `env_switch` ·
 `mission_complete` · `pause` / `resume` (source: key or focus_lost) · `restart_pressed` · `run_end`.
@@ -145,7 +147,8 @@ web-app deployment to a new version using the steps above.
 
 ## Questions the data answers (predicted weak spots)
 
-- **Is the tutorial too long or confusing?** Funnel % per step, seconds and retries per step, which step people quit on.
+- **Is the tutorial too long or confusing?** Funnel % per lesson, seconds, tries and first-try pass rate per lesson, the exact
+  object players fail on (`fail_log`, `tutorial_retry.what`), how they got past each object, which lesson people quit on.
 - **Do players understand shooting?** % runs with zero shots, accuracy, shots that hit nothing (fired out of range),
   dry fires (pressing Space with no ammo → ammo squares unclear), and `could_shoot` on collisions (had the ammo but didn't use it).
 - **Do players understand pickups?** Collect vs miss rate for F, A and ? boxes; A boxes grabbed while already full.

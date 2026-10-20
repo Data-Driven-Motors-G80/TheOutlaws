@@ -96,7 +96,7 @@ public class FuelTankSpawner : MonoBehaviour
     /// Places a tank <paramref name="distanceAhead"/> metres ahead: in the car's current lane,
     /// or at <paramref name="lateralOverride"/> metres from the road centre.
     /// </summary>
-    public GameObject SpawnAhead(float distanceAhead, float? lateralOverride = null)
+    public GameObject SpawnAhead(float distanceAhead, float? lateralOverride = null, bool expires = true)
     {
         if (road == null || !road.TryGetPointAhead(car.position, distanceAhead, out RoadPathPoint point)) return null;
         road.TryGetPathPoint(car.position, out RoadPathPoint current);
@@ -107,7 +107,8 @@ public class FuelTankSpawner : MonoBehaviour
         GameObject tank = Instantiate(fuelTankPrefab,
             point.Position + point.Right * lateral + point.Up * heightOffset,
             Quaternion.LookRotation(point.Forward, point.Up));
-        Destroy(tank, Mathf.Max(lifetime, 14f));
+        // Tutorial tanks are laid out far ahead and removed by the tutorial instead.
+        if (expires) Destroy(tank, Mathf.Max(lifetime, 14f));
         FuelTank fuelTank = tank.GetComponent<FuelTank>();
         if (fuelTank != null) tracked.Add(fuelTank);
         GameEvents.RaisePickupSpawned(PickupKind.Fuel);

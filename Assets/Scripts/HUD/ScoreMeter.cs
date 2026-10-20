@@ -54,7 +54,8 @@ public sealed class ScoreMeter : MonoBehaviour
             previousCarPosition = car.position;
             if (game.IsTutorial || game.State == OutlawGameState.Ready)
             {
-                string status = game.IsTutorial ? "TUTORIAL" : "";
+                // Blank during the tutorial: its instruction box sits in this spot.
+                string status = "";
                 if (shownStatus != status) label.SetText(status);
                 shownStatus = status;
                 displayedScore = -1;

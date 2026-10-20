@@ -103,6 +103,36 @@ public class ObstacleSpawner : MonoBehaviour
         return placed;
     }
 
+    /// <summary>Tutorial: blocks two lanes, leaving the left (<paramref name="openSide"/> -1) or right (+1) lane open.</summary>
+    public List<TrafficLightObstacle> SpawnTutorialDodgeRow(float distanceAhead, float openSide, out float openLateral,
+        TrafficObstacleState state = TrafficObstacleState.Green)
+    {
+        var placed = new List<TrafficLightObstacle>();
+        openLateral = 0f;
+        if (!road.TryGetPointAhead(car.position, distanceAhead, out RoadPathPoint point)) return placed;
+        float laneWidth = point.Width / 3f;
+        placed.Add(PlaceObstacle(point, -openSide * laneWidth * 0.5f, laneWidth * 2f, state));
+        openLateral = openSide * laneWidth;
+        return placed;
+    }
+
+    /// <summary>Tutorial: one block in the left (-1), middle (0) or right (+1) lane.</summary>
+    public TrafficLightObstacle SpawnTutorialLaneBlock(float distanceAhead, int lane, TrafficObstacleState state)
+    {
+        if (!road.TryGetPointAhead(car.position, distanceAhead, out RoadPathPoint point)) return null;
+        float laneWidth = point.Width / 3f;
+        return PlaceObstacle(point, lane * laneWidth, laneWidth - 0.3f, state);
+    }
+
+    /// <summary>Tutorial: a narrow block hugging the left (-1) or right (+1) road edge.</summary>
+    public TrafficLightObstacle SpawnTutorialEdgeBlock(float distanceAhead, int side,
+        TrafficObstacleState state = TrafficObstacleState.Green)
+    {
+        if (!road.TryGetPointAhead(car.position, distanceAhead, out RoadPathPoint point)) return null;
+        float width = point.Width / 3f * 0.6f;
+        return PlaceObstacle(point, side * (point.Width * 0.5f - width * 0.5f), width, state);
+    }
+
     private float difficultyElapsed;
 
     public void ConfigureDifficulty(float obstacleDensity, float twoObstacleChance, float elapsedSeconds = 0f)

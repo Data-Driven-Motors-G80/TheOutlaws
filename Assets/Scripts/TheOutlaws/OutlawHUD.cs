@@ -376,10 +376,13 @@ public sealed class OutlawHUD : MonoBehaviour
 
     private void DrawRunningHUD(float width, float height)
     {
+        DrawEffectOverlays(width, height);
+        DrawShieldBubble();
         DrawAmmoSquares();
         DrawRearView(width);
         DrawPowerUps(width);
-        DrawMessage(width);
+        // The tutorial box sits where these messages appear, and says the same things.
+        if (!game.IsTutorial) DrawMessage(width);
 
         if (game.IsTutorial) DrawTutorial(width, height);
 
@@ -456,16 +459,6 @@ public sealed class OutlawHUD : MonoBehaviour
         DrawRect(new Rect(0f, height - edge, width, edge), vignette);
         DrawRect(new Rect(0f, edge, edge, Mathf.Max(0f, height - edge * 2f)), vignette);
         DrawRect(new Rect(width - edge, edge, edge, Mathf.Max(0f, height - edge * 2f)), vignette);
-
-        GUIStyle warning = new GUIStyle(leftStyle)
-        {
-            fontSize = 18,
-            fontStyle = FontStyle.Bold,
-            alignment = TextAnchor.MiddleLeft
-        };
-        warning.normal.textColor = new Color(1f, 0.22f, 0.18f,
-            Mathf.Lerp(0.72f, 1f, pulse));
-        GUI.Label(new Rect(304f, 42f, 180f, 30f), "LOW FUEL", warning);
     }
 
     /// <summary>Top-left column, all left-aligned: FUEL label, fuel bar, AMMO label, one square per bullet.</summary>
@@ -483,6 +476,8 @@ public sealed class OutlawHUD : MonoBehaviour
         DrawRect(bar, new Color(0f, 0f, 0f, 0.45f));
         DrawRect(new Rect(bar.x, bar.y, bar.width * game.Fuel.NormalizedFuel, bar.height), FuelLow ? LowFuelRed : FuelOrange);
         DrawBorder(bar, 2f, FuelLow ? PoliceRed : new Color(1f, 1f, 1f, 0.5f));
+        if (game.IsTutorial && game.Tutorial.Highlight == TutorialHighlight.Fuel)
+            DrawHighlight(new Rect(x - 10f, bar.y - 10f, columnWidth + 20f, bar.height + 20f));
         // Ammo.
         GUI.Label(new Rect(x, 80f, columnWidth, 24f), "AMMO", label);
         float y = 106f;
@@ -496,8 +491,6 @@ public sealed class OutlawHUD : MonoBehaviour
         }
         if (game.IsTutorial && game.Tutorial.Highlight == TutorialHighlight.Ammo)
             DrawHighlight(new Rect(x - 10f, y - 10f, columnWidth + 20f, size + 20f));
-        if (game.IsTutorial && game.Tutorial.Highlight == TutorialHighlight.Fuel)
-            DrawHighlight(new Rect(x - 10f, bar.y - 10f, columnWidth + 20f, bar.height + 20f));
     }
 
     private void DrawRearView(float width)
@@ -571,47 +564,186 @@ public sealed class OutlawHUD : MonoBehaviour
     {
         TutorialDirector tutorial = game.Tutorial;
         if (tutorial.Title == null) return;
-        Keyboard keys = Keyboard.current;
-        bool steering = tutorial.Step == TutorialStep.Steer || tutorial.Step == TutorialStep.Dodge;
-        bool shooting = tutorial.Step == TutorialStep.Shoot && tutorial.Highlight != TutorialHighlight.Ammo;
-        bool reverse = tutorial.Step == TutorialStep.Reverse && tutorial.Title == "TRY BOTH DIRECTIONS";
-        bool showKeys = steering || shooting || reverse;
+        bool steering = tutorial.Step == TutorialStep.Steer && !tutorial.Catching;
+        // The practice shot gets the big SPACE key; once a wall is out, shooting stays one line tall
+        // so the wall ahead is never hidden.
+        bool shootIntro = tutorial.ShootPracticePending;
+        bool shooting = (tutorial.Step == TutorialStep.Shoot || tutorial.Step == TutorialStep.ShootTwice)
+            && !tutorial.Catching && !shootIntro;
+        string subtitle = shooting || shootIntro ? null : tutorial.Subtitle;
+        // Power-up messages keep the box one line tall too, with their few words on the same line.
+        bool powerUpTitle = tutorial.Title == "DIZZY!" || tutorial.Title == "SHIELD!" || tutorial.Title == "NITRO!";
+        bool inlineSubtitle = powerUpTitle && !string.IsNullOrEmpty(subtitle);
+        bool showBody = steering || shootIntro || (!inlineSubtitle && !string.IsNullOrEmpty(subtitle));
 
-        // One box with one instruction; "TRY AGAIN!" briefly takes its place after a miss.
-        float panelHeight = shooting ? 220f : showKeys ? 160f : 80f;
-        Rect panel = new Rect((width - 520f) * 0.5f, height - panelHeight - 60f, 520f, panelHeight);
+        // One box with one instruction, top centre where the distance normally shows;
+        // "TRY AGAIN!" takes its place after a hit or a miss.
+        float panelHeight = showBody ? 160f : 80f;
+        Rect panel = new Rect((width - 520f) * 0.5f, 60f, 520f, panelHeight);
         DrawPanel(panel);
-        bool retry = tutorial.FeedbackRemaining > 0f && !string.IsNullOrEmpty(tutorial.Feedback);
-        string heading = retry
-            ? $"<color={Hex(Bad)}>{tutorial.Feedback}</color>"
-            : $"<color={Hex(Gold)}>{tutorial.Title}</color>";
+        bool missed = !tutorial.Catching && tutorial.FeedbackRemaining > 0f && !string.IsNullOrEmpty(tutorial.Feedback);
+        string text = missed ? tutorial.Feedback : tutorial.Title;
+        Color colour = tutorial.Catching || missed ? Bad
+            : tutorial.TitleFlashing ? Color.Lerp(LowFuelRed, Gold, (Mathf.Sin(Time.unscaledTime * 12f) + 1f) * 0.5f)
+            : Gold;
+        string heading = $"<color={Hex(colour)}>{text}</color>";
+        if (inlineSubtitle && !missed) heading += $"  <size=22><color=#FFFFFF>{subtitle}</color></size>";
         FitLabel(new Rect(panel.x + 24f, panel.y + 12f, panel.width - 48f, 56f), heading, bigStyle, 24);
 
-        if (reverse)
+        float bodyY = panel.y + 80f;
+        if (steering)
         {
-            float keyY = panel.y + 80f;
-            DrawKey(new Rect(panel.center.x - 230f, keyY, 220f, 60f), "A / ←  RIGHT", tutorial.LeftDone);
-            DrawKey(new Rect(panel.center.x + 10f, keyY, 220f, 60f), "D / →  LEFT", tutorial.RightDone);
+            DrawKey(new Rect(panel.center.x - 230f, bodyY, 220f, 60f), "← LEFT", tutorial.LeftDone);
+            DrawKey(new Rect(panel.center.x + 10f, bodyY, 220f, 60f), "RIGHT →", tutorial.RightDone);
         }
-        else if (steering)
+        else if (shootIntro)
         {
-            float keyY = panel.y + 80f;
-            bool left = tutorial.Step == TutorialStep.Steer ? tutorial.LeftDone
-                : keys != null && (keys.aKey.isPressed || keys.leftArrowKey.isPressed);
-            bool right = tutorial.Step == TutorialStep.Steer ? tutorial.RightDone
-                : keys != null && (keys.dKey.isPressed || keys.rightArrowKey.isPressed);
-            DrawKey(new Rect(panel.center.x - 230f, keyY, 220f, 60f), "A / ← LEFT", left);
-            DrawKey(new Rect(panel.center.x + 10f, keyY, 220f, 60f), "RIGHT D / →", right);
+            Keyboard keys = Keyboard.current;
+            DrawKey(new Rect(panel.center.x - 150f, bodyY, 300f, 60f), "SPACE", keys != null && keys.spaceKey.isPressed);
         }
-        else if (shooting)
+        else if (!inlineSubtitle && !string.IsNullOrEmpty(subtitle))
         {
-            GUI.Label(new Rect(panel.x + 20f, panel.y + 70f, panel.width - 40f, 58f),
-                "Number on block = shots to destroy\n1 = 1 shot    2 = 2 shots", bodyStyle);
-            bool held = keys != null && keys.spaceKey.isPressed;
-            DrawKey(new Rect(panel.center.x - 150f, panel.y + 140f, 300f, 60f), "SPACE", held);
+            GUI.Label(new Rect(panel.x + 20f, bodyY, panel.width - 40f, 60f), subtitle, bodyStyle);
         }
+    }
 
-        GUI.Label(new Rect(0f, height - 42f, width, 30f), "TUTORIAL   (Esc: pause)", smallStyle);
+    // ---------- Power-up visuals ----------
+
+    private const float ShieldPopSeconds = 0.35f;
+    private static Texture2D ringTexture;
+    private static Texture2D spiralTexture;
+    private static Texture2D boltTexture;
+    private bool shieldWasReady;
+    private float shieldPopRemaining;
+    private Vector2 shieldCentre;
+
+    /// <summary>
+    /// Big purple spirals at both sides while controls are reversed; lightning bolts during nitro.
+    /// Static for now (spin and flicker are listed in FORLATER.md).
+    /// </summary>
+    private void DrawEffectOverlays(float width, float height)
+    {
+        CarPickupEffects effects = game.PickupEffects;
+        if (effects == null || game.State != OutlawGameState.Running) return;
+        bool dizzy = effects.ActiveEffect == PickupEffectType.ReverseSteering;
+        bool nitro = effects.RunState.HasNitro;
+        if (!dizzy && !nitro) return;
+
+        float size = height * 0.38f;
+        float y = height * 0.5f - size * 0.5f;
+        if (dizzy)
+        {
+            GUI.DrawTexture(new Rect(width * 0.03f, y, size, size), SpiralTexture());
+            // Mirrored so the two spirals face each other.
+            GUI.DrawTextureWithTexCoords(new Rect(width * 0.97f - size, y, size, size),
+                SpiralTexture(), new Rect(1f, 0f, -1f, 1f));
+        }
+        else
+        {
+            GUI.DrawTexture(new Rect(width * 0.04f, y, size * 0.5f, size), BoltTexture());
+            GUI.DrawTextureWithTexCoords(new Rect(width * 0.96f - size * 0.5f, y, size * 0.5f, size),
+                BoltTexture(), new Rect(1f, 0f, -1f, 1f));
+        }
+    }
+
+    /// <summary>A small blue circle in front of the car while a shield is ready; it bursts when used.</summary>
+    private void DrawShieldBubble()
+    {
+        CarPickupEffects effects = game.PickupEffects;
+        Camera view = Camera.main;
+        if (effects == null || view == null) return;
+        bool ready = effects.ShieldReady && game.State == OutlawGameState.Running;
+        // OnGUI runs several times a frame; advance the burst only once, on repaint.
+        if (Event.current.type == EventType.Repaint)
+        {
+            if (shieldWasReady && !ready && !effects.RunState.IsGameOver) shieldPopRemaining = ShieldPopSeconds;
+            shieldWasReady = ready;
+            if (shieldPopRemaining > 0f) shieldPopRemaining = Mathf.Max(0f, shieldPopRemaining - Time.unscaledDeltaTime);
+        }
+        if (!ready && shieldPopRemaining <= 0f) return;
+
+        if (ready)
+        {
+            Transform car = effects.transform;
+            Vector3 screen = view.WorldToScreenPoint(car.position + car.forward * 3.5f + car.up * 0.9f);
+            if (screen.z <= 0f) return;
+            shieldCentre = new Vector2(screen.x, Screen.height - screen.y) / uiScale;
+        }
+        // Gentle pulse while ready; grows and fades out when the shield is used.
+        float pop = ready ? 0f : 1f - shieldPopRemaining / ShieldPopSeconds;
+        float size = 78f * (ready ? 1f + 0.05f * Mathf.Sin(Time.unscaledTime * 6f) : Mathf.Lerp(1f, 2.2f, pop));
+        Color previous = GUI.color;
+        GUI.color = new Color(0.45f, 0.8f, 1f, ready ? 0.9f : 1f - pop);
+        GUI.DrawTexture(new Rect(shieldCentre.x - size * 0.5f, shieldCentre.y - size * 0.5f, size, size), RingTexture());
+        GUI.color = previous;
+    }
+
+    private static Texture2D RingTexture()
+    {
+        if (ringTexture != null) return ringTexture;
+        return ringTexture = PaintTexture(128, 128, (u, v) =>
+        {
+            float r = Mathf.Sqrt(u * u + v * v);
+            float ring = Mathf.Clamp01(1f - Mathf.Abs(r - 0.82f) / 0.12f);
+            float fill = r < 0.82f ? 0.18f : 0f;
+            return new Color(1f, 1f, 1f, Mathf.Max(ring, fill));
+        });
+    }
+
+    private static Texture2D SpiralTexture()
+    {
+        if (spiralTexture != null) return spiralTexture;
+        Color purple = new Color(0.72f, 0.35f, 1f);
+        return spiralTexture = PaintTexture(256, 256, (u, v) =>
+        {
+            float r = Mathf.Sqrt(u * u + v * v);
+            if (r > 1f) return Color.clear;
+            // Distance to a three-turn Archimedean spiral arm.
+            float turns = r * 3f - Mathf.Atan2(v, u) / (2f * Mathf.PI);
+            float line = Mathf.Abs(turns - Mathf.Round(turns));
+            float alpha = Mathf.Clamp01(1f - line / 0.18f) * Mathf.Clamp01((1f - r) * 6f);
+            return new Color(purple.r, purple.g, purple.b, alpha);
+        });
+    }
+
+    private static Texture2D BoltTexture()
+    {
+        if (boltTexture != null) return boltTexture;
+        // A zigzag lightning bolt, top to bottom, in normalised (x, y) space.
+        Vector2[] points =
+        {
+            new Vector2(0.62f, 0.98f), new Vector2(0.32f, 0.58f), new Vector2(0.58f, 0.56f),
+            new Vector2(0.30f, 0.20f), new Vector2(0.48f, 0.22f), new Vector2(0.26f, 0.02f)
+        };
+        Color bolt = new Color(1f, 0.85f, 0.25f);
+        return boltTexture = PaintTexture(128, 256, (u, v) =>
+        {
+            Vector2 p = new Vector2((u + 1f) * 0.5f, (v + 1f) * 0.5f);
+            float distance = float.MaxValue;
+            for (int i = 0; i + 1 < points.Length; i++)
+            {
+                Vector2 a = points[i], b = points[i + 1];
+                float t = Mathf.Clamp01(Vector2.Dot(p - a, b - a) / (b - a).sqrMagnitude);
+                distance = Mathf.Min(distance, Vector2.Distance(p, a + (b - a) * t));
+            }
+            float core = Mathf.Clamp01(1f - distance / 0.035f);
+            float glow = Mathf.Clamp01(1f - distance / 0.09f) * 0.45f;
+            Color colour = Color.Lerp(bolt, Color.white, core);
+            return new Color(colour.r, colour.g, colour.b, Mathf.Max(core, glow));
+        });
+    }
+
+    /// <summary>Builds a texture from a function of (u, v) in -1..1 (y up).</summary>
+    private static Texture2D PaintTexture(int width, int height, System.Func<float, float, Color> paint)
+    {
+        var texture = new Texture2D(width, height, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+        var pixels = new Color[width * height];
+        for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+                pixels[y * width + x] = paint((x + 0.5f) / width * 2f - 1f, (y + 0.5f) / height * 2f - 1f);
+        texture.SetPixels(pixels);
+        texture.Apply();
+        return texture;
     }
 
     // ---------- Pause and results ----------

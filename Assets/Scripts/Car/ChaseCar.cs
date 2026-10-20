@@ -131,7 +131,8 @@ public sealed class ChaseCar : MonoBehaviour
 
         // A collision changes the gameplay gap immediately, but the police
         // should visibly close that distance instead of teleporting forward.
-        bool capturing = effects != null && effects.RunState.AwaitingCaptureContact;
+        bool capturing = (effects != null && effects.RunState.AwaitingCaptureContact)
+            || (game != null && game.IsTutorial && game.Tutorial.Catching);
         float gapChangeSpeed = capturing ? captureClosingSpeed
             : game != null && game.IsTutorialHandoff ? Mathf.Min(visualGapChangeSpeed, 0.8f)
             : visualGapChangeSpeed;
@@ -209,7 +210,7 @@ public sealed class ChaseCar : MonoBehaviour
 
         DistanceToPlayer = displayedBumperGap;
         // Bumpers touching: the capture lands and the game manager ends the run.
-        if (capturing && displayedBumperGap <= 0.01f)
+        if (capturing && effects != null && displayedBumperGap <= 0.01f)
             effects.RunState.ConfirmCaptureContact();
     }
 

@@ -7,13 +7,16 @@ public enum FuelDrainMode
     /// <summary>No drain (tutorial steps that are not about fuel).</summary>
     Frozen,
     /// <summary>Drops fast but eases towards a floor, so it never actually empties.</summary>
-    TutorialPlunge
+    TutorialPlunge,
+    /// <summary>Normal drain rate, but stops at a floor above the low-fuel warning.</summary>
+    TutorialSteady
 }
 
 public sealed class FuelMeter : MonoBehaviour
 {
     public const float TutorialFloorFraction = 0.08f;
-    private const float TutorialPlungeRate = 0.55f;
+    public const float TutorialSteadyFloorFraction = 0.35f;
+    private const float TutorialPlungeRate = 1.3f;
 
     [SerializeField, Min(0)] private float maxFuel = 100f;
     [SerializeField, Min(0)] private float consumptionPerSecond = 4f;
@@ -60,6 +63,15 @@ public sealed class FuelMeter : MonoBehaviour
             float floor = maxFuel * TutorialFloorFraction;
             if (remainingFuel > floor)
                 remainingFuel = Mathf.Max(floor, remainingFuel - (remainingFuel - floor) * TutorialPlungeRate * Time.deltaTime);
+            if (bar != null) bar.fillAmount = NormalizedFuel;
+            return;
+        }
+
+        if (DrainMode == FuelDrainMode.TutorialSteady)
+        {
+            float floor = maxFuel * TutorialSteadyFloorFraction;
+            if (remainingFuel > floor)
+                remainingFuel = Mathf.Max(floor, remainingFuel - consumptionPerSecond * Time.deltaTime);
             if (bar != null) bar.fillAmount = NormalizedFuel;
             return;
         }

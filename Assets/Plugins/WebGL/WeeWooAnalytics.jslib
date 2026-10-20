@@ -11,21 +11,30 @@ mergeInto(LibraryManager.library, {
       if (state.busy || state.queue.length === 0) return;
       state.busy = true;
       var body = state.queue[0];
+      // A request that never answers would hold up the queue forever: give up after 20 s and retry.
+      var abort = typeof AbortController !== "undefined" ? new AbortController() : null;
+      var timer = abort ? setTimeout(function () { abort.abort(); }, 20000) : 0;
       // text/plain keeps this a "simple" request (no CORS preflight); Apps Script's reply is
       // readable after its redirect, so we can confirm the rows were written.
-      fetch(state.url, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: body
+      // Promise.resolve().then() turns even a synchronous fetch error into a handled rejection.
+      Promise.resolve().then(function () {
+        return fetch(state.url, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: body,
+          signal: abort ? abort.signal : undefined
+        });
       }).then(function (response) {
         return response.text();
       }).then(function (text) {
+        clearTimeout(timer);
         if (text.indexOf('"ok":true') < 0) throw new Error("not confirmed: " + text.slice(0, 120));
         state.queue.shift();
         state.failures = 0;
         state.busy = false;
         state.pump();
       }).catch(function (error) {
+        clearTimeout(timer);
         state.busy = false;
         state.failures++;
         console.warn("[Analytics] upload retry " + state.failures + ": " + error);
@@ -56,8 +65,10 @@ mergeInto(LibraryManager.library, {
   WWR_Post: function (bodyPtr) {
     var state = window.__weeWooAnalytics;
     if (!state) return;
+    // Keep memory bounded if the endpoint is down for a long session: drop the oldest batches.
+    if (state.queue.length >= 200) state.queue.shift();
     state.queue.push(UTF8ToString(bodyPtr));
-    state.pump();
+    try { state.pump(); } catch (e) { state.busy = false; }
   },
 
   WWR_SetExit: function (bodyPtr) {

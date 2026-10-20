@@ -132,10 +132,15 @@ public sealed class WeeWooAnalytics : MonoBehaviour
     /// <summary>Logs one event. Arguments alternate key, value: Track("pickup", "kind", "Fuel").</summary>
     public static void Track(string eventName, params object[] keyValues)
     {
-        var data = new Dictionary<string, object>();
-        for (int i = 0; i + 1 < keyValues.Length; i += 2)
-            data[Convert.ToString(keyValues[i], CultureInfo.InvariantCulture)] = keyValues[i + 1];
-        TrackInternal(eventName, data);
+        // Called inline from gameplay code: analytics must never throw into it.
+        try
+        {
+            var data = new Dictionary<string, object>();
+            for (int i = 0; i + 1 < keyValues.Length; i += 2)
+                data[Convert.ToString(keyValues[i], CultureInfo.InvariantCulture)] = keyValues[i + 1];
+            TrackInternal(eventName, data);
+        }
+        catch (Exception e) { Debug.LogWarning("[Analytics] " + eventName + " not recorded: " + e.Message); }
     }
 
     private static void TrackInternal(string eventName, Dictionary<string, object> fields)
@@ -162,11 +167,15 @@ public sealed class WeeWooAnalytics : MonoBehaviour
     /// <summary>Adds a summary row (e.g. one per run) to the named sheet.</summary>
     public static void AddRow(string sheet, Dictionary<string, object> data)
     {
-        EnsureStarted();
-        AddIdentity(data);
-        Enqueue(sheet, data);
-        if (Application.isEditor && !instance.uploadsEnabled)
-            Debug.Log($"[Analytics:{sheet}] " + Json(data));
+        try
+        {
+            EnsureStarted();
+            AddIdentity(data);
+            Enqueue(sheet, data);
+            if (Application.isEditor && !instance.uploadsEnabled)
+                Debug.Log($"[Analytics:{sheet}] " + Json(data));
+        }
+        catch (Exception e) { Debug.LogWarning("[Analytics] " + sheet + " row not recorded: " + e.Message); }
     }
 
     private static void AddIdentity(Dictionary<string, object> data)
@@ -187,9 +196,10 @@ public sealed class WeeWooAnalytics : MonoBehaviour
     public static void Flush()
     {
         if (instance == null) return;
-        if (pending.Count > 0)
+        // Uploads are fire-and-forget (failures retry in the background); an error here only loses the batch.
+        try
         {
-            if (instance.uploadsEnabled)
+            if (pending.Count > 0 && instance.uploadsEnabled)
             {
                 string body = Payload(pending);
 #if UNITY_WEBGL && !UNITY_EDITOR
@@ -198,8 +208,9 @@ public sealed class WeeWooAnalytics : MonoBehaviour
                 instance.StartCoroutine(instance.Post(body));
 #endif
             }
-            pending.Clear();
         }
+        catch (Exception e) { Debug.LogWarning("[Analytics] Upload not started: " + e.Message); }
+        pending.Clear();
         instance.nextFlush = Time.realtimeSinceStartup + instance.settings.flushSeconds;
         instance.RefreshExitPayload();
     }
@@ -239,15 +250,19 @@ public sealed class WeeWooAnalytics : MonoBehaviour
         nextExitRefresh = Time.realtimeSinceStartup + 2f;
 #if UNITY_WEBGL && !UNITY_EDITOR
         if (!uploadsEnabled) return;
-        var rows = new List<Row>(pending);
-        List<KeyValuePair<string, Dictionary<string, object>>> exit = ExitRowsProvider?.Invoke();
-        if (exit != null)
-            foreach (KeyValuePair<string, Dictionary<string, object>> pair in exit)
-            {
-                AddIdentity(pair.Value);
-                rows.Add(new Row { Sheet = pair.Key, Data = pair.Value });
-            }
-        WWR_SetExit(rows.Count > 0 ? Payload(rows) : "");
+        try
+        {
+            var rows = new List<Row>(pending);
+            List<KeyValuePair<string, Dictionary<string, object>>> exit = ExitRowsProvider?.Invoke();
+            if (exit != null)
+                foreach (KeyValuePair<string, Dictionary<string, object>> pair in exit)
+                {
+                    AddIdentity(pair.Value);
+                    rows.Add(new Row { Sheet = pair.Key, Data = pair.Value });
+                }
+            WWR_SetExit(rows.Count > 0 ? Payload(rows) : "");
+        }
+        catch (Exception e) { Debug.LogWarning("[Analytics] Exit rows not refreshed: " + e.Message); }
 #endif
     }
 

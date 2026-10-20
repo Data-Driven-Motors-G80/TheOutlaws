@@ -13,6 +13,36 @@
 
 var SHEETS = ['events', 'runs', 'sessions', 'tutorials'];
 var DASHBOARD = 'dashboard';
+// Current tutorial lessons in play order: [step name sent by the game, column prefix, label].
+// Older builds' lessons (Shield before the mystery boxes, Reverse, Recovery, PursuitCollision) stay in the raw tabs.
+var TUTORIAL_LESSONS = [
+  ['Intro', 'intro', 'Escape the cops'], ['Steer', 'steer', 'Steer'], ['Dodge', 'dodge', 'Avoid obstacles'],
+  ['Fuel', 'fuel', 'Fuel low'], ['Ammo', 'ammo', 'Grab 3 ammo'], ['Shoot', 'shoot', 'Destroy the 1 wall'],
+  ['ShootTwice', 'shoottwice', 'Destroy the 2 wall'], ['Shield', 'shield', 'Shield box + wall'],
+  ['MysteryDizzy', 'mysterydizzy', 'Dizzy box'], ['Nitro', 'nitro', 'Nitro box (reversed)']
+];
+
+/** "Step:what;Step:what" (fail_log) or "Step:what=result;..." (pass_log) from tutorial rows, counted. */
+function tutorialLogCounts(rows, key) {
+  var c = {};
+  rows.forEach(function (r) {
+    String(r[key] || '').split(';').forEach(function (item) {
+      if (item) c[item] = (c[item] || 0) + 1;
+    });
+  });
+  return Object.keys(c).sort(function (a, b) { return c[b] - c[a]; }).map(function (k) { return [k, c[k]]; });
+}
+
+/** Rows that report a lesson (the current tutorial records <prefix>_attempts). */
+function tutorialLessonRows(rows, prefix) {
+  return rows.filter(function (r) { return r[prefix + '_s'] !== '' && r[prefix + '_s'] !== undefined && r[prefix + '_s'] !== null; });
+}
+
+/** % of a lesson's passes on the first try, from rows that record tries (older builds did not). */
+function tutorialFirstTryPct(rows, prefix) {
+  var tracked = rows.filter(function (r) { return r[prefix + '_attempts'] !== '' && r[prefix + '_attempts'] !== undefined && r[prefix + '_attempts'] !== null; });
+  return tracked.filter(function (r) { return truthy(r[prefix + '_first_try']); }).length / (tracked.length || 1) * 100 * (tracked.length ? 1 : NaN);
+}
 
 function doPost(e) {
   var body;
@@ -128,11 +158,15 @@ function refreshDashboard() {
   section('TUTORIAL FUNNEL (% of tutorial starters reaching each step)');
   var starters = unique(filter(events, 'ev', 'tutorial_start'), 'session_id').length;
   row('Tutorials started', starters);
-  ['Steer', 'Dodge', 'Fuel', 'Ammo', 'Shoot'].forEach(function (step) {
+  TUTORIAL_LESSONS.forEach(function (lesson) {
+    var step = lesson[0];
     var done = filter(filter(events, 'ev', 'tutorial_step_complete'), 'step', step);
-    var retries = num(filter(filter(events, 'ev', 'tutorial_retry'), 'step', step), 'attempt').length;
-    row('  completed ' + step, pct(unique(done, 'session_id').length, starters),
-        'median ' + median(num(done, 'seconds')) + ' s, ' + retries + ' retries total, dry fires ' + sum(num(done, 'dry_fires')));
+    var firstDone = dedupe(done, function (r) { return r.session_id; });
+    var retries = filter(filter(events, 'ev', 'tutorial_retry'), 'step', step).length;
+    var firstTry = firstDone.filter(function (r) { return truthy(r.first_try); }).length;
+    row('  completed ' + lesson[2], pct(unique(done, 'session_id').length, starters),
+        'median ' + median(num(firstDone, 'seconds')) + ' s, passed first try ' + pct(firstTry, firstDone.length) +
+        ', median tries ' + median(num(firstDone, 'attempts')) + ', ' + retries + ' retries total, dry fires ' + sum(num(firstDone, 'dry_fires')));
   });
   var completedTut = filter(tutorials, 'status', 'completed');
   row('Tutorial completion rate', pct(completedTut.length, starters));
@@ -140,6 +174,8 @@ function refreshDashboard() {
   var abandoned = tutorials.filter(function (t) { return t.status === 'abandoned' || t.status === 'restarted'; });
   row('Tutorials abandoned / restarted', abandoned.length, 'quit step counts: ' + counts(abandoned, 'quit_step'));
   row('Most common retry reasons', counts(filter(events, 'ev', 'tutorial_retry'), 'reason'));
+  row('Where players failed (lesson:object)', tutorialLogCounts(tutorials, 'fail_log').slice(0, 12).map(function (p) { return p[0] + ' ' + p[1]; }).join(', '));
+  row('How players got past objects', tutorialLogCounts(tutorials, 'pass_log').slice(0, 12).map(function (p) { return p[0] + ' ' + p[1]; }).join(', '));
 
   section('RUNS');
   var distances = num(completedRuns, 'distance_m');
@@ -367,10 +403,26 @@ function metricReports(runRows, tutorialRows) {
       ['Recorded attempts', tutorials.length], ['Completed', filter(tutorials, 'status', 'completed').length],
       ['Restarted', filter(tutorials, 'status', 'restarted').length], ['Abandoned', filter(tutorials, 'status', 'abandoned').length],
       ['Completion rate', pct(filter(tutorials, 'status', 'completed').length, tutorials.length)],
-      ['Median completed duration (seconds)', median(metricNumbers(filter(tutorials, 'status', 'completed'), 'seconds'))]
-    ], [['ts', 'Timestamp (UTC)'], ['session_id', 'Session ID'], ['build', 'Build'], ['status', 'Outcome'], ['seconds', 'Duration (seconds)'], ['retries', 'Retries'], ['quit_step', 'Exit step']].concat(
-      ['steer', 'dodge', 'fuel', 'ammo', 'shoot', 'shield', 'reverse', 'recovery', 'pursuitcollision', 'nitro'].map(function (step) { return [step + '_s', step + ' (seconds)']; })
-    ), tutorials)
+      ['Median completed duration (seconds)', median(metricNumbers(filter(tutorials, 'status', 'completed'), 'seconds'))],
+      ['Median retries per completed tutorial', median(metricNumbers(filter(tutorials, 'status', 'completed'), 'retries'))]
+    ].concat(TUTORIAL_LESSONS.map(function (lesson) {
+      // Per lesson: players who passed it, how many on the first try, and the average number of tries.
+      var rows = tutorialLessonRows(tutorials, lesson[1]);
+      var firstTry = tutorialFirstTryPct(rows, lesson[1]);
+      return [lesson[2] + ': passed / first try / mean tries / mean seconds',
+        rows.length + ' / ' + (isFinite(firstTry) ? Math.round(firstTry * 10) / 10 + '%' : '') + ' / ' + mean(metricNumbers(rows, lesson[1] + '_attempts')) +
+        ' / ' + mean(metricNumbers(rows, lesson[1] + '_s'))];
+    })).concat(
+      tutorialLogCounts(tutorials, 'fail_log').slice(0, 10).map(function (p) { return ['Failed at ' + p[0], p[1]]; })
+    ).concat(
+      tutorialCounts(tutorials.filter(function (t) { return t.status !== 'completed'; }), 'quit_step').map(function (p) { return ['Left during ' + p[0], p[1]]; })
+    ), [['ts', 'Timestamp (UTC)'], ['session_id', 'Session ID'], ['build', 'Build'], ['status', 'Outcome'], ['seconds', 'Duration (seconds)'],
+      ['retries', 'Retries'], ['steps_completed', 'Lessons passed'], ['steps_first_try', 'Lessons passed first try'],
+      ['quit_step', 'Exit step'], ['quit_step_attempt', 'Exit step: try number'], ['quit_step_progress', 'Exit step: got past']].concat(
+      TUTORIAL_LESSONS.reduce(function (cols, lesson) {
+        return cols.concat([[lesson[1] + '_s', lesson[2] + ' (seconds)'], [lesson[1] + '_attempts', lesson[2] + ' (tries)']]);
+      }, [])
+    ).concat([['fail_log', 'Where they failed'], ['pass_log', 'How they got past each object']]), tutorials)
   ];
   reports.forEach(function (r) {
     r.note = r.name === 'Tutorial Summary' ? 'Non-test recorded tutorial attempts, not unique people. Missing lessons remain blank.' : notes;
@@ -467,6 +519,12 @@ function median(xs) {
 }
 function pct(a, b) { return b ? Math.round(1000 * a / b) / 10 + '%' : ''; }
 function ratio(a, b) { return b ? Math.round(100 * a / b) / 100 : ''; }
+function tutorialCounts(rows, key) {
+  var c = {};
+  rows.forEach(function (r) { var k = r[key] || '(none)'; c[k] = (c[k] || 0) + 1; });
+  return Object.keys(c).sort(function (a, b) { return c[b] - c[a]; }).map(function (k) { return [k, c[k]]; });
+}
+
 function truthy(v) { return v === true || v === 'true' || v === 'TRUE'; }
 function counts(rows, key) {
   var c = {};

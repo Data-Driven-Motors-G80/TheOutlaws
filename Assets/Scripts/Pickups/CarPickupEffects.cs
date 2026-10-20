@@ -240,10 +240,11 @@ public sealed class CarPickupEffects : MonoBehaviour
         }
 
         runState.TryBailOut();
-        pendingReverseDuration = reverseControlDuration;
-        // A full "3, 2, 1" warning before the controls swap.
-        reverseCountdownRemaining = 3f;
-        return true;
+        // The controls swap immediately (the old "3, 2, 1" warning is gone).
+        pendingReverseDuration = 0f;
+        bool swapped = runState.TryCollectWithoutReward(PickupEffectType.ReverseSteering, reverseControlDuration);
+        if (swapped) ReverseActivationCount++;
+        return swapped;
     }
 
     private void Update()
