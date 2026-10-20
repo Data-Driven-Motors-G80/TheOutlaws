@@ -376,7 +376,6 @@ public sealed class OutlawHUD : MonoBehaviour
 
     private void DrawRunningHUD(float width, float height)
     {
-        DrawEffectOverlays(width, height);
         DrawShieldBubble();
         DrawAmmoSquares();
         DrawRearView(width);
@@ -611,40 +610,9 @@ public sealed class OutlawHUD : MonoBehaviour
 
     private const float ShieldPopSeconds = 0.35f;
     private static Texture2D ringTexture;
-    private static Texture2D spiralTexture;
-    private static Texture2D boltTexture;
     private bool shieldWasReady;
     private float shieldPopRemaining;
     private Vector2 shieldCentre;
-
-    /// <summary>
-    /// Big purple spirals at both sides while controls are reversed; lightning bolts during nitro.
-    /// Static for now (spin and flicker are listed in FORLATER.md).
-    /// </summary>
-    private void DrawEffectOverlays(float width, float height)
-    {
-        CarPickupEffects effects = game.PickupEffects;
-        if (effects == null || game.State != OutlawGameState.Running) return;
-        bool dizzy = effects.ActiveEffect == PickupEffectType.ReverseSteering;
-        bool nitro = effects.RunState.HasNitro;
-        if (!dizzy && !nitro) return;
-
-        float size = height * 0.38f;
-        float y = height * 0.5f - size * 0.5f;
-        if (dizzy)
-        {
-            GUI.DrawTexture(new Rect(width * 0.03f, y, size, size), SpiralTexture());
-            // Mirrored so the two spirals face each other.
-            GUI.DrawTextureWithTexCoords(new Rect(width * 0.97f - size, y, size, size),
-                SpiralTexture(), new Rect(1f, 0f, -1f, 1f));
-        }
-        else
-        {
-            GUI.DrawTexture(new Rect(width * 0.04f, y, size * 0.5f, size), BoltTexture());
-            GUI.DrawTextureWithTexCoords(new Rect(width * 0.96f - size * 0.5f, y, size * 0.5f, size),
-                BoltTexture(), new Rect(1f, 0f, -1f, 1f));
-        }
-    }
 
     /// <summary>A small blue circle in front of the car while a shield is ready; it bursts when used.</summary>
     private void DrawShieldBubble()
@@ -687,49 +655,6 @@ public sealed class OutlawHUD : MonoBehaviour
             float ring = Mathf.Clamp01(1f - Mathf.Abs(r - 0.82f) / 0.12f);
             float fill = r < 0.82f ? 0.18f : 0f;
             return new Color(1f, 1f, 1f, Mathf.Max(ring, fill));
-        });
-    }
-
-    private static Texture2D SpiralTexture()
-    {
-        if (spiralTexture != null) return spiralTexture;
-        Color purple = new Color(0.72f, 0.35f, 1f);
-        return spiralTexture = PaintTexture(256, 256, (u, v) =>
-        {
-            float r = Mathf.Sqrt(u * u + v * v);
-            if (r > 1f) return Color.clear;
-            // Distance to a three-turn Archimedean spiral arm.
-            float turns = r * 3f - Mathf.Atan2(v, u) / (2f * Mathf.PI);
-            float line = Mathf.Abs(turns - Mathf.Round(turns));
-            float alpha = Mathf.Clamp01(1f - line / 0.18f) * Mathf.Clamp01((1f - r) * 6f);
-            return new Color(purple.r, purple.g, purple.b, alpha);
-        });
-    }
-
-    private static Texture2D BoltTexture()
-    {
-        if (boltTexture != null) return boltTexture;
-        // A zigzag lightning bolt, top to bottom, in normalised (x, y) space.
-        Vector2[] points =
-        {
-            new Vector2(0.62f, 0.98f), new Vector2(0.32f, 0.58f), new Vector2(0.58f, 0.56f),
-            new Vector2(0.30f, 0.20f), new Vector2(0.48f, 0.22f), new Vector2(0.26f, 0.02f)
-        };
-        Color bolt = new Color(1f, 0.85f, 0.25f);
-        return boltTexture = PaintTexture(128, 256, (u, v) =>
-        {
-            Vector2 p = new Vector2((u + 1f) * 0.5f, (v + 1f) * 0.5f);
-            float distance = float.MaxValue;
-            for (int i = 0; i + 1 < points.Length; i++)
-            {
-                Vector2 a = points[i], b = points[i + 1];
-                float t = Mathf.Clamp01(Vector2.Dot(p - a, b - a) / (b - a).sqrMagnitude);
-                distance = Mathf.Min(distance, Vector2.Distance(p, a + (b - a) * t));
-            }
-            float core = Mathf.Clamp01(1f - distance / 0.035f);
-            float glow = Mathf.Clamp01(1f - distance / 0.09f) * 0.45f;
-            Color colour = Color.Lerp(bolt, Color.white, core);
-            return new Color(colour.r, colour.g, colour.b, Mathf.Max(core, glow));
         });
     }
 

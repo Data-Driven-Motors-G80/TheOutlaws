@@ -66,11 +66,12 @@ public sealed class TutorialDirector : MonoBehaviour
     private const float FuelTankGap = 6f;
     private const float NitroMessageSeconds = 1.6f;
     private const float CompleteMessageSeconds = 1.6f;
-    private const float CatchSeconds = 1.5f;
+    /// <summary>A quick crash: the car stops, the police bump it, and the lesson is laid out again.</summary>
+    private const float CatchSeconds = 0.7f;
     /// <summary>"HIT BLOCKED!" stays up this long after ramming the wall with the shield.</summary>
     private const float HitBlockedSeconds = 2.3f;
-    /// <summary>A failed dizzy (or nitro) attempt lays the dizzy box out a little closer than a new lesson.</summary>
-    private const float DizzyRetryAhead = 70f;
+    /// <summary>A failed attempt lays its lesson out a little closer than a new lesson, so retries come quickly.</summary>
+    private const float RetryAhead = 70f;
 
     /// <summary>One lesson's objects, with the road distances they span.</summary>
     private sealed class Section
@@ -326,7 +327,7 @@ public sealed class TutorialDirector : MonoBehaviour
         if (FeedbackRemaining > 0f) FeedbackRemaining = Mathf.Max(0f, FeedbackRemaining - dt);
         // Lesson time includes police catches but not pauses or the breather after succeeding.
         if (!stepSucceeded) Stats.Seconds += dt;
-        SpeedMultiplier = Mathf.MoveTowards(SpeedMultiplier, TargetSpeedMultiplier(), (Catching ? 2.5f : 1.5f) * dt);
+        SpeedMultiplier = Mathf.MoveTowards(SpeedMultiplier, TargetSpeedMultiplier(), (Catching ? 5f : 1.5f) * dt);
 
         if (Catching)
         {
@@ -520,7 +521,7 @@ public sealed class TutorialDirector : MonoBehaviour
         // Nothing appears until the player has steered both ways, and no wall before the practice shot.
         if (!HasSection(Step) || ShootPracticePending) return;
         if (!sections.ContainsKey(Step))
-            SpawnSection(Step, relaid && Step == TutorialStep.MysteryDizzy ? DizzyRetryAhead : PrespawnAhead);
+            SpawnSection(Step, relaid ? RetryAhead : PrespawnAhead);
         if (!sections.TryGetValue(Step, out Section placed)) return;
         TutorialStep next = NextSectionStep(Step);
         if (next == TutorialStep.Done || next == TutorialStep.Shoot || sections.ContainsKey(next)) return;
@@ -752,6 +753,8 @@ public sealed class TutorialDirector : MonoBehaviour
     private void EndCatch()
     {
         Catching = false;
+        // Back to full speed straight away rather than slowly accelerating from a stop.
+        SpeedMultiplier = 1f;
         ClearSections();
         effects.Clear();
         effects.RunState.BeginTutorialPursuit();

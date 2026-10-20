@@ -19,14 +19,13 @@ selected gameplay ideas from Team 21's **Redline Run** into one cohesive game.
   then a small "2" block in the right lane) → SHOOT A BULLET (the shooting lessons drive a steady 20% slower with no catch-up boost; SPACE key shown; the first wall appears after it) → DESTROY THE OBSTACLE (a 1 wall)
   → DESTROY THE OBSTACLE (a 2 wall; shoot freely: at zero rounds an ammo box appears right in front of the car) → MYSTERY BOX: SHIELD! PROTECTS FROM A HIT (then a full-width wall to ram with it: HIT BLOCKED!, shown for about 2 s) → MYSTERY BOX: DIZZY! (right lane, level with the second obstacle: a narrow block on the far left edge, then a row leaving only the right lane open; CONTROLS REVERSED
   immediately) → steer through the wide gap between two narrow edge blocks to the last box: NITRO! SPEED BOOST, then TUTORIAL COMPLETE on its own (failing the
-  reversed stretch starts again from the dizzy box, laid out a little closer, 70 m ahead) The
+  reversed stretch starts again from the dizzy box) The
   real run starts with 3 s of nitro. Each lesson is laid out at least 95 m ahead (nothing appears near the car), and
   the car speeds up to 1.5x while the next lesson is still more than 50 m away (never during the fuel warning). Any
-  hit stops the car, the police drive into it ("TRY AGAIN!") and the lesson is laid out again; a missed pickup just
+  hit is a quick crash (the car stops and the police bump it for 0.7 s, "TRY AGAIN!") and the lesson is laid out again 70 m ahead; a missed pickup just
   flashes "TRY AGAIN!" and lays the lesson out again without stopping. The car drives at 14 m/s and nothing counts.
-- **Power-up visuals:** a blue circle in front of the car while a shield is ready (it bursts when a hit uses it),
-  big purple spirals at both sides of the screen while controls are reversed, and lightning bolts during nitro
-  (static for now; animation ideas are in `FORLATER.md`).
+- **Power-up visuals:** a blue circle in front of the car while a shield is ready (it bursts when a hit uses it).
+  The reversed-controls spirals and nitro lightning bolts were removed for the alpha (no art yet; see `FORLATER.md`).
 - The fuel bar turns red under 30%.
 - Obstacles look like orange road barriers with black warning bands made from simple geometry. Both types show a large
   white shot count (1 or 2) on a dark front panel; shooting a 2 changes its label to 1 while keeping the warning appearance.
