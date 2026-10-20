@@ -818,9 +818,10 @@ public sealed class TutorialDirector : MonoBehaviour
             fuel.DrainMode = FuelDrainMode.TutorialSteady;
         }
         if (!section.Pickups.TrueForAll(tank => IsPassed(tank, 3f))) return;
-        // Past both tanks: one is enough to continue.
-        if (tanksCollected >= 1) Succeed(0.3f);
-        else RelayLesson("missed_fuel", "fuel_tanks");
+        // Past both tanks: one is enough, but the lesson only ends past the block behind them,
+        // so crashing into that block retries this lesson rather than the next one.
+        if (tanksCollected == 0) RelayLesson("missed_fuel", "fuel_tanks");
+        else if (section.End - CarDistance < -1f) Succeed(0.3f);
     }
 
     private void UpdateAmmo()
