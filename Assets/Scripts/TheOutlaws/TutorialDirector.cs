@@ -34,6 +34,8 @@ public enum TutorialHighlight
 public sealed class TutorialDirector : MonoBehaviour
 {
     private const float SpawnAhead = 75f;
+    private const float DodgeSpawnAhead = 55f;
+    private const float ShootSpawnAhead = 60f;
     private const float FuelSpawnAhead = 35f;
     private const float SteerHoldSeconds = 0.2f;
 
@@ -49,7 +51,7 @@ public sealed class TutorialDirector : MonoBehaviour
     private CarPickupEffects effects;
     private float previousReverseLateral;
     private float reversePracticeSeconds;
-    private const float ReversePracticeMinimumSeconds = 8f;
+    private const float ReversePracticeMinimumSeconds = 4f;
     private const float ReverseDirectionHoldSeconds = 0.6f;
     private PickupItem lessonMystery;
     private bool reverseCollected;
@@ -76,7 +78,7 @@ public sealed class TutorialDirector : MonoBehaviour
     private List<TrafficLightObstacle> dodgeRow = new List<TrafficLightObstacle>();
     private bool dodgeHit;
     private bool stepSucceeded;
-    /// <summary>Shoot step: the wall was hit, so the player collects ammo again before a new wall.</summary>
+    /// <summary>Shoot step: collect only the missing ammo before retrying the current wall.</summary>
     private bool reloading;
 
     public bool Active { get; private set; }
@@ -230,7 +232,7 @@ public sealed class TutorialDirector : MonoBehaviour
                 // Separate the fuel lesson from the preceding collision/dodge feedback.
                 fuel.DrainMode = FuelDrainMode.Frozen;
                 fuelLessonStarted = false;
-                waitRemaining = 2f;
+                waitRemaining = 0.8f;
                 obstacles.ClearNear(player.position, SpawnAhead + 20f);
                 tankCollected = false;
                 break;
@@ -269,7 +271,7 @@ public sealed class TutorialDirector : MonoBehaviour
             case TutorialStep.Shoot:
                 reloading = false;
                 shootWallState = TrafficObstacleState.Green;
-                wall = obstacles.SpawnTutorialWall(SpawnAhead + 10f, shootWallState);
+                wall = obstacles.SpawnTutorialWall(ShootSpawnAhead, shootWallState);
                 break;
             case TutorialStep.Dodge:
                 SpawnDodgeRow();
@@ -281,7 +283,7 @@ public sealed class TutorialDirector : MonoBehaviour
     }
 
     /// <summary>Moves on silently after a short breather; there are no success pop-ups.</summary>
-    private void Succeed(float delay = 1.2f)
+    private void Succeed(float delay = 0.6f)
     {
         if (stepSucceeded) return;
         stepSucceeded = true;
@@ -367,7 +369,7 @@ public sealed class TutorialDirector : MonoBehaviour
         }
         // Leave room for the final nitro lesson to visibly open the gap further.
         effects.RunState.RecoveryCap = RiskRunState.MaximumPursuitGap;
-        Succeed(3f);
+        Succeed(1.5f);
     }
 
     private void UpdatePursuitCollision()
@@ -375,7 +377,7 @@ public sealed class TutorialDirector : MonoBehaviour
         if (pursuitCollisionDemonstrated)
         {
             obstacles.ClearNear(player.position, SpawnAhead + 20f);
-            Succeed(3f);
+            Succeed(1.5f);
             return;
         }
         // Shooting or missing the demonstration must not leave the lesson stuck.
@@ -423,7 +425,7 @@ public sealed class TutorialDirector : MonoBehaviour
         RightDone = rightHeld >= ReverseDirectionHoldSeconds;
         if (!LeftDone || !RightDone || reversePracticeSeconds < ReversePracticeMinimumSeconds) return;
         effects.Clear();
-        Succeed(1.5f);
+        Succeed(0.8f);
     }
 
     private void UpdateNitro(float dt)
@@ -431,7 +433,7 @@ public sealed class TutorialDirector : MonoBehaviour
         if (player.GetComponent<CarPickupEffects>().RunState.HasNitro)
         {
             // Allow time to see the gradual retreat, unlike the instant jammer bonus.
-            Succeed(5f);
+            Succeed(2.5f);
             return;
         }
         if (nitro == null)
@@ -462,8 +464,8 @@ public sealed class TutorialDirector : MonoBehaviour
         {
             fuel.SetFuel(fuel.MaximumFuel);
             fuel.DrainMode = FuelDrainMode.Frozen;
-            // A longer breather before ammo so the two lessons don't blur together.
-            Succeed(2f);
+            // Keep a brief break so fuel and ammo remain separate lessons.
+            Succeed(0.8f);
             return;
         }
 
@@ -484,11 +486,13 @@ public sealed class TutorialDirector : MonoBehaviour
         }
     }
 
-    private void SpawnAmmoLine()
+    private void SpawnAmmoLine(int targetAmmo = 3)
     {
-        ammoBoxes.Clear();
+        ClearAmmoBoxes();
+        int missingAmmo = Mathf.Clamp(targetAmmo - shooting.CurrentAmmo,
+            0, shooting.MaximumAmmo - shooting.CurrentAmmo);
         float lateral = PlayerLateral();
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < missingAmmo; i++)
         {
             if (!road.TryGetPointAhead(player.position, 35f + i * 9f, out RoadPathPoint point)) continue;
             float clamped = Mathf.Clamp(lateral, -point.Width * 0.5f + 1.2f, point.Width * 0.5f - 1.2f);
@@ -531,15 +535,15 @@ public sealed class TutorialDirector : MonoBehaviour
 
     private void UpdateShoot(float dt)
     {
+        int requiredAmmo = (int)shootWallState + 1;
         if (reloading)
         {
-            // Hitting the wall resets the step: collect ammo again, then a new wall appears.
+            // Keep earned rounds and refill only enough for this wall.
             bool anyAhead = false;
             foreach (GameObject box in ammoBoxes)
                 if (box != null && !road.IsBehind(box.transform.position, player.position, 2f))
                     anyAhead = true;
-            int requiredAmmo = shootWallState == TrafficObstacleState.Green ? 3 : 2;
-            if (shooting.CurrentAmmo >= requiredAmmo && (!anyAhead || shooting.CurrentAmmo >= 3))
+            if (shooting.CurrentAmmo >= requiredAmmo)
             {
                 ClearAmmoBoxes();
                 reloading = false;
@@ -547,8 +551,7 @@ public sealed class TutorialDirector : MonoBehaviour
             }
             else if (!anyAhead)
             {
-                ClearAmmoBoxes();
-                SpawnAmmoLine();
+                SpawnAmmoLine(requiredAmmo);
             }
             return;
         }
@@ -557,7 +560,15 @@ public sealed class TutorialDirector : MonoBehaviour
         {
             waitRemaining -= dt;
             if (waitRemaining > 0f) return;
-            wall = obstacles.SpawnTutorialWall(SpawnAhead + 10f, shootWallState);
+            // A player may fire while the next wall is being introduced.
+            // Refill before placing it rather than making them hit it to retry.
+            if (shooting.CurrentAmmo < requiredAmmo)
+            {
+                reloading = true;
+                SpawnAmmoLine(requiredAmmo);
+                return;
+            }
+            wall = obstacles.SpawnTutorialWall(ShootSpawnAhead, shootWallState);
             return;
         }
 
@@ -567,7 +578,7 @@ public sealed class TutorialDirector : MonoBehaviour
             if (shootWallState == TrafficObstacleState.Green)
             {
                 shootWallState = TrafficObstacleState.Yellow;
-                waitRemaining = 1.2f;
+                waitRemaining = 0.6f;
             }
             else
             {
@@ -580,16 +591,17 @@ public sealed class TutorialDirector : MonoBehaviour
         {
             wall = null;
             Retry("hit_wall");
-            shooting.SetAmmo(0);
-            reloading = true;
-            SpawnAmmoLine();
+            obstacles.ClearNear(player.position, SpawnAhead + 20f);
+            reloading = shooting.CurrentAmmo < requiredAmmo;
+            if (reloading) SpawnAmmoLine(requiredAmmo);
+            else waitRemaining = 0.8f;
         }
     }
 
     private void SpawnDodgeRow()
     {
         dodgeHit = false;
-        dodgeRow = obstacles.SpawnTutorialDodgeRow(SpawnAhead + 5f);
+        dodgeRow = obstacles.SpawnTutorialDodgeRow(DodgeSpawnAhead);
     }
 
     private void UpdateDodge(float dt)

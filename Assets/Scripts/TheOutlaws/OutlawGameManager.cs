@@ -6,7 +6,7 @@ using UnityEngine.SceneManagement;
 [DefaultExecutionOrder(-200)]
 public sealed class OutlawGameManager : MonoBehaviour
 {
-    private const float TutorialSpeed = 14f;
+    private const float TutorialSpeed = 16f;
     private const int StartingAmmo = 2;
 
     private static int runsThisSession;
