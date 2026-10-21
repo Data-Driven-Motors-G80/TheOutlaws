@@ -57,6 +57,8 @@ public static class RunTracker
     public static readonly int[] Collected = new int[3];
     public static readonly int[] Missed = new int[3];
     public static int AmmoWastedFull;
+    public static int GunRewards, BackpackReplacements, DiscardedBullets, BackpackActivations;
+    private static float backpackStoredAt;
     public static readonly Dictionary<string, int> MysteryOutcomes = new Dictionary<string, int>();
     public static int Roadblocks;
     // Continuous
@@ -155,6 +157,9 @@ public static class RunTracker
         Array.Clear(Spawned, 0, 3);
         Array.Clear(Collected, 0, 3);
         Array.Clear(Missed, 0, 3);
+        GunRewards = BackpackReplacements = DiscardedBullets = BackpackActivations = 0;
+        backpackStoredAt = 0f;
+        Stats.ShotsFired = 0;
         AmmoWastedFull = 0;
         MysteryOutcomes.Clear();
         Roadblocks = 0;
@@ -306,6 +311,24 @@ public static class RunTracker
         GameEvents.PickupSpawned += kind => { if (Active) Spawned[(int)kind]++; };
         GameEvents.PickupMissed += OnMissed;
         GameEvents.PickupCollected += OnCollected;
+        GameEvents.BackpackReplaced += (old, item, lost) => {
+            if (!Active) return;
+            if (old != RandomPickupOutcome.None) BackpackReplacements++;
+            DiscardedBullets += lost;
+            ammoPickupTimes.Clear();
+            if (item == RandomPickupOutcome.Gun) {
+                GunRewards++;
+                for (int i = 0; i < BackpackState.GunShots; i++) ammoPickupTimes.Enqueue(LastElapsed);
+            }
+            WeeWooAnalytics.Track("backpack_received", "item", item.ToString(), "replaced", old.ToString(),
+                "discarded_bullets", lost, "previous_hold_s", Round(LastElapsed - backpackStoredAt));
+            backpackStoredAt = LastElapsed;
+        };
+        GameEvents.BackpackUsed += item => {
+            if (!Active) return;
+            BackpackActivations++;
+            WeeWooAnalytics.Track("backpack_used", "item", item.ToString(), "held_s", Round(LastElapsed - backpackStoredAt));
+        };
         GameEvents.AmmoPickupWastedFull += () => { if (Active) AmmoWastedFull++; };
         GameEvents.RoadblockSpawned += pattern => { if (Active) Roadblocks++; };
     }
@@ -314,6 +337,7 @@ public static class RunTracker
     {
         if (!Active) return;
         ShotsFired++;
+        Stats.ShotsFired++;
         shotsThisStep++;
         cpShots++;
         // First in, first out: how long the oldest bullet was carried before being used.

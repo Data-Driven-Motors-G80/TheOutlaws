@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -8,103 +9,77 @@ public sealed class PickupSpawner : MonoBehaviour
     [SerializeField] private Transform car;
     [SerializeField] private PickupItem pickupPrefab;
     [SerializeField] private ObstacleSpawner obstacles;
-    [SerializeField, Min(5f)] private float spawnDistance = 55f;
-    [SerializeField, Min(5f)] private float spacing = 160f;
     [SerializeField, Min(0.1f)] private float effectDuration = 5f;
-    [SerializeField] private bool cycleEffectsForTesting;
-
-    private readonly List<PickupItem> active = new List<PickupItem>();
-    private System.Random random;
-    private Vector3 previousPosition;
-    private float untilNext;
-    private int spawnCount;
-    private AutoDriveCar driver;
-    private CarPickupEffects pickupEffects;
-    private float previousRoadDistance;
-    private readonly HashSet<PickupItem> reported = new HashSet<PickupItem>();
-    private readonly List<PickupItem> placementChecks = new List<PickupItem>();
-
-    /// <summary>While true (the tutorial), no mystery boxes appear.</summary>
+    [SerializeField, Min(1f)] private float firstRowSeconds = 5f;
+    [SerializeField, Min(5f)] private float rowIntervalSeconds = 20f;
+    public Func<float> RunTime;
+    public Func<float> RunSpeed;
+    public float NextRowAt { get; private set; } = 5f;
     public bool Suppressed { get; set; }
-
-    /// <summary>Removes boxes already on the road and pauses spawning (tutorial start).</summary>
-    public void ClearAndSuppress()
-    {
-        Suppressed = true;
-        foreach (PickupItem item in GetComponentsInChildren<PickupItem>(true))
-            Destroy(item.gameObject);
-        active.Clear();
-    }
-
-    /// <summary>No ? boxes for the first 500 m of a run, then one every ~320 m (and only one at a time).</summary>
-    private const float FirstSpawnDistance = 500f;
-    private const float MinimumSpacing = 320f;
-
-    public void BeginRealRun()
-    {
-        Suppressed = false;
-        untilNext = FirstSpawnDistance;
-        previousPosition = car.position;
-        if (driver != null) previousRoadDistance = driver.RoadDistanceTravelled;
-    }
-
+    private readonly List<PickupItem> active = new List<PickupItem>();
+    private bool claimed;
+    private Vector3 rowPosition;
+    private CarPickupEffects effects;
     private void Start()
     {
-        random = new System.Random(19022);
-
-        if (road == null || car == null || pickupPrefab == null)
-        {
-            Debug.LogError("PickupSpawner needs the road, car and pickup prefab.", this);
-            enabled = false;
-            return;
-        }
-        previousPosition = car.position;
-        driver = car.GetComponent<AutoDriveCar>();
-        pickupEffects = car.GetComponent<CarPickupEffects>();
-        previousRoadDistance = driver != null ? driver.RoadDistanceTravelled : 0f;
-        // A run carried over from the other environment keeps normal spacing; a new run waits 500 m.
-        untilNext = RunSession.HasPending ? Mathf.Max(spacing, MinimumSpacing) : FirstSpawnDistance;
+        if (car == null || road == null || pickupPrefab == null) { enabled = false; return; }
+        effects = car.GetComponent<CarPickupEffects>();
     }
-
+    public void RestoreSchedule(float at) { NextRowAt = at; }
+    public void BeginRealRun() { Suppressed = false; NextRowAt = (RunTime?.Invoke() ?? 0f) + firstRowSeconds; }
+    public void ClearAndSuppress() { Suppressed = true; ClearRow(); }
+    private void OnDisable() { ClearRow(); }
+    private void ClearRow()
+    {
+        if (obstacles != null) obstacles.ReleaseSafeGap(this);
+        foreach (var item in active) if (item != null) { item.gameObject.SetActive(false); Destroy(item.gameObject); }
+        active.Clear();
+    }
     private void Update()
     {
-        // Confirm last frame's spawns are clear of blocks placed in the same frame.
-        foreach (PickupItem item in placementChecks)
-            if (item != null) PickupPlacement.EnsureClear(item.transform);
-        placementChecks.Clear();
-
-        if (pickupEffects != null && pickupEffects.isActiveAndEnabled && pickupEffects.RunState.IsGameOver)
-            return;
-        for (int i = active.Count - 1; i >= 0; i--)
+        if (Suppressed || Time.timeScale <= 0f || effects == null || effects.RunState.IsGameOver) return;
+        float now = RunTime?.Invoke() ?? 0f;
+        if (active.Count > 0)
         {
-            PickupItem item = active[i];
-            if (item != null && !item.Collected && !reported.Contains(item)
-                && road.IsBehind(item.transform.position, car.position, 4f))
+            if (road.IsBehind(rowPosition, car.position, 4f))
             {
-                reported.Add(item);
                 GameEvents.RaisePickupMissed(PickupKind.Mystery);
+                ClearRow(); NextRowAt = now + rowIntervalSeconds;
             }
-            if (item != null && road.IsBehind(item.transform.position, car.position, 20f))
-                Destroy(item.gameObject);
-            else if (item != null) continue;
-            reported.Remove(item);
-            active.RemoveAt(i);
+            return;
         }
-        if (Suppressed || Time.timeScale <= 0f) return;
-
-        float travelled = driver != null
-            ? Mathf.Max(0f, driver.RoadDistanceTravelled - previousRoadDistance)
-            : Mathf.Max(0f, Vector3.Dot(car.position - previousPosition, car.forward));
-        untilNext -= travelled;
-        previousPosition = car.position;
-        if (driver != null) previousRoadDistance = driver.RoadDistanceTravelled;
-        if (untilNext > 0f) return;
-        // One power-up at a time: wait while one is active or a ? box is still on the road.
-        if (active.Count > 0 || (pickupEffects != null && pickupEffects.HasActivePowerUp)) return;
-        SpawnAhead(Mathf.Max(spawnDistance, PickupLookAhead.Distance));
-        untilNext = Mathf.Max(spacing, MinimumSpacing);
+        float speed = Mathf.Max(1f, RunSpeed?.Invoke() ?? 25f);
+        float remaining = Mathf.Max(0f, NextRowAt - now);
+        if (remaining > firstRowSeconds) return;
+        float lead = Mathf.Max(PickupLookAhead.Distance, remaining * speed);
+        // Reserve before checking: existing rows pass naturally while new ones wait.
+        if (obstacles == null || !obstacles.TryReserveSafeGap(this)) return;
+        if (!road.TryGetPointAhead(car.position, lead, out RoadPathPoint point)) return;
+        if (!obstacles.IsSafeGap(point.Position, 14f)) return;
+        claimed = false; rowPosition = point.Position;
+        float laneWidth = point.Width / 3f;
+        for (int lane = 0; lane < 3; lane++)
+        {
+            var item = Instantiate(pickupPrefab, point.Position + point.Right * ((lane - 1) * laneWidth) + point.Up * 0.6f,
+                Quaternion.LookRotation(point.Forward, point.Up), transform);
+            item.Configure(PickupEffectType.RandomFuelOrReverse, effectDuration);
+            item.GetComponent<SphereCollider>().enabled = false;
+            var trigger = item.gameObject.AddComponent<BoxCollider>();
+            trigger.isTrigger = true; trigger.size = new Vector3(laneWidth / item.transform.lossyScale.x, 3f / item.transform.lossyScale.y, 2f / item.transform.lossyScale.z);
+            item.ClaimRow = () => { if (claimed) return false; claimed = true; return true; };
+            item.CollectedCallback = () => { ClearRow(); NextRowAt = (RunTime?.Invoke() ?? now) + rowIntervalSeconds; };
+            var renderer = item.GetComponentInChildren<Renderer>();
+            if (renderer != null)
+            {
+                Vector3 scale = renderer.transform.localScale;
+                scale.x *= laneWidth * 0.95f / Mathf.Max(0.01f, renderer.bounds.size.x);
+                renderer.transform.localScale = scale;
+                WorldLabel.Attach(renderer, "?", new Color(1f, 0.85f, 0.2f));
+            }
+            active.Add(item);
+        }
+        GameEvents.RaisePickupSpawned(PickupKind.Mystery);
     }
-
     public PickupItem SpawnTutorialNitro(float distance, float lateral)
     {
         return SpawnTutorialMystery(distance, lateral, PickupEffectType.Boost);
@@ -123,28 +98,5 @@ public sealed class PickupSpawner : MonoBehaviour
         return item;
     }
 
-    private void SpawnAhead(float distance)
-    {
-        if (active.Count >= 8 || !TryGetPointAhead(distance, out RoadPathPoint point)) return;
-        float limit = Mathf.Max(0f, point.Width * 0.5f - 1.5f);
-        // The first pickup is deliberately off the starting line: collecting it is a choice.
-        float desired = spawnCount == 0 ? limit * 0.75f : ((float)random.NextDouble() * 2f - 1f) * limit;
-        float lateral = PickupPlacement.ClearLateral(point, desired);
-        Vector3 position = point.Position + point.Right * lateral + point.Up * 0.6f;
-
-        PickupItem item = Instantiate(pickupPrefab, position, Quaternion.identity, transform);
-        // Weighted outcomes: 30% each for nitro, recovery and shield; 10% reverse steering.
-        item.Configure(PickupEffectType.RandomFuelOrReverse, effectDuration);
-        Renderer box = item.GetComponentInChildren<Renderer>();
-        if (box != null) WorldLabel.Attach(box, "?", new Color(1f, 0.85f, 0.2f));
-        active.Add(item);
-        placementChecks.Add(item);
-        GameEvents.RaisePickupSpawned(PickupKind.Mystery);
-        spawnCount++;
-    }
-
-    private bool TryGetPointAhead(float distance, out RoadPathPoint point)
-    {
-        return road.TryGetPointAhead(car.position, distance, out point);
-    }
+    private bool TryGetPointAhead(float distance, out RoadPathPoint point) => road.TryGetPointAhead(car.position, distance, out point);
 }

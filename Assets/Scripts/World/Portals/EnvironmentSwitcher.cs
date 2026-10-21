@@ -74,19 +74,15 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
         if (portal == null)
         {
             if (RunSession.SecondsUntilPortal(game.ElapsedSeconds) > 0f) return;
+            if (obstacles != null && !obstacles.TryReserveSafeGap(this)) return;
             if (road == null || player == null ||
                 !road.TryGetPointAhead(player.position, PortalLeadMetres, out RoadPathPoint point))
                 return;
+            if (obstacles != null && !obstacles.IsSafeGap(point.Position, 14f)) return;
             portalTarget = PickOtherEnvironment();
             bool toMountains = portalTarget == "Env_Snow";
             portal = PortalGate.Create(point, toMountains ? new Color(0.35f, 0.85f, 1f) : new Color(1f, 0.6f, 0.15f),
                 toMountains ? "MOUNTAINS" : "CITY");
-            if (obstacles != null)
-            {
-                // Nothing new in front of the gate, and its doorway is clear.
-                obstacles.SuppressAutoSpawn = true;
-                obstacles.ClearNear(portal.transform.position, 14f);
-            }
             return;
         }
 
@@ -94,6 +90,11 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
         Destroy(portal.gameObject);
         portal = null;
         StartSwitch(portalTarget);
+    }
+
+    private void OnDisable()
+    {
+        if (obstacles != null) obstacles.ReleaseSafeGap(this);
     }
 
     private string PickOtherEnvironment()
@@ -123,7 +124,11 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
                 RunSession.ScheduleNextPortal(game.ElapsedSeconds);
                 RunSession.SetPending(game.CaptureRun());
             },
-            onCancelled: () => switching = false
+            onCancelled: () =>
+            {
+                switching = false;
+                if (obstacles != null) obstacles.ReleaseSafeGap(this);
+            }
         );
     }
 }

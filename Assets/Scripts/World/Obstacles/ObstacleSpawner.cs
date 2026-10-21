@@ -45,7 +45,43 @@ public class ObstacleSpawner : MonoBehaviour
     private float nextRoadblockAt = TrafficRoadblockRules.FirstRoadblockDistance;
 
     /// <summary>While true (the tutorial), only scripted rows are placed.</summary>
-    public bool SuppressAutoSpawn { get; set; }
+    private bool scriptedSpawnOnly;
+    private Object safeGapOwner;
+    public bool SuppressAutoSpawn
+    {
+        get => scriptedSpawnOnly || safeGapOwner != null;
+        set => scriptedSpawnOnly = value;
+    }
+
+    // One owner at a time: a portal waits for an existing pickup row, and vice versa.
+    public bool TryReserveSafeGap(Object owner)
+    {
+        if (owner == null || scriptedSpawnOnly || (safeGapOwner != null && safeGapOwner != owner)) return false;
+        safeGapOwner = owner;
+        return true;
+    }
+
+    public void ReleaseSafeGap(Object owner)
+    {
+        if (safeGapOwner == owner) safeGapOwner = null;
+    }
+
+    public bool IsSafeGap(Vector3 position, float clearance)
+    {
+        if (road == null || !road.TryGetDistance(position, out float target)) return false;
+        foreach (var obstacle in activeObstacles)
+        {
+            if (obstacle.GameObject == null || !obstacle.GameObject.activeInHierarchy) continue;
+            if (!road.TryGetDistance(obstacle.Transform.position, out float at)) return false;
+            // Bounds magnitude is conservative even for wide blocks on bends.
+            float margin = clearance + obstacle.Renderer.bounds.extents.magnitude;
+            if (Mathf.Abs(at - target) <= margin) return false;
+            // Approaching rows must already be behind the gap: otherwise they
+            // could enter it later while the player is slowed by a collision.
+            if (ExtraClosingSpeed > 0f && at > target) return false;
+        }
+        return true;
+    }
 
     /// <summary>Real-run distance, which excludes the tutorial and carries across scenes.</summary>
     public System.Func<float> RunDistance { get; set; }
@@ -58,6 +94,7 @@ public class ObstacleSpawner : MonoBehaviour
     public void BeginRealRun()
     {
         SuppressAutoSpawn = false;
+        safeGapOwner = null;
         firstFairRow = true;
         previousOpenLane = 1;
         nextRoadblockAt = CurrentRunDistance + TrafficRoadblockRules.FirstRoadblockDistance;

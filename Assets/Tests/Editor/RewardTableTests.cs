@@ -6,7 +6,7 @@ public sealed class RewardTableTests
 {
     [TestCase("City", 0f)]
     [TestCase("Snow", 0.25f)]
-    public void EnvironmentTable_PreservesLegacySequence(string environment, float weatherChance)
+    public void EnvironmentTable_MatchesConfiguredBackpackDistribution(string environment, float weatherChance)
     {
         RewardTable table = AssetDatabase.LoadAssetAtPath<RewardTable>(
             $"Assets/Settings/Rewards/{environment}Rewards.asset");

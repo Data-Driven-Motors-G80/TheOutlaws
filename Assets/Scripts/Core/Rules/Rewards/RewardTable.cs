@@ -21,9 +21,10 @@ public sealed class RewardTable : ScriptableObject
     [SerializeField] private Entry[] rewards =
     {
         new Entry(RandomPickupOutcome.ReverseSteering, 1),
-        new Entry(RandomPickupOutcome.Nitro, 3),
-        new Entry(RandomPickupOutcome.ProximityRecovery, 3),
-        new Entry(RandomPickupOutcome.Shield, 3)
+        new Entry(RandomPickupOutcome.Gun, 3),
+        new Entry(RandomPickupOutcome.Nitro, 2),
+        new Entry(RandomPickupOutcome.ProximityRecovery, 2),
+        new Entry(RandomPickupOutcome.Shield, 2)
     };
 
     // Preserve snow's existing two-stage roll: weather first, then the normal rewards.

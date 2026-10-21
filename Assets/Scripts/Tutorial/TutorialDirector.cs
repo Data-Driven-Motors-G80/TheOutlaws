@@ -115,6 +115,9 @@ public sealed class TutorialDirector : MonoBehaviour
     {
         get
         {
+            if (effects != null && (Step == TutorialStep.Shield || Step == TutorialStep.Recovery || Step == TutorialStep.Nitro)
+                && effects.Backpack.Item != RandomPickupOutcome.None && !stepSucceeded)
+                return "SPACE: USE " + effects.Backpack.Item.ToString().ToUpperInvariant();
             switch (Step)
             {
                 case TutorialStep.Steer: return "LEFT AND RIGHT";
@@ -129,8 +132,8 @@ public sealed class TutorialDirector : MonoBehaviour
                 case TutorialStep.Nitro: return stepSucceeded ? "NITRO: PULL AWAY" : "GRAB THE MYSTERY BOX";
                 case TutorialStep.PursuitCollision: return pursuitCollisionDemonstrated
                     ? "HITS BRING POLICE CLOSER" : "TRY HITTING THIS BLOCK";
-                case TutorialStep.Ammo: return "GRAB AMMO";
-                case TutorialStep.Shoot: return reloading ? "GRAB AMMO" : "SHOOT";
+                case TutorialStep.Ammo: return "MYSTERY BOX: GUN WITH 3 SHOTS";
+                case TutorialStep.Shoot: return reloading ? "COLLECT A GUN BOX" : "SPACE: SHOOT";
                 default: return null;
             }
         }
@@ -155,6 +158,7 @@ public sealed class TutorialDirector : MonoBehaviour
         Active = true;
         tutorialStartedAt = Time.time;
         GameEvents.PickupCollected += OnPickupCollected;
+        effects.ItemActivated += OnItemActivated;
         GameEvents.ObstacleCollision += OnObstacleCollision;
         GameEvents.ShotFired += OnShotFired;
         GameEvents.DryFire += OnDryFire;
@@ -168,6 +172,7 @@ public sealed class TutorialDirector : MonoBehaviour
     private void OnDestroy()
     {
         GameEvents.PickupCollected -= OnPickupCollected;
+        if (effects != null) effects.ItemActivated -= OnItemActivated;
         GameEvents.ObstacleCollision -= OnObstacleCollision;
         GameEvents.ShotFired -= OnShotFired;
         GameEvents.DryFire -= OnDryFire;
@@ -344,7 +349,7 @@ public sealed class TutorialDirector : MonoBehaviour
     {
         if (!lessonCollected)
         {
-            RespawnLessonBox(PickupEffectType.Shield);
+            if (effects.Backpack.Item != RandomPickupOutcome.Shield) RespawnLessonBox(PickupEffectType.Shield);
             return;
         }
         if (shieldDemonstrated)
@@ -364,7 +369,7 @@ public sealed class TutorialDirector : MonoBehaviour
     {
         if (!lessonCollected)
         {
-            RespawnLessonBox(PickupEffectType.ProximityRecovery);
+            if (effects.Backpack.Item != RandomPickupOutcome.ProximityRecovery) RespawnLessonBox(PickupEffectType.ProximityRecovery);
             return;
         }
         // Leave room for the final nitro lesson to visibly open the gap further.
@@ -436,6 +441,7 @@ public sealed class TutorialDirector : MonoBehaviour
             Succeed(2.5f);
             return;
         }
+        if (effects.Backpack.Item == RandomPickupOutcome.Nitro) return;
         if (nitro == null)
         {
             waitRemaining -= dt;
@@ -489,18 +495,8 @@ public sealed class TutorialDirector : MonoBehaviour
     private void SpawnAmmoLine(int targetAmmo = 3)
     {
         ClearAmmoBoxes();
-        int missingAmmo = Mathf.Clamp(targetAmmo - shooting.CurrentAmmo,
-            0, shooting.MaximumAmmo - shooting.CurrentAmmo);
-        float lateral = PlayerLateral();
-        for (int i = 0; i < missingAmmo; i++)
-        {
-            if (!road.TryGetPointAhead(player.position, 35f + i * 9f, out RoadPathPoint point)) continue;
-            float clamped = Mathf.Clamp(lateral, -point.Width * 0.5f + 1.2f, point.Width * 0.5f - 1.2f);
-            GameObject box = OutlawAmmoPickup.Create(
-                point.Position + point.Right * clamped + point.Up * 0.32f, point.Up, shooting);
-            box.transform.SetParent(transform, true);
-            ammoBoxes.Add(box);
-        }
+        var box = powerups.SpawnTutorialMystery(35f, PlayerLateral(), PickupEffectType.Gun);
+        if (box != null) ammoBoxes.Add(box.gameObject);
     }
 
     private void UpdateAmmo(float dt)
@@ -657,9 +653,13 @@ public sealed class TutorialDirector : MonoBehaviour
     {
         if (Active && Step == TutorialStep.Fuel && kind == PickupKind.Fuel) tankCollected = true;
         if (!Active || kind != PickupKind.Mystery) return;
-        if ((Step == TutorialStep.Shield && outcome == RandomPickupOutcome.Shield.ToString())
-            || (Step == TutorialStep.Recovery && outcome == RandomPickupOutcome.ProximityRecovery.ToString()))
-            lessonCollected = true;
+    }
+
+    private void OnItemActivated(RandomPickupOutcome item)
+    {
+        if (!Active) return;
+        if ((Step == TutorialStep.Shield && item == RandomPickupOutcome.Shield)
+            || (Step == TutorialStep.Recovery && item == RandomPickupOutcome.ProximityRecovery)) lessonCollected = true;
     }
 
     private void OnObstacleCollision(TrafficObstacleState colour, bool shielded)

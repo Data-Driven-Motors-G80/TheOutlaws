@@ -73,6 +73,8 @@ public sealed class SnowFogObstacle : MonoBehaviour
             AutoDriveCar driver = FindFirstObjectByType<AutoDriveCar>();
             if (driver != null) car = driver.transform;
         }
+        // Generate once during scene setup, not on the first fog encounter.
+        GetCloudTextures();
         distanceUntilSpawn = firstFogDistance;
         if (car != null)
         {
@@ -84,8 +86,11 @@ public sealed class SnowFogObstacle : MonoBehaviour
     private void OnDisable()
     {
         blocksHidden = false;
-        foreach (FogBlock block in active) block.Root.SetActive(false);
-        spare.AddRange(active);
+        foreach (FogBlock block in active)
+        {
+            if (block.Root != null) { block.Root.SetActive(false); spare.Add(block); }
+            else DestroyBlock(block);
+        }
         active.Clear();
     }
 
@@ -93,16 +98,24 @@ public sealed class SnowFogObstacle : MonoBehaviour
     {
         foreach (FogBlock block in active) DestroyBlock(block);
         foreach (FogBlock block in spare) DestroyBlock(block);
+        active.Clear();
+        spare.Clear();
         if (cloudTextures == null) return;
         foreach (Texture2D texture in cloudTextures)
             if (texture != null) Destroy(texture);
+        cloudTextures = null;
     }
 
     private void DestroyBlock(FogBlock block)
     {
         if (block.Root != null) Destroy(block.Root);
-        foreach (Material material in block.Materials)
-            if (material != null) Destroy(material);
+        block.Root = null;
+        if (block.Materials != null)
+            foreach (Material material in block.Materials)
+                if (material != null) Destroy(material);
+        block.Materials = null;
+        block.Puffs.Clear();
+        block.Rolls.Clear();
     }
 
     private void Update()
@@ -116,7 +129,7 @@ public sealed class SnowFogObstacle : MonoBehaviour
         if (sunny != blocksHidden)
         {
             blocksHidden = sunny;
-            foreach (FogBlock block in active) block.Root.SetActive(!sunny);
+            foreach (FogBlock block in active) if (block.Root != null) block.Root.SetActive(!sunny);
         }
 
         bool suppressed = spawner != null && spawner.SuppressAutoSpawn;
@@ -189,6 +202,12 @@ public sealed class SnowFogObstacle : MonoBehaviour
         for (int i = active.Count - 1; i >= 0; i--)
         {
             FogBlock block = active[i];
+            if (block.Root == null)
+            {
+                DestroyBlock(block);
+                active.RemoveAt(i);
+                continue;
+            }
 
             if (road.IsBehind(block.End, car.position, despawnDistance))
             {
@@ -209,11 +228,12 @@ public sealed class SnowFogObstacle : MonoBehaviour
 
     private FogBlock GetBlock()
     {
-        if (spare.Count > 0)
+        while (spare.Count > 0)
         {
             FogBlock reused = spare[spare.Count - 1];
             spare.RemoveAt(spare.Count - 1);
-            return reused;
+            if (reused.Root != null) return reused;
+            DestroyBlock(reused);
         }
 
         Texture2D[] textures = GetCloudTextures();
@@ -284,6 +304,7 @@ public sealed class SnowFogObstacle : MonoBehaviour
             wrapMode = TextureWrapMode.Clamp,
             filterMode = FilterMode.Bilinear
         };
+        var pixels = new Color[size * size];
         for (int y = 0; y < size; y++)
         {
             for (int x = 0; x < size; x++)
@@ -299,10 +320,11 @@ public sealed class SnowFogObstacle : MonoBehaviour
                     + 0.35f * Mathf.PerlinNoise(seed + u * 8f, seed + v * 8f);
                 float alpha = Mathf.Clamp01(falloff * (0.9f + 0.6f * noise));
                 float shade = Mathf.Lerp(0.82f, 1f, noise);
-                texture.SetPixel(x, y, new Color(shade, shade, shade, alpha));
+                pixels[y * size + x] = new Color(shade, shade, shade, alpha);
             }
         }
-        texture.Apply(false, false);
+        texture.SetPixels(pixels);
+        texture.Apply(false, true);
         return texture;
     }
 }

@@ -16,6 +16,11 @@ public struct RunSnapshot
     public float SpeedIncreaseAmount;
     public float SpeedIncreaseInterval;
     public int Ammo;
+    public RandomPickupOutcome BackpackItem;
+    public float NextMysteryRowAt;
+    public float SunnyRemaining;
+    public float ReverseCountdown;
+    public float PendingReverse;
     public RiskRunSnapshot Risk;
 }
 

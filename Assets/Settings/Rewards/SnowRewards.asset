@@ -15,11 +15,13 @@ MonoBehaviour:
   rewards:
   - outcome: 1
     weight: 1
+  - outcome: 6
+    weight: 3
   - outcome: 4
-    weight: 3
+    weight: 2
   - outcome: 2
-    weight: 3
+    weight: 2
   - outcome: 3
-    weight: 3
+    weight: 2
   sunnyDayChance: 0.25
   sunnyDaySeconds: 15

@@ -8,6 +8,11 @@ public sealed class RoadCurveMesh : MonoBehaviour
 {
     private readonly Dictionary<MeshFilter, Mesh> meshes = new Dictionary<MeshFilter, Mesh>();
 
+    // Reuse scratch buffers when pooled road sections are rebuilt.
+    private readonly List<Vector3> vertices = new List<Vector3>();
+    private readonly List<Vector2> uvs = new List<Vector2>();
+    private readonly List<int> triangles = new List<int>();
+
     public void Rebuild(RoadSegment segment)
     {
         Build(segment, transform.Find("Road"), 0f, 0f, 0f);
@@ -27,9 +32,9 @@ public sealed class RoadCurveMesh : MonoBehaviour
         bool wall = wallWidth > 0f;
         int stride = wall ? 4 : 2;
         int steps = Mathf.CeilToInt(segment.Length);
-        var vertices = new List<Vector3>();
-        var uvs = new List<Vector2>();
-        var triangles = new List<int>();
+        vertices.Clear();
+        uvs.Clear();
+        triangles.Clear();
         for (int i = 0; i <= steps; i++)
         {
             float distance = segment.Length * i / steps;

@@ -11,6 +11,9 @@ public sealed class OutlawHUD : MonoBehaviour
     private const float MissionRowHeight = 50f;
     private const float LowFuelFraction = 0.25f;
 
+    private int shownBackpackNotice;
+    private static string BackpackName(RandomPickupOutcome item) => item == RandomPickupOutcome.ProximityRecovery ? "JAMMER"
+        : item == RandomPickupOutcome.SunnyDay ? "SUNNY DAY" : item.ToString().ToUpperInvariant();
     private static readonly Color AmmoBlue = new Color(0.12f, 0.55f, 1f);
     private static readonly Color PanelColour = new Color(0.03f, 0.04f, 0.06f, 0.96f);
     private static readonly Color Gold = new Color(1f, 0.86f, 0.18f);
@@ -130,10 +133,14 @@ public sealed class OutlawHUD : MonoBehaviour
         {
             shownPickupCount = game.PickupEffects.PickupCount;
             RandomPickupOutcome outcome = game.PickupEffects.LastOutcome;
-            if (outcome == RandomPickupOutcome.Nitro) ShowMessage("NITRO ACTIVATED!", NitroOrange);
-            else if (outcome == RandomPickupOutcome.Shield) ShowMessage("SHIELD ACTIVATED!", ShieldCyan);
-            else if (outcome == RandomPickupOutcome.ProximityRecovery) ShowMessage("POLICE JAMMED!", Good);
-            else if (outcome == RandomPickupOutcome.SunnyDay) ShowMessage("SUNNY DAY! FOG CLEARED", SunnyGold);
+            if (outcome == RandomPickupOutcome.ReverseSteering) ShowMessage("REVERSED CONTROLS INCOMING", LowFuelRed);
+
+        }
+
+        if (game.PickupEffects != null && shownBackpackNotice != game.PickupEffects.BackpackNoticeVersion)
+        {
+            shownBackpackNotice = game.PickupEffects.BackpackNoticeVersion;
+            ShowMessage(game.PickupEffects.BackpackNotice, Good);
         }
 
         if (game.PickupEffects != null && game.PickupEffects.ShieldUseCount != shownShieldUses)
@@ -472,9 +479,8 @@ public sealed class OutlawHUD : MonoBehaviour
     private void DrawAmmoSquares()
     {
         if (game.Shooting == null || game.Fuel == null) return;
-        const float x = 24f, columnWidth = 270f, gap = 10f;
-        int maximum = game.Shooting.MaximumAmmo;
-        float size = (columnWidth - gap * (maximum - 1)) / maximum;
+        const float x = 24f, columnWidth = 270f;
+
         GUIStyle label = new GUIStyle(leftStyle) { fontSize = 17, fontStyle = FontStyle.Bold };
 
         // Fuel.
@@ -483,19 +489,22 @@ public sealed class OutlawHUD : MonoBehaviour
         DrawRect(bar, new Color(0f, 0f, 0f, 0.45f));
         DrawRect(new Rect(bar.x, bar.y, bar.width * game.Fuel.NormalizedFuel, bar.height), FuelLow ? LowFuelRed : FuelOrange);
         DrawBorder(bar, 2f, FuelLow ? PoliceRed : new Color(1f, 1f, 1f, 0.5f));
-        // Ammo.
-        GUI.Label(new Rect(x, 80f, columnWidth, 24f), "AMMO", label);
+        GUI.Label(new Rect(x, 80f, columnWidth, 24f), "BACKPACK (1 SLOT)", label);
         float y = 106f;
-        int ammo = game.Shooting.CurrentAmmo;
-        for (int i = 0; i < maximum; i++)
-        {
-            Rect square = new Rect(x + i * (size + gap), y, size, size);
-            bool filled = i < ammo;
-            DrawRect(square, filled ? AmmoBlue : new Color(0f, 0f, 0f, 0.35f));
-            DrawBorder(square, 2f, filled ? new Color(0.75f, 0.9f, 1f) : new Color(1f, 1f, 1f, 0.35f));
-        }
+        var pack = game.PickupEffects.Backpack;
+        Rect slot = new Rect(x, y, columnWidth, 70f);
+        DrawRect(slot, new Color(0f, 0f, 0f, 0.6f));
+        DrawBorder(slot, 2f, AmmoBlue);
+        string name = BackpackName(pack.Item);
+        string action = pack.Item == RandomPickupOutcome.None ? "Collect a mystery box"
+            : pack.Item == RandomPickupOutcome.Gun ? "SPACE - Shoot (" + pack.Shots + ")" : "SPACE - Use " + name;
+        GUI.Label(new Rect(x + 10f, y + 5f, columnWidth - 20f, 25f), pack.Item == RandomPickupOutcome.None ? "EMPTY" : name, label);
+        GUI.Label(new Rect(x + 10f, y + 33f, columnWidth - 20f, 25f), action, new GUIStyle(label) { fontSize = 15 });
+        GUI.Label(new Rect(x, y + 72f, columnWidth + 60f, 22f), "New positive reward replaces this item", new GUIStyle(label) { fontSize = 12 });
+        if (game.IsTutorial && pack.Item != RandomPickupOutcome.None && pack.Item != RandomPickupOutcome.Gun)
+            GUI.Label(new Rect(x, y + 94f, columnWidth + 70f, 50f), "Press SPACE to activate", label);
         if (game.IsTutorial && game.Tutorial.Highlight == TutorialHighlight.Ammo)
-            DrawHighlight(new Rect(x - 10f, y - 10f, columnWidth + 20f, size + 20f));
+            DrawHighlight(slot);
         if (game.IsTutorial && game.Tutorial.Highlight == TutorialHighlight.Fuel)
             DrawHighlight(new Rect(x - 10f, bar.y - 10f, columnWidth + 20f, bar.height + 20f));
     }

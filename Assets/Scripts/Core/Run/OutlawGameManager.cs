@@ -7,7 +7,7 @@ using UnityEngine.SceneManagement;
 public sealed class OutlawGameManager : MonoBehaviour
 {
     private const float TutorialSpeed = 16f;
-    private const int StartingAmmo = 2;
+    private const int StartingAmmo = 0;
 
     private static int runsThisSession;
 
@@ -97,6 +97,9 @@ public sealed class OutlawGameManager : MonoBehaviour
         pickupEffects.ConfigureRewards(environment.Rewards);
         shooting.Configure(pickupEffects, obstacles);
         ammoSpawner.Configure(road, player.transform, shooting, pickupEffects);
+        ammoSpawner.enabled = false;
+        mysterySpawner.RunTime = () => elapsed;
+        mysterySpawner.RunSpeed = () => driver.ForwardSpeed;
         obstacles.RunDistance = () => DistanceTravelled;
         ammoSpawner.RunDistance = () => DistanceTravelled;
 
@@ -141,7 +144,9 @@ public sealed class OutlawGameManager : MonoBehaviour
         elapsed = carried.Elapsed;
         speedScheduleSeed = carried.SpeedScheduleSeed;
         carriedDistance = carried.Distance;
-        shooting.SetAmmo(carried.Ammo);
+        pickupEffects.Backpack.Restore(carried.BackpackItem, carried.Ammo);
+        mysterySpawner.RestoreSchedule(carried.NextMysteryRowAt);
+        pickupEffects.RestoreTransientEffects(carried.SunnyRemaining, carried.ReverseCountdown, carried.PendingReverse);
         pickupEffects.RestoreRun(carried.Risk, carried.StateFuel);
         previousPursuitGap = pickupEffects.RunState.PursuitGap;
         obstacles.BeginRealRun();
@@ -173,6 +178,11 @@ public sealed class OutlawGameManager : MonoBehaviour
             SpeedIncreaseAmount = driver.SpeedIncreaseAmount,
             SpeedIncreaseInterval = driver.SpeedIncreaseInterval,
             Ammo = shooting.CurrentAmmo,
+            BackpackItem = pickupEffects.Backpack.Item,
+            NextMysteryRowAt = mysterySpawner.NextRowAt,
+            SunnyRemaining = pickupEffects.SunnyDayRemaining,
+            ReverseCountdown = pickupEffects.ReverseCountdownRemaining,
+            PendingReverse = pickupEffects.PendingReverseDuration,
             Risk = pickupEffects.CaptureRun()
         };
     }
@@ -366,7 +376,7 @@ public sealed class OutlawGameManager : MonoBehaviour
         shooting.SetAmmo(StartingAmmo);
         obstacles.BeginRealRun();
         fuelTanks.BeginRealRun();
-        ammoSpawner.BeginRealRun();
+        ammoSpawner.Suppressed = true;
         if (mysterySpawner != null) mysterySpawner.BeginRealRun();
         RunSession.ResetSwitchSchedule();
 

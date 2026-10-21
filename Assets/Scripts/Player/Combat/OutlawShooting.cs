@@ -4,7 +4,7 @@ using UnityEngine.InputSystem;
 [DisallowMultipleComponent]
 public sealed class OutlawShooting : MonoBehaviour
 {
-    private const int MaximumAmmoValue = 5;
+    private const int MaximumAmmoValue = BackpackState.GunShots;
     // No cooldown: every Space press fires (as long as there is ammo).
     private const float FireCooldown = 0f;
 
@@ -13,7 +13,7 @@ public sealed class OutlawShooting : MonoBehaviour
     private ObstacleSpawner obstacles;
     private float nextFireTime;
 
-    public int CurrentAmmo { get; private set; } = 2;
+    public int CurrentAmmo => pickupEffects != null ? pickupEffects.Backpack.Shots : 0;
     public int MaximumAmmo => MaximumAmmoValue;
     public float NormalizedAmmo => (float)CurrentAmmo / MaximumAmmoValue;
 
@@ -22,14 +22,14 @@ public sealed class OutlawShooting : MonoBehaviour
         driver = GetComponent<AutoDriveCar>();
         pickupEffects = effects;
         obstacles = obstacleSpawner;
-        CurrentAmmo = 2;
+        pickupEffects.Backpack.Clear();
         nextFireTime = 0f;
     }
 
     // Read the final visible pose after AutoDriveCar.Update applies drift and road rotation.
     private void LateUpdate()
     {
-        if (Time.timeScale <= 0f || Keyboard.current == null || Time.time < nextFireTime)
+        if (Time.timeScale <= 0f || Keyboard.current == null || Time.time < nextFireTime || pickupEffects == null || !pickupEffects.SimulationActive || pickupEffects.RunState.IsGameOver)
         {
             return;
         }
@@ -42,27 +42,22 @@ public sealed class OutlawShooting : MonoBehaviour
 
     public void SetAmmo(int amount)
     {
-        CurrentAmmo = Mathf.Clamp(amount, 0, MaximumAmmoValue);
+        if (pickupEffects == null) return;
+        if (amount <= 0) pickupEffects.Backpack.Clear();
+        else pickupEffects.Backpack.Restore(RandomPickupOutcome.Gun, amount);
     }
 
     public bool AddAmmo(int amount)
     {
-        if (amount <= 0 || CurrentAmmo >= MaximumAmmoValue)
-        {
-            return false;
-        }
-
-        CurrentAmmo = Mathf.Min(MaximumAmmoValue, CurrentAmmo + amount);
-        return true;
+        if (amount <= 0 || pickupEffects == null) return false;
+        return pickupEffects.Backpack.Receive(RandomPickupOutcome.Gun);
     }
 
     private void TryShoot()
     {
-        if (CurrentAmmo <= 0)
-        {
-            GameEvents.RaiseDryFire();
-            return;
-        }
+        var item = pickupEffects.Backpack.Item;
+        if (!pickupEffects.UseBackpack()) return;
+        if (item != RandomPickupOutcome.Gun) return;
 
         Transform firingFrame = driver != null ? driver.FiringFrame : transform;
         Vector3 direction = firingFrame.forward;
@@ -75,7 +70,6 @@ public sealed class OutlawShooting : MonoBehaviour
             obstacles,
             GetComponentsInChildren<Collider>());
 
-        CurrentAmmo--;
         GameEvents.RaiseShotFired();
         nextFireTime = Time.time + FireCooldown;
     }

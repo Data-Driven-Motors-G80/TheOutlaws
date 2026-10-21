@@ -7,6 +7,44 @@ public sealed class CarPickupEffects : MonoBehaviour
     private readonly RiskRunState runState = new RiskRunState();
     private readonly FuelState fuelState = new FuelState();
     private readonly RandomPickupOutcomeState randomOutcome = new RandomPickupOutcomeState();
+    public BackpackState Backpack { get; } = new BackpackState();
+    public int BackpackChangedFrame { get; private set; } = -1;
+    public event System.Action<RandomPickupOutcome> ItemActivated;
+    public string BackpackNotice { get; private set; }
+    public int BackpackNoticeVersion { get; private set; }
+    private void Awake()
+    {
+        Backpack.Replaced += (old, item, lost) => {
+            BackpackChangedFrame = Time.frameCount;
+            BackpackNotice = item + " STORED" + (old != RandomPickupOutcome.None ? " - replaced " + old : "")
+                + (lost > 0 ? " (" + lost + " shots lost)" : "");
+            BackpackNoticeVersion++;
+            GameEvents.RaiseBackpackReplaced(old, item, lost);
+        };
+    }
+    public bool UseBackpack()
+    {
+        if (!simulationActive || runState.IsGameOver || BackpackChangedFrame == Time.frameCount) return false;
+        var item = Backpack.Item;
+        if (item == RandomPickupOutcome.None) return false;
+        if (item != RandomPickupOutcome.Gun && !ActivateOutcome(item)) return false;
+        Backpack.Use();
+        ItemActivated?.Invoke(item);
+        GameEvents.RaiseBackpackUsed(item);
+        return true;
+    }
+    private bool ActivateOutcome(RandomPickupOutcome item)
+    {
+        switch (item)
+        {
+            case RandomPickupOutcome.Shield: return runState.TryGrantShield();
+            case RandomPickupOutcome.Nitro: return runState.TryActivateNitro();
+            case RandomPickupOutcome.ProximityRecovery: return runState.TryRestorePursuitGap(RiskRunState.PickupProximityRecovery);
+            case RandomPickupOutcome.SunnyDay: sunnyDayRemaining = 15f; return true;
+            case RandomPickupOutcome.ReverseSteering: return TryApplyTemporaryEffect(PickupEffectType.ReverseSteering, reverseControlDuration);
+            default: return false;
+        }
+    }
     private float baseForwardSpeed = 15f;
     private float policeSpeed = 14f;
     private bool simulationActive = true;
@@ -89,74 +127,21 @@ public sealed class CarPickupEffects : MonoBehaviour
     {
         if (!isActiveAndEnabled) return false;
 
-        LastOutcome = RandomPickupOutcome.None;
+        if (runState.IsGameOver) return false;
+        RandomPickupOutcome outcome;
         switch (effect)
         {
-            case PickupEffectType.RandomFuelOrReverse:
-                RandomPickupOutcome outcome = randomOutcome.Next();
-                if (outcome == RandomPickupOutcome.None) return false;
-                if (outcome == RandomPickupOutcome.SunnyDay)
-                {
-                    sunnyDayRemaining = sunnyDaySeconds;
-                    LastOutcome = outcome;
-                    PickupCount++;
-                    return true;
-                }
-                if (outcome == RandomPickupOutcome.ProximityRecovery)
-                {
-                    bool restored = runState.TryRestorePursuitGap(RiskRunState.PickupProximityRecovery);
-                    if (restored)
-                    {
-                        LastOutcome = outcome;
-                        PickupCount++;
-                    }
-                    return restored;
-                }
-
-                if (outcome == RandomPickupOutcome.Shield)
-                {
-                    bool shielded = runState.TryGrantShield();
-                    if (shielded)
-                    {
-                        LastOutcome = outcome;
-                        PickupCount++;
-                    }
-                    return shielded;
-                }
-
-                LastOutcome = outcome;
-                PickupEffectType temporaryEffect = outcome == RandomPickupOutcome.Nitro
-                    ? PickupEffectType.Boost : PickupEffectType.ReverseSteering;
-                bool collected = TryApplyTemporaryEffect(temporaryEffect, duration);
-                if (collected)
-                    PickupCount++;
-                return collected;
-
-
-            case PickupEffectType.ProximityRecovery:
-                bool recovered = runState.TryRestorePursuitGap(RiskRunState.PickupProximityRecovery);
-                if (recovered)
-                {
-                    LastOutcome = RandomPickupOutcome.ProximityRecovery;
-                    PickupCount++;
-                }
-                return recovered;
-
-            case PickupEffectType.Shield:
-                bool shieldedPickup = runState.TryGrantShield();
-                if (shieldedPickup)
-                {
-                    LastOutcome = RandomPickupOutcome.Shield;
-                    PickupCount++;
-                }
-                return shieldedPickup;
-
-            default:
-                bool applied = TryApplyTemporaryEffect(effect, duration);
-                if (applied)
-                    PickupCount++;
-                return applied;
+            case PickupEffectType.RandomFuelOrReverse: outcome = randomOutcome.Next(); break;
+            case PickupEffectType.Gun: outcome = RandomPickupOutcome.Gun; break;
+            case PickupEffectType.Shield: outcome = RandomPickupOutcome.Shield; break;
+            case PickupEffectType.ProximityRecovery: outcome = RandomPickupOutcome.ProximityRecovery; break;
+            case PickupEffectType.Boost: outcome = RandomPickupOutcome.Nitro; break;
+            case PickupEffectType.ReverseSteering: outcome = RandomPickupOutcome.ReverseSteering; break;
+            default: return TryApplyTemporaryEffect(effect, duration);
         }
+        bool accepted = outcome == RandomPickupOutcome.ReverseSteering ? ActivateOutcome(outcome) : Backpack.Receive(outcome);
+        if (accepted) { LastOutcome = outcome; PickupCount++; }
+        return accepted;
     }
 
     public bool TryCrash(float proximityDrain = RiskRunState.DefaultCrashProximityDrain)
@@ -197,6 +182,14 @@ public sealed class CarPickupEffects : MonoBehaviour
     public bool RepelPolice(float distance)
     {
         return isActiveAndEnabled && runState.TryRestorePursuitGap(distance);
+    }
+
+    public float PendingReverseDuration => pendingReverseDuration;
+    public void RestoreTransientEffects(float sunny, float countdown, float pending)
+    {
+        sunnyDayRemaining = Mathf.Max(0f, sunny);
+        reverseCountdownRemaining = Mathf.Max(0f, countdown);
+        pendingReverseDuration = Mathf.Max(0f, pending);
     }
 
     public RiskRunSnapshot CaptureRun() => runState.Capture();
@@ -287,6 +280,7 @@ public sealed class CarPickupEffects : MonoBehaviour
 
     private void OnDisable()
     {
+        Backpack.Clear();
         runState.Reset();
         fuelState.Reset();
         LastOutcome = RandomPickupOutcome.None;

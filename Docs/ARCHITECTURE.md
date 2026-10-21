@@ -1,6 +1,6 @@
 # Gameplay structure
 
-This refactor keeps the current endless-driving mechanics, rewards, tuning, tutorials, portals, missions, and analytics. It does not implement the proposed environment collectibles or collection rounds.
+The endless chase now uses a one-slot mystery-reward backpack. Space fires the equipped three-shot gun or activates the stored positive item. No starting ammo or independent ammo pickups are supplied. Environment collectibles and world switching are not implemented.
 
 ## Where things live
 
@@ -24,7 +24,11 @@ Reward prefabs live in `Assets/Prefabs/Rewards`. Environment reward assets live 
 
 Both saved scenes have an `EnvironmentRoot` on **The Outlaws Game Systems**. Assign the player, road, obstacle spawner, fuel and mystery spawners, police, score, and reward table here. The game manager and portal switcher use these references rather than searching the scene. The game manager preserves the existing rule of using only active police cars.
 
-The reward table configures mystery-box outcomes, not the independent fuel and ammo schedules. City retains 10% reverse steering and 30% each nitro, recovery, and shield. Snow retains its initial 25% Sunny Day roll, followed by the same four-way roll if Sunny Day is not selected. Sunny Day still lasts 15 seconds. This two-stage selection preserves the original random-number sequence as well as the probabilities.
+The reward table configures mystery outcomes. City weights are reverse 1, gun 3, nitro 2, jammer 2, shield 2. Snow first rolls 25% Sunny Day, then uses the same weights. Positive rewards replace the stored item without activating it; unused bullets are discarded. Reverse controls keep their warning and apply without replacing the backpack. Activated effects survive later pickups.
+
+BackpackState owns the item and shots; CarPickupEffects receives and activates rewards. OutlawShooting is the sole Space input reader. A newly collected reward cannot be activated in the same frame. Empty-slot input is ignored. Positive effects are not stacked beyond their existing rules.
+
+PickupSpawner creates forced three-lane rows, targeting the first encounter after five active seconds and subsequent encounters twenty seconds after resolution. Each row grants exactly one reward and is counted as one encounter. Boxes are placed ahead using current speed and safe approaches; portal transitions may defer rows. Active effects no longer suppress rewards. The old ammo spawner component remains serialized for compatibility but is disabled by the game manager.
 
 Create a table with **Assets > Create > The Outlaws > Reward Table**. Change the weighted entries to enable or disable existing rewards. Runtime timers and effect state belong to the player, never to the shared asset. New effect behaviour belongs in the effect receiver; reward timing and placement belong in the spawner.
 
@@ -38,7 +42,7 @@ The small `SnowObstacleSpawner` wrapper intentionally remains to preserve the sc
 
 `OutlawGameManager` controls run flow and difficulty. `RunAnalyticsReporter` builds the existing context, run, session, and tutorial-exit payloads and manages analytics callbacks. Reporting fields and event names are unchanged. `RunSession` still carries the same snapshot between environment scenes.
 
-Fuel, ammo, and mystery boxes keep separate schedules. Fuel and ammo share `PickupTracking` for missed-pickup accounting; all three continue using the existing placement utilities.
+Fuel keeps its existing schedule. Mystery rows carry their schedule through scenes, along with the backpack, remaining shots, and transient effects. Full-road rows bypass lateral pickup relocation; regular fuel placement is unchanged.
 
 ## Unity references and checks
 

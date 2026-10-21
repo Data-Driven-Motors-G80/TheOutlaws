@@ -26,7 +26,7 @@ public sealed class MissionCatalogTests
     public void OnlyTheStarterIsAPlainMilestone()
     {
         // Every mission after the first needs something extra in the same run, not just distance.
-        var plainRun = new MissionRunStats { Distance = 5000f, ReachedSnow = true, Hits = 3, AmmoPickups = 4,
+        var plainRun = new MissionRunStats { Distance = 5000f, ReachedSnow = true, Hits = 3, AmmoPickups = 4, ShotsFired = 1,
             MinFuelFraction = 0.1f, FuelMissed = 1 };
         Assert.That(MissionCatalog.Find(1).IsComplete(plainRun), Is.True);
         for (int id = 2; id <= 10; id++)
@@ -54,7 +54,7 @@ public sealed class MissionCatalogTests
         Assert.That(MissionCatalog.Find(10).IsFailed(stats), Is.True);
         stats = new MissionRunStats { ReachedSnow = true, FuelMissed = 1 };
         Assert.That(MissionCatalog.Find(4).IsFailed(stats), Is.True);
-        stats = new MissionRunStats { Distance = 1500f, AmmoPickups = 1 };
+        stats = new MissionRunStats { Distance = 1500f, ShotsFired = 1 };
         Assert.That(MissionCatalog.Find(7).IsFailed(stats), Is.True);
     }
 }

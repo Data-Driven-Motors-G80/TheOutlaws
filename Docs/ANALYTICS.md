@@ -148,3 +148,10 @@ web-app deployment to a new version using the steps above.
 - `-1` means "not applicable" (e.g. `accuracy_pct` with no shots, `first_hit_m` with no hits).
 - Raw uploads can overlap. Automatic metric reports deduplicate `runs` by `run_id`, preferring the row
   whose `end_reason` is not `quit_tab_closed`; raw rows remain available for inspection.
+
+
+## Backpack prototype (weewoo-1.3-backpack)
+
+Analyze this build separately from earlier standalone-ammo builds. A mystery row is one encounter; sibling boxes removed after collection are not missed pickups. A gun is reported as mystery outcome `Gun`, not a standalone ammo pickup. Legacy `ammo_spawned`, `ammo_collected`, `ammo_missed`, and `ammo_wasted_full` therefore remain zero in new gameplay.
+
+New run fields: `gun_rewards`, `backpack_replacements`, `discarded_bullets`, `backpack_uses`, `backpack_at_end`. `backpack_received` events record item, replaced item, discarded bullets and previous holding time; `backpack_used` events record item and holding time (each gun shot is a use). Collection does not imply activation. Existing shots/hits and destruction counts remain valid. Gun bullet holding times reset on replacement; a full gun now means three shots. The no-ammo-pickup mission is now a no-shooting mission.

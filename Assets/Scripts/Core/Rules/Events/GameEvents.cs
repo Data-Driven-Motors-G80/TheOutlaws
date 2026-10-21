@@ -14,6 +14,10 @@ public enum PickupKind
 /// </summary>
 public static class GameEvents
 {
+    public static event Action<RandomPickupOutcome, RandomPickupOutcome, int> BackpackReplaced;
+    public static event Action<RandomPickupOutcome> BackpackUsed;
+    public static void RaiseBackpackReplaced(RandomPickupOutcome old, RandomPickupOutcome item, int lost) => BackpackReplaced?.Invoke(old, item, lost);
+    public static void RaiseBackpackUsed(RandomPickupOutcome item) => BackpackUsed?.Invoke(item);
     public static event Action ShotFired;
     public static event Action DryFire;
     public static event Action ShotMissed;
@@ -51,6 +55,8 @@ public static class GameEvents
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
     {
+        BackpackReplaced = null;
+        BackpackUsed = null;
         ShotFired = null;
         DryFire = null;
         ShotMissed = null;

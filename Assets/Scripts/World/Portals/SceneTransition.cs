@@ -1,6 +1,7 @@
 // Displays a sliding transition when switching scenes.
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -12,6 +13,10 @@ public sealed class SceneTransition : MonoBehaviour
     private float offsetX;
     private float alpha;
     private bool visible;
+    private bool completed;
+    private bool cleanedUp;
+    private string destination;
+    private Action cancelled;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
@@ -30,6 +35,12 @@ public sealed class SceneTransition : MonoBehaviour
         if (IsRunning)
             return;
 
+        if (string.IsNullOrEmpty(sceneName) || !Application.CanStreamedLevelBeLoaded(sceneName))
+        {
+            Debug.LogError($"SceneTransition: destination '{sceneName}' is not available in Build Settings.");
+            onCancelled?.Invoke();
+            return;
+        }
         IsRunning = true;
 
         GameObject host = new GameObject("SceneTransition");
@@ -37,15 +48,17 @@ public sealed class SceneTransition : MonoBehaviour
 
         SceneTransition runner = host.AddComponent<SceneTransition>();
         runner.color = color;
+        runner.destination = sceneName;
+        runner.cancelled = onCancelled;
 
         runner.StartCoroutine(
-            runner.Routine(
+            runner.Guarded(runner.Routine(
                 sceneName,
                 Mathf.Max(0.1f, slideSeconds),
                 canProceed,
                 capture,
                 onCancelled
-            )
+            ))
         );
     }
 
@@ -89,7 +102,6 @@ public sealed class SceneTransition : MonoBehaviour
             yield return Slide(0f, -width, 1f, 0f, seconds);
 
             Finish();
-            onCancelled?.Invoke();
 
             yield break;
         }
@@ -104,7 +116,37 @@ public sealed class SceneTransition : MonoBehaviour
 
         yield return Slide(0f, -width, 1f, 0f, seconds);
 
+        completed = true;
         Finish();
+    }
+
+    // Drive nested enumerators here so exceptions in either loading or sliding
+    // cannot strand the persistent full-screen overlay.
+    private IEnumerator Guarded(IEnumerator routine)
+    {
+        var stack = new Stack<IEnumerator>();
+        stack.Push(routine);
+        while (stack.Count > 0)
+        {
+            object current = null;
+            bool more = false;
+            Exception failure = null;
+            try
+            {
+                more = stack.Peek().MoveNext();
+                if (more) current = stack.Peek().Current;
+            }
+            catch (Exception exception) { failure = exception; }
+            if (failure != null)
+            {
+                Debug.LogError($"SceneTransition: transition to '{destination}' failed: {failure}");
+                Finish();
+                yield break;
+            }
+            if (!more) { stack.Pop(); continue; }
+            if (current is IEnumerator nested) stack.Push(nested);
+            else yield return current;
+        }
     }
 
     private IEnumerator Slide(
@@ -132,10 +174,25 @@ public sealed class SceneTransition : MonoBehaviour
 
     private void Finish()
     {
+        Cleanup();
+        Destroy(gameObject);
+    }
+
+    private void OnDisable() { Cleanup(); }
+
+    private void Cleanup()
+    {
+        if (cleanedUp) return;
+        cleanedUp = true;
         visible = false;
         IsRunning = false;
-
-        Destroy(gameObject);
+        RunSession.ClearPending();
+        if (!completed)
+        {
+            try { cancelled?.Invoke(); }
+            catch (Exception exception) { Debug.LogError($"SceneTransition: cancellation of '{destination}' failed: {exception}"); }
+        }
+        cancelled = null;
     }
 
     private void OnGUI()

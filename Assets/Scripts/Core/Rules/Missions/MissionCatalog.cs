@@ -21,6 +21,7 @@ public sealed class MissionRunStats
     public int RedDestroyed;
     public int MysteryCollected;
     public int AmmoPickups;
+    public int ShotsFired;
     public bool ReachedSnow;
     /// <summary>Lowest fuel seen this run, 0..1.</summary>
     public float MinFuelFraction = 1f;
@@ -90,10 +91,10 @@ public static class MissionCatalog
             s => s.ObstaclesDestroyed >= 10, s => Count(s.ObstaclesDestroyed, 10)),
         new MissionDefinition(6, "Grab 2 ? boxes in one run", MissionCategory.Mystery,
             s => s.MysteryCollected >= 2, s => Count(s.MysteryCollected, 2)),
-        new MissionDefinition(7, "Reach 1,500 m without grabbing an A", MissionCategory.Frugal,
-            s => s.AmmoPickups == 0 && s.Distance >= 1500f,
-            s => s.AmmoPickups > 0 ? "Grabbed an A" : Metres(s.Distance, 1500f),
-            s => s.AmmoPickups > 0),
+        new MissionDefinition(7, "Reach 1,500 m without shooting", MissionCategory.Frugal,
+            s => s.ShotsFired == 0 && s.Distance >= 1500f,
+            s => s.ShotsFired > 0 ? "Fired a shot" : Metres(s.Distance, 1500f),
+            s => s.ShotsFired > 0),
         new MissionDefinition(8, "Reach 1,200 m, fuel never under 25%", MissionCategory.Fuel,
             s => s.MinFuelFraction >= 0.25f && s.Distance >= 1200f,
             s => s.MinFuelFraction < 0.25f ? "Fuel dipped too low" : Metres(s.Distance, 1200f),

@@ -97,6 +97,6 @@ public static class PickupPlacement
         OutlawAmmoPickup ammo = collider.GetComponentInParent<OutlawAmmoPickup>();
         if (ammo != null) return ammo.transform;
         PickupItem mystery = collider.GetComponentInParent<PickupItem>();
-        return mystery != null ? mystery.transform : null;
+        return mystery != null && mystery.ClaimRow == null ? mystery.transform : null;
     }
 }
