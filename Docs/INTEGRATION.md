@@ -44,4 +44,6 @@ discards ordinary Play-mode edits when Play stops. During gameplay, movement
 scripts still control vehicle positions, bars reflect live resource values,
 and spawners still create road segments, obstacles, and pickups as before.
 
-The central integration scripts are in `Assets/Scripts/TheOutlaws`.
+The central integration scripts are in `Assets/Scripts/Core/Run`.
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for environment setup, reward tables, and the current feature folders.
