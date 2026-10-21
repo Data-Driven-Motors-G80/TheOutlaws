@@ -49,3 +49,7 @@ Fuel keeps its existing schedule. Mystery rows carry their schedule through scen
 Moved scripts and prefabs retain their `.meta` GUIDs. Existing `MoneyHeist.Pickups` and road assembly names are retained. Small `.asmref` files keep the player effects, mystery collectible, and pickup HUD in their original assembly despite their new folders. This avoids changing serialized type identities or test dependencies.
 
 Run **The Outlaws > Validate Environment Setup** to check both scenes for missing scripts, required references, reward settings, and snow movement configuration. Run Edit Mode tests for shared gameplay rules and seeded reward-selection parity. Playtest tutorial handoff, pickup effects, pause/restart, and City–Snow–City portal transitions after changing scene wiring.
+
+## Ocean Coast
+
+`Env_OceanCoast` is the third build scene and portal destination. Its `EnvironmentRoot` enables `ocean` and has an `OceanCoastController` for surf lanes and coast guard wakes. `OceanObstacleSpawner` retains shared fair rows, pooling, collision and shooting rules, with REEF/BUOY labels. The driving environment multiplier feeds pursuit before the effects tick, so integrated travel and police separation agree. It does not change difficulty speed or consume collectible nitro. See [OCEAN_COAST.md](OCEAN_COAST.md) for controls, tuning and prototype limits.

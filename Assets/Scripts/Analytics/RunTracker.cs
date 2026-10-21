@@ -12,6 +12,7 @@ public struct RunTickContext
     public float PursuitGap;
     public float Speed;
     public bool Snow;
+    public bool Ocean;
     /// <summary>Raw keyboard steering (-1..1), before reversed controls.</summary>
     public float RawSteer;
     public bool Reversed;
@@ -62,7 +63,7 @@ public static class RunTracker
     public static readonly Dictionary<string, int> MysteryOutcomes = new Dictionary<string, int>();
     public static int Roadblocks;
     // Continuous
-    public static float CitySeconds, SnowSeconds, SecondsBelowQuarterFuel, SecondsSteering;
+    public static float CitySeconds, SnowSeconds, OceanSeconds, SecondsBelowQuarterFuel, SecondsSteering;
     public static float SecondsReversed, SecondsNitro, SecondsShielded, SecondsAmmoFull, SecondsAmmoEmpty;
     public static float MinGap = float.MaxValue, MaxSpeed, SnowReachedAt = -1f;
     public static int SteerDirectionChanges, PoliceAlerts, EnvironmentSwitches;
@@ -163,7 +164,7 @@ public static class RunTracker
         AmmoWastedFull = 0;
         MysteryOutcomes.Clear();
         Roadblocks = 0;
-        CitySeconds = SnowSeconds = SecondsBelowQuarterFuel = SecondsSteering = 0f;
+        CitySeconds = SnowSeconds = OceanSeconds = SecondsBelowQuarterFuel = SecondsSteering = 0f;
         SecondsReversed = SecondsNitro = SecondsShielded = SecondsAmmoFull = SecondsAmmoEmpty = 0f;
         MinGap = float.MaxValue;
         MaxSpeed = 0f;
@@ -205,6 +206,7 @@ public static class RunTracker
                 SnowReachedAt = c.Distance;
             }
         }
+        else if (c.Ocean) OceanSeconds += dt;
         else CitySeconds += dt;
 
         if (c.FuelFraction < 0.25f) SecondsBelowQuarterFuel += dt;

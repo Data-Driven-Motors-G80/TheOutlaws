@@ -61,6 +61,16 @@ public sealed class AutoDriveCar : MonoBehaviour
     public float BaseForwardSpeed => currentForwardSpeed > 0f
         ? currentForwardSpeed
         : Mathf.Min(forwardSpeed, maximumForwardSpeed);
+    // Environment effects are separate from difficulty and collectible nitro.
+    public float EnvironmentSpeedMultiplier { get; set; } = 1f;
+    public float EnvironmentSteeringGrip { get; set; } = 1f;
+
+    /// <summary>Road-relative impulse; normal steering and edge limits resolve it on the next tick.</summary>
+    public void ApplyLateralImpulse(float metresPerSecond)
+    {
+        if (IsDriveReady && isActiveAndEnabled)
+            lateralSpeed = Mathf.Clamp(lateralSpeed + metresPerSecond, -maximumLateralSpeed, maximumLateralSpeed);
+    }
     public float RoadDistanceTravelled { get; private set; }
     public float RoadPositionDistance { get; private set; }
     public bool IsDriveReady { get; private set; }
@@ -191,7 +201,7 @@ public sealed class AutoDriveCar : MonoBehaviour
             1f
         );
 
-        float forwardDistance = currentForwardSpeed * deltaTime;
+        float forwardDistance = currentForwardSpeed * EnvironmentSpeedMultiplier * deltaTime;
         float accelerationMultiplier = 1f;
         bool captured = false;
 
@@ -220,12 +230,12 @@ public sealed class AutoDriveCar : MonoBehaviour
 
         // Ice retains momentum on release; countersteering has stronger grip
         // so a player can still recover. Forward speed and road-edge limits stay intact.
-        float surfaceGrip = 1f;
+        float surfaceGrip = EnvironmentSteeringGrip;
         if (icyRoad)
         {
             bool releasedSteering = Mathf.Abs(steerInput) < 0.01f;
             bool countersteering = steerInput * lateralSpeed < 0f;
-            surfaceGrip = releasedSteering ? iceReleaseGrip
+            surfaceGrip *= releasedSteering ? iceReleaseGrip
                 : countersteering ? 1f : iceSteeringGrip;
         }
 

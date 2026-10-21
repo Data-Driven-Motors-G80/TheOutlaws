@@ -14,6 +14,15 @@ public sealed class TrafficLightObstacle : MonoBehaviour
     private MaterialPropertyBlock propertyBlock;
 
     private WorldLabel shotLabel;
+    private string environmentLabel;
+    private string ShotText => string.IsNullOrEmpty(environmentLabel)
+        ? ShotsRemaining.ToString() : environmentLabel + " " + ShotsRemaining;
+
+    public void SetEnvironmentLabel(string value)
+    {
+        environmentLabel = value;
+        if (shotLabel != null) shotLabel.SetText(ShotText);
+    }
 
     public TrafficObstacleState CurrentState { get; private set; }
     public TrafficObstacleState InitialState { get; private set; }
@@ -119,7 +128,7 @@ public sealed class TrafficLightObstacle : MonoBehaviour
             obstacleRenderer.SetPropertyBlock(propertyBlock);
         }
 
-        if (shotLabel != null) shotLabel.SetText(ShotsRemaining.ToString());
+        if (shotLabel != null) shotLabel.SetText(ShotText);
     }
 
     private void PlaceShotLabel()
@@ -128,10 +137,10 @@ public sealed class TrafficLightObstacle : MonoBehaviour
         // The shot count is printed on the face the player drives towards.
         if (shotLabel == null)
         {
-            shotLabel = WorldLabel.AttachToFrontFace(renderers[0], transform, ShotsRemaining.ToString(), Color.white);
+            shotLabel = WorldLabel.AttachToFrontFace(renderers[0], transform, ShotText, Color.white);
             shotLabel.SetBackground(WarningBlack);
         }
-        shotLabel.SetText(ShotsRemaining.ToString());
+        shotLabel.SetText(ShotText);
         shotLabel.SetVisible(true);
     }
 

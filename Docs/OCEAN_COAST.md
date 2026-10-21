@@ -1,0 +1,17 @@
+# Ocean Coast prototype
+
+Open `Assets/Scenes/Env_OceanCoast.unity` and press Play, then Enter to start. Turn off the standard driving tutorial with T if you want to try the coastal mechanics immediately. In the Editor or a development build, F9 cycles City → Snow → Ocean Coast → City during a real run. Normal timed portals can also lead to the coast.
+
+The coast uses blue-green water with animated ripples, sun glints and light foam. Water extends beyond the driving channel, with soft turquoise edges replacing painted lane lines and roadside walls. The existing car model gently bobs and rolls, more noticeably while surfing; the camera and collider stay stable. Teal strips mark surf lanes; their thin white centre lines mark the crests. Enter a strip to surf automatically using the usual A/D or arrow controls. Steering responds more gradually while surfing. Surf speed builds over 1.5 seconds, up to +21% on the shoulder or +35% on the crest. Leaving a wave preserves momentum, fading to normal over at most 1.8 seconds. Nitro stacks with surfing without being replaced or awarded by it.
+
+Active coast guard police generate angled wakes ahead every eight seconds. Amber marks the warning, then white marks the active wake. Steer around the marked section or countersteer against its sideways impulse. Wakes do not directly drain proximity or fuel; a shove can put you in the path of an obstacle. A shield blocks a wake, and collision protection prevents another shove during recovery. Existing police models stand in for jet skis.
+
+Wider obstacle blocks are labelled REEF and narrower ones BUOY. They keep the existing numbered shot counts, obstacle collision costs, shields, rewards and guaranteed open routes. This first version uses these as coastal stand-ins; dedicated reef slowdowns and buoy slalom rewards are future additions. Row spacing accounts for the surf speed boost and gives the coast 15% more room between ordinary rows.
+
+Surf lanes and wakes follow road arc length, including bends. They stop updating during pause and the tutorial. Pickup and portal reservations clear surface effects and reset surf speed so those reserved gaps stay safe. Surf state is local to the coast and does not carry into other environments. Existing fuel, ammo, nitro, shield, pursuit, score and run continuity still use the normal scene transition snapshot.
+
+`OceanCoastController` on The Outlaws Game Systems exposes wave spacing/length/width, crest width, wake interval/warning and shove strength. `OceanSurfState` contains the independent momentum rules. `OceanObstacleSpawner` reuses the shared pooled obstacle system. Run **The Outlaws > Validate Environment Setup** for all three saved scenes and Edit Mode `OceanSurfStateTests` for boost, exit, pause and pursuit/nitro checks.
+
+`RoadOcean.mat` controls water colours, ripple scale/speed and foam amount using `Assets/Shaders/OceanWater.shader`. `OceanSurfaceVisuals` on the game systems object drives the shader clock and model motion only during active play, so pausing freezes the sea. Its Inspector settings control sea size, bob height and roll. Animation uses per-renderer property blocks rather than changing the saved material. The water remains physically flat; ripples and buoyancy are presentation effects. Ocean-only scene overrides hide the road paint and walls on every streamed segment without changing the shared City/Snow prefab.
+
+Crashing waves, swimmers, sharks, jet ski models and surfboard art are outside this first playable slice.

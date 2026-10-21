@@ -113,6 +113,7 @@ public sealed class RunAnalyticsReporter : IDisposable
             ["snow_at_m"] = Mathf.RoundToInt(RunTracker.SnowReachedAt),
             ["city_s"] = RunTracker.Round(RunTracker.CitySeconds),
             ["snow_s"] = RunTracker.Round(RunTracker.SnowSeconds),
+            ["ocean_s"] = RunTracker.Round(RunTracker.OceanSeconds),
             ["gun_rewards"] = RunTracker.GunRewards,
             ["backpack_replacements"] = RunTracker.BackpackReplacements,
             ["discarded_bullets"] = RunTracker.DiscardedBullets,

@@ -7,7 +7,7 @@ using UnityEngine.SceneManagement;
 public sealed class EnvironmentSwitcher : MonoBehaviour
 {
     [Header("Environments")]
-    [SerializeField] private string[] environmentScenes = { "Env_City", "Env_Snow" };
+    [SerializeField] private string[] environmentScenes = { "Env_City", "Env_Snow", "Env_OceanCoast" };
 
     [Header("Transition")]
     [SerializeField, Min(0.1f)] private float slideSeconds = 0.6f;
@@ -81,8 +81,10 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
             if (obstacles != null && !obstacles.IsSafeGap(point.Position, 14f)) return;
             portalTarget = PickOtherEnvironment();
             bool toMountains = portalTarget == "Env_Snow";
-            portal = PortalGate.Create(point, toMountains ? new Color(0.35f, 0.85f, 1f) : new Color(1f, 0.6f, 0.15f),
-                toMountains ? "MOUNTAINS" : "CITY");
+            bool toOcean = portalTarget == "Env_OceanCoast";
+            portal = PortalGate.Create(point, toOcean ? new Color(0.08f, 0.8f, 0.7f)
+                : toMountains ? new Color(0.35f, 0.85f, 1f) : new Color(1f, 0.6f, 0.15f),
+                toOcean ? "OCEAN COAST" : toMountains ? "MOUNTAINS" : "CITY");
             return;
         }
 

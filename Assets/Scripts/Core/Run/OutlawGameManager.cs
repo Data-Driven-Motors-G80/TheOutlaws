@@ -99,7 +99,7 @@ public sealed class OutlawGameManager : MonoBehaviour
         ammoSpawner.Configure(road, player.transform, shooting, pickupEffects);
         ammoSpawner.enabled = false;
         mysterySpawner.RunTime = () => elapsed;
-        mysterySpawner.RunSpeed = () => driver.ForwardSpeed;
+        mysterySpawner.RunSpeed = () => driver.ForwardSpeed * driver.EnvironmentSpeedMultiplier;
         obstacles.RunDistance = () => DistanceTravelled;
         ammoSpawner.RunDistance = () => DistanceTravelled;
 
@@ -278,8 +278,9 @@ public sealed class OutlawGameManager : MonoBehaviour
             Distance = DistanceTravelled,
             FuelFraction = fuel.NormalizedFuel,
             PursuitGap = pickupEffects.RunState.PursuitGap,
-            Speed = driver.ForwardSpeed * pickupEffects.ForwardSpeedMultiplier,
+            Speed = driver.ForwardSpeed * driver.EnvironmentSpeedMultiplier * pickupEffects.ForwardSpeedMultiplier,
             Snow = environment.IsSnow,
+            Ocean = environment.IsOcean,
             RawSteer = raw,
             Reversed = pickupEffects.ActiveEffect == PickupEffectType.ReverseSteering,
             Nitro = pickupEffects.RunState.HasNitro,
