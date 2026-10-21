@@ -11,13 +11,13 @@ using UnityEngine.SceneManagement;
 public static class PickupDemoBuilder
 {
     public const string DemoPath = "Assets/Scenes/PickupPlayground.unity";
-    private const string PrefabPath = "Assets/Prefabs/Pickups/MysteryPickup.prefab";
+    private const string PrefabPath = "Assets/Prefabs/Rewards/MysteryPickup.prefab";
 
     [MenuItem("Money Heist/Pickups/Create or Refresh Test Scene")]
     public static void CreateDemo()
     {
         if (!Application.isBatchMode && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
-        Directory.CreateDirectory("Assets/Prefabs/Pickups");
+        Directory.CreateDirectory("Assets/Prefabs/Rewards");
         AssetDatabase.Refresh();
         CreatePickupPrefab();
         AssetDatabase.SaveAssets();

@@ -305,7 +305,6 @@ GameObject:
   - component: {fileID: 146678643}
   - component: {fileID: 146678642}
   - component: {fileID: 146678641}
-  - component: {fileID: 146678644}
   m_Layer: 0
   m_Name: PickupSystem
   m_TagString: Untagged
@@ -361,20 +360,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &146678644
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 146678640}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a7b55873675fc1a4e826b9e3659fb3e2, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: MoneyHeist.Pickups::SunnyDayPickup
-  chance: 0.25
-  clearSeconds: 15
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0
@@ -1048,6 +1033,7 @@ GameObject:
   - component: {fileID: 534353349}
   - component: {fileID: 534353348}
   - component: {fileID: 534353352}
+  - component: {fileID: 2100000001}
   m_Layer: 0
   m_Name: The Outlaws Game Systems
   m_TagString: Untagged
@@ -2627,6 +2613,7 @@ GameObject:
   - component: {fileID: 1802903152}
   - component: {fileID: 1802903151}
   - component: {fileID: 1802903153}
+  - component: {fileID: 2100000002}
   m_Layer: 0
   m_Name: ObstacleSpawner
   m_TagString: Untagged
@@ -2645,7 +2632,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: dd09e8f88ec87174f9df4c506ea47017, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ObstacleSpawner
+  m_EditorClassIdentifier: Assembly-CSharp::SnowObstacleSpawner
   road: {fileID: 371121412}
   car: {fileID: 1633598803}
   obstaclePrefab: {fileID: 4200094951286172899, guid: 0b829b2c5d217e3468a3ad9cd195d43d, type: 3}
@@ -2658,8 +2645,7 @@ MonoBehaviour:
   despawnDistance: 15
   rowSpacingMultiplier: 1.7
   roadblockSpacingMultiplier: 1.7
-  minObstacleSpeed: 20
-  maxObstacleSpeed: 30
+  motion: {fileID: 2100000002}
 --- !u!4 &1802903152
 Transform:
   m_ObjectHideFlags: 0
@@ -3169,6 +3155,43 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 1c048551c4e148c4f9d65c40f8ab9b9e, type: 3}
+--- !u!114 &2100000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 534353347}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8210a667e28544c298eca8b6b3cff743, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::EnvironmentRoot
+  player: {fileID: 1633598804}
+  road: {fileID: 371121412}
+  obstacles: {fileID: 1802903151}
+  fuelSpawner: {fileID: 382386166}
+  mysterySpawner: {fileID: 146678642}
+  policeCars:
+  - {fileID: 920425995}
+  - {fileID: 1536843010}
+  score: {fileID: 428933352}
+  rewards: {fileID: 11400000, guid: 2aa7b19beb5549e08e2a5d9867b4a16b, type: 2}
+  snow: 1
+--- !u!114 &2100000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1802903150}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 326f4524aa4646efa57a22e57d4778cd, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ApproachingObstacleMotion
+  minObstacleSpeed: 20
+  maxObstacleSpeed: 30
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
