@@ -12,7 +12,7 @@ public static class EnvironmentValidation
     public static void Validate()
     {
         if (Application.isPlaying) throw new InvalidOperationException("Validate outside Play mode.");
-        foreach (string name in new[] { "Env_City", "Env_Snow" })
+        foreach (string name in new[] { "Env_City", "Env_Snow", "Env_OceanCoast" })
         {
             string path = $"Assets/Scenes/{name}.unity";
             Scene scene = SceneManager.GetSceneByPath(path);
@@ -29,6 +29,33 @@ public static class EnvironmentValidation
                 Require(environment.GetComponent<OutlawGameManager>() != null, name + ": missing game manager");
                 Require(environment.GetComponent<EnvironmentSwitcher>() != null, name + ": missing portal switcher");
                 Require(environment.IsSnow == (name == "Env_Snow"), name + ": wrong environment flag");
+                Require(environment.IsOcean == (name == "Env_OceanCoast"), name + ": wrong ocean flag");
+                if (environment.IsOcean)
+                {
+                    Require(environment.GetComponent<OceanCoastController>() != null, name + ": missing surf and wake controller");
+                    Require(environment.Obstacles is OceanObstacleSpawner, name + ": missing coastal obstacles");
+                    OceanSurfaceVisuals visuals = environment.GetComponent<OceanSurfaceVisuals>();
+                    Require(visuals != null, name + ": missing ocean surface presentation");
+                    var water = new SerializedObject(visuals).FindProperty("waterMaterial").objectReferenceValue as Material;
+                    Require(water != null && water.shader != null && water.shader.name == "The Outlaws/Ocean Water",
+                        name + ": missing ocean water material or shader");
+                    Require(!ShaderUtil.ShaderHasError(water.shader), name + ": ocean shader has compile errors");
+                    var roadSetup = new SerializedObject(environment.Road);
+                    Require(roadSetup.FindProperty("roadSurfaceMaterial").objectReferenceValue == water,
+                        name + ": road and open ocean must use the same water material");
+                    var template = roadSetup.FindProperty("segmentPrefabs").GetArrayElementAtIndex(0).objectReferenceValue as RoadSegment;
+                    Require(template != null && !template.GetComponent<MeshRenderer>().enabled,
+                        name + ": ocean still has painted road markings");
+                    foreach (string wall in new[] { "Left Roadside Wall", "Right Roadside Wall" })
+                        Require(!template.transform.Find(wall).gameObject.activeSelf, name + ": ocean still has roadside walls");
+                }
+                var switcher = new SerializedObject(environment.GetComponent<EnvironmentSwitcher>());
+                var scenes = switcher.FindProperty("environmentScenes");
+                Require(scenes.arraySize == 3, name + ": expected three portal destinations");
+                for (int i = 0; i < scenes.arraySize; i++)
+                    Require(scenes.GetArrayElementAtIndex(i).stringValue == new[] { "Env_City", "Env_Snow", "Env_OceanCoast" }[i],
+                        name + ": wrong portal cycle");
+                Require(EditorBuildSettings.scenes.Any(s => s.enabled && s.path == path), name + ": missing from build scenes");
                 Require(environment.Rewards.SunnyDayChance == (environment.IsSnow ? 0.25f : 0f), name + ": changed reward odds");
                 Require(environment.Obstacles.RoadReference == environment.Road, name + ": inconsistent road references");
                 Require(environment.Player.GetComponent<CarPickupEffects>() != null, name + ": missing effects");

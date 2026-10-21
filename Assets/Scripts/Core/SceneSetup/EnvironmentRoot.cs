@@ -13,6 +13,7 @@ public sealed class EnvironmentRoot : MonoBehaviour
     [SerializeField] private ScoreMeter score;
     [SerializeField] private RewardTable rewards;
     [SerializeField] private bool snow;
+    [SerializeField] private bool ocean;
 
     public AutoDriveCar Player => player;
     public InfiniteRoad Road => road;
@@ -23,6 +24,7 @@ public sealed class EnvironmentRoot : MonoBehaviour
     public ScoreMeter Score => score;
     public RewardTable Rewards => rewards;
     public bool IsSnow => snow;
+    public bool IsOcean => ocean;
 
     public bool ValidateSetup()
     {

@@ -176,6 +176,7 @@ public class ObstacleSpawner : MonoBehaviour
         if (!useFairRows) return NextRange(minSpacing, maxSpacing) * RowSpacingMultiplier;
         // Allow steering and the length of both vehicles, even as the car speeds up.
         float speed = driver != null ? driver.ForwardSpeed : 15f;
+        if (driver != null) speed *= driver.EnvironmentSpeedMultiplier;
         if (driver != null && driver.TryGetComponent(out CarPickupEffects effects))
             speed *= effects.RunState.ForwardSpeedMultiplier;
         // Still leaves about a second between rows to reach the (adjacent) open lane.

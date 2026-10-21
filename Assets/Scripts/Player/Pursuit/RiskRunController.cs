@@ -80,7 +80,7 @@ public sealed class RiskRunController : MonoBehaviour
             float effectivePoliceSpeed = Time.time < slowedUntil
                 ? Mathf.Max(0f, Mathf.Min(policeSpeed, car.BaseForwardSpeed - 6f))
                 : policeSpeed;
-            effects.ConfigurePursuit(car.BaseForwardSpeed, effectivePoliceSpeed);
+            effects.ConfigurePursuit(car.BaseForwardSpeed * car.EnvironmentSpeedMultiplier, effectivePoliceSpeed);
         }
     }
 }

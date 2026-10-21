@@ -29,6 +29,7 @@ public sealed class OutlawHUD : MonoBehaviour
     private static readonly Color NitroOrange = new Color(1f, 0.55f, 0.1f);
 
     private OutlawGameManager game;
+    private OceanCoastController ocean;
     [SerializeField] private Image ammoBar;
     [SerializeField] private TMP_Text ammoLabel;
     [SerializeField] private TMP_Text extractionLabel;
@@ -59,9 +60,12 @@ public sealed class OutlawHUD : MonoBehaviour
     public void Configure(OutlawGameManager manager)
     {
         game = manager;
+        ocean = manager.GetComponent<OceanCoastController>();
         // Arriving through an environment switch.
         if (RunSession.HasPending)
-            ShowMessage(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "Env_Snow" ? "PORTAL! YOU ENTERED THE MOUNTAINS" : "PORTAL! BACK TO THE CITY", ShieldCyan, 3.5f);
+            ShowMessage(ocean != null ? "OCEAN COAST! RIDE THE WHITE CRESTS"
+                : UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "Env_Snow"
+                ? "PORTAL! YOU ENTERED THE MOUNTAINS" : "PORTAL! BACK TO THE CITY", ShieldCyan, 3.5f);
         // Bind saved UI without rebuilding or repositioning it during Play.
         if (ammoBar == null) ammoBar = FindImage("AmmoBar");
         if (ammoLabel == null)
@@ -386,6 +390,7 @@ public sealed class OutlawHUD : MonoBehaviour
         DrawAmmoSquares();
         DrawRearView(width);
         DrawPowerUps(width);
+        DrawOceanStatus(width);
         DrawMessage(width);
 
         if (game.IsTutorial) DrawTutorial(width, height);
@@ -530,6 +535,23 @@ public sealed class OutlawHUD : MonoBehaviour
     }
 
     /// <summary>All power-up state lives in one small stack of tiles under the rear view.</summary>
+    private void DrawOceanStatus(float width)
+    {
+        if (ocean == null || game.IsTutorial) return;
+        string label = ocean.WakeWarningActive ? "WAKE AHEAD — STEER CLEAR"
+            : ocean.Surf.IsOnCrest ? "RIDING CREST"
+            : ocean.Surf.IsSurfing ? "SURFING — FIND THE CREST"
+            : ocean.Surf.Boost > 0f ? "SURF EXIT BOOST" : "RIDE TEAL WAVES TO BOOST";
+        Color colour = ocean.WakeWarningActive ? Gold : ShieldCyan;
+        Rect rect = new Rect(width - RearViewSize - Margin, Margin + RearViewSize + 52f, RearViewSize, 54f);
+        DrawPanel(rect);
+        GUIStyle text = new GUIStyle(leftStyle) { fontSize = 12, fontStyle = FontStyle.Bold };
+        text.normal.textColor = colour;
+        GUI.Label(new Rect(rect.x + 10f, rect.y, rect.width - 20f, 28f), label, text);
+        GUI.Label(new Rect(rect.x + 10f, rect.y + 25f, rect.width - 20f, 24f),
+            "+" + Mathf.RoundToInt(ocean.Surf.Boost * 100f) + "% SPEED", text);
+    }
+
     private void DrawPowerUps(float width)
     {
         CarPickupEffects effects = game.PickupEffects;
