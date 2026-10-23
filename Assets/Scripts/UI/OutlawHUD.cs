@@ -63,7 +63,8 @@ public sealed class OutlawHUD : MonoBehaviour
         ocean = manager.GetComponent<OceanCoastController>();
         // Arriving through an environment switch.
         if (RunSession.HasPending)
-            ShowMessage(ocean != null ? "OCEAN COAST! RIDE THE WHITE CRESTS"
+            ShowMessage(manager.GetComponent<EnvironmentRoot>().IsDesert ? "DESERT! WATCH FOR CROSSING ROCKS"
+                : ocean != null ? "OCEAN COAST! RIDE THE WHITE CRESTS"
                 : UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "Env_Snow"
                 ? "PORTAL! YOU ENTERED THE MOUNTAINS" : "PORTAL! BACK TO THE CITY", ShieldCyan, 3.5f);
         // Bind saved UI without rebuilding or repositioning it during Play.

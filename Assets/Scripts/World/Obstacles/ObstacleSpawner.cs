@@ -444,7 +444,7 @@ public class ObstacleSpawner : MonoBehaviour
         return obstacle.TrafficLight;
     }
 
-    public bool TryApplyShot(Collider hitCollider)
+    public virtual bool TryApplyShot(Collider hitCollider)
     {
         if (hitCollider == null) return false;
         TrafficLightObstacle trafficLight = hitCollider.GetComponentInParent<TrafficLightObstacle>();
