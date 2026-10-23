@@ -281,6 +281,7 @@ public sealed class OutlawGameManager : MonoBehaviour
             Speed = driver.ForwardSpeed * driver.EnvironmentSpeedMultiplier * pickupEffects.ForwardSpeedMultiplier,
             Snow = environment.IsSnow,
             Ocean = environment.IsOcean,
+            Desert = environment.IsDesert,
             RawSteer = raw,
             Reversed = pickupEffects.ActiveEffect == PickupEffectType.ReverseSteering,
             Nitro = pickupEffects.RunState.HasNitro,

@@ -12,7 +12,7 @@ public static class EnvironmentValidation
     public static void Validate()
     {
         if (Application.isPlaying) throw new InvalidOperationException("Validate outside Play mode.");
-        foreach (string name in new[] { "Env_City", "Env_Snow", "Env_OceanCoast" })
+        foreach (string name in new[] { "Env_City", "Env_Snow", "Env_OceanCoast", "Env_Desert" })
         {
             string path = $"Assets/Scenes/{name}.unity";
             Scene scene = SceneManager.GetSceneByPath(path);
@@ -30,6 +30,17 @@ public static class EnvironmentValidation
                 Require(environment.GetComponent<EnvironmentSwitcher>() != null, name + ": missing portal switcher");
                 Require(environment.IsSnow == (name == "Env_Snow"), name + ": wrong environment flag");
                 Require(environment.IsOcean == (name == "Env_OceanCoast"), name + ": wrong ocean flag");
+                Require(environment.IsDesert == (name == "Env_Desert"), name + ": wrong desert flag");
+                if (environment.IsDesert)
+                {
+                    Require(environment.GetComponent<DesertCrossingController>() != null, name + ": missing crossing controller");
+                    Require(environment.GetComponent<DesertSandstorm>() != null, name + ": missing sandstorm controller");
+                    Require(environment.Obstacles is DesertObstacleSpawner, name + ": missing desert obstacles");
+                    var presentation = environment.GetComponent<DesertPresentation>();
+                    Require(presentation != null, name + ": missing desert presentation");
+                    Require(new SerializedObject(presentation).FindProperty("sandMaterial").objectReferenceValue != null,
+                        name + ": missing sand material");
+                }
                 if (environment.IsOcean)
                 {
                     Require(environment.GetComponent<OceanCoastController>() != null, name + ": missing surf and wake controller");
@@ -51,9 +62,9 @@ public static class EnvironmentValidation
                 }
                 var switcher = new SerializedObject(environment.GetComponent<EnvironmentSwitcher>());
                 var scenes = switcher.FindProperty("environmentScenes");
-                Require(scenes.arraySize == 3, name + ": expected three portal destinations");
+                Require(scenes.arraySize == 4, name + ": expected four portal destinations");
                 for (int i = 0; i < scenes.arraySize; i++)
-                    Require(scenes.GetArrayElementAtIndex(i).stringValue == new[] { "Env_City", "Env_Snow", "Env_OceanCoast" }[i],
+                    Require(scenes.GetArrayElementAtIndex(i).stringValue == new[] { "Env_City", "Env_Snow", "Env_OceanCoast", "Env_Desert" }[i],
                         name + ": wrong portal cycle");
                 Require(EditorBuildSettings.scenes.Any(s => s.enabled && s.path == path), name + ": missing from build scenes");
                 Require(environment.Rewards.SunnyDayChance == (environment.IsSnow ? 0.25f : 0f), name + ": changed reward odds");

@@ -1112,6 +1112,7 @@ MonoBehaviour:
   - Env_City
   - Env_Snow
   - Env_OceanCoast
+  - Env_Desert
   slideSeconds: 0.3
   transitionColor: {r: 0.627451, g: 0.72156864, b: 0.8, a: 0.8509804}
 --- !u!1 &695834107
