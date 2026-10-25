@@ -4,17 +4,23 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class RoadSegment : MonoBehaviour
 {
+    public const float HairpinRampFraction = 0.2f;
+
     [SerializeField] private Transform startPoint;
     [SerializeField] private Transform endPoint;
     [SerializeField] private Transform[] waypoints = Array.Empty<Transform>();
     [SerializeField, Min(0.1f)] private float width = 10f;
+
     private Vector3[] curvePoints;
     private Vector3[] curveDirections;
     private RoadCurveMesh curveMesh;
+    private float curveLength;
 
     public float Width => width;
     public int PathPointCount => curvePoints != null ? curvePoints.Length : waypoints.Length + 2;
     public Pose ExitPose => new Pose(endPoint.position, endPoint.rotation);
+    public bool IsConfigured => startPoint != null && endPoint != null
+        && Array.TrueForAll(waypoints, waypoint => waypoint != null);
 
     public float Length
     {
@@ -27,22 +33,25 @@ public sealed class RoadSegment : MonoBehaviour
             return length;
         }
     }
-    private float curveLength;
 
-    // A smooth change of heading produces a bend; a heading that returns to
-    // zero produces an S-curve. Both meet neighbouring pieces tangentially.
-    public void ConfigureCurve(float length, float angle, bool sCurve)
+    public void ConfigureCurve(float length, float angle, bool sCurve,
+        float startSlope = 0f, float endSlope = 0f, bool hairpin = false)
     {
         curveLength = Mathf.Max(1f, length);
         int steps = Mathf.CeilToInt(curveLength);
         curvePoints = new Vector3[steps + 1];
         curveDirections = new Vector3[steps + 1];
         float step = curveLength / steps;
+        float height = 0f;
         for (int i = 0; i <= steps; i++)
         {
-            curveDirections[i] = Direction((float)i / steps, angle, sCurve);
-            if (i > 0)
-                curvePoints[i] = curvePoints[i - 1] + Direction((i - 0.5f) / steps, angle, sCurve) * step;
+            float t = (float)i / steps;
+            curveDirections[i] = (Direction(t, angle, sCurve, hairpin) + Vector3.up * Slope(t, startSlope, endSlope)).normalized;
+            if (i == 0) continue;
+            float midT = (i - 0.5f) / steps;
+            Vector3 move = Direction(midT, angle, sCurve, hairpin) * step;
+            height += Slope(midT, startSlope, endSlope) * step;
+            curvePoints[i] = new Vector3(curvePoints[i - 1].x + move.x, height, curvePoints[i - 1].z + move.z);
         }
         startPoint.SetPositionAndRotation(transform.position, transform.rotation);
         endPoint.SetPositionAndRotation(transform.TransformPoint(curvePoints[steps]),
@@ -50,12 +59,6 @@ public sealed class RoadSegment : MonoBehaviour
         if (curveMesh == null) curveMesh = gameObject.AddComponent<RoadCurveMesh>();
         curveMesh.Rebuild(this);
         if (TryGetComponent(out RoadMarking markings)) markings.Rebuild();
-    }
-
-    private static Vector3 Direction(float t, float angle, bool sCurve)
-    {
-        float blend = sCurve ? Mathf.Pow(Mathf.Sin(Mathf.PI * t), 2f) : t * t * (3f - 2f * t);
-        return Quaternion.Euler(0f, angle * blend, 0f) * Vector3.forward;
     }
 
     public RoadPathPoint Sample(float distance)
@@ -84,16 +87,15 @@ public sealed class RoadSegment : MonoBehaviour
 
     public float ProjectDistance(Vector3 position, out float sqrDistance)
     {
-        // Generated segments use unit scale. Project locally to avoid hundreds
-        // of TransformPoint calls for every obstacle and pickup each frame.
-        if (curvePoints != null) position = transform.InverseTransformPoint(position);
+        bool isCurve = curvePoints != null;
+        if (isCurve) position = transform.InverseTransformPoint(position);
         float closest = 0f;
         float travelled = 0f;
         sqrDistance = float.MaxValue;
         for (int i = 1; i < PathPointCount; i++)
         {
-            Vector3 from = curvePoints != null ? curvePoints[i - 1] : GetPathPoint(i - 1);
-            Vector3 delta = (curvePoints != null ? curvePoints[i] : GetPathPoint(i)) - from;
+            Vector3 from = isCurve ? curvePoints[i - 1] : GetPathPoint(i - 1);
+            Vector3 delta = (isCurve ? curvePoints[i] : GetPathPoint(i)) - from;
             float length = delta.magnitude;
             if (length <= Mathf.Epsilon) continue;
             float t = Mathf.Clamp01(Vector3.Dot(position - from, delta) / delta.sqrMagnitude);
@@ -101,47 +103,18 @@ public sealed class RoadSegment : MonoBehaviour
             if (candidate < sqrDistance)
             {
                 sqrDistance = candidate;
-                closest = travelled + length * t;
+                closest = isCurve ? (i - 1 + t) * (curveLength / (curvePoints.Length - 1)) : travelled + length * t;
             }
             travelled += length;
         }
         return closest;
     }
 
-    public bool IsConfigured
-    {
-        get
-        {
-            if (startPoint == null || endPoint == null)
-            {
-                return false;
-            }
-
-            foreach (Transform waypoint in waypoints)
-            {
-                if (waypoint == null)
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-    }
-
     public Vector3 GetPathPoint(int index)
     {
         if (curvePoints != null) return transform.TransformPoint(curvePoints[index]);
-        if (index == 0)
-        {
-            return startPoint.position;
-        }
-
-        if (index == waypoints.Length + 1)
-        {
-            return endPoint.position;
-        }
-
+        if (index == 0) return startPoint.position;
+        if (index == waypoints.Length + 1) return endPoint.position;
         return waypoints[index - 1].position;
     }
 
@@ -152,9 +125,39 @@ public sealed class RoadSegment : MonoBehaviour
 
     public void AlignStartTo(Pose entry)
     {
-        Quaternion correction = entry.rotation * Quaternion.Inverse(startPoint.rotation);
-        transform.rotation = correction * transform.rotation;
+        if (curvePoints != null)
+        {
+            Vector3 forward = entry.rotation * Vector3.forward;
+            transform.rotation = Quaternion.Euler(0f, Mathf.Atan2(forward.x, forward.z) * Mathf.Rad2Deg, 0f);
+        }
+        else transform.rotation = entry.rotation * Quaternion.Inverse(startPoint.rotation) * transform.rotation;
         transform.position += entry.position - startPoint.position;
+    }
+
+    private static float Slope(float t, float startSlope, float endSlope)
+    {
+        return Mathf.Lerp(startSlope, endSlope, t * t * (3f - 2f * t));
+    }
+
+    private static Vector3 Direction(float t, float angle, bool sCurve, bool hairpin)
+    {
+        float blend = hairpin ? HairpinBlend(t)
+            : sCurve ? Mathf.Pow(Mathf.Sin(Mathf.PI * t), 2f) : t * t * (3f - 2f * t);
+        return Quaternion.Euler(0f, angle * blend, 0f) * Vector3.forward;
+    }
+
+    private static float HairpinBlend(float t)
+    {
+        const float r = HairpinRampFraction;
+        float h;
+        if (t < r) h = t * t / (2f * r);
+        else if (t <= 1f - r) h = r * 0.5f + (t - r);
+        else
+        {
+            float u = 1f - t;
+            h = (1f - r) - u * u / (2f * r);
+        }
+        return h / (1f - r);
     }
 
     private void Reset()
@@ -163,23 +166,14 @@ public sealed class RoadSegment : MonoBehaviour
         endPoint = FindChild("EndPoint");
 
         Transform road = FindChild("Road");
-
         if (road != null && road.TryGetComponent(out MeshFilter meshFilter) && meshFilter.sharedMesh != null)
-        {
             width = meshFilter.sharedMesh.bounds.size.x * road.lossyScale.x;
-        }
     }
 
     private Transform FindChild(string childName)
     {
         foreach (Transform child in GetComponentsInChildren<Transform>(true))
-        {
-            if (string.Equals(child.name, childName, StringComparison.OrdinalIgnoreCase))
-            {
-                return child;
-            }
-        }
-
+            if (string.Equals(child.name, childName, StringComparison.OrdinalIgnoreCase)) return child;
         return null;
     }
 }
