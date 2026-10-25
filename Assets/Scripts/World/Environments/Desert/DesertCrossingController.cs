@@ -29,6 +29,8 @@ public sealed class DesertCrossingController : MonoBehaviour
     private float timer, reservationWait, regionStart, nextRockAt, spacing;
     private int scheduled, targetRockCount;
     private int direction = 1;
+    private int ordinaryGroupsCompleted;
+    private bool mirroredPattern;
     private bool reserved, regionActive, nextIsStorm, isStormRegion;
     public bool CrossingActive => regionActive;
     public bool StormRegionActive => regionActive && isStormRegion;
@@ -40,7 +42,7 @@ public sealed class DesertCrossingController : MonoBehaviour
     {
         public DesertRollingRock Rock;
         public GameObject Warning;
-        public float At, Span, WarningLeft;
+        public float At, Span, WarningLeft, TravelToLaneSeconds;
         public int Direction;
         public bool Armed, Moving;
     }
@@ -57,7 +59,7 @@ public sealed class DesertCrossingController : MonoBehaviour
     private void Update()
     {
         if (game.State == OutlawGameState.Lost || game.State == OutlawGameState.Won || game.IsTutorial)
-        { ClearCrossing(); nextIsStorm = false; timer = firstCrossingSeconds; return; }
+        { ClearCrossing(); nextIsStorm = false; ordinaryGroupsCompleted = 0; timer = firstCrossingSeconds; return; }
         if (game.State != OutlawGameState.Running || Time.timeScale <= 0f || !environment.Player.IsDriveReady) return;
         float dt = Time.deltaTime;
         var car = environment.Player;
@@ -76,14 +78,18 @@ public sealed class DesertCrossingController : MonoBehaviour
             }
             reservationWait += dt;
             if (reservationWait > 10f) { ClearCrossing(); timer = 3f; return; }
-            float lead = Mathf.Clamp(EffectiveSpeed() * (warningSeconds + crossingSeconds * 0.5f + 1f), 75f, 160f);
+            // The far-side lane takes longer to reach than the centre. Include its
+            // travel time and keep the warning intact, also at boosted driving speeds.
+            float lead = Mathf.Max(75f, EffectiveSpeed() * (warningSeconds + crossingSeconds * (5f / 6f) + 0.5f));
             regionStart = distance + lead;
             if (!road.TrySample(regionStart, out RoadPathPoint point) || !obstacles.IsSafeGap(point.Position, 24f)) return;
             regionActive = true;
             isStormRegion = nextIsStorm;
             int minimum = isStormRegion ? Mathf.Clamp(minimumRegionRocks, 10, 12) : Mathf.Clamp(minimumOrdinaryRocks, 1, 3);
             int maximum = isStormRegion ? Mathf.Clamp(maximumRegionRocks, minimum, 12) : Mathf.Clamp(maximumOrdinaryRocks, minimum, 3);
-            targetRockCount = encounterRandom.Next(minimum, maximum + 1);
+            targetRockCount = isStormRegion ? encounterRandom.Next(minimum, maximum + 1)
+                : DesertCrossingPattern.OrdinaryCount(minimum, maximum, ordinaryGroupsCompleted > 0, encounterRandom.NextDouble());
+            mirroredPattern = encounterRandom.Next(2) == 0;
             scheduled = RocksSpawnedInRegion = 0;
             nextRockAt = regionStart;
             spacing = Mathf.Max(minimumRockSpacing, EffectiveSpeed() * secondsBetweenCrossings);
@@ -96,9 +102,16 @@ public sealed class DesertCrossingController : MonoBehaviour
             { scheduled++; nextRockAt += spacing; continue; }
             if (!road.TrySample(nextRockAt, out RoadPathPoint point) || !obstacles.IsSafeGap(point.Position, 24f)) break;
             float span = point.Width * 0.5f + rockRadius + 0.5f;
+            int lane = DesertCrossingPattern.LaneAt(scheduled, mirroredPattern);
+            float travelToLane = DesertCrossingPattern.TravelSeconds(point.Width, span, crossingSeconds, direction, lane);
+            // A streamed section may arrive late at high speed. Skip it instead of
+            // compressing the warning or spawning a rock halfway across the road.
+            if (nextRockAt - distance < EffectiveSpeed() * (warningSeconds + travelToLane + 0.1f))
+            { scheduled++; nextRockAt += spacing; continue; }
             crossings.Add(new Crossing
             {
                 At = nextRockAt, Span = span, Direction = direction,
+                TravelToLaneSeconds = travelToLane,
                 Rock = DesertRollingRock.Create(obstacles.transform, point, -direction * span, rockRadius),
                 Warning = CreateWarning(point, direction)
             });
@@ -113,11 +126,16 @@ public sealed class DesertCrossingController : MonoBehaviour
             var item = crossings[i];
             if (item.Rock == null) { if (item.Warning != null) Destroy(item.Warning); crossings.RemoveAt(i); continue; }
             // After the countdown starts, a rock's motion is independent of subsequent speed changes.
-            if (!item.Armed && (item.At - distance) / EffectiveSpeed() <= warningSeconds + crossingSeconds * 0.5f)
+            if (!item.Armed && (item.At - distance) / EffectiveSpeed() <= warningSeconds + item.TravelToLaneSeconds)
             { item.Armed = true; item.WarningLeft = warningSeconds; }
+            float movementSeconds = dt;
             if (item.Armed && !item.Moving)
-            { item.WarningLeft -= dt; if (item.WarningLeft <= 0f) item.Moving = true; }
-            if (item.Moving) item.Rock.Advance(item.Direction * (2f * item.Span / crossingSeconds) * dt);
+            {
+                item.WarningLeft -= dt;
+                if (item.WarningLeft <= 0f)
+                { item.Moving = true; movementSeconds = -item.WarningLeft; }
+            }
+            if (item.Moving) item.Rock.Advance(item.Direction * (2f * item.Span / crossingSeconds) * movementSeconds);
             if (distance <= item.At + 8f && Mathf.Abs(item.Rock.Lateral) <= item.Span + 0.1f && !item.Rock.Resolved) continue;
             item.Rock.ReportPassed();
             Destroy(item.Rock.gameObject); Destroy(item.Warning);
@@ -130,6 +148,7 @@ public sealed class DesertCrossingController : MonoBehaviour
             // A short, clear-weather group also appears between the long storm regions.
             // Ordinary rows resume during these gaps; pickups/portals retain the shared reservation.
             nextIsStorm = !isStormRegion;
+            if (!isStormRegion) ordinaryGroupsCompleted++;
             ClearCrossing();
             timer = nextIsStorm ? crossingInterval : ordinaryCrossingInterval;
         }

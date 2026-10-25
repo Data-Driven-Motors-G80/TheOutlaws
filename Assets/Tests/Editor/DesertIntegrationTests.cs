@@ -15,6 +15,7 @@ public sealed class DesertIntegrationTests
     private static object Call(object target, string name, params object[] args) => target.GetType().GetMethod(name, Flags).Invoke(target, args);
     private static object Get(object target, string name) => target.GetType().GetProperty(name, Flags).GetValue(target);
     private static void Set(object target, string name, object value) => target.GetType().GetField(name, Flags).SetValue(target, value);
+    private static object Field(object target, string name) => target.GetType().GetField(name, Flags).GetValue(target);
 
     private static void DisableUploads()
     {
@@ -280,16 +281,220 @@ public sealed class DesertIntegrationTests
         yield return new ExitPlayMode();
     }
 
-    private static void CaptureStormPreview()
+    [UnityTest]
+    public IEnumerator CrossingPhasesReachAllThreeLanesAtNormalSpeed() => CheckCrossingPhases(25f);
+
+    [UnityTest]
+    public IEnumerator CrossingPhasesReachAllThreeLanesAtMaximumSpeed() => CheckCrossingPhases(55f);
+
+    private IEnumerator CheckCrossingPhases(float speed)
     {
-        var camera = Camera.main;
+        EditorSceneManager.OpenScene("Assets/Scenes/Env_Desert.unity");
+        yield return new EnterPlayMode(); DisableUploads(); yield return null;
+        var game = Find("OutlawGameManager");
+        Call(game, "SetTutorialSelected", false); Call(game, "BeginGame");
+        ((Behaviour)game).enabled = false; // Keep the chosen speed steady while exercising actual driving.
+        var driver = Find("AutoDriveCar");
+        Call(driver, "SetDifficultySpeed", speed);
+        // Observe rocks at the crossing plane without resolving them at the front bumper.
+        foreach (var collider in driver.GetComponentsInChildren<Collider>()) collider.enabled = false;
+        ((Behaviour)Find("PickupSpawner")).enabled = false;
+        var spawner = Find("DesertObstacleSpawner"); ((Behaviour)spawner).enabled = false;
+        var controller = Find("DesertCrossingController");
+        Set(controller, "minimumOrdinaryRocks", 3);
+        Set(controller, "maximumOrdinaryRocks", 3);
+        Set(controller, "timer", 0f);
+        var observations = new System.Collections.Generic.Dictionary<Component, CrossingObservation>();
+        var lanes = new System.Collections.Generic.HashSet<int>();
+        float until = Time.time + 25f;
+        bool started = false;
+        while (Time.time < until)
+        {
+            yield return null;
+            if ((bool)Get(controller, "CrossingActive")) started = true;
+            if (started && !(bool)Get(controller, "CrossingActive")) break;
+            float distance = (float)Get(driver, "RoadPositionDistance");
+            foreach (object item in (IEnumerable)Field(controller, "crossings"))
+            {
+                var rock = (Component)Field(item, "Rock");
+                float at = (float)Field(item, "At");
+                float lateral = (float)Get(rock, "Lateral");
+                if (!observations.TryGetValue(rock, out CrossingObservation sample))
+                {
+                    sample = new CrossingObservation { Distance = distance, Lateral = lateral, At = at };
+                    observations.Add(rock, sample);
+                    Assert.That((at - distance) / speed, Is.GreaterThan(2.4f), "A rock must not appear inside the reaction window.");
+                }
+                if ((bool)Field(item, "Armed") && sample.ArmedAt < 0f) sample.ArmedAt = Time.time;
+                if ((bool)Field(item, "Moving") && !sample.StartedMoving)
+                {
+                    sample.StartedMoving = true;
+                    Assert.That(Time.time - sample.ArmedAt, Is.GreaterThanOrEqualTo(1.5f - 2f * Time.deltaTime), "Keep the full warning.");
+                }
+                if (!sample.Passed && distance >= at && sample.Distance < at)
+                {
+                    sample.Passed = true;
+                    float crossingLateral = Mathf.Lerp(sample.Lateral, lateral, (at - sample.Distance) / (distance - sample.Distance));
+                    object point = SampleRoad(Find("InfiniteRoad"), at);
+                    float laneWidth = (float)Get(point, "Width") / 3f;
+                    int lane = Mathf.RoundToInt(crossingLateral / laneWidth);
+                    Assert.That(lane, Is.InRange(-1, 1));
+                    Assert.That(Mathf.Abs(crossingLateral - lane * laneWidth), Is.LessThan(0.5f), "Rocks should meet the lane centres, not all the road centre.");
+                    lanes.Add(lane);
+                }
+                sample.Distance = distance; sample.Lateral = lateral;
+            }
+        }
+        Assert.That(started, Is.True, "Crossings must still start at the chosen speed.");
+        Assert.That((bool)Get(controller, "CrossingActive"), Is.False);
+        Assert.That(observations.Count, Is.EqualTo(3));
+        Assert.That(lanes.SetEquals(new[] { -1, 0, 1 }), Is.True, "Camping in either edge lane must no longer avoid every rock.");
+        var ordered = observations.Values.OrderBy(s => s.At).ToArray();
+        for (int i = 1; i < ordered.Length; i++)
+            Assert.That((ordered[i].At - ordered[i - 1].At) / (speed * 1.2f), Is.GreaterThanOrEqualTo(1.24f), "Keep the existing steering interval even with nitro.");
+        Assert.That(Call(spawner, "TryReserveSafeGap", game), Is.True, "Release the gap for pickups and portals.");
+        Call(spawner, "ReleaseSafeGap", game);
+        yield return new ExitPlayMode();
+    }
+
+    private sealed class CrossingObservation
+    {
+        public float Distance, Lateral, At;
+        public float ArmedAt = -1f;
+        public bool StartedMoving, Passed;
+    }
+
+    [Test]
+    public void LaterOrdinaryGroupsFavourTwoOrThreeWhileHonouringInspectorLimits()
+    {
+        var type = AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("DesertCrossingPattern")).First(t => t != null);
+        var choose = type.GetMethod("OrdinaryCount");
+        var counts = new int[4];
+        for (int i = 0; i < 1000; i++)
+            counts[(int)choose.Invoke(null, new object[] { 1, 3, true, (i + 0.5d) / 1000d })]++;
+        Assert.That(counts, Is.EqualTo(new[] { 0, 200, 400, 400 }));
+        for (int count = 1; count <= 3; count++)
+            foreach (double roll in new[] { 0d, 0.5d, 0.999d })
+                Assert.That(choose.Invoke(null, new object[] { count, count, true, roll }), Is.EqualTo(count));
+    }
+
+    [UnityTest]
+    public IEnumerator SandClearsAllLanesAndPoliceAcrossHillsHairpinsAndStreaming()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/Env_Desert.unity");
+        yield return new EnterPlayMode(); DisableUploads(); yield return null;
+        var game = Find("OutlawGameManager");
+        Call(game, "SetTutorialSelected", false); Call(game, "BeginGame");
+        var driver = Find("AutoDriveCar");
+        var road = Find("InfiniteRoad");
+        ((Behaviour)driver).enabled = false;
+        ((Behaviour)Find("PickupSpawner")).enabled = false;
+        ((Behaviour)Find("DesertObstacleSpawner")).enabled = false;
+        ((Behaviour)Find("DesertCrossingController")).enabled = false;
+        Time.timeScale = 0f; // Sample the real streamed route without input, fuel or pursuit simulation.
+        bool climbed = false, descended = false, turnedBack = false, legacyPlaneWouldClip = false;
+        for (float distance = 30f; distance <= 3030f; distance += 15f)
+        {
+            object point = SampleRoad(road, distance);
+            Vector3 position = (Vector3)Get(point, "Position");
+            Vector3 forward = (Vector3)Get(point, "Forward");
+            Vector3 up = (Vector3)Get(point, "Up");
+            driver.transform.SetPositionAndRotation(position + up * 0.5f, Quaternion.LookRotation(forward, up));
+            climbed |= forward.y > 0.025f;
+            descended |= forward.y < -0.025f;
+            turnedBack |= forward.z < 0f;
+            yield return null; yield return null;
+
+            var backdrop = GameObject.Find("Prototype sand surround");
+            Assert.That(backdrop, Is.Not.Null);
+            foreach (var segment in road.GetComponentsInChildren<MonoBehaviour>().Where(c => c.GetType().Name == "RoadSegment"))
+            {
+                int count = (int)Get(segment, "PathPointCount");
+                for (int i = 0; i < count; i++)
+                {
+                    float pathY = ((Vector3)Call(segment, "GetPathPoint", i)).y;
+                    Assert.That(backdrop.transform.position.y, Is.LessThanOrEqualTo(pathY - 1.9f),
+                        "Sand backdrop must clear the whole loaded road, including behind the player.");
+                    legacyPlaneWouldClip |= pathY < position.y - 0.12f;
+                }
+                var bank = segment.transform.Find("Desert roadside sand");
+                Assert.That(bank, Is.Not.Null, "Every pooled road instance needs its own banks.");
+                Assert.That(bank.GetComponent<Collider>(), Is.Null, "Sand must not change driving collisions.");
+            }
+            var sandMeshes = UnityEngine.Object.FindObjectsByType<MeshFilter>(FindObjectsSortMode.None)
+                .Where(f => f.name == "Desert roadside sand" || f.name == "Prototype sand surround" || f.name.StartsWith("Prototype dune "))
+                .Where(f => f.GetComponent<Renderer>().enabled).ToArray();
+            foreach (float offset in new[] { -10f, 0f, 30f })
+            {
+                object probe = SampleRoad(road, distance + offset);
+                Vector3 roadPoint = (Vector3)Get(probe, "Position");
+                Vector3 right = (Vector3)Get(probe, "Right");
+                float halfWidth = (float)Get(probe, "Width") * 0.5f;
+                foreach (float lateral in new[] { -halfWidth + 0.5f, 0f, halfWidth - 0.5f })
+                    foreach (MeshFilter filter in sandMeshes)
+                        Assert.That(HighestSurfaceAt(filter, roadPoint + right * lateral), Is.LessThan(roadPoint.y - 0.02f),
+                            filter.name + " covers a lane at " + (distance + offset) + "m.");
+            }
+            foreach (var police in UnityEngine.Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None).Where(c => c.GetType().Name == "ChaseCar"))
+                foreach (var renderer in police.GetComponentsInChildren<Renderer>())
+                    Assert.That(renderer.bounds.min.y, Is.GreaterThan(backdrop.transform.position.y), "The backdrop must not bury the pursuing car.");
+            if ((distance == 705f || distance == 780f) && System.Environment.GetEnvironmentVariable("OUTLAWS_DESERT_PREVIEW") == "1")
+            {
+                Camera.main.transform.SetPositionAndRotation(position - forward * 8f + up * 4f,
+                    Quaternion.LookRotation(forward * 20f - up * 1.5f, up));
+                CapturePreview("outlaws-desert-slope-" + distance + ".png");
+                CapturePreview("outlaws-desert-slope-rear-" + distance + ".png", GameObject.Find("Rear View Camera").GetComponent<Camera>());
+            }
+        }
+        Assert.That(climbed && descended && turnedBack, Is.True, "The regression route must include both slopes and a hairpin.");
+        Assert.That(legacyPlaneWouldClip, Is.True, "This route must reproduce the old player-height plane intersection.");
+        Assert.That((float)Get(road, "FirstDistance"), Is.GreaterThan(0f), "Exercise pooled road reuse, not just initial geometry.");
+        yield return new ExitPlayMode();
+    }
+
+    private static object SampleRoad(Component road, float distance)
+    {
+        object[] arguments = { distance, null };
+        Assert.That(road.GetType().GetMethod("TrySample").Invoke(road, arguments), Is.True, "Missing streamed road at " + distance);
+        return arguments[1];
+    }
+
+    // Test the rendered triangles in XZ without introducing physics colliders for decoration.
+    private static float HighestSurfaceAt(MeshFilter filter, Vector3 point)
+    {
+        Bounds bounds = filter.GetComponent<Renderer>().bounds;
+        if (point.x < bounds.min.x || point.x > bounds.max.x || point.z < bounds.min.z || point.z > bounds.max.z)
+            return float.NegativeInfinity;
+        Vector3[] vertices = filter.sharedMesh.vertices;
+        int[] indices = filter.sharedMesh.triangles;
+        for (int i = 0; i < vertices.Length; i++) vertices[i] = filter.transform.TransformPoint(vertices[i]);
+        float highest = float.NegativeInfinity;
+        for (int i = 0; i < indices.Length; i += 3)
+        {
+            Vector3 a = vertices[indices[i]], b = vertices[indices[i + 1]], c = vertices[indices[i + 2]];
+            float determinant = (b.z - c.z) * (a.x - c.x) + (c.x - b.x) * (a.z - c.z);
+            if (Mathf.Abs(determinant) < 0.00001f) continue;
+            float u = ((b.z - c.z) * (point.x - c.x) + (c.x - b.x) * (point.z - c.z)) / determinant;
+            float v = ((c.z - a.z) * (point.x - c.x) + (a.x - c.x) * (point.z - c.z)) / determinant;
+            float w = 1f - u - v;
+            if (u >= -0.00001f && v >= -0.00001f && w >= -0.00001f)
+                highest = Mathf.Max(highest, u * a.y + v * b.y + w * c.y);
+        }
+        return highest;
+    }
+
+    private static void CaptureStormPreview() => CapturePreview("outlaws-desert-storm.png");
+
+    private static void CapturePreview(string filename, Camera camera = null)
+    {
+        if (camera == null) camera = Camera.main;
         var target = new RenderTexture(1280, 720, 24);
         var previous = camera.targetTexture;
         var active = RenderTexture.active;
         camera.targetTexture = target; camera.Render(); RenderTexture.active = target;
         var image = new Texture2D(1280, 720, TextureFormat.RGB24, false);
         image.ReadPixels(new Rect(0, 0, 1280, 720), 0, 0); image.Apply();
-        System.IO.File.WriteAllBytes(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "outlaws-desert-storm.png"), image.EncodeToPNG());
+        System.IO.File.WriteAllBytes(System.IO.Path.Combine(System.IO.Path.GetTempPath(), filename), image.EncodeToPNG());
         camera.targetTexture = previous; RenderTexture.active = active;
         target.Release(); UnityEngine.Object.Destroy(target); UnityEngine.Object.Destroy(image);
     }

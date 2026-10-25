@@ -3,7 +3,7 @@ using UnityEngine;
 /// <summary>Shared fair rows, with separately scheduled crossing rocks.</summary>
 public sealed class DesertObstacleSpawner : ObstacleSpawner
 {
-    protected override float RowSpacingMultiplier => 1.15f;
+    protected override float RowSpacingMultiplier => 1f;
 
     public override bool TryApplyShot(Collider hitCollider)
     {
