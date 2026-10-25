@@ -670,11 +670,11 @@ MonoBehaviour:
   behindBuffer: 40
   aheadBuffer: 180
   straightIntroDistance: 160
-  curveFrequency: 0.4
-  curveLength: {x: 110, y: 150}
+  curveFrequency: 1
+  curveLength: {x: 60, y: 90}
   bendAngle: {x: 10, y: 20}
   maximumHeading: 30
-  hairpinFrequency: 0.1
+  hairpinFrequency: 0.05
   hairpinRadius: {x: 20, y: 28}
   hairpinAngle: {x: 140, y: 180}
   hillFrequency: 0.9
