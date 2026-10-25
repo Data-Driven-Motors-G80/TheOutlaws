@@ -47,6 +47,55 @@ public class ObstacleSpawner : MonoBehaviour
     /// <summary>While true (the tutorial), only scripted rows are placed.</summary>
     private bool scriptedSpawnOnly;
     private Object safeGapOwner;
+    private Object pickupGapOwner;
+    private float pickupDistance;
+    private bool spawnDeferred;
+
+    public float PickupApproachSpeed
+    {
+        get
+        {
+            float speed = driver != null ? driver.ForwardSpeed * driver.EnvironmentSpeedMultiplier : 20f;
+            if (driver != null && driver.TryGetComponent(out CarPickupEffects effects))
+                speed *= effects.RunState.ForwardSpeedMultiplier;
+            return Mathf.Max(1f, speed);
+        }
+    }
+
+    // Only the time and space around collection are reserved, not the whole road.
+    private bool ConflictsWithPickup(float at, float closingSpeed, float halfLength, float target)
+    {
+        // The driver already tracks route distance. Avoid projecting its position
+        // through every road segment again for each obstacle and gap candidate.
+        float carDistance = driver != null ? driver.RoadPositionDistance : 0f;
+        if (driver == null && !road.TryGetDistance(car.position, out carDistance)) return true;
+        float arrival = Mathf.Max(0f, target - carDistance) / PickupApproachSpeed;
+        float margin = 6f + halfLength;
+        float early = at - closingSpeed * Mathf.Max(0f, arrival - 0.35f);
+        float late = at - closingSpeed * (arrival + 0.35f);
+        return Mathf.Abs(at - target) <= margin || (late <= target + margin && early >= target - margin);
+    }
+
+    public bool TryReservePickupGap(Object owner, Vector3 position)
+    {
+        if (owner == null || SuppressAutoSpawn || (pickupGapOwner != null && pickupGapOwner != owner)) return false;
+        if (!road.TryGetDistance(position, out float target)) return false;
+        foreach (var obstacle in activeObstacles)
+        {
+            if (obstacle.GameObject == null || !obstacle.GameObject.activeInHierarchy) continue;
+            if (!road.TryGetDistance(obstacle.Transform.position, out float at)) return false;
+            float speed = motion != null && motion.isActiveAndEnabled ? motion.ApproachSpeed(obstacle.Transform) : 0f;
+            if (ConflictsWithPickup(at, speed, obstacle.Renderer.bounds.extents.magnitude, target)) return false;
+        }
+        pickupGapOwner = owner;
+        pickupDistance = target;
+        return true;
+    }
+
+    public void ReleasePickupGap(Object owner)
+    {
+        if (pickupGapOwner == owner) pickupGapOwner = null;
+    }
     public bool SuppressAutoSpawn
     {
         get => scriptedSpawnOnly || safeGapOwner != null;
@@ -56,7 +105,7 @@ public class ObstacleSpawner : MonoBehaviour
     // One owner at a time: a portal waits for an existing pickup row, and vice versa.
     public bool TryReserveSafeGap(Object owner)
     {
-        if (owner == null || scriptedSpawnOnly || (safeGapOwner != null && safeGapOwner != owner)) return false;
+        if (owner == null || scriptedSpawnOnly || pickupGapOwner != null || (safeGapOwner != null && safeGapOwner != owner)) return false;
         safeGapOwner = owner;
         return true;
     }
@@ -95,6 +144,7 @@ public class ObstacleSpawner : MonoBehaviour
     {
         SuppressAutoSpawn = false;
         safeGapOwner = null;
+        pickupGapOwner = null;
         firstFairRow = true;
         previousOpenLane = 1;
         nextRoadblockAt = CurrentRunDistance + TrafficRoadblockRules.FirstRoadblockDistance;
@@ -228,7 +278,7 @@ public class ObstacleSpawner : MonoBehaviour
         {
             bool spawnedSpecialRow = TrySpawn();
             // After a long frame, do not stack catch-up rows at the same position.
-            distanceUntilSpawn = spawnedSpecialRow ? 45f : NextSpacing();
+            distanceUntilSpawn = spawnDeferred ? 2f : spawnedSpecialRow ? 45f : NextSpacing();
         }
     }
 
@@ -263,11 +313,21 @@ public class ObstacleSpawner : MonoBehaviour
 
     private bool TrySpawn()
     {
+        spawnDeferred = false;
         if (!TryGetPointAhead(out RoadPathPoint point))
         {
             return false;
         }
 
+        if (pickupGapOwner != null && road.TryGetDistance(point.Position, out float candidate))
+        {
+            float speed = motion != null && motion.isActiveAndEnabled ? motion.NextRowSpeed : 0f;
+            if (ConflictsWithPickup(candidate, speed, 5f, pickupDistance))
+            {
+                spawnDeferred = true;
+                return false;
+            }
+        }
         float distance = CurrentRunDistance;
         if (distance >= nextRoadblockAt)
         {
@@ -455,8 +515,6 @@ public class ObstacleSpawner : MonoBehaviour
 
         if (trafficLight.ApplyShot())
         {
-            OutlawShooting shooting = car != null ? car.GetComponent<OutlawShooting>() : null;
-            ObstacleRewardSpawner.SpawnRedDestructionReward(trafficLight, shooting);
             activeObstacles.Remove(obstacle);
             pool.Release(obstacle);
         }

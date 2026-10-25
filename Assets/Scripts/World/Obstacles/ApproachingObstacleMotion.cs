@@ -22,6 +22,26 @@ public sealed class ApproachingObstacleMotion : ObstacleMotion
 
     public override float ExtraClosingSpeed => Mathf.Max(minObstacleSpeed, maxObstacleSpeed);
 
+    public override float ApproachSpeed(Transform obstacle)
+    {
+        for (int i = 0; i < movers.Count; i++)
+            if (movers[i].Transform == obstacle) return movers[i].Speed;
+        return 0f;
+    }
+
+    public override float NextRowSpeed
+    {
+        get
+        {
+            if (Time.frameCount != lastPlacementFrame)
+            {
+                lastPlacementFrame = Time.frameCount;
+                rowSpeed = Random.Range(Mathf.Min(minObstacleSpeed, maxObstacleSpeed), Mathf.Max(minObstacleSpeed, maxObstacleSpeed));
+            }
+            return rowSpeed;
+        }
+    }
+
     public override void Prepare(GameObject instance)
     {
         if (instance.GetComponent<Rigidbody>() != null) return;
@@ -34,11 +54,7 @@ public sealed class ApproachingObstacleMotion : ObstacleMotion
         float lateral, float halfHeight)
     {
         if (road == null || !road.TryGetDistance(point.Position, out float distance)) return;
-        if (Time.frameCount != lastPlacementFrame)
-        {
-            lastPlacementFrame = Time.frameCount;
-            rowSpeed = Random.Range(Mathf.Min(minObstacleSpeed, maxObstacleSpeed), Mathf.Max(minObstacleSpeed, maxObstacleSpeed));
-        }
+        rowSpeed = NextRowSpeed;
         if (rowSpeed <= 0f) return;
 
         for (int i = movers.Count - 1; i >= 0; i--)

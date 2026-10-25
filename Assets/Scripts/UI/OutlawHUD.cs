@@ -6,14 +6,31 @@ using UnityEngine.UI;
 
 public sealed class OutlawHUD : MonoBehaviour
 {
-    private const float RearViewSize = 230f;
+    private const float MirrorWidth = 280f;
+    private const float MirrorHeight = 70f;
     private const float Margin = 20f;
     private const float MissionRowHeight = 50f;
     private const float LowFuelFraction = 0.25f;
 
     private int shownBackpackNotice;
-    private static string BackpackName(RandomPickupOutcome item) => item == RandomPickupOutcome.ProximityRecovery ? "JAMMER"
-        : item == RandomPickupOutcome.SunnyDay ? "SUNNY DAY" : item.ToString().ToUpperInvariant();
+    private CarPickupEffects observedEffects;
+    private float activationFlash, emptyFlash, jammerFeedback, shieldFeedback;
+    private RandomPickupOutcome flashedItem;
+    private readonly List<RandomPickupOutcome> activeIcons = new List<RandomPickupOutcome>(5);
+
+    private void OnItemActivated(RandomPickupOutcome item)
+    {
+        flashedItem = item;
+        activationFlash = .35f;
+        emptyFlash = 0f;
+        if (item == RandomPickupOutcome.ProximityRecovery)
+        {
+            jammerFeedback = 1.5f;
+            ShowMessage("POLICE PUSHED BACK", Good, 1.5f);
+        }
+    }
+    private void OnEmptyBackpackUsed() { activationFlash = 0f; emptyFlash = .3f; }
+
     private static readonly Color AmmoBlue = new Color(0.12f, 0.55f, 1f);
     private static readonly Color PanelColour = new Color(0.03f, 0.04f, 0.06f, 0.96f);
     private static readonly Color Gold = new Color(1f, 0.86f, 0.18f);
@@ -59,7 +76,19 @@ public sealed class OutlawHUD : MonoBehaviour
 
     public void Configure(OutlawGameManager manager)
     {
+        BackpackIcon.Preload();
+        if (observedEffects != null)
+        {
+            observedEffects.ItemActivated -= OnItemActivated;
+            observedEffects.EmptyBackpackUsed -= OnEmptyBackpackUsed;
+        }
         game = manager;
+        observedEffects = manager.PickupEffects;
+        if (observedEffects != null)
+        {
+            observedEffects.ItemActivated += OnItemActivated;
+            observedEffects.EmptyBackpackUsed += OnEmptyBackpackUsed;
+        }
         ocean = manager.GetComponent<OceanCoastController>();
         // Arriving through an environment switch.
         if (RunSession.HasPending)
@@ -85,15 +114,9 @@ public sealed class OutlawHUD : MonoBehaviour
         GameObject fuelLabel = GameObject.Find("FUEL Label");
         if (fuelLabel != null) fuelLabel.SetActive(false);
 
-        // Centre the distance readout (the scene places it off-centre).
-        GameObject score = GameObject.Find("Score");
-        if (score != null)
-        {
-            RectTransform scoreRect = score.GetComponent<RectTransform>();
-            scoreRect.anchoredPosition = new Vector2(0f, -18f);
-            TMP_Text scoreText = score.GetComponent<TMP_Text>();
-            if (scoreText != null) scoreText.alignment = TextAlignmentOptions.Center;
-        }
+        // Hide only the old label; ScoreMeter continues recording the score.
+        TMP_Text scoreText = GameObject.Find("Score")?.GetComponent<TMP_Text>();
+        if (scoreText != null) scoreText.enabled = false;
 
         // The rear-view camera replaces the police distance bar.
         GameObject proximity = GameObject.Find("Proximity");
@@ -107,6 +130,11 @@ public sealed class OutlawHUD : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (observedEffects != null)
+        {
+            observedEffects.ItemActivated -= OnItemActivated;
+            observedEffects.EmptyBackpackUsed -= OnEmptyBackpackUsed;
+        }
         if (rearView != null) Destroy(rearView.gameObject);
     }
 
@@ -122,6 +150,11 @@ public sealed class OutlawHUD : MonoBehaviour
         if (game == null) return;
         float dt = Time.unscaledDeltaTime;
         bool running = game.State == OutlawGameState.Running;
+        float feedbackDelta = running ? dt : 0f;
+        activationFlash = Mathf.Max(0f, activationFlash - feedbackDelta);
+        emptyFlash = Mathf.Max(0f, emptyFlash - feedbackDelta);
+        jammerFeedback = Mathf.Max(0f, jammerFeedback - feedbackDelta);
+        shieldFeedback = Mathf.Max(0f, shieldFeedback - feedbackDelta);
         missionToastRemaining = Mathf.Max(0f, missionToastRemaining - (running ? dt : 0f));
         messageRemaining = Mathf.Max(0f, messageRemaining - (running ? dt : 0f));
         if (!countersSynced && game.PickupEffects != null)
@@ -151,7 +184,8 @@ public sealed class OutlawHUD : MonoBehaviour
         if (game.PickupEffects != null && game.PickupEffects.ShieldUseCount != shownShieldUses)
         {
             shownShieldUses = game.PickupEffects.ShieldUseCount;
-            ShowMessage("HIT BLOCKED!", ShieldCyan, 1.5f);
+            shieldFeedback = 1.2f;
+            ShowMessage("HIT BLOCKED!", ShieldCyan, 1.2f);
         }
 
         // Events that replace the centred message (most recent wins).
@@ -390,6 +424,7 @@ public sealed class OutlawHUD : MonoBehaviour
     {
         DrawAmmoSquares();
         DrawRearView(width);
+        DrawScore(width);
         DrawPowerUps(width);
         DrawOceanStatus(width);
         DrawMessage(width);
@@ -402,20 +437,17 @@ public sealed class OutlawHUD : MonoBehaviour
         if (missionToastRemaining > 0f && game.State == OutlawGameState.Running)
         {
             GUIStyle line = new GUIStyle(leftStyle) { fontSize = 17 };
-            // Wide enough for both lines (the bold heading is usually the longer one).
-            GUIStyle bold = new GUIStyle(line) { fontStyle = FontStyle.Bold };
-            float textWidth = Mathf.Max(line.CalcSize(new GUIContent(missionToastTitle)).x,
-                bold.CalcSize(new GUIContent(missionToastHeading)).x) + 12f;
-            Rect toast = new Rect(Margin, 180f, textWidth + 28f, 60f);
+            Rect toast = new Rect(Margin, 240f, 274f, 92f);
+            line.wordWrap = true;
             DrawPanel(toast);
             DrawBorder(toast, 2f, Good);
-            GUI.Label(new Rect(toast.x + 14f, toast.y + 4f, toast.width, 26f),
+            GUI.Label(new Rect(toast.x + 14f, toast.y + 4f, toast.width - 28f, 26f),
                 $"<b><color={Hex(Good)}>{missionToastHeading}</color></b>", line);
-            GUI.Label(new Rect(toast.x + 14f, toast.y + 30f, toast.width, 26f), missionToastTitle, line);
+            GUI.Label(new Rect(toast.x + 14f, toast.y + 30f, toast.width - 28f, 58f), missionToastTitle, line);
         }
     }
 
-    /// <summary>One centred message under the distance; the most recent event replaces the last.</summary>
+    /// <summary>One centred message below the mirror and active-effect row; the most recent event replaces the last.</summary>
     private void DrawMessage(float width)
     {
         if (game.State != OutlawGameState.Running && game.State != OutlawGameState.Paused) return;
@@ -438,8 +470,10 @@ public sealed class OutlawHUD : MonoBehaviour
         if (string.IsNullOrEmpty(text)) return;
 
         GUIStyle style = new GUIStyle(bodyStyle) { fontSize = 20, fontStyle = FontStyle.Bold, wordWrap = false };
-        float textWidth = style.CalcSize(new GUIContent(text)).x + 32f;
-        Rect rect = new Rect((width - textWidth) * 0.5f, 66f, textWidth, 38f);
+        float textWidth = Mathf.Min(540f, style.CalcSize(new GUIContent(text)).x + 32f);
+        Rect rect = new Rect((width - textWidth) * 0.5f, 216f, textWidth, 48f);
+        style.fontSize = 16;
+        style.wordWrap = true;
         DrawRect(rect, new Color(colour.r * 0.2f, colour.g * 0.2f, colour.b * 0.2f, 0.92f));
         DrawBorder(rect, 2f, colour);
         style.normal.textColor = colour;
@@ -481,7 +515,7 @@ public sealed class OutlawHUD : MonoBehaviour
         GUI.Label(new Rect(304f, 42f, 180f, 30f), "LOW FUEL", warning);
     }
 
-    /// <summary>Top-left column, all left-aligned: FUEL label, fuel bar, AMMO label, one square per bullet.</summary>
+    /// <summary>Top-left fuel gauge and one backpack slot.</summary>
     private void DrawAmmoSquares()
     {
         if (game.Shooting == null || game.Fuel == null) return;
@@ -495,20 +529,23 @@ public sealed class OutlawHUD : MonoBehaviour
         DrawRect(bar, new Color(0f, 0f, 0f, 0.45f));
         DrawRect(new Rect(bar.x, bar.y, bar.width * game.Fuel.NormalizedFuel, bar.height), FuelLow ? LowFuelRed : FuelOrange);
         DrawBorder(bar, 2f, FuelLow ? PoliceRed : new Color(1f, 1f, 1f, 0.5f));
-        GUI.Label(new Rect(x, 80f, columnWidth, 24f), "BACKPACK (1 SLOT)", label);
-        float y = 106f;
+        GUI.Label(new Rect(x, 80f, columnWidth, 24f), "BACKPACK", label);
         var pack = game.PickupEffects.Backpack;
-        Rect slot = new Rect(x, y, columnWidth, 70f);
+        Rect slot = new Rect(x, 106f, 88f, 88f);
         DrawRect(slot, new Color(0f, 0f, 0f, 0.6f));
-        DrawBorder(slot, 2f, AmmoBlue);
-        string name = BackpackName(pack.Item);
-        string action = pack.Item == RandomPickupOutcome.None ? "Collect a mystery box"
-            : pack.Item == RandomPickupOutcome.Gun ? "SPACE - Shoot (" + pack.Shots + ")" : "SPACE - Use " + name;
-        GUI.Label(new Rect(x + 10f, y + 5f, columnWidth - 20f, 25f), pack.Item == RandomPickupOutcome.None ? "EMPTY" : name, label);
-        GUI.Label(new Rect(x + 10f, y + 33f, columnWidth - 20f, 25f), action, new GUIStyle(label) { fontSize = 15 });
-        GUI.Label(new Rect(x, y + 72f, columnWidth + 60f, 22f), "New positive reward replaces this item", new GUIStyle(label) { fontSize = 12 });
-        if (game.IsTutorial && pack.Item != RandomPickupOutcome.None && pack.Item != RandomPickupOutcome.Gun)
-            GUI.Label(new Rect(x, y + 94f, columnWidth + 70f, 50f), "Press SPACE to activate", label);
+        Color border = pack.Item == RandomPickupOutcome.None ? Color.gray : AmmoBlue;
+        if (activationFlash > 0f)
+            border = Color.Lerp(border, Color.white, activationFlash / .35f);
+        else if (emptyFlash > 0f)
+            border = Color.Lerp(border, new Color(.65f,.65f,.65f), emptyFlash / .3f);
+        DrawBorder(slot, activationFlash > 0f ? 4f : 2f, border);
+        var shownItem = activationFlash > 0f ? flashedItem : pack.Item;
+        BackpackIcon.Draw(new Rect(x + 12f, 112f, 64f, 64f), shownItem);
+        if (pack.Item == RandomPickupOutcome.Gun)
+            for (int i = 0; i < BackpackState.GunShots; i++)
+                DrawRect(new Rect(x + 26f + i * 14f, 177f, 8f, 8f), i < pack.Shots ? Gold : Color.gray);
+        GUI.Label(new Rect(x, 197f, 88f, 24f), pack.Item == RandomPickupOutcome.None ? "EMPTY" : "SPACE",
+            new GUIStyle(label) { fontSize = 13, alignment = TextAnchor.MiddleCenter });
         if (game.IsTutorial && game.Tutorial.Highlight == TutorialHighlight.Ammo)
             DrawHighlight(slot);
         if (game.IsTutorial && game.Tutorial.Highlight == TutorialHighlight.Fuel)
@@ -518,7 +555,7 @@ public sealed class OutlawHUD : MonoBehaviour
     private void DrawRearView(float width)
     {
         if (rearView == null || rearView.Texture == null) return;
-        Rect view = new Rect(width - RearViewSize - Margin, Margin, RearViewSize, RearViewSize);
+        Rect view = new Rect((width - MirrorWidth) * .5f, 8f, MirrorWidth, MirrorHeight);
         float gap = game.PursuitGap;
         // The border turns red as the police get closer (no blinking).
         float danger = Mathf.InverseLerp(30f, 8f, gap);
@@ -526,13 +563,9 @@ public sealed class OutlawHUD : MonoBehaviour
         const float thickness = 5f;
 
         DrawRect(new Rect(view.x - thickness, view.y - thickness, view.width + thickness * 2f, view.height + thickness * 2f), border);
-        GUI.DrawTexture(view, rearView.Texture, ScaleMode.ScaleAndCrop, false);
-        Rect tag = new Rect(view.x, view.y, view.width, 28f);
-        DrawRect(tag, new Color(0f, 0f, 0f, 0.55f));
-        GUI.Label(tag, "<b>BEHIND YOU</b>", smallStyle);
-
+        GUI.DrawTexture(view, rearView.Texture, ScaleMode.ScaleToFit, false);
         if (game.IsTutorial && game.Tutorial.Highlight == TutorialHighlight.RearView)
-            DrawHighlight(new Rect(view.x - 16f, view.y - 16f, view.width + 32f, view.height + 32f));
+            DrawHighlight(new Rect(view.x - 8f, Mathf.Max(0f, view.y - 8f), view.width + 16f, view.height + 16f));
     }
 
     /// <summary>All power-up state lives in one small stack of tiles under the rear view.</summary>
@@ -544,58 +577,59 @@ public sealed class OutlawHUD : MonoBehaviour
             : ocean.Surf.IsSurfing ? "SURFING — FIND THE CREST"
             : ocean.Surf.Boost > 0f ? "SURF EXIT BOOST" : "RIDE TEAL WAVES TO BOOST";
         Color colour = ocean.WakeWarningActive ? Gold : ShieldCyan;
-        Rect rect = new Rect(width - RearViewSize - Margin, Margin + RearViewSize + 52f, RearViewSize, 54f);
+        Rect rect = new Rect(width - 250f, 100f, 230f, 74f);
         DrawPanel(rect);
-        GUIStyle text = new GUIStyle(leftStyle) { fontSize = 12, fontStyle = FontStyle.Bold };
+        GUIStyle text = new GUIStyle(leftStyle) { fontSize = 12, fontStyle = FontStyle.Bold, wordWrap = true };
         text.normal.textColor = colour;
-        GUI.Label(new Rect(rect.x + 10f, rect.y, rect.width - 20f, 28f), label, text);
-        GUI.Label(new Rect(rect.x + 10f, rect.y + 25f, rect.width - 20f, 24f),
+        GUI.Label(new Rect(rect.x + 10f, rect.y, rect.width - 20f, 44f), label, text);
+        GUI.Label(new Rect(rect.x + 10f, rect.y + 46f, rect.width - 20f, 24f),
             "+" + Mathf.RoundToInt(ocean.Surf.Boost * 100f) + "% SPEED", text);
+    }
+
+    private void DrawScore(float width)
+    {
+        var heading = new GUIStyle(rightStyle) { fontSize = 14, fontStyle = FontStyle.Bold };
+        var value = new GUIStyle(rightStyle) { fontSize = 30, fontStyle = FontStyle.Bold };
+        GUI.Label(new Rect(width - 250f, 18f, 226f, 24f), game.IsTutorial ? "TUTORIAL" : "DISTANCE", heading);
+        if (!game.IsTutorial)
+            GUI.Label(new Rect(width - 250f, 42f, 226f, 42f), game.DistanceTravelled.ToString("N0") + " m", value);
+    }
+
+    private void RefreshActiveIcons()
+    {
+        activeIcons.Clear();
+        var effects = game.PickupEffects;
+        if (effects == null) return;
+        if (effects.ShieldReady || shieldFeedback > 0f) activeIcons.Add(RandomPickupOutcome.Shield);
+        if (effects.RunState.HasNitro) activeIcons.Add(RandomPickupOutcome.Nitro);
+        if (effects.SunnyDayActive) activeIcons.Add(RandomPickupOutcome.SunnyDay);
+        if (effects.ActiveEffect == PickupEffectType.ReverseSteering || effects.ReverseCountdownRemaining > 0f)
+            activeIcons.Add(RandomPickupOutcome.ReverseSteering);
+        if (jammerFeedback > 0f) activeIcons.Add(RandomPickupOutcome.ProximityRecovery);
     }
 
     private void DrawPowerUps(float width)
     {
-        CarPickupEffects effects = game.PickupEffects;
-        if (effects == null) return;
-        // Only one power-up can be active at a time; show just that one.
-        string label = null;
-        string seconds = null;
-        Color colour = Color.white;
-        if (effects.ActiveEffect == PickupEffectType.ReverseSteering)
+        RefreshActiveIcons();
+        var effects = game.PickupEffects;
+        const float tileWidth = 52f, gap = 6f;
+        for (int i = 0; i < activeIcons.Count; i++)
         {
-            label = "CONTROLS SWAPPED";
-            seconds = Mathf.CeilToInt(effects.RemainingSeconds) + "s";
-            colour = ReversePurple;
-        }
-        else if (effects.RunState.HasNitro)
-        {
-            label = "NITRO";
-            colour = NitroOrange;
-        }
-        else if (effects.ShieldReady)
-        {
-            label = "SHIELD";
-            colour = ShieldCyan;
-        }
-        else if (effects.SunnyDayActive)
-        {
-            label = "SUNNY DAY";
-            seconds = Mathf.CeilToInt(effects.SunnyDayRemaining) + "s";
-            colour = SunnyGold;
-        }
-        if (label == null) return;
-
-        GUIStyle text = new GUIStyle(leftStyle) { fontSize = 14, fontStyle = FontStyle.Bold };
-        float x = width - RearViewSize - Margin;
-        Rect rect = new Rect(x, Margin + RearViewSize + 14f, RearViewSize, 30f);
-        DrawPanel(rect);
-        DrawRect(new Rect(rect.x, rect.y, 6f, rect.height), colour);
-        text.normal.textColor = colour;
-        GUI.Label(new Rect(rect.x + 14f, rect.y, rect.width - 60f, rect.height), label, text);
-        if (seconds != null)
-        {
-            GUIStyle right = new GUIStyle(text) { alignment = TextAnchor.MiddleRight };
-            GUI.Label(new Rect(rect.x, rect.y, rect.width - 10f, rect.height), seconds, right);
+            var item = activeIcons[i];
+            Rect tile = new Rect(126f + (i % 3) * (tileWidth + gap), 106f + (i / 3) * 60f, tileWidth, 54f);
+            DrawPanel(tile);
+            Color accent = item == RandomPickupOutcome.ReverseSteering ? ReversePurple : ShieldCyan;
+            DrawBorder(tile, 1f, accent);
+            BackpackIcon.Draw(new Rect(tile.x + 9f, tile.y + 2f, 34f, 34f), item);
+            string status = "ACTIVE";
+            if (item == RandomPickupOutcome.Shield) status = shieldFeedback > 0f ? "BLOCKED" : "READY";
+            else if (item == RandomPickupOutcome.ProximityRecovery) status = "USED";
+            else if (item == RandomPickupOutcome.SunnyDay) status = Mathf.CeilToInt(effects.SunnyDayRemaining) + "s";
+            else if (item == RandomPickupOutcome.ReverseSteering)
+                status = effects.ReverseCountdownRemaining > 0f ? "IN " + Mathf.CeilToInt(effects.ReverseCountdownRemaining) + "s"
+                    : Mathf.CeilToInt(effects.RemainingSeconds) + "s";
+            GUI.Label(new Rect(tile.x, tile.y + 35f, tileWidth, 18f), status,
+                new GUIStyle(smallStyle) { fontSize = 10, fontStyle = FontStyle.Bold });
         }
     }
 

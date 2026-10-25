@@ -7,7 +7,8 @@ using UnityEngine.Rendering.Universal;
 /// </summary>
 public sealed class RearViewCamera : MonoBehaviour
 {
-    private const int Resolution = 320;
+    private const int TextureWidth = 512;
+    private const int TextureHeight = 128;
 
     private Transform player;
     private ChaseCar[] police;
@@ -21,11 +22,12 @@ public sealed class RearViewCamera : MonoBehaviour
         RearViewCamera rear = cameraObject.AddComponent<RearViewCamera>();
         rear.player = player;
         rear.police = police;
-        rear.Texture = new RenderTexture(Resolution, Resolution, 24) { name = "Rear View" };
+        rear.Texture = new RenderTexture(TextureWidth, TextureHeight, 24) { name = "Rear View" };
 
         rear.view = cameraObject.AddComponent<Camera>();
         rear.view.targetTexture = rear.Texture;
         rear.view.fieldOfView = 62f;
+        rear.view.aspect = (float)TextureWidth / TextureHeight;
         rear.view.nearClipPlane = 0.3f;
         rear.view.farClipPlane = 140f;
         Camera main = Camera.main;

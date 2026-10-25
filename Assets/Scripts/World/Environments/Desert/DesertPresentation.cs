@@ -6,6 +6,9 @@ using System.Collections.Generic;
 public sealed class DesertPresentation : MonoBehaviour
 {
     [SerializeField] private Material sandMaterial;
+    private static readonly string[] WallNames = { "Left Roadside Wall", "Right Roadside Wall" };
+    private static readonly int[] DuneSides = { -1, 1 };
+    private static readonly string[] DuneNames = { "Prototype dune -1", "Prototype dune 1" };
     private EnvironmentRoot environment;
     private Transform sand;
     private readonly List<RoadSegment> segments = new List<RoadSegment>();
@@ -32,15 +35,16 @@ public sealed class DesertPresentation : MonoBehaviour
         foreach (var segment in segments)
         {
             // Scene-local instances only: keep shared prefabs and their boundary colliders intact.
-            foreach (string wallName in new[] { "Left Roadside Wall", "Right Roadside Wall" })
+            foreach (string wallName in WallNames)
             {
                 var wall = segment.transform.Find(wallName);
                 if (wall != null && wall.TryGetComponent(out Renderer wallRenderer)) wallRenderer.enabled = false;
             }
             RoadPathPoint middle = segment.Sample(segment.Length * 0.5f);
-            foreach (int side in new[] { -1, 1 })
+            for (int i = 0; i < DuneSides.Length; i++)
             {
-                string name = "Prototype dune " + side;
+                int side = DuneSides[i];
+                string name = DuneNames[i];
                 Transform dune = segment.transform.Find(name);
                 if (dune == null)
                 {

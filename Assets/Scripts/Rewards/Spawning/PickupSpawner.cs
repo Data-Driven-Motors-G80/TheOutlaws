@@ -5,6 +5,8 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class PickupSpawner : MonoBehaviour
 {
+    // Leave a visible car-sized passage between optional mystery rewards.
+    private const float MysteryLaneWidthFraction = 0.4f;
     [SerializeField] private InfiniteRoad road;
     [SerializeField] private Transform car;
     [SerializeField] private PickupItem pickupPrefab;
@@ -17,6 +19,7 @@ public sealed class PickupSpawner : MonoBehaviour
     public float NextRowAt { get; private set; } = 5f;
     public bool Suppressed { get; set; }
     private readonly List<PickupItem> active = new List<PickupItem>();
+    private readonly List<PickupItem> retiring = new List<PickupItem>();
     private bool claimed;
     private Vector3 rowPosition;
     private CarPickupEffects effects;
@@ -31,31 +34,64 @@ public sealed class PickupSpawner : MonoBehaviour
     private void OnDisable() { ClearRow(); }
     private void ClearRow()
     {
-        if (obstacles != null) obstacles.ReleaseSafeGap(this);
+        if (obstacles != null) obstacles.ReleasePickupGap(this);
         foreach (var item in active) if (item != null) { item.gameObject.SetActive(false); Destroy(item.gameObject); }
         active.Clear();
+        foreach (var item in retiring) if (item != null) { item.gameObject.SetActive(false); Destroy(item.gameObject); }
+        retiring.Clear();
+    }
+    private void RetireRow(bool fade)
+    {
+        if (obstacles != null) obstacles.ReleasePickupGap(this);
+        foreach (var item in active)
+        {
+            if (item == null) continue;
+            item.Retire();
+            if (fade) FadeItem(item);
+            retiring.Add(item);
+        }
+        active.Clear();
+    }
+    private static void FadeItem(PickupItem item)
+    {
+        var visual = item.GetComponentInChildren<MysteryPickupVisual>();
+        if (visual != null) visual.BeginFade();
+        else Destroy(item.gameObject);
     }
     private void Update()
     {
         if (Suppressed || Time.timeScale <= 0f || effects == null || effects.RunState.IsGameOver) return;
+        for (int i = retiring.Count - 1; i >= 0; i--)
+        {
+            var item = retiring[i];
+            if (item == null) retiring.RemoveAt(i);
+            else if (road.IsBehind(item.transform.position, car.position, 4f)) FadeItem(item);
+        }
         float now = RunTime?.Invoke() ?? 0f;
         if (active.Count > 0)
         {
             if (road.IsBehind(rowPosition, car.position, 4f))
             {
                 GameEvents.RaisePickupMissed(PickupKind.Mystery);
-                ClearRow(); NextRowAt = now + rowIntervalSeconds;
+                RetireRow(true); NextRowAt = now + rowIntervalSeconds;
             }
             return;
         }
-        float speed = Mathf.Max(1f, RunSpeed?.Invoke() ?? 25f);
+        float speed = obstacles != null ? obstacles.PickupApproachSpeed : Mathf.Max(1f, RunSpeed?.Invoke() ?? 25f);
         float remaining = Mathf.Max(0f, NextRowAt - now);
         if (remaining > firstRowSeconds) return;
         float lead = Mathf.Max(PickupLookAhead.Distance, remaining * speed);
-        // Reserve before checking: existing rows pass naturally while new ones wait.
-        if (obstacles == null || !obstacles.TryReserveSafeGap(this)) return;
-        if (!road.TryGetPointAhead(car.position, lead, out RoadPathPoint point)) return;
-        if (!obstacles.IsSafeGap(point.Position, 14f)) return;
+        if (obstacles == null) return;
+        RoadPathPoint point = default;
+        bool found = false;
+        for (float offset = 0f; offset <= 32f; offset += 4f)
+        {
+            if (!road.TryGetPointAhead(car.position, lead + offset, out point)) break;
+            if (!obstacles.TryReservePickupGap(this, point.Position)) continue;
+            found = true;
+            break;
+        }
+        if (!found) return;
         claimed = false; rowPosition = point.Position;
         float laneWidth = point.Width / 3f;
         for (int lane = 0; lane < 3; lane++)
@@ -65,17 +101,12 @@ public sealed class PickupSpawner : MonoBehaviour
             item.Configure(PickupEffectType.RandomFuelOrReverse, effectDuration);
             item.GetComponent<SphereCollider>().enabled = false;
             var trigger = item.gameObject.AddComponent<BoxCollider>();
-            trigger.isTrigger = true; trigger.size = new Vector3(laneWidth / item.transform.lossyScale.x, 3f / item.transform.lossyScale.y, 2f / item.transform.lossyScale.z);
+            trigger.isTrigger = true; trigger.size = new Vector3(laneWidth * MysteryLaneWidthFraction / item.transform.lossyScale.x, 3f / item.transform.lossyScale.y, 2f / item.transform.lossyScale.z);
             item.ClaimRow = () => { if (claimed) return false; claimed = true; return true; };
-            item.CollectedCallback = () => { ClearRow(); NextRowAt = (RunTime?.Invoke() ?? now) + rowIntervalSeconds; };
+            item.CollectedCallback = () => { RetireRow(false); NextRowAt = (RunTime?.Invoke() ?? now) + rowIntervalSeconds; };
             var renderer = item.GetComponentInChildren<Renderer>();
             if (renderer != null)
-            {
-                Vector3 scale = renderer.transform.localScale;
-                scale.x *= laneWidth * 0.95f / Mathf.Max(0.01f, renderer.bounds.size.x);
-                renderer.transform.localScale = scale;
-                WorldLabel.Attach(renderer, "?", new Color(1f, 0.85f, 0.2f));
-            }
+                renderer.gameObject.AddComponent<MysteryPickupVisual>().Configure(renderer, laneWidth * MysteryLaneWidthFraction);
             active.Add(item);
         }
         GameEvents.RaisePickupSpawned(PickupKind.Mystery);
@@ -94,7 +125,7 @@ public sealed class PickupSpawner : MonoBehaviour
         PickupItem item = Instantiate(pickupPrefab, position, Quaternion.identity, transform);
         item.Configure(outcome, effectDuration);
         Renderer box = item.GetComponentInChildren<Renderer>();
-        if (box != null) WorldLabel.Attach(box, "?", new Color(1f, 0.85f, 0.2f));
+        if (box != null) box.gameObject.AddComponent<MysteryPickupVisual>().Configure(box, point.Width / 3f * MysteryLaneWidthFraction);
         return item;
     }
 

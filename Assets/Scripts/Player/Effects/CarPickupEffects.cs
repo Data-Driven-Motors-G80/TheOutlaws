@@ -10,6 +10,7 @@ public sealed class CarPickupEffects : MonoBehaviour
     public BackpackState Backpack { get; } = new BackpackState();
     public int BackpackChangedFrame { get; private set; } = -1;
     public event System.Action<RandomPickupOutcome> ItemActivated;
+    public event System.Action EmptyBackpackUsed;
     public string BackpackNotice { get; private set; }
     public int BackpackNoticeVersion { get; private set; }
     private void Awake()
@@ -26,7 +27,7 @@ public sealed class CarPickupEffects : MonoBehaviour
     {
         if (!simulationActive || runState.IsGameOver || BackpackChangedFrame == Time.frameCount) return false;
         var item = Backpack.Item;
-        if (item == RandomPickupOutcome.None) return false;
+        if (item == RandomPickupOutcome.None) { EmptyBackpackUsed?.Invoke(); return false; }
         if (item != RandomPickupOutcome.Gun && !ActivateOutcome(item)) return false;
         Backpack.Use();
         ItemActivated?.Invoke(item);

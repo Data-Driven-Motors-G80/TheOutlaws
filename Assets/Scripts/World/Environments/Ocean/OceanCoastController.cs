@@ -60,17 +60,12 @@ public sealed class OceanCoastController : MonoBehaviour
             nextWaveAt = distance + 15f;
             wakeTimer = wakeInterval;
         }
-        // Respect pickup and portal reservations. Surface hazards must never enter their safe gaps.
-        if (environment.Obstacles.SuppressAutoSpawn)
-        {
-            ClearSurface();
-            nextWaveAt = distance + 20f;
-            wakeTimer = Mathf.Max(wakeTimer, 3f);
-            return;
-        }
+        // Stop new hazards during scripted reservations, but let visible waves and
+        // wakes finish naturally instead of popping out or abruptly resetting surf.
+        bool suppressed = environment.Obstacles.SuppressAutoSpawn;
         if (!road.TrySample(distance, out RoadPathPoint point)) return;
         float lateral = Vector3.Dot(car.transform.position - point.Position, point.Right);
-        if (distance >= nextWaveAt && SpawnWave(distance + 65f)) nextWaveAt = distance + waveSpacing;
+        if (!suppressed && distance >= nextWaveAt && SpawnWave(distance + 65f)) nextWaveAt = distance + waveSpacing;
 
         bool onWave = false;
         bool onCrest = false;
@@ -92,8 +87,8 @@ public sealed class OceanCoastController : MonoBehaviour
         car.EnvironmentSpeedMultiplier = surf.SpeedMultiplier;
         car.EnvironmentSteeringGrip = surf.IsSurfing ? 0.65f : 1f;
 
-        wakeTimer -= Time.deltaTime;
-        if (wakeTimer <= 0f && SpawnWake(distance, lateral)) wakeTimer = wakeInterval;
+        if (!suppressed) wakeTimer -= Time.deltaTime;
+        if (!suppressed && wakeTimer <= 0f && SpawnWake(distance, lateral)) wakeTimer = wakeInterval;
         UpdateWakes(distance, lateral);
     }
 
