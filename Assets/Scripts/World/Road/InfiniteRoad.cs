@@ -14,51 +14,51 @@ public sealed class InfiniteRoad : MonoBehaviour
     [SerializeField, Min(2)] private int segmentCount = 8;
     [SerializeField, Min(0f)] private float behindBuffer = 20f;
     [SerializeField, Min(100f)] private float aheadBuffer = 180f;
-    [Tooltip("Length of straight road at the start before any bends, hairpins or hills appear.")]
+    [Tooltip("Straight road at the start, before any bends, hairpins, or hills.")]
     [SerializeField, Min(0f)] private float straightIntroDistance = 160f;
 
     [Header("Bends")]
-    [Tooltip("How often a bend appears. 0 = never, 1 = after every straight piece.")]
+    [Tooltip("Chance of a bend after each straight piece.")]
     [SerializeField, Range(0f, 1f)] private float curveFrequency = 1f;
-    [Tooltip("Length of a bend or hill piece in metres (min, max).")]
+    [Tooltip("Bend or hill length in meters (min, max).")]
     [SerializeField] private Vector2 curveLength = new Vector2(70f, 90f);
-    [Tooltip("How far a bend turns, in degrees (min, max). Bigger = sharper.")]
+    [Tooltip("Bend turn in degrees (min, max).")]
     [SerializeField] private Vector2 bendAngle = new Vector2(15f, 25f);
-    [Tooltip("The road never heads more than this many degrees away from straight ahead.")]
+    [Tooltip("Max degrees the road may stray from straight ahead.")]
     [SerializeField, Range(20f, 50f)] private float maximumHeading = 35f;
 
     [Header("Hairpins")]
-    [Tooltip("How often a hairpin appears. They come in opposite pairs so the road keeps its overall direction. 0 = none.")]
+    [Tooltip("Chance of a hairpin. They come in opposite pairs. 0 = none.")]
     [SerializeField, Range(0f, 1f)] private float hairpinFrequency = 0.15f;
-    [Tooltip("Turn radius in metres (min, max). Smaller = tighter.")]
+    [Tooltip("Turn radius in meters (min, max).")]
     [SerializeField] private Vector2 hairpinRadius = new Vector2(24f, 32f);
-    [Tooltip("How far a hairpin turns, in degrees (min, max).")]
+    [Tooltip("Hairpin turn in degrees (min, max).")]
     [SerializeField] private Vector2 hairpinAngle = new Vector2(126f, 180f);
 
     [Header("Hills")]
-    [Tooltip("How often a hill appears. 0 = flat road, 1 = after every straight piece. Hairpins can also climb or descend.")]
+    [Tooltip("Chance of a hill. 0 = flat. Hairpins can also climb or descend.")]
     [SerializeField, Range(0f, 1f)] private float hillFrequency = 0.5f;
-    [Tooltip("Steepness of a hill, in degrees (min, max). Steeper hills make the car lighter over crests.")]
+    [Tooltip("Hill steepness in degrees (min, max).")]
     [SerializeField] private Vector2 hillPitch = new Vector2(4f, 8f);
-    [Tooltip("The road never climbs or sinks more than this many metres from where it started.")]
+    [Tooltip("Max meters the road may climb or sink from its start.")]
     [SerializeField, Min(2f)] private float altitudeRange = 15f;
-
-    private float nextDistance;
-    private float routeHeading;
-    private int curveIndex;
-    private bool lastWasFeature;
-    private bool lastWasCurve;
-    private float pendingHairpinAngle;
-    private float pendingHairpinRadius;
-    private float routeSlope;
-    private float baseAltitude;
-    public float FirstDistance => activeSegments.Count > 0 ? activeSegments.Peek().StartDistance : 0f;
-    public float LastDistance => nextDistance;
 
     private readonly Queue<ActiveSegment> activeSegments = new Queue<ActiveSegment>();
     private readonly Dictionary<RoadSegment, ObjectPool<RoadSegment>> pools = new Dictionary<RoadSegment, ObjectPool<RoadSegment>>();
     private System.Random random;
     private Pose nextEntry;
+    private float nextDistance;
+    private float routeHeading;
+    private float routeSlope;
+    private float baseAltitude;
+    private float pendingHairpinAngle;
+    private float pendingHairpinRadius;
+    private int curveIndex;
+    private bool lastWasFeature;
+    private bool lastWasCurve;
+
+    public float FirstDistance => activeSegments.Count > 0 ? activeSegments.Peek().StartDistance : 0f;
+    public float LastDistance => nextDistance;
 
     private void OnValidate()
     {
@@ -74,41 +74,6 @@ public sealed class InfiniteRoad : MonoBehaviour
         EnsureInitialized();
     }
 
-    private void EnsureInitialized()
-    {
-        if (activeSegments.Count > 0) return;
-        random = new System.Random(19020);
-
-        if (!HasValidSetup())
-        {
-            enabled = false;
-            return;
-        }
-
-        foreach (RoadSegment segment in GetComponentsInChildren<RoadSegment>())
-        {
-            segment.gameObject.SetActive(false);
-            Destroy(segment.gameObject);
-        }
-        pools.Clear();
-        nextDistance = 0f;
-        routeHeading = 0f;
-        curveIndex = 0;
-        lastWasFeature = false;
-        lastWasCurve = false;
-        pendingHairpinAngle = 0f;
-        pendingHairpinRadius = 0f;
-        routeSlope = 0f;
-        Vector3 origin = new Vector3(transform.position.x, transform.position.y, car.position.z - behindBuffer);
-        baseAltitude = origin.y;
-        nextEntry = new Pose(origin, Quaternion.identity);
-
-        while (activeSegments.Count < segmentCount || nextDistance < behindBuffer + aheadBuffer)
-        {
-            SpawnSegment();
-        }
-    }
-
     private void Update()
     {
         EnsureInitialized();
@@ -117,6 +82,13 @@ public sealed class InfiniteRoad : MonoBehaviour
             activeSegments.Dequeue().Release();
         while (activeSegments.Count < segmentCount || nextDistance < carDistance + aheadBuffer)
             SpawnSegment();
+    }
+
+    private void OnDestroy()
+    {
+        foreach (ObjectPool<RoadSegment> pool in pools.Values) pool.Clear();
+        pools.Clear();
+        activeSegments.Clear();
     }
 
     public bool TryGetDistance(Vector3 worldPosition, out float distance)
@@ -166,6 +138,39 @@ public sealed class InfiniteRoad : MonoBehaviour
             && from - at > margin;
     }
 
+    private void EnsureInitialized()
+    {
+        if (activeSegments.Count > 0) return;
+        random = new System.Random(19020);
+
+        if (!HasValidSetup())
+        {
+            enabled = false;
+            return;
+        }
+
+        foreach (RoadSegment segment in GetComponentsInChildren<RoadSegment>())
+        {
+            segment.gameObject.SetActive(false);
+            Destroy(segment.gameObject);
+        }
+        pools.Clear();
+        nextDistance = 0f;
+        routeHeading = 0f;
+        routeSlope = 0f;
+        curveIndex = 0;
+        lastWasFeature = false;
+        lastWasCurve = false;
+        pendingHairpinAngle = 0f;
+        pendingHairpinRadius = 0f;
+        Vector3 origin = new Vector3(transform.position.x, transform.position.y, car.position.z - behindBuffer);
+        baseAltitude = origin.y;
+        nextEntry = new Pose(origin, Quaternion.identity);
+
+        while (activeSegments.Count < segmentCount || nextDistance < behindBuffer + aheadBuffer)
+            SpawnSegment();
+    }
+
     private bool HasValidSetup()
     {
         if (car == null)
@@ -187,7 +192,6 @@ public sealed class InfiniteRoad : MonoBehaviour
                 LogError("a segment prefab slot is empty.");
                 return false;
             }
-
             if (!prefab.IsConfigured)
             {
                 LogError($"'{prefab.name}' has a missing start point, end point or waypoint.", prefab);
@@ -214,13 +218,13 @@ public sealed class InfiniteRoad : MonoBehaviour
             surfaceRenderer.sharedMaterial = roadSurfaceMaterial;
 
         float angle = 0f;
+        float length = 20f;
+        float startSlope = routeSlope;
+        float endSlope = routeSlope;
         bool sCurve = false;
         bool hairpin = false;
         bool curve = false;
         bool hill = false;
-        float length = 20f;
-        float startSlope = routeSlope;
-        float endSlope = routeSlope;
         bool pastIntro = nextDistance >= behindBuffer + straightIntroDistance;
 
         if (pastIntro && !lastWasCurve && pendingHairpinAngle != 0f)
@@ -298,26 +302,17 @@ public sealed class InfiniteRoad : MonoBehaviour
 
     private bool Roll(float frequency)
     {
-        if (frequency <= 0f) return false;
-        return frequency >= 1f || random.NextDouble() < frequency;
+        return frequency > 0f && (frequency >= 1f || random.NextDouble() < frequency);
     }
 
     private RoadSegment SelectPrefab()
     {
-        if (activeSegments.Count == 0)
-        {
-            return segmentPrefabs[0];
-        }
-
-        return segmentPrefabs[random.Next(0, segmentPrefabs.Length)];
+        return segmentPrefabs[activeSegments.Count == 0 ? 0 : random.Next(0, segmentPrefabs.Length)];
     }
 
     private ObjectPool<RoadSegment> GetPool(RoadSegment prefab)
     {
-        if (pools.TryGetValue(prefab, out ObjectPool<RoadSegment> existing))
-        {
-            return existing;
-        }
+        if (pools.TryGetValue(prefab, out ObjectPool<RoadSegment> existing)) return existing;
 
         ObjectPool<RoadSegment> pool = new ObjectPool<RoadSegment>(
             createFunc: () => Instantiate(prefab, transform),
@@ -334,13 +329,6 @@ public sealed class InfiniteRoad : MonoBehaviour
         if (segment == null) return;
         if (Application.isPlaying) Destroy(segment.gameObject);
         else DestroyImmediate(segment.gameObject);
-    }
-
-    private void OnDestroy()
-    {
-        foreach (ObjectPool<RoadSegment> pool in pools.Values) pool.Clear();
-        pools.Clear();
-        activeSegments.Clear();
     }
 
     private void LogError(string message, Object context = null)
