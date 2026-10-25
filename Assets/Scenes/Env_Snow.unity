@@ -674,7 +674,7 @@ MonoBehaviour:
   curveLength: {x: 60, y: 90}
   bendAngle: {x: 10, y: 20}
   maximumHeading: 30
-  hairpinFrequency: 0.05
+  hairpinFrequency: 0
   hairpinRadius: {x: 20, y: 28}
   hairpinAngle: {x: 140, y: 180}
   hillFrequency: 0.9
