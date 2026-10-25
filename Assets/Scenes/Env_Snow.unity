@@ -341,10 +341,9 @@ MonoBehaviour:
   car: {fileID: 1633598803}
   pickupPrefab: {fileID: 136182238796722122, guid: a5f8ce0d514bad840b83246d0c70b77c, type: 3}
   obstacles: {fileID: 1802903151}
-  spawnDistance: 55
-  spacing: 160
   effectDuration: 5
-  cycleEffectsForTesting: 0
+  firstRowSeconds: 5
+  rowIntervalSeconds: 20
 --- !u!4 &146678643
 Transform:
   m_ObjectHideFlags: 0
@@ -669,12 +668,18 @@ MonoBehaviour:
   - {fileID: 1092099603}
   segmentCount: 8
   behindBuffer: 40
-  enableCurves: 1
-  curveLength: 80
-  bendAngle: 25
-  maximumHeading: 35
-  straightIntroDistance: 160
   aheadBuffer: 180
+  straightIntroDistance: 160
+  curveFrequency: 0.4
+  curveLength: {x: 110, y: 150}
+  bendAngle: {x: 10, y: 20}
+  maximumHeading: 30
+  hairpinFrequency: 0.1
+  hairpinRadius: {x: 20, y: 28}
+  hairpinAngle: {x: 140, y: 180}
+  hillFrequency: 0.9
+  hillPitch: {x: 10, y: 20}
+  altitudeRange: 125
 --- !u!4 &371121413
 Transform:
   m_ObjectHideFlags: 0
@@ -2250,11 +2255,35 @@ MonoBehaviour:
   minimumLateralAcceleration: 30
   maximumLateralAcceleration: 45
   edgeMargin: 1
+  maxSteerAngle: 20
+  steeringRiseRate: 7
+  steeringReturnRate: 10
   icyRoad: 1
   iceSteeringGrip: 0.9
   iceReleaseGrip: 0.3
-  maxSteerAngle: 20
-  turnSharpness: 12
+  centrifugalDrift: 3
+  rollPerG: 6
+  maxBodyRoll: 9
+  skidOnsetTime: 0.25
+  skidRampTime: 0.7
+  skidRecoveryTime: 0.5
+  skidSlide: 5
+  skidSteeringLoss: 0.5
+  driftBodyAngle: 24
+  driftLean: 5
+  driftHopSpeed: 3.2
+  turboChargeTime: 0.6
+  turboDuration: 0.7
+  turboKick: 40
+  gravity: 9.81
+  fallGravityMultiplier: 1.4
+  maxLaunchSpeed: 4
+  airSteeringControl: 0.15
+  maxBodyPitch: 4
+  roadVibration: 0.012
+  suspensionStiffness: 120
+  suspensionDamping: 10
+  maxSuspensionTravel: 0.18
 --- !u!114 &1633598805
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2879,6 +2908,45 @@ MonoBehaviour:
   endPoint: {fileID: 0}
   waypoints: []
   width: 10
+--- !u!114 &2100000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 534353347}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8210a667e28544c298eca8b6b3cff743, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnvironmentRoot
+  player: {fileID: 1633598804}
+  road: {fileID: 371121412}
+  obstacles: {fileID: 1802903151}
+  fuelSpawner: {fileID: 382386166}
+  mysterySpawner: {fileID: 146678642}
+  policeCars:
+  - {fileID: 920425995}
+  - {fileID: 1536843010}
+  score: {fileID: 428933352}
+  rewards: {fileID: 11400000, guid: 2aa7b19beb5549e08e2a5d9867b4a16b, type: 2}
+  snow: 1
+  ocean: 0
+  desert: 0
+--- !u!114 &2100000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1802903150}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 326f4524aa4646efa57a22e57d4778cd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ApproachingObstacleMotion
+  minObstacleSpeed: 20
+  maxObstacleSpeed: 30
 --- !u!1 &2102547998
 GameObject:
   m_ObjectHideFlags: 0
@@ -3157,43 +3225,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 1c048551c4e148c4f9d65c40f8ab9b9e, type: 3}
---- !u!114 &2100000001
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 534353347}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8210a667e28544c298eca8b6b3cff743, type: 3}
-  m_Name:
-  m_EditorClassIdentifier: Assembly-CSharp::EnvironmentRoot
-  player: {fileID: 1633598804}
-  road: {fileID: 371121412}
-  obstacles: {fileID: 1802903151}
-  fuelSpawner: {fileID: 382386166}
-  mysterySpawner: {fileID: 146678642}
-  policeCars:
-  - {fileID: 920425995}
-  - {fileID: 1536843010}
-  score: {fileID: 428933352}
-  rewards: {fileID: 11400000, guid: 2aa7b19beb5549e08e2a5d9867b4a16b, type: 2}
-  snow: 1
---- !u!114 &2100000002
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1802903150}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 326f4524aa4646efa57a22e57d4778cd, type: 3}
-  m_Name:
-  m_EditorClassIdentifier: Assembly-CSharp::ApproachingObstacleMotion
-  minObstacleSpeed: 20
-  maxObstacleSpeed: 30
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

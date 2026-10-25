@@ -28,21 +28,32 @@ public sealed class RoadSegment : MonoBehaviour
         }
     }
     private float curveLength;
+    public const float HairpinRampFraction = 0.2f;
 
-    // A smooth change of heading produces a bend; a heading that returns to
-    // zero produces an S-curve. Both meet neighbouring pieces tangentially.
-    public void ConfigureCurve(float length, float angle, bool sCurve)
+    public void ConfigureCurve(float length, float angle, bool sCurve,
+        float startSlope = 0f, float endSlope = 0f,
+        bool hairpin = false)
     {
         curveLength = Mathf.Max(1f, length);
         int steps = Mathf.CeilToInt(curveLength);
         curvePoints = new Vector3[steps + 1];
         curveDirections = new Vector3[steps + 1];
         float step = curveLength / steps;
+        float baseHeight = 0f;
         for (int i = 0; i <= steps; i++)
         {
-            curveDirections[i] = Direction((float)i / steps, angle, sCurve);
-            if (i > 0)
-                curvePoints[i] = curvePoints[i - 1] + Direction((i - 0.5f) / steps, angle, sCurve) * step;
+            float t = (float)i / steps;
+            float slope = Slope(t, startSlope, endSlope);
+            Vector3 heading = Direction(t, angle, sCurve, hairpin);
+            curveDirections[i] = (heading + Vector3.up * slope).normalized;
+            if (i == 0) continue;
+            float midT = (i - 0.5f) / steps;
+            Vector3 point = curvePoints[i - 1];
+            point.y = 0f;
+            point += Direction(midT, angle, sCurve, hairpin) * step;
+            baseHeight += Slope(midT, startSlope, endSlope) * step;
+            point.y = baseHeight;
+            curvePoints[i] = point;
         }
         startPoint.SetPositionAndRotation(transform.position, transform.rotation);
         endPoint.SetPositionAndRotation(transform.TransformPoint(curvePoints[steps]),
@@ -52,10 +63,30 @@ public sealed class RoadSegment : MonoBehaviour
         if (TryGetComponent(out RoadMarking markings)) markings.Rebuild();
     }
 
-    private static Vector3 Direction(float t, float angle, bool sCurve)
+    private static float Slope(float t, float startSlope, float endSlope)
     {
-        float blend = sCurve ? Mathf.Pow(Mathf.Sin(Mathf.PI * t), 2f) : t * t * (3f - 2f * t);
+        return Mathf.Lerp(startSlope, endSlope, t * t * (3f - 2f * t));
+    }
+
+    private static Vector3 Direction(float t, float angle, bool sCurve, bool hairpin)
+    {
+        float blend = hairpin ? HairpinBlend(t)
+            : sCurve ? Mathf.Pow(Mathf.Sin(Mathf.PI * t), 2f) : t * t * (3f - 2f * t);
         return Quaternion.Euler(0f, angle * blend, 0f) * Vector3.forward;
+    }
+
+    private static float HairpinBlend(float t)
+    {
+        const float r = HairpinRampFraction;
+        float h;
+        if (t < r) h = t * t / (2f * r);
+        else if (t <= 1f - r) h = r * 0.5f + (t - r);
+        else
+        {
+            float u = 1f - t;
+            h = (1f - r) - u * u / (2f * r);
+        }
+        return h / (1f - r);
     }
 
     public RoadPathPoint Sample(float distance)
@@ -84,8 +115,6 @@ public sealed class RoadSegment : MonoBehaviour
 
     public float ProjectDistance(Vector3 position, out float sqrDistance)
     {
-        // Generated segments use unit scale. Project locally to avoid hundreds
-        // of TransformPoint calls for every obstacle and pickup each frame.
         if (curvePoints != null) position = transform.InverseTransformPoint(position);
         float closest = 0f;
         float travelled = 0f;
@@ -101,7 +130,8 @@ public sealed class RoadSegment : MonoBehaviour
             if (candidate < sqrDistance)
             {
                 sqrDistance = candidate;
-                closest = travelled + length * t;
+                closest = curvePoints != null ? (i - 1 + t) * (curveLength / (curvePoints.Length - 1))
+                    : travelled + length * t;
             }
             travelled += length;
         }
@@ -152,6 +182,14 @@ public sealed class RoadSegment : MonoBehaviour
 
     public void AlignStartTo(Pose entry)
     {
+        if (curvePoints != null)
+        {
+            Vector3 forward = entry.rotation * Vector3.forward;
+            float yaw = Mathf.Atan2(forward.x, forward.z) * Mathf.Rad2Deg;
+            transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+            transform.position += entry.position - startPoint.position;
+            return;
+        }
         Quaternion correction = entry.rotation * Quaternion.Inverse(startPoint.rotation);
         transform.rotation = correction * transform.rotation;
         transform.position += entry.position - startPoint.position;
