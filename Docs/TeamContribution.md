@@ -59,13 +59,13 @@ The team version supplies the endless road, automatic forward driving, steering 
 
 ## Files owned by our slice
 
-- `Assets/Scripts/Pickups/`
-- `Assets/Scripts/PickupIntegration/`
-- `Assets/Prefabs/Pickups/MysteryPickup.prefab`
+- `Assets/Scripts/Rewards/`
+- `Assets/Scripts/Rewards/Spawning/`
+- `Assets/Prefabs/Rewards/MysteryPickup.prefab`
 - `Assets/Editor/Pickups/`
 - `Assets/Tests/Editor/`
 - `Assets/Scenes/PickupPlayground.unity`
 - `Assets/Scenes/GetawayChase.unity` integration objects
-- `Assets/Scripts/Car/AutoDriveCar.cs`
-- `Assets/Scripts/Car/HandleCrash.cs`
-- `Assets/Scripts/HUD/Proximity/ChaseMeter.cs`
+- `Assets/Scripts/Player/Driving/AutoDriveCar.cs`
+- `Assets/Scripts/Player/Driving/HandleCrash.cs`
+- `Assets/Scripts/UI/Proximity/ChaseMeter.cs`

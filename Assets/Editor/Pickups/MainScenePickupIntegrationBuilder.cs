@@ -8,7 +8,7 @@ using UnityEngine.SceneManagement;
 public static class MainScenePickupIntegrationBuilder
 {
     private const string ScenePath = "Assets/Scenes/GetawayChase.unity";
-    private const string PrefabPath = "Assets/Prefabs/Pickups/MysteryPickup.prefab";
+    private const string PrefabPath = "Assets/Prefabs/Rewards/MysteryPickup.prefab";
 
     [MenuItem("Money Heist/Pickups/Integrate Into Main Scene")]
     public static void Integrate()

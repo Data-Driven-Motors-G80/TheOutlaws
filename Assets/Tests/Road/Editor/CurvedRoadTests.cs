@@ -82,8 +82,9 @@ public sealed class CurvedRoadTests
         Assert.That(mesh.vertexCount, Is.EqualTo(42));
     }
 
-    [Test]
-    public void StreamingKeepsAheadAndBehindCoverageOverLongRun()
+    [TestCase(false)]
+    [TestCase(true)]
+    public void StreamingKeepsAheadAndBehindCoverageOverLongRun(bool hairpins)
     {
         RoadSegment template = MakeSegment();
         GameObject car = MakeObject("Test Car");
@@ -92,7 +93,8 @@ public sealed class CurvedRoadTests
         InfiniteRoad road = holder.AddComponent<InfiniteRoad>();
         Set(road, "car", car.transform);
         Set(road, "segmentPrefabs", new[] { template });
-        Set(road, "enableCurves", true);
+        Set(road, "curveFrequency", 1f);
+        Set(road, "hairpinFrequency", hairpins ? 0.15f : 0f);
         Set(road, "behindBuffer", 40f);
         Set(road, "straightIntroDistance", 160f);
         Assert.That(road.TryGetDistance(car.transform.position, out float start), Is.True);
@@ -108,8 +110,12 @@ public sealed class CurvedRoadTests
             Assert.That(road.IsBehind(behind.Position, point.Position, 10f), Is.True);
             Assert.That(road.IsBehind(ahead.Position, point.Position, 10f), Is.False);
             Assert.That(road.LastDistance - distance, Is.GreaterThanOrEqualTo(179.9f));
-            Assert.That(point.Forward.z, Is.GreaterThan(0.8f));
-            Assert.That(point.Position.z, Is.GreaterThanOrEqualTo(previousZ - 0.001f));
+            Assert.That(point.Forward.sqrMagnitude, Is.EqualTo(1f).Within(0.001f));
+            if (!hairpins)
+            {
+                Assert.That(point.Forward.z, Is.GreaterThan(0.8f));
+                Assert.That(point.Position.z, Is.GreaterThanOrEqualTo(previousZ - 0.001f));
+            }
             previousZ = point.Position.z;
         }
         Assert.That(road.TrySample(road.LastDistance + 1f, out _), Is.False);

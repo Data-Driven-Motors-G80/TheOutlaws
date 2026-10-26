@@ -42,13 +42,14 @@ public sealed class FuelAndRandomPickupTests
     }
 
     [Test]
-    public void RandomPickupOutcomeState_ProducesAllFourOutcomesWithASeed()
+    public void RandomPickupOutcomeState_ProducesAllFiveOutcomesWithASeed()
     {
         var outcomes = new RandomPickupOutcomeState(12345);
         int reverse = 0;
         int proximity = 0;
         int shield = 0;
         int nitro = 0;
+        int gun = 0;
 
         for (int i = 0; i < 1000; i++)
         {
@@ -62,6 +63,9 @@ public sealed class FuelAndRandomPickupTests
                     break;
                 case RandomPickupOutcome.Shield:
                     shield++;
+                    break;
+                case RandomPickupOutcome.Gun:
+                    gun++;
                     break;
                 case RandomPickupOutcome.Nitro:
                     nitro++;
@@ -79,7 +83,7 @@ public sealed class FuelAndRandomPickupTests
         Assert.That(proximity, Is.GreaterThan(0));
         Assert.That(shield, Is.GreaterThan(0));
         Assert.That(nitro, Is.GreaterThan(0));
-        Assert.That(reverse + proximity + shield + nitro, Is.EqualTo(1000));
+        Assert.That(reverse + proximity + shield + nitro + gun, Is.EqualTo(1000));
     }
 
     [Test]
