@@ -1,0 +1,26 @@
+{
+  "build": "beta-progress",
+  "source_commit": "1b07a547d31c1115d34e269fc0ffe415add235a8",
+  "unity": "6000.3.23f1",
+  "analytics_build": "beta-progress-1b07a54",
+  "built_at_utc": "2026-10-27T21:13:40.727795+00:00",
+  "sha256": {
+    "index.html": "6a195b030502fe3d9050aa87280d4748176324f636d7da0e855bdb23bbd29126",
+    "TemplateData/MemoryProfiler.png": "0ce87be20d0c24ab6cb73b57de2004da261cc2a641e69319c6ae3fe11fc85483",
+    "TemplateData/fullscreen-button.png": "21221581673a54b8139d408d4a3f8d2b879e86827d4b6fc53b995ff7a99ee3e9",
+    "TemplateData/unity-logo-dark.png": "c1b72d26c096487dabc948b54bc203f8dac7ed4e3f5733918798e858acb4b159",
+    "TemplateData/favicon.ico": "9c13beb90ee8f70580d52a21d5233970d1c89e71e4a34a462c22610941c3c77f",
+    "TemplateData/webmemd-icon.png": "c56f5494640cedda273aad38d58e6ab9da625d5b3f4d875c0ff92c6192a569c2",
+    "TemplateData/progress-bar-empty-light.png": "143696c060ad43d6c30f19ff5f49000927a139a2a1e4c9f45fafaa2b90d7d2be",
+    "TemplateData/style.css": "80acab5f9147ed15876d638d776c0f9c6b4c273c01c96d82d23b6c53ea96f9cf",
+    "TemplateData/unity-logo-title-footer.png": "9e8b3bdb67c2446d16362fe59449d892100931dbbadfe6a9d923a4142b57a79f",
+    "TemplateData/progress-bar-full-dark.png": "3306a6244dcb3926fca38a28e3ced589df8ff1beed955eb17c0bbf01c918bc62",
+    "TemplateData/progress-bar-full-light.png": "12395ea785480c5cdf12fade6e6cbf49666d5bb1cef7240c113dbcba6bdc5c87",
+    "TemplateData/progress-bar-empty-dark.png": "bbee7131afe8a3365906240d89184dc86234c119467f390bc4bc6802328fdb4d",
+    "TemplateData/unity-logo-light.png": "002990aea0d946833cadc1519d5b7e50a4570bd537a0517dd79a59d3eec84da7",
+    "Build/outlaws-beta-progress-output.framework.js.unityweb": "a6de2ae27ce2ed3523d43738cec600dbc888bba6108f52f9d9920d79841468b1",
+    "Build/outlaws-beta-progress-output.loader.js": "ac575d482ef50b86a7605d7fc36833b77b499594d9e8547f6a89613b69fe8056",
+    "Build/outlaws-beta-progress-output.data.unityweb": "2f5895037b5d40c2db90a42a0fd9935d00bb27d2dda6132b078618a759aa98b3",
+    "Build/outlaws-beta-progress-output.wasm.unityweb": "6f2d923d58f8da4ccd5820a868ffd212f5d369eec2b7b6ba0aec9b4175dc1617"
+  }
+}
