@@ -122,6 +122,9 @@ public sealed class AutoDriveCar : MonoBehaviour
     private bool hasSpeedSample;
     private bool wasDrifting;
     private bool managedDifficulty;
+    // Finite prototypes can supply a path and tick the same handling explicitly.
+    // The regular InfiniteRoad/input-driven lifecycle continues to use Update.
+    private System.Func<float, RoadPathPoint> externalRoute;
 
     public event System.Action<float> Landed;
     public event System.Action<float> DriftBoosted;
@@ -145,11 +148,61 @@ public sealed class AutoDriveCar : MonoBehaviour
     public float EnvironmentSteeringGrip { get; set; } = 1f;
     public float RoadDistanceTravelled { get; private set; }
     public float RoadPositionDistance { get; private set; }
+    public float LateralOffset => lateralOffset;
     public float SpeedIncreaseTimer => speedIncreaseTimer;
     public float StartingSpeed => forwardSpeed;
     public float MaximumSpeed => maximumForwardSpeed;
     public float SpeedIncreaseAmount => speedIncreaseAmount;
     public float SpeedIncreaseInterval => speedIncreaseInterval;
+
+    public void ConfigureExternalRoute(System.Func<float, RoadPathPoint> sampler, Transform body, float speed)
+    {
+        externalRoute = sampler ?? throw new System.ArgumentNullException(nameof(sampler));
+        enabled = false;
+        visual = body;
+        if (visual != null) visualBasePosition = visual.localPosition;
+        pickupEffects = null;
+        managedDifficulty = true;
+        currentForwardSpeed = speed;
+        RestoreExternalPose(0f, 0f);
+    }
+
+    public void RestoreExternalPose(float distance, float lateral)
+    {
+        if (externalRoute == null) return;
+        RoadPositionDistance = RoadDistanceTravelled = distance;
+        lateralOffset = lateral;
+        heightOffset = 0.08f;
+        lateralSpeed = 0f;
+        roll = rollVelocity = bounce = bounceVelocity = 0f;
+        previousLateralSpeed = 0f;
+        ResetHandling();
+        RoadPathPoint point = externalRoute(distance);
+        transform.SetPositionAndRotation(point.Position + point.Right * lateral + point.Up * heightOffset,
+            Quaternion.LookRotation(point.Forward, point.Up));
+        if (visual != null)
+        {
+            visual.localPosition = visualBasePosition;
+            visual.localRotation = Quaternion.identity;
+        }
+    }
+
+    public void StepExternal(float deltaTime, float steering, float speed)
+    {
+        if (externalRoute == null || deltaTime <= 0f) return;
+        currentForwardSpeed = speed;
+        Drive(deltaTime, steering);
+    }
+
+    /// <summary>Resolve contact with a finite route's solid lane divider without resetting body response.</summary>
+    public void ConstrainExternalLateral(float lateral)
+    {
+        if (externalRoute == null) return;
+        lateralOffset = lateral;
+        lateralSpeed = driftSpeed = 0f;
+        RoadPathPoint point = externalRoute(RoadPositionDistance);
+        transform.position = point.Position + point.Right * lateralOffset + point.Up * heightOffset + Vector3.up * airHeight;
+    }
 
     public void SetDifficultySpeed(float speed)
     {
@@ -235,6 +288,11 @@ public sealed class AutoDriveCar : MonoBehaviour
         heightOffset = Vector3.Dot(offset, start.Up);
 
         currentForwardSpeed = Mathf.Min(forwardSpeed, maximumForwardSpeed);
+        ResetHandling();
+    }
+
+    private void ResetHandling()
+    {
         driftSpeed = 0f;
         steerHoldTime = 0f;
         Skid = 0f;
@@ -261,10 +319,15 @@ public sealed class AutoDriveCar : MonoBehaviour
 
         if (!managedDifficulty) UpdateForwardSpeed(deltaTime);
 
+        Drive(deltaTime, steerAction.ReadValue<float>());
+    }
+
+    private void Drive(float deltaTime, float rawSteering)
+    {
         float speedProgress = Mathf.InverseLerp(forwardSpeed, maximumForwardSpeed, currentForwardSpeed);
         float currentMaxLateralSpeed = Mathf.Lerp(minimumLateralSpeed, maximumLateralSpeed, speedProgress);
         float currentLateralAcceleration = Mathf.Lerp(minimumLateralAcceleration, maximumLateralAcceleration, speedProgress);
-        float steerInput = SmoothSteering(Mathf.Clamp(steerAction.ReadValue<float>(), -1f, 1f), deltaTime);
+        float steerInput = SmoothSteering(Mathf.Clamp(rawSteering, -1f, 1f), deltaTime);
 
         float forwardDistance = currentForwardSpeed * EnvironmentSpeedMultiplier * deltaTime;
         float accelerationMultiplier = 1f;
@@ -303,7 +366,7 @@ public sealed class AutoDriveCar : MonoBehaviour
         if (captured) lateralSpeed = 0f;
 
         float nextDistance = RoadPositionDistance + forwardDistance;
-        if (!road.TrySample(nextDistance, out RoadPathPoint next)) return;
+        if (!TrySampleRoad(nextDistance, out RoadPathPoint next)) return;
 
         float limit = Mathf.Max(0f, next.Width * 0.5f - edgeMargin);
 
@@ -380,12 +443,20 @@ public sealed class AutoDriveCar : MonoBehaviour
     private float SampleYawRate(float distance)
     {
         const float half = 2f;
-        if (!road.TrySample(distance - half, out RoadPathPoint from) ||
-            !road.TrySample(distance + half, out RoadPathPoint to)) return 0f;
+        if (!TrySampleRoad(distance - half, out RoadPathPoint from) ||
+            !TrySampleRoad(distance + half, out RoadPathPoint to)) return 0f;
         Vector3 a = Vector3.ProjectOnPlane(from.Forward, Vector3.up);
         Vector3 b = Vector3.ProjectOnPlane(to.Forward, Vector3.up);
         if (a.sqrMagnitude < 1e-6f || b.sqrMagnitude < 1e-6f) return 0f;
         return Vector3.SignedAngle(a, b, Vector3.up) * Mathf.Deg2Rad / (2f * half);
+    }
+
+    private bool TrySampleRoad(float distance, out RoadPathPoint point)
+    {
+        if (externalRoute != null) { point = externalRoute(distance); return true; }
+        if (road != null) return road.TrySample(distance, out point);
+        point = default;
+        return false;
     }
 
     private Vector3 UpdateVertical(RoadPathPoint point, float groundY, float forwardDistance, float deltaTime)

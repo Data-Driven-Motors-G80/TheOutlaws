@@ -55,6 +55,12 @@ public sealed class RearViewCamera : MonoBehaviour
     private void LateUpdate()
     {
         if (player == null) return;
+        Camera main = Camera.main;
+        if (main != null)
+        {
+            view.clearFlags = main.clearFlags;
+            view.backgroundColor = main.backgroundColor;
+        }
         Vector3 forward = player.forward;
         Vector3 up = player.up;
         // Above the car's middle, looking back: the rear of the player's car sits at the
@@ -68,7 +74,7 @@ public sealed class RearViewCamera : MonoBehaviour
             int count = 0;
             foreach (ChaseCar car in police)
             {
-                if (car == null || !car.isActiveAndEnabled) continue;
+                if (car == null || !car.gameObject.activeInHierarchy || (!car.isActiveAndEnabled && !car.IsFiniteRoute)) continue;
                 sum += car.transform.position;
                 count++;
             }
@@ -76,6 +82,15 @@ public sealed class RearViewCamera : MonoBehaviour
         }
 
         transform.rotation = Quaternion.LookRotation(target + up * 0.2f - transform.position, up);
+    }
+
+    /// <summary>Refresh the existing mirror immediately after an explicit simulation step.</summary>
+    public void RefreshView() => LateUpdate();
+
+    public void RenderPreview()
+    {
+        LateUpdate();
+        if (view != null && view.targetTexture != null) view.Render();
     }
 
     private void OnDestroy()
