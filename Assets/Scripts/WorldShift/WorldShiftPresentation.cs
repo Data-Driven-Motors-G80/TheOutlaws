@@ -5,11 +5,11 @@ using UnityEngine.Rendering;
 
 namespace Outlaws.WorldShift
 {
-    /// <summary>Primitive city geometry and unambiguous solid/outline world presentation.</summary>
+    /// <summary>Primitive city geometry. Only the current world has visible hazards.</summary>
     public sealed class WorldShiftPresentation : MonoBehaviour
     {
         private sealed class PaletteItem { public Renderer Renderer; public Material Day, Echo; }
-        private sealed class Chunk { public GameObject Root; public float At, End; public float Tail = 90f; }
+        private sealed class Chunk { public GameObject Root; public float At, End; public float Tail = 90f; public bool CityBlock; }
         private sealed class HazardView
         {
             public ShiftHazard Data;
@@ -33,7 +33,6 @@ namespace Outlaws.WorldShift
         private readonly List<Mesh> spikeMeshes = new List<Mesh>();
         private WorldShiftCity game;
         private GameObject obstaclePrefab, policePrefab, streetlightPrefab, fuelPrefab;
-        private bool showPreviews = true;
         private WorldShiftRoute route;
         private Camera view;
         private Light sun;
@@ -41,6 +40,9 @@ namespace Outlaws.WorldShift
         private GameObject headlightHaze;
         private Material headlightHazeMaterial;
         private WorldShiftRoadside roadside;
+        private WorldShiftConvergence convergence;
+        private WorldShiftRift rift;
+        private WorldShiftRelayVisuals relayVisuals;
         private readonly List<Material> ownedMaterials = new List<Material>();
         private readonly List<NightReflector> nightReflectors = new List<NightReflector>();
         private readonly List<PedestrianView> pedestrians = new List<PedestrianView>();
@@ -70,8 +72,20 @@ namespace Outlaws.WorldShift
             BuildHeadlight(player);
             roadside = gameObject.AddComponent<WorldShiftRoadside>();
             roadside.Build(route);
+            convergence = gameObject.AddComponent<WorldShiftConvergence>();
+            convergence.BuildWallsOnly(route);
+            if (!game.SplitViewValidation)
+            {
+                rift = gameObject.AddComponent<WorldShiftRift>();
+                rift.Build(game, route);
+            }
+            if (!game.SplitViewValidation && !game.TutorialLevel)
+            {
+                relayVisuals = gameObject.AddComponent<WorldShiftRelayVisuals>();
+                relayVisuals.Build(game, route);
+            }
             BuildCity();
-            foreach (ShiftHazard hazard in WorldShiftLevel.Hazards) BuildHazard(hazard);
+            foreach (ShiftHazard hazard in game.Hazards) BuildHazard(hazard);
             BuildFuel();
             BuildCheckpoints();
             UpdateVisibility(0f);
@@ -84,13 +98,13 @@ namespace Outlaws.WorldShift
             Color[] colours = { new Color(0.36f, 0.53f, 0.57f), new Color(0.58f, 0.43f, 0.37f),
                 new Color(0.61f, 0.57f, 0.43f), new Color(0.43f, 0.46f, 0.54f) };
             var random = new System.Random(2710);
-            for (float at = -80f; at < WorldShiftLevel.Length + 80f; at += 40f)
+            for (float at = -80f; at < game.RunLength + 80f; at += 40f)
             {
                 RoadPathPoint p = route.Sample(at + 20f);
                 Transform block = new GameObject("City block " + at.ToString("0")).transform;
                 block.SetParent(root.transform, false);
                 block.SetPositionAndRotation(p.Position, Quaternion.LookRotation(p.Forward, p.Up));
-                chunks.Add(new Chunk { Root = block.gameObject, At = at + 20f });
+                chunks.Add(new Chunk { Root = block.gameObject, At = at + 20f, CityBlock = true });
                 for (int side = -1; side <= 1; side += 2)
                 {
                     for (int n = 0; n < 2; n++)
@@ -166,15 +180,25 @@ namespace Outlaws.WorldShift
             var solid = new GameObject("Solid - collides in this world"); solid.transform.SetParent(root, false);
             var ghost = new GameObject("Outline - belongs to other world"); ghost.transform.SetParent(root, false);
             Material outline = data.World == ShiftWorld.Day ? warmEdge : coldEdge;
+            Material ghostLine = Reflective(data.World == ShiftWorld.Day
+                ? new Color(.62f, .42f, .18f) : new Color(.20f, .50f, .60f), .24f);
             Material fire = RuntimeMaterials.Coloured(data.World == ShiftWorld.Day ? new Color(0.95f, 0.24f, 0.07f) : new Color(0.2f, 0.65f, 0.9f));
             Material body = RuntimeMaterials.Coloured(data.World == ShiftWorld.Day ? new Color(0.14f, 0.18f, 0.24f) : new Color(0.58f, 0.7f, 0.79f));
             float depth = data.End - data.Start;
             if (data.Kind == ShiftHazardKind.Gap)
             {
-                WorldShiftRoadSigns.BuildGapWarnings(solid.transform, route, data.Start);
+                WorldShiftRoadSigns.BuildGapWarnings(solid.transform, route, data.Start, data.World == ShiftWorld.Echo);
                 BuildPitLighting(solid.transform, data);
                 WorldShiftPitVisuals.Build(solid.transform, route, data);
-                WireBox(ghost.transform, Vector3.up * 0.08f, new Vector3(9.6f, 0.08f, depth), outline);
+            }
+            else if (data.Kind == ShiftHazardKind.HalfBarrier)
+            {
+                float x = data.HalfSide * WorldShiftLevel.RoadWidth * .25f;
+                Material concrete = RuntimeMaterials.Coloured(new Color(.5f, .52f, .55f));
+                Material stripe = outline;
+
+                // Route-fitted one-metre slices keep even the wall-side end flush on bends.
+                convergence.BuildWall(solid.transform, data, concrete, stripe);
             }
             else if (data.Kind == ShiftHazardKind.Divider)
             {
@@ -191,13 +215,15 @@ namespace Outlaws.WorldShift
                         new Vector3(2.8f, .08f, Mathf.Min(1.2f, length)), warmEdge);
                     reflector.transform.SetPositionAndRotation(section.Position + section.Up * 1.08f,
                         Quaternion.LookRotation(section.Forward, section.Up));
+                    var outlineSection = new GameObject("Divider preview segment").transform;
+                    outlineSection.SetParent(ghost.transform, false);
+                    outlineSection.SetPositionAndRotation(section.Position, Quaternion.LookRotation(section.Forward, section.Up));
                 }
             }
             else if (data.Kind == ShiftHazardKind.Pedestrians)
             {
                 BuildCrossing(solid.transform, data);
                 WorldShiftRoadSigns.BuildCrossing(solid.transform);
-                WireBox(ghost.transform, Vector3.up, new Vector3(9.6f, 2f, depth), outline);
             }
             else if (data.Kind == ShiftHazardKind.Oncoming)
             {
@@ -205,10 +231,7 @@ namespace Outlaws.WorldShift
                 float x = (lane - 1) * WorldShiftLevel.RoadWidth / 3f;
                 if (policePrefab != null)
                 {
-                    GameObject car = Visual(policePrefab, solid.transform, new Vector3(x, .03f, 0f), Vector3.one * 1.15f);
-                    car.name = "Oncoming police - faces player";
-                    car.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
-                    foreach (Light light in car.GetComponentsInChildren<Light>()) light.enabled = false;
+                    WorldShiftTrafficVisual.Create(policePrefab, solid.transform, x);
                 }
                 else
                 {
@@ -216,7 +239,7 @@ namespace Outlaws.WorldShift
                     Box(solid.transform, "Oncoming police cabin", new Vector3(x, 1.2f, 0f), new Vector3(1.4f, .5f, 1.6f), body);
                 }
                 Box(solid.transform, "Approaching white headlight bar", new Vector3(x, .65f, -1.8f), new Vector3(1.75f, .15f, .07f),
-                    RuntimeMaterials.Coloured(new Color(1f, 1f, .86f)));
+                    Reflective(new Color(1f, 1f, .86f), .5f));
             }
             else
             {
@@ -224,7 +247,6 @@ namespace Outlaws.WorldShift
                 {
                     if ((data.LaneMask & (1 << lane)) == 0) continue;
                     float x = (lane - 1) * WorldShiftLevel.RoadWidth / 3f;
-                    WireBox(ghost.transform, new Vector3(x, 1f, 0f), new Vector3(3.15f, 2f, depth), outline);
                     if (data.Kind == ShiftHazardKind.Fire)
                     {
                         Box(solid.transform, "Fire footprint", new Vector3(x, 0.14f, 0f), new Vector3(3.22f, 0.28f, depth), fire);
@@ -330,9 +352,10 @@ namespace Outlaws.WorldShift
 
         private void BuildCheckpoints()
         {
-            for (int i = 0; i <= WorldShiftLevel.Checkpoints.Length; i++)
+            for (int i = 0; i <= game.Checkpoints.Length; i++)
             {
-                float at = i == WorldShiftLevel.Checkpoints.Length ? WorldShiftLevel.Length : WorldShiftLevel.Checkpoints[i].Distance;
+                float at = i == game.Checkpoints.Length ? game.RunLength : game.Checkpoints[i].Distance;
+                if (!game.SplitViewValidation && i < game.Checkpoints.Length && game.IsJoinedDistance(at)) continue; // The rift replaces the entrance marker, not extraction.
                 RoadPathPoint p = route.Sample(at);
                 Transform root = new GameObject("Checkpoint marker " + i).transform;
                 root.SetParent(transform, false);
@@ -341,7 +364,7 @@ namespace Outlaws.WorldShift
                 Material marker = RuntimeMaterials.Coloured(new Color(0.25f, 0.93f, 0.7f));
                 foreach (float x in new[] { -5.8f, 5.8f }) Box(root, "Checkpoint post", new Vector3(x, 2.5f, 0f), new Vector3(0.18f, 5f, 0.18f), marker);
                 Box(root, "Checkpoint lintel", new Vector3(0f, 5f, 0f), new Vector3(11.8f, 0.18f, 0.18f), marker);
-                Label(root, i == WorldShiftLevel.Checkpoints.Length ? "EXTRACTION" : "SECTOR " + (i + 1).ToString("00"),
+                Label(root, i == game.Checkpoints.Length ? "EXTRACTION" : "SECTOR " + (i + 1).ToString("00"),
                     new Vector3(0f, 5.7f, 0f), 6f, new Color(0.65f, 1f, 0.86f));
             }
         }
@@ -353,13 +376,14 @@ namespace Outlaws.WorldShift
             foreach (var item in palette) item.Renderer.sharedMaterial = day ? item.Day : item.Echo;
             RefreshHazards();
             RefreshFuel();
+            if (relayVisuals != null) relayVisuals.SetWorld(next);
             foreach (GameObject lamp in nightLamps) lamp.SetActive(!day);
             if (playerHeadlight != null) playerHeadlight.enabled = !day;
             if (headlightHaze != null) headlightHaze.SetActive(!day);
             if (roadside != null) roadside.SetWorld(next);
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Flat;
-            RenderSettings.ambientLight = day ? new Color(0.72f, 0.72f, 0.68f) : new Color(0.045f, 0.065f, 0.09f);
+            RenderSettings.ambientLight = day ? new Color(0.72f, 0.72f, 0.68f) : new Color(0.28f, 0.34f, 0.43f);
             // Update the probe too: an old daylight ambient probe otherwise keeps
             // lighting every facade after the visible sky has turned black.
             var ambient = new SphericalHarmonicsL2();
@@ -368,14 +392,15 @@ namespace Outlaws.WorldShift
             RenderSettings.reflectionIntensity = day ? 1f : 0f;
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogStartDistance = day ? 140f : 24f;
-            RenderSettings.fogEndDistance = day ? 260f : 78f;
-            Color sky = day ? new Color(0.57f, 0.7f, 0.79f) : new Color(0.003f, 0.006f, 0.012f);
+            RenderSettings.fogStartDistance = day ? 140f : 48f;
+            RenderSettings.fogEndDistance = day ? 260f : 150f;
+            Color sky = day ? new Color(0.57f, 0.7f, 0.79f) : new Color(0.065f, 0.10f, 0.155f);
             RenderSettings.fogColor = sky;
             view.clearFlags = CameraClearFlags.SolidColor;
             view.backgroundColor = sky;
             sun.color = day ? new Color(1f, 0.87f, 0.7f) : new Color(0.56f, 0.76f, 1f);
-            sun.intensity = day ? 1.25f : 0.01f;
+            sun.intensity = day ? 1.25f : 0.40f;
+
         }
 
         public void UpdateVisibility(float distance)
@@ -383,14 +408,21 @@ namespace Outlaws.WorldShift
             if (headlightHazeMaterial != null)
             {
                 float clearRoad = 54f;
-                foreach (ShiftHazard hazard in WorldShiftLevel.Hazards)
+                foreach (ShiftHazard hazard in game.Hazards)
                     if (hazard.World == world && hazard.Kind == ShiftHazardKind.Gap && hazard.End > distance)
                         clearRoad = Mathf.Min(clearRoad, Mathf.Max(0f, hazard.Start - distance - 4f));
+                if (!game.SplitViewValidation)
+                    foreach (var jump in WorldShiftRelay.Sections)
+                    {
+                        float edge = world == jump.Source ? jump.Takeoff : jump.Ramp;
+                        float end = world == jump.Source ? jump.End : jump.Landing;
+                        if (end > distance) clearRoad = Mathf.Min(clearRoad, Mathf.Max(0f, edge - distance - 4f));
+                    }
                 headlightHazeMaterial.SetFloat("_ClearRoadLength", clearRoad);
             }
             if (roadside != null) roadside.UpdateVisibility(distance);
-            bool previews = distance < WorldShiftLevel.TutorialEnd;
-            if (previews != showPreviews) { showPreviews = previews; RefreshHazards(); }
+            if (rift != null) rift.Refresh(distance);
+            if (relayVisuals != null) relayVisuals.Refresh(distance);
             foreach (var hazard in hazards)
             {
                 if (hazard.Data.Kind != ShiftHazardKind.Oncoming) continue;
@@ -408,14 +440,16 @@ namespace Outlaws.WorldShift
             foreach (var hazard in hazards)
             {
                 bool active = hazard.Data.World == world;
-                bool preview = showPreviews && hazard.Data.Start < WorldShiftLevel.TutorialEnd && !active;
+                bool preview = ShouldPreview(hazard, distance);
+                hazard.Ghost.SetActive(preview);
                 // TMP labels are unlit. Fade distant labels too, otherwise they
                 // reveal the entire night layout through the shorter visibility.
                 float ahead = hazard.Chunk.At - distance;
                 float legibility = world == ShiftWorld.Day ? 1f : 1f - Mathf.InverseLerp(50f, 82f, ahead);
-                hazard.Label.gameObject.SetActive(hazard.Data.Kind != ShiftHazardKind.Gap && (active || preview) && legibility > 0f);
+                hazard.Label.gameObject.SetActive(hazard.Data.Kind != ShiftHazardKind.Gap && hazard.Data.Kind != ShiftHazardKind.HalfBarrier && active && legibility > 0f);
                 hazard.Label.alpha = (active ? 1f : .65f) * legibility;
             }
+            if (game.IsMerged) RefreshFuel();
             UpdateNightReflectors();
         }
 
@@ -454,7 +488,7 @@ namespace Outlaws.WorldShift
                     {
                         glow = new Material(original) { name = "Night obstacle faint self light" };
                         glow.EnableKeyword("_EMISSION");
-                        glow.SetColor(EmissionId, original.GetColor("_BaseColor") * .012f);
+                        glow.SetColor(EmissionId, original.GetColor("_BaseColor") * .10f);
                         ownedMaterials.Add(glow);
                         obstacleGlowMaterials.Add(original, glow);
                     }
@@ -474,15 +508,22 @@ namespace Outlaws.WorldShift
                 if (surface.name == "Barrier reflector" || surface.name == "White cliff reflector"
                     || surface.name == "Crossing sign") RegisterNightReflector(surface, white);
                 else if (surface.name == "Spike strip warning") RegisterNightReflector(surface, yellow);
-                else if (surface.name == "Warning-striped cliff lip" && surface.sharedMaterial.color.r > .4f)
+                else if ((surface.name == "Warning-striped cliff lip" || surface.name == "Broken deck hazard lip") && surface.sharedMaterial.color.r > .4f)
                     RegisterNightReflector(surface, yellow);
             }
             if (data.Kind == ShiftHazardKind.Pedestrians)
             {
                 foreach (Transform person in parent.GetComponentsInChildren<Transform>())
                     if (person.name == "Grey prototype pedestrian")
+                    {
                         RegisterNightReflector(Box(person, "Reflective chest band", new Vector3(0f, 1.2f, -.17f),
-                            new Vector3(.43f, .13f, .035f), coldEdge), yellow);
+                            new Vector3(.47f, .20f, .045f), coldEdge), yellow);
+                        RegisterNightReflector(Box(person, "Reflective head marker", new Vector3(0f, 1.77f, -.19f),
+                            new Vector3(.39f, .10f, .045f), coldEdge), white);
+                        foreach (float side in new[] { -1f, 1f })
+                            RegisterNightReflector(Box(person, "Reflective lower leg band", new Vector3(side * .13f, .36f, -.16f),
+                                new Vector3(.19f, .16f, .045f), coldEdge), yellow);
+                    }
                 return;
             }
             if (data.Kind != ShiftHazardKind.Police && data.Kind != ShiftHazardKind.Oncoming
@@ -515,7 +556,7 @@ namespace Outlaws.WorldShift
                 material.SetFloat("_Metallic", .05f);
                 material.SetFloat("_Smoothness", .7f);
                 material.EnableKeyword("_EMISSION");
-                material.SetColor(EmissionId, colour * .018f);
+                material.SetColor(EmissionId, colour * .14f);
                 ownedMaterials.Add(material);
                 reflectorMaterials.Add(colour, material);
             }
@@ -531,7 +572,7 @@ namespace Outlaws.WorldShift
             foreach (NightReflector reflector in nightReflectors)
             {
                 if (!reflector.Surface.gameObject.activeInHierarchy) continue;
-                float brightness = world == ShiftWorld.Echo ? .018f : 0f;
+                float brightness = world == ShiftWorld.Echo ? .14f : 0f;
                 if (illuminated)
                 {
                     Vector3 ray = reflector.Surface.bounds.center - playerHeadlight.transform.position;
@@ -553,13 +594,15 @@ namespace Outlaws.WorldShift
             foreach (var hazard in hazards)
             {
                 bool active = hazard.Data.World == world;
-                bool preview = showPreviews && hazard.Data.Start < WorldShiftLevel.TutorialEnd && !active;
+                bool preview = ShouldPreview(hazard, game.Distance);
                 hazard.Solid.SetActive(active);
                 hazard.Ghost.SetActive(preview);
-                hazard.Label.gameObject.SetActive(hazard.Data.Kind != ShiftHazardKind.Gap && (active || preview));
+                hazard.Label.gameObject.SetActive(hazard.Data.Kind != ShiftHazardKind.Gap && hazard.Data.Kind != ShiftHazardKind.HalfBarrier && active);
                 hazard.Label.alpha = active ? 1f : .65f;
             }
         }
+
+        private bool ShouldPreview(HazardView hazard, float distance) => false;
 
         private static void BuildCrossing(Transform parent, ShiftHazard data)
         {
@@ -599,9 +642,9 @@ namespace Outlaws.WorldShift
 
         private void BuildFuel()
         {
-            for (int i = 0; i < WorldShiftLevel.FuelPickups.Length; i++)
+            for (int i = 0; i < game.Pickups.Length; i++)
             {
-                ShiftFuelPickup data = WorldShiftLevel.FuelPickups[i];
+                ShiftFuelPickup data = game.Pickups[i];
                 RoadPathPoint point = route.Sample(data.Distance);
                 var root = new GameObject(data.World + " fuel " + data.Distance).transform;
                 root.SetParent(transform, false);
@@ -621,7 +664,7 @@ namespace Outlaws.WorldShift
         public void RefreshFuel()
         {
             for (int i = 0; i < fuelModels.Count; i++)
-                fuelModels[i].SetActive(WorldShiftLevel.FuelPickups[i].World == world && !game.IsFuelCollected(i));
+                fuelModels[i].SetActive((game.Pickups[i].World == world) && !game.IsFuelCollected(i));
         }
 
         private void SpikeStrip(Transform parent, float x, float depth)
@@ -765,23 +808,6 @@ namespace Outlaws.WorldShift
             var renderer = shape.GetComponent<Renderer>();
             renderer.sharedMaterial = material;
             return renderer;
-        }
-
-        private static void WireBox(Transform parent, Vector3 centre, Vector3 size, Material material)
-        {
-            const float thickness = 0.055f;
-            foreach (int axis in new[] { 0, 1, 2 })
-                for (int a = -1; a <= 1; a += 2)
-                    for (int b = -1; b <= 1; b += 2)
-                    {
-                        int other = (axis + 1) % 3, last = (axis + 2) % 3;
-                        Vector3 position = centre, extent = Vector3.one * thickness;
-                        position[other] += a * size[other] * 0.5f;
-                        position[last] += b * size[last] * 0.5f;
-                        extent[axis] = Mathf.Max(thickness, size[axis]);
-                        Renderer edge = Box(parent, "Other-world outline", position, extent, material);
-                        edge.shadowCastingMode = ShadowCastingMode.Off;
-                    }
         }
 
         private static TextMeshPro Label(Transform parent, string value, Vector3 position, float width, Color colour)

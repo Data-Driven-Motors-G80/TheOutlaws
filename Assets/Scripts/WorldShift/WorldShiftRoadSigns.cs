@@ -36,12 +36,12 @@ namespace Outlaws.WorldShift
             return signs;
         }
 
-        public static WorldShiftRoadSigns BuildGapWarnings(Transform parent, WorldShiftRoute route, float gapStart)
+        public static WorldShiftRoadSigns BuildGapWarnings(Transform parent, WorldShiftRoute route, float gapStart, bool night = false)
         {
             var signs = Create(parent, "Broken-road pictogram warnings - decoration");
             Material pole = RuntimeMaterials.Coloured(new Color(.27f, .28f, .29f));
-            Material red = signs.Glow(new Color(.95f, .045f, .025f), .22f);
-            Material yellow = signs.Glow(new Color(1f, .78f, .16f), .075f);
+            Material red = signs.Glow(new Color(.95f, .045f, .025f), night ? .65f : .22f);
+            Material yellow = signs.Glow(new Color(1f, .78f, .16f), night ? .38f : .075f);
             Material black = RuntimeMaterials.Coloured(new Color(.015f, .02f, .025f));
             // Two advance signs are anchored to the actual path, not the gap's
             // midpoint orientation, so they remain beside the road on a bend.

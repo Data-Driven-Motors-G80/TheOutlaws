@@ -16,26 +16,49 @@ namespace Outlaws.WorldShift
         private readonly List<Mesh> meshes = new List<Mesh>();
         private readonly List<Material> materials = new List<Material>();
 
-        public static WorldShiftPitVisuals Build(Transform parent, WorldShiftRoute route, ShiftHazard gap)
+        public static WorldShiftPitVisuals Build(Transform parent, WorldShiftRoute route, ShiftHazard gap, bool warnings = true)
         {
             var root = new GameObject("Open pit - fitted edges and depth cues");
             root.transform.SetParent(parent, false);
             var pit = root.AddComponent<WorldShiftPitVisuals>();
             List<Row> rows = CollectEdges(route, gap);
             if (rows.Count < 2) return pit;
-            Material wall = pit.Glow(new Color(.13f, .16f, .2f), .018f);
-            Material farWall = pit.Glow(new Color(.17f, .22f, .27f), .045f);
+            bool night = gap.World == ShiftWorld.Echo && warnings;
+            Material wall = pit.Glow(new Color(.13f, .16f, .2f), night ? .12f : .018f);
+            Material farWall = pit.Glow(new Color(.17f, .22f, .27f), night ? .25f : .045f);
             Material bottom = RuntimeMaterials.Coloured(new Color(.012f, .016f, .022f));
-            Material yellow = pit.Glow(new Color(1f, .7f, .16f), .2f);
+            Material yellow = pit.Glow(new Color(1f, .7f, .16f), night ? .65f : .2f);
             Material dark = RuntimeMaterials.Coloured(new Color(.012f, .016f, .02f));
-            Material depthMark = pit.Glow(new Color(1f, .62f, .19f), .11f);
+            Material depthMark = pit.Glow(new Color(1f, .62f, .19f), night ? .6f : .11f);
 
             pit.BuildShaft(rows, wall, farWall, bottom);
+            if (!warnings) return pit;
             pit.BuildLip(route, gap.Start, true, yellow, dark);
             pit.BuildLip(route, gap.End, false, yellow, dark);
             pit.BuildDepthMarks(route, gap, depthMark);
             pit.BuildApproachCrosses(route, gap.Start, yellow);
+            if (night) pit.BuildNightRim(route, gap, yellow);
             return pit;
+        }
+
+        private void BuildNightRim(WorldShiftRoute route, ShiftHazard gap, Material marker)
+        {
+            // Trace the opening, never cover its empty interior with a bright plane.
+            for (float at = gap.Start; at < gap.End; at += 2f)
+            {
+                float end = Mathf.Min(at + 2f, gap.End);
+                RoadPathPoint p = route.Sample((at + end) * .5f);
+                foreach (float side in new[] { -1f, 1f })
+                    Box("Night pit continuous rim", p.Position + p.Right * side * (p.Width * .5f - .04f) + p.Up * .09f,
+                        Quaternion.LookRotation(p.Forward, p.Up), new Vector3(.18f, .12f, end - at + .03f), marker);
+            }
+            foreach (float at in new[] { gap.Start, gap.End })
+            {
+                RoadPathPoint p = route.Sample(at);
+                foreach (float side in new[] { -1f, 1f })
+                    Box("Night pit corner beacon", p.Position + p.Right * side * (p.Width * .5f + .22f) + p.Up * .95f,
+                        Quaternion.LookRotation(p.Forward, p.Up), new Vector3(.16f, 1.9f, .16f), marker);
+            }
         }
 
         private static List<Row> CollectEdges(WorldShiftRoute route, ShiftHazard gap)

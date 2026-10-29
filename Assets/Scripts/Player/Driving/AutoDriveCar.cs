@@ -194,6 +194,9 @@ public sealed class AutoDriveCar : MonoBehaviour
         Drive(deltaTime, steering);
     }
 
+    // Opt-in for an authored finite-route flight. Ordinary roads keep their existing physics.
+    public bool ExternalVerticalControl { get; set; }
+
     /// <summary>Resolve contact with a finite route's solid lane divider without resetting body response.</summary>
     public void ConstrainExternalLateral(float lateral)
     {
@@ -467,6 +470,17 @@ public sealed class AutoDriveCar : MonoBehaviour
         float horizontalSpeed = deltaTime > 0.0001f ? forwardDistance / deltaTime : 0f;
         float groundVelocity = slope * horizontalSpeed;
         Vector3 flatDirection = flatLength > 1e-3f ? flat / flatLength : Vector3.forward;
+
+        if (externalRoute != null && ExternalVerticalControl)
+        {
+            IsAirborne = false;
+            airHeight = 0f;
+            verticalVelocity = groundVelocity;
+            previousGroundY = groundY;
+            previousGroundVelocity = groundVelocity;
+            hasGroundSample = true;
+            return point.Forward;
+        }
 
         if (deltaTime <= 0.0001f)
         {

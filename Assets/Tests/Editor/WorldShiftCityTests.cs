@@ -26,7 +26,7 @@ public sealed class WorldShiftCityTests
         object[] checkpoints = ((IEnumerable)level.GetField("Checkpoints").GetValue(null)).Cast<object>().ToArray();
         Assert.That(length / speed, Is.EqualTo(120f));
         Assert.That(hazards.Select(h => Field(h, "Kind").ToString()).Distinct(),
-            Is.EquivalentTo(new[] { "Fire", "Police", "Gap", "Spikes", "Barrier", "Divider", "Pedestrians", "Oncoming" }));
+            Is.EquivalentTo(new[] { "Fire", "Police", "Gap", "Spikes", "Barrier", "Divider", "Pedestrians", "Oncoming", "HalfBarrier" }));
         foreach (object hazard in hazards)
         {
             Assert.That((float)Field(hazard, "Start"), Is.InRange(0f, length));
@@ -50,9 +50,17 @@ public sealed class WorldShiftCityTests
             int lane = (int)Field(pickup, "Lane");
             Assert.That(at, Is.InRange(0f, length));
             Assert.That(lane, Is.InRange(-1, 1));
-            Assert.That(hazards.Any(h => Field(h, "World").Equals(Field(pickup, "World"))
-                && (float)Field(h, "Start") < at + 2f && (float)Field(h, "End") > at - 2f
-                && ((int)Field(h, "LaneMask") & (1 << (lane + 1))) != 0), Is.False, "Fuel needs a clear collection area.");
+            foreach (object hazard in hazards)
+            {
+                if (!Field(hazard, "World").Equals(Field(pickup, "World"))) continue;
+                // A vehicle's spawn coordinate is not its position when the
+                // player reaches this pickup. Check the actual moving bounds.
+                object[] bounds = { at, 0f, 0f };
+                hazard.GetType().GetMethod("BoundsAt").Invoke(hazard, bounds);
+                bool overlaps = (float)bounds[1] < at + 2f && (float)bounds[2] > at - 2f
+                    && ((int)Field(hazard, "LaneMask") & (1 << (lane + 1))) != 0;
+                Assert.That(overlaps, Is.False, "Fuel at " + at + " needs a clear collection area.");
+            }
         }
         Assert.That(checkpoints.Length, Is.GreaterThan(1));
         Assert.That(Field(checkpoints[0], "Distance"), Is.EqualTo(0f));
@@ -112,7 +120,7 @@ public sealed class WorldShiftCityTests
         Assert.That(haze.gameObject.activeSelf, Is.True);
         Assert.That(headlight.type, Is.EqualTo(LightType.Spot));
         Assert.That(headlight.range, Is.GreaterThanOrEqualTo(60f));
-        Assert.That(RenderSettings.fogEndDistance, Is.LessThanOrEqualTo(100f));
+        Assert.That(RenderSettings.fogEndDistance, Is.InRange(120f, 160f));
         Assert.That(Get(game, "Distance"), Is.EqualTo(distance));
         Assert.That(Get(game, "Lateral"), Is.EqualTo(lateral));
         Assert.That(player.position, Is.EqualTo(position));
@@ -132,21 +140,37 @@ public sealed class WorldShiftCityTests
         Assert.That(player.position, Is.EqualTo(position));
         Call(game, "TogglePause");
 
-        bool fireBlocked = false, gapBlocked = false, firePreview = false, gapPreview = false, spikePreview = false;
+        bool firePreview = false, gapPreview = false, spikePreview = false;
         bool medianPreview = false, trafficPreview = false, laterCrossingPreview = false, comboPreview = false, gapWarningPreview = false;
+        bool riftApproach = false, riftOpening = false, riftJoined = false;
+        bool pressureNight = false, pressureJoined = false, readabilityPeople = false, readabilityPit = false;
         bool previews = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OUTLAWS_WORLD_SHIFT_PREVIEW"));
         for (int step = 0; step < 2500 && Get(game, "State").ToString() == "Running"; step++)
         {
             distance = (float)Get(game, "Distance");
-            string desiredWorld = distance < 300f ? "Echo" : distance < 620f ? "Day"
-                : distance < 1180f ? "Echo" : distance < 1440f ? "Day" : distance < 2000f ? "Echo"
-                : distance < 2300f ? "Day" : distance < 2550f ? "Echo" : distance < 2870f ? "Day"
-                : distance < 3100f ? "Echo" : "Day";
-            if (distance >= 1820f && distance < 1855f) desiredWorld = "Day";
-            if (Get(game, "World").ToString() != desiredWorld) Assert.That(Call(game, "TrySwitch"), Is.True);
+            string desiredWorld = SafeWorld(distance);
+            if (!(bool)Get(game, "IsMerged") && Get(game, "World").ToString() != desiredWorld) Assert.That(Call(game, "TrySwitch"), Is.True);
+            if (!readabilityPeople && distance >= 290f)
+            { CapturePreview(game, "readability-01-pedestrians"); readabilityPeople = true; }
+            if (!readabilityPit && distance >= 1210f)
+            {
+                Assert.That(Call(game, "TrySwitch"), Is.True);
+                CapturePreview(game, "readability-02-night-pit");
+                Assert.That(Call(game, "TrySwitch"), Is.True);
+                readabilityPit = true;
+            }
+            if (!pressureNight && distance >= 1050f)
+            {
+                Assert.That(game.GetComponentsInChildren<Transform>().Any(t => t.name == "Outline - belongs to other world"), Is.False,
+                    "Other-world previews are removed for the entire run.");
+                CapturePreview(game, "readability-03-near-preview");
+                CapturePreview(game, "pressure-01-night-traffic"); pressureNight = true;
+            }
+            if (!pressureJoined && distance >= 3020f)
+            { CapturePreview(game, "pressure-02-joined-traffic"); pressureJoined = true; }
             if (previews && !spikePreview && distance >= 290f)
             { CapturePreview(game, "01b-spikes-echo"); spikePreview = true; }
-            if (previews && !medianPreview && distance >= 690f)
+            if (previews && !medianPreview && distance >= 850f)
             {
                 CapturePreview(game, "01c-night-no-median");
                 Assert.That(Call(game, "TrySwitch"), Is.True);
@@ -158,19 +182,44 @@ public sealed class WorldShiftCityTests
             { CapturePreview(game, "01d-oncoming-echo"); trafficPreview = true; }
             if (previews && !gapWarningPreview && distance >= 1170f)
             { CapturePreview(game, "02a-pit-approach-echo"); gapWarningPreview = true; }
-            if (previews && !comboPreview && distance >= 1818f)
+            if (!comboPreview && distance >= 1818f)
             {
-                CapturePreview(game, "02c-night-crossing-combo");
+                Assert.That(Get(game, "IsMerged"), Is.False, "No middle-sector joining remains.");
                 Assert.That(Call(game, "TrySwitch"), Is.True);
-                CapturePreview(game, "02c-day-median-combo");
                 Assert.That(Call(game, "TrySwitch"), Is.True);
                 comboPreview = true;
             }
+            if (!riftApproach && distance >= 2750f)
+            {
+                Assert.That(Get(game, "IsMerged"), Is.False);
+                Assert.That(game.GetComponentsInChildren<Transform>().Any(t => t.name.StartsWith("World rift -")), Is.True);
+                CapturePreview(game, "rift-01-approach");
+                riftApproach = true;
+            }
+            if (!riftOpening && distance >= 2807f)
+            {
+                Assert.That(Get(game, "IsMerged"), Is.True);
+                Assert.That((float)Get(game, "JoinedViewSplit"), Is.GreaterThan(.5f).And.LessThan(1f));
+                Assert.That(Call(game, "TrySwitch"), Is.False);
+                CapturePreview(game, "rift-02-opening");
+                riftOpening = true;
+            }
+            if (!riftJoined && distance >= 2960f)
+            {
+                Assert.That((float)Get(game, "JoinedViewSplit"), Is.EqualTo(.5f));
+                Call(game, "UpdateCamera", true);
+                foreach (float ahead in new[] { 0f, 30f, 90f })
+                {
+                    object point = Call(Get(game, "Route"), "Sample", distance + ahead);
+                    Assert.That(Camera.main.WorldToViewportPoint((Vector3)Get(point, "Position")).x,
+                        Is.EqualTo(.5f).Within(.002f), "The visual seam must meet the road centre at every depth.");
+                }
+                CapturePreview(game, "rift-03-joined");
+                riftJoined = true;
+            }
             if (previews && !laterCrossingPreview && distance >= 2100f)
             {
-                Assert.That(Call(game, "TrySwitch"), Is.True);
-                CapturePreview(game, "02b-night-crossing");
-                Assert.That(Call(game, "TrySwitch"), Is.True);
+                CapturePreview(game, "02b-overlap-exit");
                 laterCrossingPreview = true;
             }
             if (previews && ((!firePreview && distance >= 70f) || (!gapPreview && distance >= 1210f)))
@@ -182,29 +231,20 @@ public sealed class WorldShiftCityTests
                 Assert.That(Call(game, "TrySwitch"), Is.True);
                 if (distance < 100f) firePreview = true; else gapPreview = true;
             }
-            if ((!fireBlocked && distance >= 105f && distance < 111f)
-                || (!gapBlocked && distance >= 1255f && distance < 1265f))
-            {
-                object world = Get(game, "World");
-                int switches = (int)Get(game, "Switches");
-                Assert.That(Call(game, "TrySwitch"), Is.False, "A switch must reject an occupied or missing destination.");
-                Assert.That(Get(game, "World"), Is.EqualTo(world));
-                Assert.That(Get(game, "Switches"), Is.EqualTo(switches));
-                if (distance < 200f) fireBlocked = true;
-                else
-                {
-                    gapBlocked = true;
-                    object echo = Enum.Parse(world.GetType(), "Echo");
-                    Assert.That(Call(Get(game, "Route"), "HasSurface", distance, echo), Is.False);
-                    Assert.That(Call(Get(game, "Route"), "HasSurface", distance, world), Is.True);
-                }
-            }
-            float target = (distance >= 850f && distance < 950f) || (distance >= 1745f && distance < 1880f)
-                || distance >= 2940f ? 3.2f : distance >= 2660f ? -3.2f : 0f;
+            float target = SafeLane(distance);
+            if (distance >= 2800f)
+                Assert.That(Get(game, "World").ToString(), Is.EqualTo((float)Get(game, "Lateral") < 0f ? "Day" : "Echo"));
+            if (previews && distance >= 1749f && distance < 1751f) CapturePreview(game, "06-joined-left-block");
+            if (previews && distance >= 1869f && distance < 1871f) CapturePreview(game, "07-joined-right-block");
+            if (previews && distance >= 2909f && distance < 2911f) CapturePreview(game, "08-final-overlap");
             float steer = Mathf.Clamp((target - (float)Get(game, "Lateral")) * 2f, -1f, 1f);
             Call(game, "StepSimulation", .05f, steer, false);
+            Assert.That(Get(game, "Hits"), Is.EqualTo(0), "Safe-route contact near " + distance
+                + " m; world " + Get(game, "World") + "; lateral " + Get(game, "Lateral")
+                + "; hazards: " + string.Join(", ", ((IEnumerable)Field(game, "hitHazards")).Cast<object>()
+                    .Select(h => Field(h, "World") + " " + Field(h, "Kind") + " " + Field(h, "Start"))));
         }
-        Assert.That(fireBlocked && gapBlocked, Is.True);
+        Assert.That(riftApproach && riftOpening && riftJoined, Is.True);
         Assert.That(Get(game, "State").ToString(), Is.EqualTo("Won"));
         Assert.That(Get(game, "Deaths"), Is.EqualTo(0));
         Assert.That(Get(game, "Hits"), Is.EqualTo(0), "The complete route must remain possible without forced collisions.");
@@ -213,9 +253,43 @@ public sealed class WorldShiftCityTests
         Assert.That((float)Get(game, "FuelFraction"), Is.GreaterThan(0f).And.LessThan(1f));
         Assert.That(game.GetComponentsInChildren<Transform>(true)
             .Where(t => t.name == "Outline - belongs to other world").All(t => !t.gameObject.activeSelf), Is.True,
-            "Tutorial previews must disappear after the first sector.");
-        Assert.That((float)Get(game, "Duration"), Is.EqualTo(120f).Within(.2f));
+            "The joined finale shows real halves, without other-world ghost overlays.");
+        Assert.That((float)Get(game, "Duration"), Is.InRange(112f, 118f));
+        Assert.That(Get(game, "RelaysCompleted"), Is.EqualTo(3));
         CapturePreview(game, "03-won");
+
+        // Both halves coexist, regardless of which world the car centre belongs to.
+        var worldType = Get(game, "World").GetType();
+        foreach (string name in new[] { "Day", "Echo" })
+        {
+            object w = Enum.Parse(worldType, name);
+            Assert.That(Call(game, "FindCollision", w, 2902f, 2903f, -.3f, -.3f, false), Is.Not.Null,
+                "A car straddling the seam must still contact the visible left half-wall.");
+            Assert.That(Call(game, "FindCollision", w, 2902f, 2903f, 3.2f, 3.2f, false), Is.Null);
+            Assert.That(Call(game, "FindCollision", w, 2972f, 2973f, 3.2f, 3.2f, false), Is.Not.Null);
+            Assert.That(Call(game, "FindCollision", w, 2972f, 2973f, -3.2f, -3.2f, false), Is.Null);
+        }
+        Assert.That(game.GetComponentsInChildren<Transform>(true).Any(t => t.name.StartsWith("Joined road ")), Is.False,
+            "The full worlds are rendered; no replacement half-road geometry should be built.");
+        var rift = game.GetComponentsInChildren<Transform>(true).Single(t => t.name.StartsWith("World rift -"));
+        Assert.That(rift.GetComponentsInChildren<Collider>(true), Is.Empty);
+
+        Call(game, "RestartRun");
+        game.GetType().GetField("checkpointIndex", Flags).SetValue(game, 5);
+        Call(game, "RetryCheckpoint");
+        Assert.That(Get(game, "Distance"), Is.EqualTo(2800f));
+        Assert.That(Get(game, "World").ToString(), Is.EqualTo("Day"));
+        Assert.That(Call(game, "TrySwitch"), Is.False);
+        Call(game, "TogglePause");
+        position = player.position;
+        Call(game, "StepSimulation", .5f, 1f, true);
+        Assert.That(player.position, Is.EqualTo(position));
+        Call(game, "TogglePause");
+        for (int i = 0; i < 30; i++) Call(game, "StepSimulation", .05f, 1f, false);
+        Assert.That(Get(game, "World").ToString(), Is.EqualTo("Echo"), "Steering across joins the other world without Space.");
+        Call(game, "RetryCheckpoint");
+        Assert.That((float)Get(game, "Lateral"), Is.EqualTo(-3.2f));
+        Assert.That(Get(game, "World").ToString(), Is.EqualTo("Day"));
 
         // A moving car crosses this sweep before reaching its original authored position.
         var hazards = ((IEnumerable)RuntimeType("WorldShiftLevel").GetField("Hazards").GetValue(null)).Cast<object>().ToArray();
@@ -244,17 +318,17 @@ public sealed class WorldShiftCityTests
         Assert.That(Get(game, "World").ToString(), Is.EqualTo("Day"));
 
         // A Day median pushes contact to a side and keeps that side until the world changes.
-        for (int step = 0; (float)Get(game, "Distance") < 690f && step < 600; step++)
+        for (int step = 0; (float)Get(game, "Distance") < 850f && step < 750; step++)
         {
             distance = (float)Get(game, "Distance");
-            string desired = distance < 300f ? "Echo" : distance < 620f ? "Day" : "Echo";
+            string desired = SafeWorld(distance);
             if (Get(game, "World").ToString() != desired) Call(game, "TrySwitch");
-            Call(game, "StepSimulation", .05f, Mathf.Clamp(-(float)Get(game, "Lateral") * 2f, -1f, 1f), false);
+            Call(game, "StepSimulation", .05f, Mathf.Clamp((SafeLane(distance) - (float)Get(game, "Lateral")) * 2f, -1f, 1f), false);
         }
         Assert.That(Call(game, "TrySwitch"), Is.True);
         int beforeMedian = (int)Get(game, "Hits");
         Call(game, "StepSimulation", .6f, 0f, false);
-        Call(game, "StepSimulation", 1f, -1f, false);
+        Call(game, "StepSimulation", .35f, -1f, false);
         Assert.That((float)Get(game, "Lateral"), Is.GreaterThanOrEqualTo(2.49f));
         Assert.That((int)Get(game, "Hits"), Is.EqualTo(beforeMedian + 1));
         Assert.That(Call(game, "TrySwitch"), Is.True);
@@ -267,9 +341,9 @@ public sealed class WorldShiftCityTests
         for (int step = 0; (float)Get(game, "Distance") < 1210f && step < 950; step++)
         {
             distance = (float)Get(game, "Distance");
-            string desired = distance < 300f ? "Echo" : distance < 620f ? "Day" : distance < 1180f ? "Echo" : "Day";
+            string desired = SafeWorld(distance);
             if (Get(game, "World").ToString() != desired) Call(game, "TrySwitch");
-            float target = distance >= 850f && distance < 950f ? 3.2f : 0f;
+            float target = SafeLane(distance);
             Call(game, "StepSimulation", .05f, Mathf.Clamp((target - (float)Get(game, "Lateral")) * 2f, -1f, 1f), false);
         }
         Assert.That((float)Get(game, "Distance"), Is.InRange(1210f, 1213f));
@@ -339,6 +413,33 @@ public sealed class WorldShiftCityTests
         yield return new ExitPlayMode();
     }
 
+    private static string SafeWorld(float distance)
+    {
+        if (distance >= 348f && distance < 394f) return "Echo";
+        if (distance >= 568f && distance < 820f) return distance < 672f ? "Day" : "Echo";
+        if (distance >= 1708f && distance < 1988f) return distance < 1812f ? "Echo" : "Day";
+        if (distance >= 2268f && distance < 2550f) return distance < 2372f ? "Day" : "Echo";
+        if (distance >= 952f && distance < 1000f) return "Day";
+        if (distance >= 1988f && distance < 2038f) return "Echo";
+        if (distance >= 2146f && distance < 2184f) return "Echo";
+        return distance < 300f ? "Echo" : distance < 620f ? "Day" : distance < 1180f ? "Echo"
+            : distance < 1440f ? "Day" : distance < 2000f ? "Echo" : distance < 2300f ? "Day"
+            : distance < 2550f ? "Echo" : "Day";
+    }
+
+    private static float SafeLane(float d)
+    {
+        // Read the oncoming car after each wall before returning to that half.
+        if (d >= 2800f)
+            return d < 2928f ? 3.2f : d < 2998f ? -3.2f : d < 3068f ? 3.2f
+                : d < 3138f ? -3.2f : d < 3208f ? 3.2f : d < 3278f ? -3.2f : 3.2f;
+        if (d >= 1700f && d < 1880f) return 3.2f;
+        if ((d >= 450f && d < 490f) || (d >= 850f && d < 1000f)
+            || (d >= 1038f && d < 1150f)) return 3.2f;
+        if ((d >= 1500f && d < 1605f) || (d >= 2118f && d < 2184f)) return -3.2f;
+        return d >= 2575f ? -3.2f : 0f;
+    }
+
     private static void AssertRoadsideSeams(Component game)
     {
         var route = (Component)Get(game, "Route");
@@ -365,7 +466,15 @@ public sealed class WorldShiftCityTests
 
     private static void CapturePreview(Component game, string name)
     {
-        string directory = Environment.GetEnvironmentVariable("OUTLAWS_WORLD_SHIFT_PREVIEW");
+        string directory = Environment.GetEnvironmentVariable("OUTLAWS_READABILITY_PREVIEW");
+        if (!string.IsNullOrEmpty(directory) && !name.StartsWith("readability-")) return;
+        if (string.IsNullOrEmpty(directory)) directory = Environment.GetEnvironmentVariable("OUTLAWS_CITY_PRESSURE_PREVIEW");
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OUTLAWS_CITY_PRESSURE_PREVIEW")) && !name.StartsWith("pressure-")) return;
+        if (string.IsNullOrEmpty(directory)) directory = Environment.GetEnvironmentVariable("OUTLAWS_RELAY_PREVIEW");
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OUTLAWS_RELAY_PREVIEW")) && !name.StartsWith("relay-")) return;
+        if (string.IsNullOrEmpty(directory)) directory = Environment.GetEnvironmentVariable("OUTLAWS_FINAL_RIFT_PREVIEW");
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OUTLAWS_FINAL_RIFT_PREVIEW")) && !name.StartsWith("rift-")) return;
+        if (string.IsNullOrEmpty(directory)) directory = Environment.GetEnvironmentVariable("OUTLAWS_WORLD_SHIFT_PREVIEW");
         if (string.IsNullOrEmpty(directory)) return;
         Call(game, "UpdateCamera", true);
         var components = game.GetComponents<MonoBehaviour>();
@@ -375,19 +484,27 @@ public sealed class WorldShiftCityTests
         if (mirror != null) Call(mirror, "RenderPreview");
         Canvas.ForceUpdateCanvases();
         Camera camera = Camera.main;
-        Canvas canvas = game.GetComponentInChildren<Canvas>();
-        RenderMode mode = canvas.renderMode;
-        Camera canvasCamera = canvas.worldCamera;
-        float plane = canvas.planeDistance;
+        Canvas[] canvases = game.GetComponentsInChildren<Canvas>(true);
+        RenderMode[] modes = canvases.Select(c => c.renderMode).ToArray();
+        Camera[] canvasCameras = canvases.Select(c => c.worldCamera).ToArray();
+        float[] planes = canvases.Select(c => c.planeDistance).ToArray();
+        int mask = camera.cullingMask;
+        float aspect = camera.aspect;
         RenderTexture previous = camera.targetTexture, active = RenderTexture.active;
         var target = new RenderTexture(1280, 720, 24);
         var image = new Texture2D(1280, 720, TextureFormat.RGB24, false);
         try
         {
             camera.targetTexture = target;
-            canvas.renderMode = RenderMode.ScreenSpaceCamera;
-            canvas.worldCamera = camera;
-            canvas.planeDistance = 1f;
+            camera.aspect = 1280f / 720f;
+            Call(components.Single(c => c.GetType().Name == "WorldShiftSplitView"), "RenderViews");
+            foreach (Canvas canvas in canvases)
+            {
+                canvas.renderMode = RenderMode.ScreenSpaceCamera;
+                canvas.worldCamera = camera;
+                canvas.planeDistance = 1f;
+            }
+            camera.cullingMask = -1;
             Canvas.ForceUpdateCanvases();
             camera.Render();
             RenderTexture.active = target;
@@ -400,9 +517,14 @@ public sealed class WorldShiftCityTests
         {
             camera.targetTexture = previous;
             RenderTexture.active = active;
-            canvas.renderMode = mode;
-            canvas.worldCamera = canvasCamera;
-            canvas.planeDistance = plane;
+            for (int i = 0; i < canvases.Length; i++)
+            {
+                canvases[i].renderMode = modes[i];
+                canvases[i].worldCamera = canvasCameras[i];
+                canvases[i].planeDistance = planes[i];
+            }
+            camera.cullingMask = mask;
+            camera.aspect = aspect;
             target.Release();
             UnityEngine.Object.DestroyImmediate(target);
             UnityEngine.Object.DestroyImmediate(image);

@@ -6,6 +6,18 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/WorldShift_Menu.unity
+    guid: b3898b99153c4324ea8801a527252292
+  - enabled: 1
+    path: Assets/Scenes/City_WorldShift.unity
+    guid: 21198f45b12737342b42c2b886fac4e5
+  - enabled: 1
+    path: Assets/Scenes/Desert_WorldShift.unity
+    guid: bfa9d4d4e9352774eaa7242123e6c9eb
+  - enabled: 1
+    path: Assets/Scenes/WorldShift_Tutorial.unity
+    guid: f80b0f60c4c51f046b8d252bf3e1ab31
+  - enabled: 1
     path: Assets/Scenes/Env_City.unity
     guid: 99c9720ab356a0642a771bea13969a05
   - enabled: 1
@@ -17,9 +29,6 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Env_Desert.unity
     guid: 8d4b1f1f5237a934f95663f7ac50b72f
-  - enabled: 1
-    path: Assets/Scenes/City_WorldShift.unity
-    guid: 21198f45b12737342b42c2b886fac4e5
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0

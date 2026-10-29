@@ -158,9 +158,12 @@ public sealed class DesertCrossingController : MonoBehaviour
         environment.Player.EnvironmentSpeedMultiplier * game.PickupEffects.RunState.ForwardSpeedMultiplier);
 
     private GameObject CreateWarning(RoadPathPoint point, int direction)
+        => CreateWarning(transform, point, direction);
+
+    public static GameObject CreateWarning(Transform parent, RoadPathPoint point, int direction, bool oscillating = false)
     {
         var marker = new GameObject(direction > 0 ? "ROCK >>>" : "<<< ROCK");
-        marker.transform.SetParent(transform, false);
+        marker.transform.SetParent(parent, false);
         for (int i = -3; i <= 3; i++)
         {
             var dash = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -181,7 +184,7 @@ public sealed class DesertCrossingController : MonoBehaviour
         var signCollider = sign.GetComponent<Collider>(); signCollider.enabled = false; Destroy(signCollider);
         var renderer = sign.GetComponent<Renderer>();
         renderer.sharedMaterial = RuntimeMaterials.Coloured(new Color(0.16f, 0.09f, 0.04f));
-        WorldLabel.AttachToFrontFace(renderer, sign.transform, direction > 0 ? "ROCK >>>" : "<<< ROCK", Color.yellow);
+        WorldLabel.AttachToFrontFace(renderer, sign.transform, oscillating ? "ROCK < >" : direction > 0 ? "ROCK >>>" : "<<< ROCK", Color.yellow);
         return marker;
     }
 
