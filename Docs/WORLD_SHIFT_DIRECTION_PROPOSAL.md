@@ -24,7 +24,11 @@ Extraction deposits the carried amount once, updates the best banked haul, and s
 
 Gold briefcases marked with a dollar sign are loot. Collect them by driving through them in their world. The opening trail provides a safe introduction; later rewards follow existing fuel locations to offer world and lane choices. Each pickup can be collected once per environment visit.
 
-A cyan shield pickup sits on the left near the start of each escape leg, in Day. Driving through it automatically equips one shield, shown by cyan rings around the car. It absorbs one solid impact, with a brief grace period for overlapping contacts. Shields do not stack, carry across continued environments, and disappear when used or the run ends. They do not prevent falls, capture from a depleted pursuit gap, or running out of fuel.
+Near the start of each escape leg, choose one automatic power-up: a cyan shield on the left in Day, a purple magnet on the right in Night, or a gold boost in the middle in Night. Taking one removes the other choices for that leg. You can pass them all without taking one. A carried shield leaves the Night alternatives available on the next leg.
+
+The magnet lasts six driving seconds and draws in loot across the road in the current world. It cannot collect elevated ramp bags from underneath. A Night loot trail makes the reward immediately visible. The boost lasts four driving seconds, adds 20% forward speed, and reduces steering input by 20%. Police retain their normal speed, so boosting creates separation. Both effects pause with the game and reset between environments. A shrinking purple ring or gold exhaust trails show the active effect without another HUD panel.
+
+The shield lasts until used. Driving through it automatically equips one shield, shown by cyan rings around the car. It absorbs one solid impact, with a brief grace period for overlapping contacts. Shields do not stack, carry across continued environments, and disappear when used or the run ends. They do not prevent falls, capture from a depleted pursuit gap, or running out of fuel.
 
 Before each extraction, an optional right-lane ramp leads through six elevated bags. A wide ground route on the left offers two bags. The ramp takes off automatically, guides the short approach with low rails, and restores full steering in the air. The landing is supported by the ordinary road in either world; this bonus jump never requires a world switch. Bags follow the actual flight arc, and their rewards require taking the ramp, so they cannot be collected by driving underneath. Existing world-switch relay jumps remain unchanged.
 
@@ -49,7 +53,7 @@ Pause and results hide the driving HUD completely. **Leave this run** is paired 
 - `GetawayRunState` owns carried loot, leg progression, reward scaling, and one-time settlement.
 - `WorldShiftFlow` owns the escape session, scene transitions, and local bank persistence.
 - `WorldShiftGetaway` shares pickups, exit geometry, and escape UI between City and Desert.
-- `WorldShiftBonusJump` shares the optional ramp and flight curve across simulation and geometry. `WorldShiftGetawayExtras` adds the ramp, landing markings, shield pickup, protection grace period, and visible shield rings.
+- `WorldShiftBonusJump` shares the optional ramp and flight curve across simulation and geometry. `WorldShiftGetawayExtras` adds the ramp, landing markings, power-up choices, timed magnet and boost effects, protection grace period, and visible power effects.
 - Existing City and Desert simulations collect loot through swept road-coordinate checks and end the escape on failure. Checkpoint retry commands are disabled in escape mode.
 - The existing Day/Night compositor presents each loot pickup in its owning world without advancing the simulation twice.
 

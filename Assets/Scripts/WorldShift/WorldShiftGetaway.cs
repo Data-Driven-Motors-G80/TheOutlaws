@@ -88,6 +88,9 @@ namespace Outlaws.WorldShift
                 AddLoot(at, WorldShiftBonusJump.Lane, ShiftWorld.Echo, gold, handle, Extras.Jump.HeightAt(at), true);
             AddLoot(Extras.Jump.Start + 16f, -3.2f, ShiftWorld.Day, gold, handle);
             AddLoot(Extras.Jump.Start + 60f, -3.2f, ShiftWorld.Day, gold, handle);
+            // A visible Night trail makes the magnet choice useful immediately.
+            foreach (float at in new[] { 65f, 90f, 115f, 140f })
+                AddLoot(at, -3.2f, ShiftWorld.Echo, gold, handle);
             BuildExit();
             BuildHud();
             Present(World);
@@ -128,7 +131,8 @@ namespace Outlaws.WorldShift
                 float entry = Mathf.InverseLerp(from, to, item.At - 1.3f);
                 float exit = Mathf.InverseLerp(from, to, item.At + 1.3f);
                 float a = Mathf.Lerp(fromX, toX, entry), b = Mathf.Lerp(fromX, toX, exit);
-                if (Mathf.Max(a, b) < item.X - 1.35f || Mathf.Min(a, b) > item.X + 1.35f) continue;
+                float reach = Extras.MagnetActive ? 7f : 1.35f;
+                if (Mathf.Max(a, b) < item.X - reach || Mathf.Min(a, b) > item.X + reach) continue;
                 item.Taken = true;
                 item.Visual.gameObject.SetActive(false);
                 int amount = WorldShiftFlow.Escape.Collect(100);
@@ -154,6 +158,14 @@ namespace Outlaws.WorldShift
             {
                 bool visible = !item.Taken && item.World == displayedWorld && item.At > Distance - 10f && item.At < Distance + 180f;
                 item.Visual.gameObject.SetActive(visible);
+                if (visible)
+                {
+                    var point = Route.Sample(item.At);
+                    float pull = Extras.MagnetActive && (!item.Bonus || Extras.Jump.Traversing)
+                        ? Mathf.Clamp01(1f - (item.At - Distance) / 18f) : 0f;
+                    float x = Mathf.Lerp(item.X, Lateral, pull);
+                    item.Visual.position = point.Position + point.Right * x + Vector3.up * (.9f + (item.Bonus ? Extras.Jump.HeightAt(item.At) : 0f));
+                }
             }
         }
 

@@ -226,6 +226,73 @@ public sealed class WorldShiftGetawayTests
         Assert.That(Run.HasShield, Is.False, "A shield protects impacts, not missing road.");
     }
 
+    [UnityTest]
+    public IEnumerator PowerChoicesRespectWorldPauseExpiryAndPursuitInBothEnvironments()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
+        yield return new EnterPlayMode();
+        for (int environment = 0; environment < 2; environment++)
+        {
+            Flow("StartGetaway", false); yield return null; yield return null;
+            if (environment == 1) { Flow("FinishGetawayLeg", true); yield return null; yield return null; }
+            var game = Find(environment == 0 ? "WorldShiftCity" : "DesertShiftTrial"); game.enabled = false;
+            var getaway = Find("WorldShiftGetaway"); var extras = Get(getaway, "Extras");
+            Pose(game, 35f, 3.2f);
+            Call(game, "StepSimulation", .5f, 0f, false);
+            Assert.That(Get(extras, "MagnetActive"), Is.False, "Night powers cannot be taken in Day.");
+            Pose(game, 35f, 3.2f); Call(game, "TrySwitch");
+            Capture(environment == 0 ? "city-power-choices" : "desert-power-choices");
+            Call(game, "StepSimulation", .5f, 0f, false);
+            Assert.That(Get(extras, "MagnetActive"), Is.True);
+            Assert.That(Run.HasShield, Is.False);
+            // Crossing the other choice cannot stack it onto this leg's selected power.
+            Call(extras, "Collect", 42f, 46f, 0f, 0f);
+            Assert.That(Get(extras, "BoostActive"), Is.False);
+            Call(game, "TogglePause");
+            float pausedTime = (float)Get(game, "Duration");
+            Call(game, "StepSimulation", 8f, 0f, false);
+            Assert.That(Get(game, "Duration"), Is.EqualTo(pausedTime));
+            Assert.That(Get(extras, "MagnetActive"), Is.True);
+            Call(game, "TogglePause");
+            Pose(game, 60f, 3.2f);
+            int beforeLoot = Run.Carried;
+            Call(game, "StepSimulation", .4f, 0f, false);
+            Assert.That(Run.Carried, Is.GreaterThan(beforeLoot), "Magnet must collect the opposite lane's Night bag.");
+            Capture(environment == 0 ? "city-magnet" : "desert-magnet");
+            int beforeAir = Run.Carried;
+            object jump = Get(extras, "Jump");
+            float airBag = (float)jump.GetType().GetField("Takeoff").GetValue(jump) + 24f;
+            Call(getaway, "Collect", airBag - 1f, airBag + 1f, -3.2f, -3.2f);
+            Assert.That(Run.Carried, Is.EqualTo(beforeAir), "Magnet cannot pull elevated loot from below the ramp.");
+            Pose(game, 44f, 0f);
+            Call(game, "StepSimulation", 6f, 0f, false);
+            Assert.That(Get(extras, "MagnetActive"), Is.False);
+
+            Flow("StartGetaway", false); yield return null; yield return null;
+            if (environment == 1) { Flow("FinishGetawayLeg", true); yield return null; yield return null; }
+            game = Find(environment == 0 ? "WorldShiftCity" : "DesertShiftTrial"); game.enabled = false;
+            getaway = Find("WorldShiftGetaway"); extras = Get(getaway, "Extras");
+            Pose(game, 35f, 0f); Call(game, "TrySwitch");
+            Call(game, "StepSimulation", .5f, 0f, false);
+            Assert.That(Get(extras, "BoostActive"), Is.True);
+            Assert.That(Get(extras, "SteeringMultiplier"), Is.EqualTo(.8f));
+            float gap = (float)Get(game, "PursuitGap"), distance = (float)Get(game, "Distance");
+            Call(game, "StepSimulation", 1f, 0f, false);
+            Assert.That((float)Get(game, "PursuitGap"), Is.GreaterThan(gap + 4f), "Police must not inherit the player's boost.");
+            Assert.That((float)Get(game, "Distance") - distance, Is.GreaterThan(environment == 0 ? 32f : 28f));
+            Capture(environment == 0 ? "city-boost" : "desert-boost");
+            Call(game, "TogglePause"); Call(game, "StepSimulation", 10f, 0f, false);
+            Assert.That(Get(extras, "BoostActive"), Is.True);
+            Call(game, "TogglePause");
+            Call(game, "StepSimulation", 3.2f, 0f, false);
+            Assert.That(Get(extras, "BoostActive"), Is.False);
+            Assert.That(Get(extras, "SteeringMultiplier"), Is.EqualTo(1f));
+            Assert.That(Get(game, "State").ToString(), Is.EqualTo("Running"));
+            Call(game, "Fail", "CAUGHT");
+            Assert.That(Get(extras, "SpeedMultiplier"), Is.EqualTo(1f));
+        }
+    }
+
     private static void Advance(object game, float target, float lane)
     {
         for (int i = 0; i < 1200 && (float)Get(game, "Distance") < target; i++)
