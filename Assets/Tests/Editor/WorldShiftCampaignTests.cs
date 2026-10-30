@@ -48,15 +48,32 @@ public sealed class WorldShiftCampaignTests
         Assert.That(Get(tutorial, "State").ToString(), Is.EqualTo("Running"));
         Call(Find("WorldShiftHud"), "Refresh");
         Capture("tutorial-one-prompt");
+        bool learnedShooting = false;
         for (int i = 0; i < 850 && Get(tutorial, "State").ToString() == "Running"; i++)
         {
             float d = (float)Get(tutorial, "Distance");
+            if (!learnedShooting && d >= 410f && d < 520f)
+            {
+                float stoppedAt = d, gap = (float)Get(tutorial, "PursuitGap");
+                Call(tutorial, "StepSimulation", 3f, 0f, false);
+                Assert.That((float)Get(tutorial, "Distance"), Is.EqualTo(stoppedAt).Within(.01f), "The lesson waits safely for the player's shot.");
+                Assert.That((float)Get(tutorial, "PursuitGap"), Is.EqualTo(gap).Within(.01f));
+                Assert.That(Get(tutorial, "SectionHint"), Is.EqualTo("Click to shoot the block."));
+                Capture("tutorial-shoot");
+                var combat = Get(tutorial, "Combat");
+                Call(tutorial, "TogglePause"); Assert.That(Call(combat, "TryShoot"), Is.False);
+                Call(tutorial, "TogglePause"); Assert.That(Call(combat, "TryShoot"), Is.True);
+                Assert.That(Get(tutorial, "SectionHint"), Is.EqualTo("Nice shot!"));
+                Assert.That((float)Get(tutorial, "Speed"), Is.EqualTo(18f));
+                learnedShooting = true;
+            }
             string desired = d >= 130f && d < 260f ? "Echo" : "Day";
             if (Get(tutorial, "World").ToString() != desired) Call(tutorial, "TrySwitch");
             float target = d < 112f || d < 610f && d >= 400f ? 3.2f : d >= 610f ? -3.2f : 0f;
             Call(tutorial, "StepSimulation", .05f, Mathf.Clamp((target - (float)Get(tutorial, "Lateral")) * 2f, -1f, 1f), false);
         }
         Assert.That(Get(tutorial, "State").ToString(), Is.EqualTo("Won"));
+        Assert.That(learnedShooting, Is.True);
         Assert.That(Get(tutorial, "Deaths"), Is.EqualTo(0));
         Assert.That(Get(tutorial, "Hits"), Is.EqualTo(0));
         Call(Find("WorldShiftHud"), "Refresh");

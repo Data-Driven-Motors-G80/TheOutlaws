@@ -44,6 +44,7 @@ namespace Outlaws.WorldShift
         private void LateUpdate() => Present();
         private void Initialize()
         {
+            if (city != null && city.TutorialLevel) return;
             AddAmmoPickup(780f, 0f);
             if (Escape) AddAmmoPickup((city != null ? WorldShiftLevel.Length : DesertShiftLevel.Length) + 140f, -2.8f);
         }
@@ -68,6 +69,8 @@ namespace Outlaws.WorldShift
         }
         public bool TryShoot()
         {
+            if (city != null && city.TutorialLevel && (!city.TutorialShootingActive || World != ShiftWorld.Day
+                || IsDestroyed(WorldShiftTutorial.ShootingObstacle))) return false;
             if (!Running || Ammo <= 0 || Duration < nextShot) return false;
             if (Escape) { if (!WorldShiftFlow.Escape.SpendShot()) return false; }
             else practiceAmmo--;
@@ -109,6 +112,7 @@ namespace Outlaws.WorldShift
             {
                 foreach (var h in city.Hazards)
                 {
+                    if (city.TutorialLevel && (!city.TutorialShootingActive || h != WorldShiftTutorial.ShootingObstacle)) continue;
                     if (IsDestroyed(h) || h.World != World || Airborne || h.Kind == ShiftHazardKind.Gap || h.Kind == ShiftHazardKind.Fire || h.Kind == ShiftHazardKind.Spikes) continue;
                     h.BoundsAt(Distance, out float at, out float end);
                     float x = Lateral;

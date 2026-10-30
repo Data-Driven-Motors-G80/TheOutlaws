@@ -69,7 +69,9 @@ namespace Outlaws.WorldShift
             riftEntryWorld == ShiftWorld.Day ? 1f : 0f, .5f,
             Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((Distance - MergeStart) / 16f)));
         private bool JumpSequence => relay?.SectionAt(Distance) != null || (Getaway?.Extras.IsJumpSequence(Distance) ?? false);
-        private float BaseSpeed => tutorialLevel ? 18f : JumpSequence ? relay?.SpeedAt(Distance) ?? WorldShiftLevel.Speed
+        public bool TutorialShootingActive => tutorialLevel && Distance >= 380f && Distance < 520f;
+        private bool WaitingForTutorialShot => TutorialShootingActive && !(Combat?.IsDestroyed(WorldShiftTutorial.ShootingObstacle) ?? false);
+        private float BaseSpeed => tutorialLevel ? WaitingForTutorialShot && Distance >= 410f ? 0f : 18f : JumpSequence ? relay?.SpeedAt(Distance) ?? WorldShiftLevel.Speed
             : WorldShiftLevel.Speed * (splitViewValidation ? 1f : WorldShiftLevel.CruiseSpeedMultiplier);
         public float Speed => BaseSpeed * (JumpSequence ? 1f : Getaway?.Extras.SpeedMultiplier ?? 1f);
         public ChaseCar Police { get; private set; }
@@ -82,7 +84,9 @@ namespace Outlaws.WorldShift
         public string Message { get; private set; } = "";
         public float MessageRemaining { get; private set; }
         public string SectionTitle => Checkpoints[checkpointIndex].Title;
-        public string SectionHint => relay != null && relay.Hint(Distance, World).Length > 0 ? relay.Hint(Distance, World)
+        public string SectionHint => TutorialShootingActive ? WaitingForTutorialShot
+            ? World == ShiftWorld.Day ? "Click to shoot the block." : "Tap Space to go back to day."
+            : "Nice shot!" : relay != null && relay.Hint(Distance, World).Length > 0 ? relay.Hint(Distance, World)
             : hintRemaining > 0f ? Checkpoints[checkpointIndex].Hint : "";
         public WorldShiftCombat Combat { get; private set; }
         public WorldShiftRoute Route { get; private set; }
@@ -126,7 +130,7 @@ namespace Outlaws.WorldShift
             RearView = RearViewCamera.Create(Player, new[] { Police });
             RearView.transform.SetParent(transform, true);
             UpdateCamera(true);
-            if (!tutorialLevel && !splitViewValidation) { Combat = gameObject.AddComponent<WorldShiftCombat>(); Combat.Bind(this); }
+            if (!splitViewValidation) { Combat = gameObject.AddComponent<WorldShiftCombat>(); Combat.Bind(this); }
             if (GetawayMode) { Getaway = gameObject.AddComponent<WorldShiftGetaway>(); Getaway.Bind(this); }
             else gameObject.AddComponent<WorldShiftHud>().Bind(this);
             if (splitViewValidation) gameObject.AddComponent<WorldShiftSplitView>().Initialize(this, view);

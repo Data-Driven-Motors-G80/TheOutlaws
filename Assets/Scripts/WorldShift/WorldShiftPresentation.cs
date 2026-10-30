@@ -301,7 +301,8 @@ namespace Outlaws.WorldShift
                     pedestrians.Add(new PedestrianView { Hazard = data, Figure = figure, Lateral = person.localPosition.x });
                 }
             }
-            if (!game.TutorialLevel && !game.SplitViewValidation && (data.Kind == ShiftHazardKind.Barrier || data.Kind == ShiftHazardKind.HalfBarrier))
+            if (!game.SplitViewValidation && (!game.TutorialLevel || data == WorldShiftTutorial.ShootingObstacle)
+                && (data.Kind == ShiftHazardKind.Barrier || data.Kind == ShiftHazardKind.HalfBarrier))
                 WorldShiftCombat.MarkBreakable(solid.transform, new Vector3(data.Kind == ShiftHazardKind.HalfBarrier ? data.HalfSide * 2.5f : 0f, 1.3f, -depth * .5f - .12f));
             hazards.Add(new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk });
         }
