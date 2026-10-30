@@ -59,7 +59,7 @@ namespace Outlaws.WorldShift
         public bool SplitViewValidation => false;
         public float RunLength => fullLevel ? DesertShiftLevel.Length + (GetawayMode ? WorldShiftGetaway.ExitTail : 0f) : Length;
         public float MergeStart => fullLevel ? DesertShiftLevel.MergeStart : float.PositiveInfinity;
-        public bool IsMerged => fullLevel && Distance >= MergeStart;
+        public bool IsMerged => false;
         public float JoinedViewSplit => Mathf.Lerp(entryWorld == ShiftWorld.Day ? 1f : 0f, .5f,
             Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((Distance - MergeStart) / 16f)));
         public DesertTrialRock[] Rocks =
@@ -132,9 +132,7 @@ namespace Outlaws.WorldShift
         public int Retries { get; private set; }
         public int Switches { get; private set; }
         public string Message { get; private set; } = "";
-        public string Hint => State == ShiftRunState.Retrying ? Message : IsMerged
-            ? "Steer between day and night."
-            : Relay != null && Relay.SectionAt(Distance) != null ? IsAirborne
+        public string Hint => State == ShiftRunState.Retrying ? Message : Relay != null && Relay.SectionAt(Distance) != null ? IsAirborne
                 ? World == ShiftWorld.Day ? "Tap Space to land in night." : "Stay in night to land."
                 : Relay.Hint(Distance, World)
             : World == ShiftWorld.Echo ? "Night freezes things. They're still solid." : "Try Space to freeze things.";
@@ -172,8 +170,6 @@ namespace Outlaws.WorldShift
                 Police.StepFinite(0f, 0f, 0f, 6f);
                 RearView = RearViewCamera.Create(Player, new[] { Police });
                 RearView.transform.SetParent(transform, true);
-                var rift = gameObject.AddComponent<WorldShiftRift>(); rift.Build(this, Route);
-                gameObject.AddComponent<WorldShiftSplitView>().Initialize(this, view);
             }
             if (GetawayMode) { Getaway = gameObject.AddComponent<WorldShiftGetaway>(); Getaway.Bind(this); }
             presentation.Refresh();
@@ -217,7 +213,6 @@ namespace Outlaws.WorldShift
         public bool TrySwitch()
         {
             if (State != ShiftRunState.Running) return false;
-            if (IsMerged) { Notify("A / D CROSSES WORLDS HERE", 1f); return false; }
             ShiftWorld next = World == ShiftWorld.Day ? ShiftWorld.Echo : ShiftWorld.Day;
             World = next;
             Switches++;
@@ -254,17 +249,6 @@ namespace Outlaws.WorldShift
                     if (landed) Notify("LANDED", 1.5f);
                 }
                 if (!IsAirborne && !Route.HasSurface(Distance, World)) { Fail("NO ROAD - USE THE DAY BOOST RAMP"); break; }
-                if (IsMerged)
-                {
-                    if (before < MergeStart)
-                    {
-                        entryWorld = World;
-                        foreach (var rock in Rocks) rock.CaptureNight();
-                        foreach (var car in Traffic) car.CaptureNight();
-                        Notify("A / D  CROSS WORLDS", 3f);
-                    }
-                    World = WorldShiftLevel.WorldAt(Lateral);
-                }
                 Duration += dt;
                 messageTime -= dt;
                 if (fullLevel)
@@ -311,7 +295,6 @@ namespace Outlaws.WorldShift
                 else if (Distance >= RunLength) { State = ShiftRunState.Won; Getaway?.Finish(Lateral); }
             }
             if (Police != null) Police.StepFinite(elapsed, Distance, Lateral, Mathf.Lerp(.45f, 6f, Mathf.Clamp01(PursuitGap / 45f)));
-            GetComponent<WorldShiftRift>()?.Refresh(Distance);
             presentation.Refresh();
         }
 
@@ -320,7 +303,7 @@ namespace Outlaws.WorldShift
             if (IsAirborne) return;
             foreach (var gate in ActiveGates)
             {
-                bool visible = gate.Start >= MergeStart ? gate.HalfSide != 0 && gate.World == WorldShiftLevel.WorldAt(gate.HalfSide) : gate.World == World;
+                bool visible = gate.World == World;
                 if (!visible || Distance + 1.5f < gate.Start || before - 1.5f > gate.End) continue;
                 float min = gate.HalfSide > 0 ? 0f : -5f, max = gate.HalfSide < 0 ? 0f : 5f;
                 if (Mathf.Max(previousX, Lateral) + .8f > min && Mathf.Min(previousX, Lateral) - .8f < max)
@@ -409,7 +392,6 @@ namespace Outlaws.WorldShift
             for (int i = 0; i < Traffic.Length; i++) Traffic[i].Restore(checkpointTraffic[i], checkpointNightTraffic[i]);
             Relay?.Reset(Distance);
             driver.RestoreExternalPose(Distance, 0f);
-            if (IsMerged) { World = ShiftWorld.Echo; entryWorld = ShiftWorld.Echo; }
             if (Police != null) Police.StepFinite(0f, Distance, Lateral, Mathf.Lerp(.45f, 6f, Mathf.Clamp01(PursuitGap / 45f)));
             Notify("CHECKPOINT", 1.6f);
             presentation.Refresh();

@@ -192,29 +192,22 @@ public sealed class WorldShiftCityTests
             if (!riftApproach && distance >= 2750f)
             {
                 Assert.That(Get(game, "IsMerged"), Is.False);
-                Assert.That(game.GetComponentsInChildren<Transform>().Any(t => t.name.StartsWith("World rift -")), Is.True);
+                Assert.That(game.GetComponentsInChildren<Transform>(true).Any(t => t.name.StartsWith("World rift -")), Is.False);
                 CapturePreview(game, "rift-01-approach");
                 riftApproach = true;
             }
             if (!riftOpening && distance >= 2807f)
             {
-                Assert.That(Get(game, "IsMerged"), Is.True);
-                Assert.That((float)Get(game, "JoinedViewSplit"), Is.GreaterThan(.5f).And.LessThan(1f));
-                Assert.That(Call(game, "TrySwitch"), Is.False);
-                CapturePreview(game, "rift-02-opening");
+                Assert.That(Get(game, "IsMerged"), Is.False);
+                Assert.That(Call(game, "TrySwitch"), Is.True);
+                Assert.That(Call(game, "TrySwitch"), Is.True);
+                CapturePreview(game, "finale-single-world");
                 riftOpening = true;
             }
             if (!riftJoined && distance >= 2960f)
             {
-                Assert.That((float)Get(game, "JoinedViewSplit"), Is.EqualTo(.5f));
-                Call(game, "UpdateCamera", true);
-                foreach (float ahead in new[] { 0f, 30f, 90f })
-                {
-                    object point = Call(Get(game, "Route"), "Sample", distance + ahead);
-                    Assert.That(Camera.main.WorldToViewportPoint((Vector3)Get(point, "Position")).x,
-                        Is.EqualTo(.5f).Within(.002f), "The visual seam must meet the road centre at every depth.");
-                }
-                CapturePreview(game, "rift-03-joined");
+                Assert.That(Get(game, "IsMerged"), Is.False);
+                Assert.That(game.GetComponentsInChildren<MonoBehaviour>().Any(c => c.GetType().Name == "WorldShiftSplitView"), Is.False);
                 riftJoined = true;
             }
             if (previews && !laterCrossingPreview && distance >= 2100f)
@@ -233,7 +226,7 @@ public sealed class WorldShiftCityTests
             }
             float target = SafeLane(distance);
             if (distance >= 2800f)
-                Assert.That(Get(game, "World").ToString(), Is.EqualTo((float)Get(game, "Lateral") < 0f ? "Day" : "Echo"));
+                Assert.That(Get(game, "World").ToString(), Is.EqualTo(desiredWorld), "Steering must not switch worlds.");
             if (previews && distance >= 1749f && distance < 1751f) CapturePreview(game, "06-joined-left-block");
             if (previews && distance >= 1869f && distance < 1871f) CapturePreview(game, "07-joined-right-block");
             if (previews && distance >= 2909f && distance < 2911f) CapturePreview(game, "08-final-overlap");
@@ -258,35 +251,29 @@ public sealed class WorldShiftCityTests
         Assert.That(Get(game, "RelaysCompleted"), Is.EqualTo(3));
         CapturePreview(game, "03-won");
 
-        // Both halves coexist, regardless of which world the car centre belongs to.
+        // Finale hazards belong only to the selected world, including at the old seam.
         var worldType = Get(game, "World").GetType();
-        foreach (string name in new[] { "Day", "Echo" })
-        {
-            object w = Enum.Parse(worldType, name);
-            Assert.That(Call(game, "FindCollision", w, 2902f, 2903f, -.3f, -.3f, false), Is.Not.Null,
-                "A car straddling the seam must still contact the visible left half-wall.");
-            Assert.That(Call(game, "FindCollision", w, 2902f, 2903f, 3.2f, 3.2f, false), Is.Null);
-            Assert.That(Call(game, "FindCollision", w, 2972f, 2973f, 3.2f, 3.2f, false), Is.Not.Null);
-            Assert.That(Call(game, "FindCollision", w, 2972f, 2973f, -3.2f, -3.2f, false), Is.Null);
-        }
-        Assert.That(game.GetComponentsInChildren<Transform>(true).Any(t => t.name.StartsWith("Joined road ")), Is.False,
-            "The full worlds are rendered; no replacement half-road geometry should be built.");
-        var rift = game.GetComponentsInChildren<Transform>(true).Single(t => t.name.StartsWith("World rift -"));
-        Assert.That(rift.GetComponentsInChildren<Collider>(true), Is.Empty);
+        object dayWorld = Enum.Parse(worldType, "Day"), nightWorld = Enum.Parse(worldType, "Echo");
+        Assert.That(Call(game, "FindCollision", dayWorld, 2902f, 2903f, -.3f, -.3f, false), Is.Not.Null);
+        Assert.That(Call(game, "FindCollision", nightWorld, 2902f, 2903f, -.3f, -.3f, false), Is.Null);
+        Assert.That(Call(game, "FindCollision", nightWorld, 2972f, 2973f, 3.2f, 3.2f, false), Is.Not.Null);
+        Assert.That(Call(game, "FindCollision", dayWorld, 2972f, 2973f, 3.2f, 3.2f, false), Is.Null);
+        Assert.That(game.GetComponentsInChildren<Transform>(true).Any(t => t.name.StartsWith("World rift -")), Is.False);
 
         Call(game, "RestartRun");
         game.GetType().GetField("checkpointIndex", Flags).SetValue(game, 5);
         Call(game, "RetryCheckpoint");
         Assert.That(Get(game, "Distance"), Is.EqualTo(2800f));
         Assert.That(Get(game, "World").ToString(), Is.EqualTo("Day"));
-        Assert.That(Call(game, "TrySwitch"), Is.False);
+        Assert.That(Call(game, "TrySwitch"), Is.True);
+        Assert.That(Call(game, "TrySwitch"), Is.True);
         Call(game, "TogglePause");
         position = player.position;
         Call(game, "StepSimulation", .5f, 1f, true);
         Assert.That(player.position, Is.EqualTo(position));
         Call(game, "TogglePause");
         for (int i = 0; i < 30; i++) Call(game, "StepSimulation", .05f, 1f, false);
-        Assert.That(Get(game, "World").ToString(), Is.EqualTo("Echo"), "Steering across joins the other world without Space.");
+        Assert.That(Get(game, "World").ToString(), Is.EqualTo("Day"), "Steering across the centre must keep the selected world.");
         Call(game, "RetryCheckpoint");
         Assert.That((float)Get(game, "Lateral"), Is.EqualTo(-3.2f));
         Assert.That(Get(game, "World").ToString(), Is.EqualTo("Day"));
@@ -497,7 +484,8 @@ public sealed class WorldShiftCityTests
         {
             camera.targetTexture = target;
             camera.aspect = 1280f / 720f;
-            Call(components.Single(c => c.GetType().Name == "WorldShiftSplitView"), "RenderViews");
+            var compositor = components.SingleOrDefault(c => c.GetType().Name == "WorldShiftSplitView");
+            if (compositor != null) Call(compositor, "RenderViews");
             foreach (Canvas canvas in canvases)
             {
                 canvas.renderMode = RenderMode.ScreenSpaceCamera;

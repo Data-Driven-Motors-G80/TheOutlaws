@@ -75,7 +75,7 @@ namespace Outlaws.WorldShift
         private static float DesertHeading(float d)
             => DesertBend(d, 200f, 360f, 520f, 640f)
                 - DesertBend(d, 1120f, 1280f, 1440f, 1560f);
-        // The aerial puzzle and final rift use a straight approach so their openings are readable.
+        // The aerial puzzle and final stretch use a straight approach for readability.
         private float DesertRelaySlope(float d, bool afterEdge)
         {
             foreach (var jump in relays)

@@ -41,7 +41,6 @@ namespace Outlaws.WorldShift
         private Material headlightHazeMaterial;
         private WorldShiftRoadside roadside;
         private WorldShiftConvergence convergence;
-        private WorldShiftRift rift;
         private WorldShiftRelayVisuals relayVisuals;
         private readonly List<Material> ownedMaterials = new List<Material>();
         private readonly List<NightReflector> nightReflectors = new List<NightReflector>();
@@ -74,11 +73,6 @@ namespace Outlaws.WorldShift
             roadside.Build(route);
             convergence = gameObject.AddComponent<WorldShiftConvergence>();
             convergence.BuildWallsOnly(route);
-            if (!game.SplitViewValidation)
-            {
-                rift = gameObject.AddComponent<WorldShiftRift>();
-                rift.Build(game, route);
-            }
             if (!game.SplitViewValidation && !game.TutorialLevel)
             {
                 relayVisuals = gameObject.AddComponent<WorldShiftRelayVisuals>();
@@ -422,7 +416,6 @@ namespace Outlaws.WorldShift
                 headlightHazeMaterial.SetFloat("_ClearRoadLength", clearRoad);
             }
             if (roadside != null) roadside.UpdateVisibility(distance);
-            if (rift != null) rift.Refresh(distance);
             if (relayVisuals != null) relayVisuals.Refresh(distance);
             foreach (var hazard in hazards)
             {

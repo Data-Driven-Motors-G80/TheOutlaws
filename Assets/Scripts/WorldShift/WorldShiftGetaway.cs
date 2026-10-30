@@ -48,7 +48,6 @@ namespace Outlaws.WorldShift
         private float Length => environmentEnd + ExitTail;
         private float Fuel => IsCity ? city.FuelFraction : desert.FuelFraction;
         private float Gap => IsCity ? city.PursuitGap : desert.PursuitGap;
-        private bool Merged => IsCity ? city.IsMerged : desert.IsMerged;
         internal ShiftWorld World => IsCity ? city.World : desert.World;
         private ShiftRunState State => IsCity ? city.State : desert.State;
         private WorldShiftRoute Route => IsCity ? city.Route : desert.Route;
@@ -126,8 +125,7 @@ namespace Outlaws.WorldShift
             {
                 if (item.Bonus && !Extras.Jump.Traversing) continue;
                 if (item.Taken || to < item.At - 1.3f || from > item.At + 1.3f) continue;
-                bool joined = IsCity ? city.IsJoinedDistance(item.At) : item.At >= desert.MergeStart;
-                if (joined ? item.World != WorldShiftLevel.WorldAt(item.X) : item.World != World) continue;
+                if (item.World != World) continue;
                 float entry = Mathf.InverseLerp(from, to, item.At - 1.3f);
                 float exit = Mathf.InverseLerp(from, to, item.At + 1.3f);
                 float a = Mathf.Lerp(fromX, toX, entry), b = Mathf.Lerp(fromX, toX, exit);
@@ -318,7 +316,7 @@ namespace Outlaws.WorldShift
             Extras.Refresh();
             bool running = State == ShiftRunState.Running;
             bool settled = run.Status == GetawayRunState.RunStatus.Banked || run.Status == GetawayRunState.RunStatus.Lost;
-            world.text = Merged ? "Day + night" : World == ShiftWorld.Day ? "Day" : "Night";
+            world.text = World == ShiftWorld.Day ? "Day" : "Night";
             world.color = World == ShiftWorld.Day ? Gold : Cyan;
             haul.text = "<size=14>Your loot</size>\n$" + run.Carried.ToString("N0");
             stage.text = IsCity ? "City" : "Desert";
@@ -360,14 +358,12 @@ namespace Outlaws.WorldShift
         private string CityHint()
         {
             if (city.IsRelayAirborne) return city.SectionHint;
-            if (city.IsMerged && Distance < city.MergeStart + 80f) return "Steer between day and night.";
             return city.SectionHint;
         }
 
         private string DesertHint()
         {
             if (desert.IsAirborne) return World == ShiftWorld.Day ? "Tap Space to land in night." : "Stay in night to land.";
-            if (Merged) return Distance < desert.MergeStart + 70f ? "Steer between day and night." : "";
             if (Duration < 10f) return World == ShiftWorld.Day ? "Try Space to freeze things." : "Night freezes things. They're still solid.";
             return DesertShiftLevel.InRockField(Distance) ? "Try night to freeze a gap." : "";
         }

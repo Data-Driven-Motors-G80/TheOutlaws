@@ -52,8 +52,9 @@ namespace Outlaws.WorldShift
         public ShiftHazard[] Hazards => tutorialLevel ? WorldShiftTutorial.Hazards : splitViewValidation ? WorldShiftSplitView.Layout : WorldShiftLevel.Hazards;
         public ShiftFuelPickup[] Pickups => tutorialLevel ? System.Array.Empty<ShiftFuelPickup>() : splitViewValidation ? WorldShiftSplitView.Fuel : WorldShiftLevel.FuelPickups;
         public ShiftCheckpoint[] Checkpoints => tutorialLevel ? WorldShiftTutorial.Checkpoints : splitViewValidation ? WorldShiftSplitView.Checkpoints : WorldShiftLevel.Checkpoints;
+        // Side-by-side worlds are retained only in the standalone rendering validation scene.
         public bool IsJoinedDistance(float at) => splitViewValidation
-            ? at >= WorldShiftSplitView.JoinStart && at < WorldShiftSplitView.JoinEnd : tutorialLevel ? at >= MergeStart : GetawayMode ? at >= MergeStart : WorldShiftLevel.IsMerged(at);
+            && at >= WorldShiftSplitView.JoinStart && at < WorldShiftSplitView.JoinEnd;
         public bool IsWorldVisible(ShiftWorld world, float at, float lateral, ShiftWorld current)
             => IsJoinedDistance(at) ? world == WorldShiftLevel.WorldAt(lateral) : world == current;
         public float Progress => Mathf.Clamp01(Distance / RunLength);
@@ -81,8 +82,6 @@ namespace Outlaws.WorldShift
         public float MessageRemaining { get; private set; }
         public string SectionTitle => Checkpoints[checkpointIndex].Title;
         public string SectionHint => relay != null && relay.Hint(Distance, World).Length > 0 ? relay.Hint(Distance, World)
-            : !splitViewValidation && Distance >= MergeStart - 64f && Distance < MergeStart
-            ? "Day and night meet up ahead."
             : hintRemaining > 0f ? Checkpoints[checkpointIndex].Hint : "";
         public WorldShiftRoute Route { get; private set; }
         public Transform Player { get; private set; }
@@ -127,7 +126,7 @@ namespace Outlaws.WorldShift
             UpdateCamera(true);
             if (GetawayMode) { Getaway = gameObject.AddComponent<WorldShiftGetaway>(); Getaway.Bind(this); }
             else gameObject.AddComponent<WorldShiftHud>().Bind(this);
-            gameObject.AddComponent<WorldShiftSplitView>().Initialize(this, view);
+            if (splitViewValidation) gameObject.AddComponent<WorldShiftSplitView>().Initialize(this, view);
         }
 
         private void Start()
@@ -499,8 +498,7 @@ namespace Outlaws.WorldShift
         private void UpdateCamera(bool immediate)
         {
             RoadPathPoint point = Route.Sample(Distance);
-            float follow = splitViewValidation ? 0f : .28f * (1f - Mathf.SmoothStep(0f, 1f,
-                Mathf.InverseLerp(MergeStart - 56f, MergeStart - 16f, Distance)));
+            float follow = splitViewValidation ? 0f : .28f;
             Vector3 desired = point.Position - point.Forward * 12f + Vector3.up * 6.4f + point.Right * Lateral * follow;
             bool falling = State == ShiftRunState.Retrying && (lastFailure == "NO ROAD" || lastFailure == "MISSED RELAY LANDING");
             if ((IsRelayAirborne || (Getaway?.Extras.Jump.Traversing ?? false)) && !falling) desired.y += Player.position.y - point.Position.y - .08f;

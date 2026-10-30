@@ -88,15 +88,10 @@ namespace Outlaws.WorldShift
         public const float FuelConsumption = 2f;
         public const float FuelRefill = 26f;
 
-        // Only the final sector joins. Extend past extraction so the winning view stays joined.
+        // Retain the authored final-sector checkpoint, with manual world switching throughout.
         public const float MergeStart = 2800f;
-        public static readonly float[] MergeBounds = { MergeStart, Length + 80f };
-        public static bool IsMerged(float distance)
-        {
-            for (int i = 0; i < MergeBounds.Length; i += 2)
-                if (distance >= MergeBounds[i] && distance < MergeBounds[i + 1]) return true;
-            return false;
-        }
+        public static readonly float[] MergeBounds = System.Array.Empty<float>();
+        public static bool IsMerged(float distance) => false;
         public static ShiftWorld WorldAt(float lateral) => lateral < 0f ? ShiftWorld.Day : ShiftWorld.Echo;
         public static bool IsVisible(ShiftWorld world, float at, float lateral, ShiftWorld current)
             => IsMerged(at) ? world == WorldAt(lateral) : world == current;
@@ -119,8 +114,8 @@ namespace Outlaws.WorldShift
                 "FINAL JUMP",
                 "Take the jump, then switch to night."),
             new ShiftCheckpoint(2800f, ShiftWorld.Day, -3.2f,
-                "WORLDS JOIN",
-                "Now steer between day and night.")
+                "HOME STRETCH",
+                "Switch worlds or steer around the walls.")
         };
 
         public static readonly ShiftHazard[] Hazards =
@@ -203,7 +198,7 @@ namespace Outlaws.WorldShift
             // Ordinary-world introductions: exactly five metres wide, attached to one edge.
             new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.HalfBarrier, 480f, 486f, 3, halfSide: -1),
             new ShiftHazard(ShiftWorld.Echo, ShiftHazardKind.HalfBarrier, 520f, 526f, 6, halfSide: 1),
-            // Final rift: 100 m clear entry, then 70 m between alternating walls.
+            // Final stretch: 100 m clear entry, then alternating world-specific walls.
             // A car follows on the SAME closed half; do not cross back too early.
             // Their encounter positions are ~Start - 50 m, not their spawn points.
             new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.HalfBarrier, 2900f, 2906f, 3, halfSide: -1),

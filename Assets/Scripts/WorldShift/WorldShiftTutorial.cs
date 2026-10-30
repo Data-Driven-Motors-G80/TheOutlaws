@@ -18,7 +18,7 @@ namespace Outlaws.WorldShift
             new ShiftCheckpoint(120f, ShiftWorld.Day, 0f, "SWITCH", "Tap Space to try night."),
             new ShiftCheckpoint(240f, ShiftWorld.Echo, 0f, "SWITCH BACK", "Tap Space to go back to day."),
             new ShiftCheckpoint(380f, ShiftWorld.Day, 0f, "YOUR ROUTE", "Go around it, or switch worlds."),
-            new ShiftCheckpoint(520f, ShiftWorld.Day, 2.5f, "WORLDS JOIN", "Now steer between day and night.")
+            new ShiftCheckpoint(520f, ShiftWorld.Day, 2.5f, "YOUR CHOICE", "Steer around it, or tap Space to switch.")
         };
     }
 }

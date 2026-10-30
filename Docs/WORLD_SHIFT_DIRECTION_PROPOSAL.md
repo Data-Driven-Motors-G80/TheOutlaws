@@ -4,11 +4,13 @@ WorldShift is an endless escape through Day and Night. Collect loot, reach an ex
 
 ## Play the escape
 
-Open `Assets/Scenes/WorldShift_Menu.unity` and choose **Play escape** under **Endless escape**. The first escape includes a short lesson in steering, switching, and crossing the joined worlds. **Practice** opens a separate route picker for City or Desert, with nearby retries and no bank rewards. **New here? Learn to play** opens the lesson on its own.
+Open `Assets/Scenes/WorldShift_Menu.unity` and choose **Play escape** under **Endless escape**. The first escape includes a short lesson in steering and switching between worlds. **Practice** opens a separate route picker for City or Desert, with nearby retries and no bank rewards. **New here? Learn to play** opens the lesson on its own.
 
 - **A / D or arrows:** steer.
-- **Space:** switch Day and Night. In joined sections, steer between the two halves instead.
+- **Space:** switch Day and Night throughout the route, including the final stretch and exits.
 - **Escape:** pause. Choosing **Leave this run** forfeits the carried haul; the pause screen states the amount before you choose.
+
+Only one world appears on screen at a time. Steering never changes worlds; Space always does. The merged-world finale and its portal have been removed from escape, practice, and the tutorial.
 
 The first version alternates City and Desert indefinitely. Snow and Ocean Coast remain existing environment scenes; they are not yet connected to this escape loop. More environments can join the same segment boundary once they have validated WorldShift routes.
 
@@ -55,6 +57,6 @@ Pause and results hide the driving HUD completely. **Leave this run** is paired 
 - `WorldShiftGetaway` shares pickups, exit geometry, and escape UI between City and Desert.
 - `WorldShiftBonusJump` shares the optional ramp and flight curve across simulation and geometry. `WorldShiftGetawayExtras` adds the ramp, landing markings, power-up choices, timed magnet and boost effects, protection grace period, and visible power effects.
 - Existing City and Desert simulations collect loot through swept road-coordinate checks and end the escape on failure. Checkpoint retry commands are disabled in escape mode.
-- The existing Day/Night compositor presents each loot pickup in its owning world without advancing the simulation twice.
+- Pickups and hazards appear and interact only in the selected world. The old split-view compositor remains only in the standalone rendering validation scene.
 
 The current goal is to test whether players want to risk another environment. Evaluate clarity of the exit lanes, intentional extraction decisions, understandable losses, and willingness to replay before adding a shop, additional currencies, or more environments.

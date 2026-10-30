@@ -158,6 +158,9 @@ public sealed class WorldShiftGetawayTests
             int before = Run.Carried;
             float lane = leg == 2 ? -3.2f : 3.2f;
             Pose(game, start - 8f, lane);
+            Assert.That(Get(game, "IsMerged"), Is.False);
+            string desired = leg < 2 ? "Echo" : "Day";
+            if (Get(game, "World").ToString() != desired) Assert.That(Call(game, "TrySwitch"), Is.True);
             Advance(game, start - 1f, lane);
             if (leg < 2) Capture(leg == 0 ? "city-bonus-approach" : "desert-bonus-approach");
             Advance(game, takeoff + 12f, lane);

@@ -71,7 +71,6 @@ namespace Outlaws.WorldShift
             }
             for (float at = game.GetawayMode ? float.PositiveInfinity : game.CheckpointSpacing; at <= game.RunLength; at += game.CheckpointSpacing)
             {
-                if (Mathf.Abs(at - game.MergeStart) < 1f) continue;
                 Transform marker = RoadRoot("Checkpoint", at);
                 Box(marker, "Checkpoint road marker", new Vector3(0f, .06f, 0f), new Vector3(10f, .09f, .5f), Material(Cyan, .2f));
                 WorldText(marker, at == game.RunLength ? "FINISH" : "CHECKPOINT", new Vector3(0f, 5f, 0f), Cyan, 4f);
@@ -235,7 +234,8 @@ namespace Outlaws.WorldShift
                 OriginalObstacle(solid.transform, new Vector3(lane * 3.33f, .7f, 0f), new Vector3(3.3f, 1.4f, 8f), Material(colour * .55f, .1f));
                 Box(solid.transform, "Wall reflective band", new Vector3(lane * 3.33f, 1.1f, -4.05f), new Vector3(3.2f, .16f, .12f), Material(colour, .35f));
             }
-            WorldText(solid.transform, data.HalfSide != 0 ? "CROSS" : data.World == ShiftWorld.Day ? "NIGHT PASSAGE" : "DAY PASSAGE", new Vector3(data.HalfSide * 2.5f, 2.6f, -4f), colour, 2.6f);
+            if (data.HalfSide == 0)
+                WorldText(solid.transform, data.World == ShiftWorld.Day ? "Try night" : "Try day", new Vector3(0f, 2.6f, -4f), colour, 2.6f);
             gates.Add(new GateView { Root = root, Solid = solid });
         }
 
@@ -307,19 +307,17 @@ namespace Outlaws.WorldShift
             Present(game.World);
             bool day = game.World == ShiftWorld.Day;
             RoadPathPoint follow = game.DriverPoint(game.Distance);
-            float followX = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(game.MergeStart - 56f, game.MergeStart - 16f, game.Distance));
-            if (!game.FullLevel) followX = 1f;
+            const float followX = 1f;
             Vector3 cameraPosition = follow.Position - follow.Forward * 12f + Vector3.up * 6.6f + follow.Right * game.Lateral * .28f * followX;
             view.transform.SetPositionAndRotation(cameraPosition,
                 Quaternion.LookRotation(game.DriverPoint(game.Distance + 22f).Position + Vector3.up * .7f - cameraPosition));
             if (game.GetawayMode) return;
             title.text = "Desert practice";
-            worldLabel.text = game.IsMerged ? "Day + night" : day ? "Day" : "Night";
+            worldLabel.text = day ? "Day" : "Night";
             worldLabel.color = day ? Gold : Cyan;
-            hint.text = game.State == ShiftRunState.Retrying || game.Duration < 10f || game.IsAirborne || game.IsMerged && game.Distance < game.MergeStart + 70f ? game.Hint : "";
+            hint.text = game.State == ShiftRunState.Retrying || game.Duration < 10f || game.IsAirborne ? game.Hint : "";
             controls.transform.parent.gameObject.SetActive(game.Duration < 8f || game.State != ShiftRunState.Running);
-            controls.text = game.IsMerged ? "A / D  CROSS     ESC  PAUSE"
-                : "A / D  STEER     SPACE  SWITCH     ESC  PAUSE";
+            controls.text = "A / D  STEER     SPACE  SWITCH     ESC  PAUSE";
             progress.text = "";
             progressFill.anchorMax = new Vector2(game.Distance / game.RunLength, 1f);
             status.text = game.FullLevel ? "Fuel " + Mathf.CeilToInt(game.FuelFraction * 100f) + "%" + (game.PursuitGap < 23f ? "   They're close!" : "") : "";
