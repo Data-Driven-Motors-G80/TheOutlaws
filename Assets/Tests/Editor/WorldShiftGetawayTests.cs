@@ -464,6 +464,48 @@ public sealed class WorldShiftGetawayTests
         }
     }
 
+    [UnityTest]
+    public IEnumerator FuelPercentageAndSpeedShareTheSameStripInBothModesAndEnvironments()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
+        yield return new EnterPlayMode();
+        for (int mode = 0; mode < 4; mode++)
+        {
+            if (mode == 0) Flow("StartGetaway", false);
+            else if (mode == 1) Flow("FinishGetawayLeg", true);
+            else Flow("Select", Enum.Parse(FlowType.Assembly.GetType("Outlaws.WorldShift.ShiftLevel"), mode == 2 ? "City" : "Desert"), false);
+            yield return null; yield return null;
+            bool city = mode == 0 || mode == 2;
+            var game = Find(city ? "WorldShiftCity" : "DesertShiftTrial"); game.enabled = false;
+            var hud = Find(mode < 2 ? "WorldShiftGetaway" : city ? "WorldShiftHud" : "DesertShiftTrialView");
+            var strip = hud.GetType().GetField("statusStrip", Flags).GetValue(hud);
+            var fuel = (FuelState)game.GetType().GetField("fuel", Flags).GetValue(game);
+            fuel.Reset(100f); Call(hud, "Refresh");
+            var fuelText = (TMP_Text)Get(strip, "Fuel"); var speedText = (TMP_Text)Get(strip, "Speed");
+            Assert.That(fuelText.text, Is.EqualTo("Fuel 100%"));
+            Assert.That(speedText.text, Is.EqualTo(city ? "111 km/h" : "95 km/h"));
+            Assert.That(fuelText.rectTransform.anchorMin.x, Is.EqualTo(.37f));
+            Assert.That(speedText.rectTransform.anchorMin.x, Is.EqualTo(.56f));
+            Assert.That(((RectTransform)fuelText.transform.parent).anchorMin.y, Is.GreaterThan(.85f));
+            Assert.That(hud.GetComponentsInChildren<RectTransform>(true).Any(r => new[] { "Fuel track", "RouteProgress", "Exit distance", "Progress" }.Contains(r.name)), Is.False);
+            fuel.Reset(12.25f); Call(hud, "Refresh");
+            Assert.That(fuelText.text, Is.EqualTo("Fuel 13%"), "Fuel percentage must round consistently in every route.");
+            Assert.That(fuelText.color.r, Is.GreaterThan(fuelText.color.g));
+            Capture("status-strip-" + (mode < 2 ? "escape-" : "practice-") + (city ? "city" : "desert"));
+            Call(game, "TogglePause"); Call(hud, "Refresh");
+            float before = fuel.CurrentFuel;
+            Call(game, "StepSimulation", 5f, 0f, false);
+            Assert.That(fuel.CurrentFuel, Is.EqualTo(before));
+            Call(game, "TogglePause"); fuel.Reset(100f);
+            if (mode == 0)
+            {
+                Call(game, "TrySwitch");
+                Call(Get(hud, "Extras"), "Collect", 42f, 46f, 0f, 0f); Call(hud, "Refresh");
+                Assert.That(speedText.text, Is.EqualTo("133 km/h"), "The speed readout must reflect an active boost.");
+            }
+        }
+    }
+
     private static void Advance(object game, float target, float lane)
     {
         for (int i = 0; i < 1200 && (float)Get(game, "Distance") < target; i++)

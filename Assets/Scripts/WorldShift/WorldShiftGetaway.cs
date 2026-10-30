@@ -22,14 +22,12 @@ namespace Outlaws.WorldShift
         private DesertShiftTrial desert;
         private readonly List<Loot> loot = new List<Loot>();
         private readonly List<Material> materials = new List<Material>();
-        private TMP_Text haul, world, stage, guidance, fuelText, resultTitle, resultValue, resultNote;
+        private TMP_Text haul, guidance, resultTitle, resultValue, resultNote;
         private TMP_Text pauseNote, choiceLeft, choiceRight;
         private GameObject promptPanel;
-        private Image mirrorBorder;
-        private RectTransform fuelFill, progressFill;
+        private WorldShiftStatusStrip statusStrip;
         private Image choiceLeftPanel, choiceRightPanel;
         private GameObject result, pause, choices, mirrorPanel, drivingHud;
-        private RawImage mirror;
         private bool continuePending, openingGoalDismissed;
         private float environmentEnd;
         private float lootFeedbackUntil = float.NegativeInfinity;
@@ -240,12 +238,9 @@ namespace Outlaws.WorldShift
             safe.offsetMin = safe.offsetMax = Vector2.zero;
             var hudRoot = WorldShiftMenu.Panel(safe, "Driving", Vector2.zero, Vector2.one, Color.clear);
             drivingHud = hudRoot.gameObject;
-            var header = Panel(hudRoot, "Run", .02f, .89f, .98f, .98f);
-            world = Label(header, "Day", .02f, .1f, .2f, .9f, 22f);
-            haul = Label(header, "$0", .28f, .1f, .65f, .9f, 30f);
-            haul.alignment = TextAlignmentOptions.Center; haul.color = Gold;
-            stage = Label(header, "", .69f, .1f, .98f, .9f, 18f);
-            stage.alignment = TextAlignmentOptions.Right;
+            statusStrip = WorldShiftStatusStrip.Create(hudRoot, true);
+            haul = statusStrip.Loot;
+            mirrorPanel = statusStrip.MirrorPanel;
             // One shared prompt above the horizon, away from the car, mirror and road hazards.
             var promptRoot = Panel(hudRoot, "One prompt", .14f, .77f, .75f, .85f);
             promptRoot.GetComponent<Image>().color = new Color(.025f, .045f, .07f, .82f);
@@ -258,20 +253,6 @@ namespace Outlaws.WorldShift
             guidance.fontSizeMin = 24f;
             guidance.fontSizeMax = 26f;
             guidance.textWrappingMode = TextWrappingModes.NoWrap;
-            var track = Panel(hudRoot, "Exit distance", .02f, .88f, .98f, .885f);
-            progressFill = WorldShiftMenu.Panel(track, "Progress", Vector2.zero, Vector2.one, Gold);
-            var fuelPanel = Panel(hudRoot, "Fuel", .02f, .04f, .20f, .13f);
-            fuelText = Label(fuelPanel, "FUEL", .08f, .4f, .92f, .95f, 17f);
-            var fuelTrack = Panel(fuelPanel, "Fuel track", .08f, .18f, .92f, .30f);
-            fuelFill = WorldShiftMenu.Panel(fuelTrack, "Fuel remaining", Vector2.zero, Vector2.one, Gold);
-            mirrorPanel = Panel(hudRoot, "Pursuit", .78f, .68f, .98f, .86f).gameObject;
-            mirrorBorder = mirrorPanel.GetComponent<Image>();
-            var image = new GameObject("Mirror", typeof(RectTransform), typeof(RawImage));
-            image.transform.SetParent(mirrorPanel.transform, false);
-            mirror = image.GetComponent<RawImage>(); mirror.raycastTarget = false;
-            mirror.rectTransform.anchorMin = new Vector2(.025f, .04f);
-            mirror.rectTransform.anchorMax = new Vector2(.98f, .98f);
-            mirror.rectTransform.offsetMin = mirror.rectTransform.offsetMax = Vector2.zero;
             WorldShiftMenu.Button(hudRoot, "Pause", new Vector2(.85f, .04f), new Vector2(.98f, .11f), TogglePause);
 
             var choice = Panel(hudRoot, "Extraction choice", .16f, .65f, .76f, .84f);
@@ -328,22 +309,11 @@ namespace Outlaws.WorldShift
             Extras.Refresh();
             bool running = State == ShiftRunState.Running;
             bool settled = run.Status == GetawayRunState.RunStatus.Banked || run.Status == GetawayRunState.RunStatus.Lost;
-            world.text = World == ShiftWorld.Day ? "Day" : "Night";
-            world.color = World == ShiftWorld.Day ? Gold : Cyan;
+            statusStrip.Refresh(World, Fuel, IsCity ? city.Speed : desert.CurrentSpeed, RearView != null ? RearView.Texture : null, Gap);
             haul.text = "$" + run.Carried.ToString("N0");
             float pickupPulse = Mathf.Clamp01((lootFeedbackUntil - Duration) / .35f);
             haul.color = Color.Lerp(Gold, Color.white, pickupPulse);
             haul.rectTransform.localScale = Vector3.one * (1f + .12f * pickupPulse);
-            stage.text = IsCity ? "City" : "Desert";
-            fuelFill.anchorMax = new Vector2(Mathf.Clamp01(Fuel), 1f);
-            fuelText.text = "Fuel";
-            fuelText.color = Fuel < .25f ? new Color(1f, .3f, .2f) : Gold;
-            progressFill.anchorMax = new Vector2(Mathf.Clamp01(Distance / Length), 1f);
-            bool danger = Gap < 23f;
-            // The mirror border carries pursuit danger without another competing sentence.
-            mirrorBorder.color = danger ? new Color(.95f, .25f, .18f, .95f) : Ink;
-            mirrorPanel.SetActive(RearView != null);
-            if (RearView != null) mirror.texture = RearView.Texture;
             choices.SetActive(running && InExit);
             choiceLeft.text = "Left: Cash out\n$" + run.Carried.ToString("N0");
             choiceRight.text = "Right: Keep going\n" + (IsCity ? "Desert" : "City") + " / " + (1f + Mathf.Min(currentLeg + 1, 40) * .5f).ToString("0.#") + "x loot";

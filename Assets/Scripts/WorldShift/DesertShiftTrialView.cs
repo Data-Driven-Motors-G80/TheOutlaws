@@ -24,14 +24,12 @@ namespace Outlaws.WorldShift
         private Light sun;
         private ShiftWorld? displayed;
         private Material rockDay, rockNight, sandDay, sandNight;
-        private TMP_Text title, worldLabel, hint, progress, modalText;
+        private TMP_Text hint, modalText;
+        private WorldShiftStatusStrip statusStrip;
         private GameObject modal, practiceHud;
-        private RectTransform progressFill;
         private GameObject obstaclePrefab;
         private readonly List<GameObject> fuelViews = new List<GameObject>();
-        private TMP_Text status, actionLabel, controls;
-        private RawImage mirror;
-        private GameObject mirrorPanel;
+        private TMP_Text actionLabel;
         private WorldShiftRelayVisuals relayViews;
         private static readonly Color Gold = new Color(1f, .70f, .26f), Cyan = new Color(.32f, .84f, 1f);
 
@@ -314,25 +312,16 @@ namespace Outlaws.WorldShift
             view.transform.SetPositionAndRotation(cameraPosition,
                 Quaternion.LookRotation(game.DriverPoint(game.Distance + 22f).Position + Vector3.up * .7f - cameraPosition));
             if (game.GetawayMode) return;
-            title.text = "Desert practice";
-            worldLabel.text = day ? "Day" : "Night";
-            worldLabel.color = day ? Gold : Cyan;
+            statusStrip.Refresh(game.World, game.FuelFraction, game.CurrentSpeed, game.RearView != null ? game.RearView.Texture : null,
+                game.PursuitGap, game.FullLevel);
             hint.text = game.State == ShiftRunState.Retrying || game.Duration < 10f || game.Relay?.SectionAt(game.Distance) != null ? game.Hint : "";
-            controls.transform.parent.gameObject.SetActive(game.Duration < 8f || game.State != ShiftRunState.Running);
-            controls.text = "A / D  STEER     SPACE  SWITCH     ESC  PAUSE";
-            progress.text = "";
-            progressFill.anchorMax = new Vector2(game.Distance / game.RunLength, 1f);
-            status.text = game.FullLevel ? "Fuel " + Mathf.CeilToInt(game.FuelFraction * 100f) + "%" + (game.PursuitGap < 23f ? "   They're close!" : "") : "";
-            status.color = game.FuelFraction < .25f || game.PursuitGap < 23f ? new Color(1f, .3f, .2f) : Gold;
-            mirrorPanel.SetActive(game.RearView != null);
-            if (game.RearView != null) mirror.texture = game.RearView.Texture;
             bool menu = game.State == ShiftRunState.Ready || game.State == ShiftRunState.Paused || game.State == ShiftRunState.Won;
             modal.SetActive(menu);
             practiceHud.SetActive(!menu);
             modalText.text = game.State == ShiftRunState.Ready
                 ? "Desert practice\n\nThings move in day and freeze in night.\nGive Space a try."
                 : game.State == ShiftRunState.Won ? "Nice driving!\n\nFancy another go?"
-                : "Paused\n\nTake your time.";
+                : "Paused\n\nA / D to steer. Space to switch.";
             actionLabel.text = game.State == ShiftRunState.Ready ? "Let's drive" : game.State == ShiftRunState.Won ? "Try again" : "Keep driving";
         }
 
@@ -347,26 +336,10 @@ namespace Outlaws.WorldShift
             driving.GetComponent<Image>().color = Color.clear;
             practiceHud = driving.gameObject;
             Transform canvas = driving;
-            var header = Panel(canvas, "Header", new Vector2(.02f, .83f), new Vector2(.98f, .98f));
-            title = Text(header, new Vector2(.02f, .50f), new Vector2(.65f, .98f), 24f);
-            worldLabel = Text(header, new Vector2(.02f, .05f), new Vector2(.62f, .50f), 22f);
-            progress = Text(header, new Vector2(.64f, .10f), new Vector2(.98f, .9f), 20f);
-            progressFill = Panel(canvas, "Progress", new Vector2(0f, .817f), new Vector2(1f, .825f));
-            progressFill.GetComponent<Image>().color = Cyan;
-            // Child fill keeps vertical anchors fixed while horizontal progress changes.
-            var track = progressFill; track.GetComponent<Image>().color = new Color(.12f, .18f, .23f);
-            progressFill = Panel(track, "Fill", Vector2.zero, Vector2.one); progressFill.GetComponent<Image>().color = Cyan;
-            hint = Text(canvas, new Vector2(.04f, .72f), new Vector2(.75f, .80f), 20f);
-            hint.alignment = TextAlignmentOptions.TopLeft;
-            status = Text(canvas, new Vector2(.04f, .66f), new Vector2(.60f, .72f), 22f);
-            mirrorPanel = Panel(canvas, "Police mirror", new Vector2(.78f, .61f), new Vector2(.98f, .79f)).gameObject;
-            mirror = new GameObject("Rear view", typeof(RectTransform), typeof(RawImage)).GetComponent<RawImage>();
-            mirror.transform.SetParent(mirrorPanel.transform, false); mirror.raycastTarget = false;
-            mirror.rectTransform.anchorMin = new Vector2(.015f, .03f); mirror.rectTransform.anchorMax = new Vector2(.985f, .97f);
-            mirror.rectTransform.offsetMin = mirror.rectTransform.offsetMax = Vector2.zero;
-            var footer = Panel(canvas, "Controls", new Vector2(.13f, .025f), new Vector2(.87f, .09f));
-            controls = Text(footer, Vector2.zero, Vector2.one, 20f); controls.alignment = TextAlignmentOptions.Center;
-            controls.text = "A / D  STEER     SPACE  SWITCH     ESC  PAUSE";
+            statusStrip = WorldShiftStatusStrip.Create(canvas);
+            hint = Text(canvas, new Vector2(.14f, .77f), new Vector2(.75f, .85f), 26f);
+            hint.alignment = TextAlignmentOptions.Center;
+            hint.outlineWidth = .18f; hint.outlineColor = Color.black;
             modal = Panel(canvasObject.transform, "State", new Vector2(.17f, .22f), new Vector2(.83f, .71f)).gameObject;
             modalText = Text(modal.transform, new Vector2(.04f, .24f), new Vector2(.96f, .96f), 25f);
             modalText.alignment = TextAlignmentOptions.Center;

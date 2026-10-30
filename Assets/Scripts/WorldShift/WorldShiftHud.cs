@@ -22,33 +22,11 @@ namespace Outlaws.WorldShift
         private TMP_FontAsset font;
         private RectTransform canvasRoot;
         private RectTransform safeRoot;
-        private RectTransform progressFill;
         private CanvasGroup hud;
         private CanvasGroup hintGroup;
-        private CanvasGroup messageGroup;
-        private Image worldMark;
-        private Image worldBackground;
-        private Image progressImage;
-        private TMP_Text worldLabel;
-        private TMP_Text steerControl, switchControl;
-        private TMP_Text worldSubLabel;
-        private TMP_Text sectionLabel;
-        private TMP_Text progressLabel;
-        private TMP_Text clockLabel;
+        private WorldShiftStatusStrip statusStrip;
         private TMP_Text sectionHint;
-        private TMP_Text message;
         private TMP_Text retryMessage;
-        private GameObject controlsRoot;
-        private RectTransform fuelFill;
-        private Image fuelImage;
-        private Image fuelBorder;
-        private TMP_Text fuelLabel;
-        private TMP_Text speedLabel;
-        private Image[] fuelWarningEdges;
-        private RectTransform mirrorRoot;
-        private RawImage mirrorImage;
-        private Image mirrorBorder;
-        private TMP_Text pursuitLabel;
         private GameObject modal;
         private GameObject readyPanel;
         private GameObject pausePanel;
@@ -141,47 +119,8 @@ namespace Outlaws.WorldShift
                 hasState = true;
             }
 
-            Color accent = game.World == ShiftWorld.Day ? Day : Echo;
-            worldMark.color = accent;
-            worldBackground.color = new Color(accent.r, accent.g, accent.b, .11f);
-            worldLabel.color = accent;
-            worldLabel.text = game.IsMerged ? "Day + night" : game.World == ShiftWorld.Day ? "Day" : "Night";
-            worldLabel.fontSize = game.IsMerged ? 17f : 26f;
-            worldSubLabel.text = game.IsMerged ? "A / D  CROSS" : game.IsRelayAirborne ? "AIRBORNE" : "";
-            steerControl.text = game.IsMerged ? "CROSS" : "STEER";
-            switchControl.text = game.IsMerged ? "RESTING" : game.IsRelayAirborne ? "LAND" : "SWITCH";
-            switchControl.color = game.IsMerged ? Muted : White;
-            sectionLabel.text = "City practice";
-            clockLabel.gameObject.SetActive(false);
-            progressLabel.gameObject.SetActive(false);
-            progressImage.color = accent;
-            progressFill.anchorMax = new Vector2(Mathf.Clamp01(game.Progress), 1f);
-            progressLabel.text = $"{Mathf.RoundToInt(Mathf.Clamp01(game.Progress) * 100f)}%";
-            clockLabel.text = FormatTime(game.Duration);
-            bool lowFuel = game.FuelFraction < .25f;
-            Color fuelColor = lowFuel ? new Color(1f, .24f, .19f) : new Color(1f, .69f, .28f);
-            fuelFill.anchorMax = new Vector2(Mathf.Clamp01(game.FuelFraction), 1f);
-            fuelImage.color = fuelColor;
-            fuelBorder.color = lowFuel ? new Color(.34f, .06f, .05f, .94f) : Ink;
-            fuelLabel.text = lowFuel ? "Fuel's low" : "Fuel";
-            speedLabel.gameObject.SetActive(false);
-            fuelLabel.color = fuelColor;
-            speedLabel.text = Mathf.RoundToInt(game.Speed * 3.6f) + " KM/H";
-            float edgeAlpha = running && lowFuel ? .05f + .09f * (.5f + .5f * Mathf.Sin(Time.unscaledTime * 5f)) : 0f;
-            edgeAlpha = Mathf.Max(edgeAlpha, running ? Mathf.Clamp01(game.HitWarningRemaining) * .16f : 0f);
-            foreach (Image edge in fuelWarningEdges) edge.color = new Color(.9f, .025f, .03f, edgeAlpha);
-            speedLabel.color = game.IsBoosting ? Echo : Muted;
-            bool hasMirror = !game.TutorialLevel && game.RearView != null && game.RearView.Texture != null;
-            mirrorRoot.gameObject.SetActive(hasMirror);
-            if (hasMirror)
-            {
-                if (mirrorImage.texture != game.RearView.Texture) mirrorImage.texture = game.RearView.Texture;
-                float danger = 1f - Mathf.Clamp01((game.PursuitFraction - .15f) / .65f);
-                Color pursuitColor = Color.Lerp(White, new Color(1f, .23f, .19f), danger);
-                mirrorBorder.color = pursuitColor;
-                pursuitLabel.color = pursuitColor;
-                pursuitLabel.text = game.PursuitGap < 23f ? "They're close!" : "";
-            }
+            statusStrip.Refresh(game.World, game.FuelFraction, game.Speed, game.RearView != null ? game.RearView.Texture : null,
+                game.PursuitGap, joined: game.IsMerged);
 
             if (previousHint != game.SectionHint)
             {
@@ -192,12 +131,7 @@ namespace Outlaws.WorldShift
             if (running) hintAge += Time.unscaledDeltaTime;
             hintGroup.alpha = running && !string.IsNullOrEmpty(previousHint)
                 ? game.TutorialLevel ? 1f : 1f - Mathf.Clamp01((hintAge - 3f) / .5f) : 0f;
-            controlsRoot.SetActive(!running || game.Duration < 8f);
 
-            bool usefulMessage = game.Message == "FUEL +26" || game.Message == "POLICE CLOSER" || game.Message == "LANDED";
-            bool showMessage = running && game.MessageRemaining > 0f && usefulMessage;
-            messageGroup.alpha = showMessage ? Mathf.Clamp01(game.MessageRemaining * 3f) : 0f;
-            if (showMessage) message.text = game.Message == "FUEL +26" ? "Fuel topped up." : game.Message == "LANDED" ? "Nice landing!" : "They're getting close.";
             if (retrying) retryMessage.text = game.Message == "NO ROAD" ? "Try switching before the gap."
                 : game.Message == "MISSED RELAY LANDING" ? "Switch worlds before you land."
                 : game.Message == "OUT OF FUEL" ? "Grab a fuel can on the way." : "Let's try that bit again.";
@@ -213,7 +147,7 @@ namespace Outlaws.WorldShift
             canvas.sortingOrder = 100;
             CanvasScaler scaler = canvasRoot.gameObject.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1600f, 900f);
+            scaler.referenceResolution = new Vector2(1280f, 720f);
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
             scaler.matchWidthOrHeight = .5f;
             canvasRoot.gameObject.AddComponent<GraphicRaycaster>();
@@ -225,27 +159,16 @@ namespace Outlaws.WorldShift
             hud = hudRoot.gameObject.AddComponent<CanvasGroup>();
             hud.interactable = false;
             hud.blocksRaycasts = false;
-            BuildHeader(hudRoot);
-            BuildControls(hudRoot);
-            BuildFuel(hudRoot);
-            BuildMirror(hudRoot);
+            statusStrip = WorldShiftStatusStrip.Create(hudRoot);
 
             RectTransform hintRoot = Rect("SectionHint", hudRoot);
-            Place(hintRoot, new Vector2(.5f, 1f), new Vector2(-60f, -155f), new Vector2(720f, 60f));
+            Place(hintRoot, new Vector2(.5f, 1f), new Vector2(-70f, -137f), new Vector2(700f, 52f));
             hintGroup = hintRoot.gameObject.AddComponent<CanvasGroup>();
-            sectionHint = Label("Hint", hintRoot, string.Empty, 20f, White, TextAlignmentOptions.Center);
+            sectionHint = Label("Hint", hintRoot, string.Empty, 26f, White, TextAlignmentOptions.Center);
             Stretch(sectionHint.rectTransform);
             sectionHint.fontStyle = FontStyles.Bold;
             sectionHint.outlineWidth = .16f;
             sectionHint.outlineColor = new Color(0f, 0f, 0f, .8f);
-
-            RectTransform messageRoot = Panel("Message", safeRoot, Ink);
-            Place(messageRoot, new Vector2(.5f, 0f), new Vector2(0f, 132f), new Vector2(760f, 54f));
-            messageGroup = messageRoot.gameObject.AddComponent<CanvasGroup>();
-            messageGroup.interactable = false;
-            messageGroup.blocksRaycasts = false;
-            message = Label("MessageText", messageRoot, string.Empty, 20f, Day, TextAlignmentOptions.Center);
-            Stretch(message.rectTransform, 24f, 6f, 24f, 6f);
 
             RectTransform retry = Panel("RetryBanner", safeRoot, Ink);
             Place(retry, new Vector2(.5f, 1f), new Vector2(0f, -220f), new Vector2(760f, 100f));
@@ -262,116 +185,6 @@ namespace Outlaws.WorldShift
             pausePanel = BuildPause(backdrop);
             wonPanel = BuildWon(backdrop);
             EnsureEventSystem();
-        }
-
-        private void BuildHeader(RectTransform parent)
-        {
-            RectTransform header = Panel("Header", parent, Ink);
-            header.anchorMin = new Vector2(0f, 1f);
-            header.anchorMax = Vector2.one;
-            header.pivot = new Vector2(.5f, 1f);
-            header.offsetMin = new Vector2(30f, -118f);
-            header.offsetMax = new Vector2(-30f, -26f);
-            RectTransform world = Panel("WorldCapsule", header, new Color(Day.r, Day.g, Day.b, .11f));
-            Place(world, new Vector2(0f, .5f), new Vector2(104f, 0f), new Vector2(168f, 56f));
-            worldBackground = world.GetComponent<Image>();
-            RectTransform mark = Panel("WorldIndicator", world, Day);
-            Place(mark, new Vector2(0f, .5f), new Vector2(17f, 0f), new Vector2(4f, 32f));
-            worldMark = mark.GetComponent<Image>();
-            worldLabel = FixedLabel(world, "DAY", 26f, Day, 30f, 4f, 126f, 31f, true);
-            worldLabel.enableAutoSizing = false; // Refresh sets the compact joined-world title explicitly.
-            worldSubLabel = FixedLabel(world, "CURRENT WORLD", 10f, Muted, 31f, 36f, 130f, 14f);
-            worldSubLabel.characterSpacing = 1.4f;
-
-            sectionLabel = Label("Section", header, "CITY RUN", 23f, White, TextAlignmentOptions.Left);
-            sectionLabel.fontStyle = FontStyles.Bold;
-            sectionLabel.rectTransform.anchorMin = new Vector2(0f, 1f);
-            sectionLabel.rectTransform.anchorMax = new Vector2(1f, 1f);
-            sectionLabel.rectTransform.pivot = new Vector2(.5f, 1f);
-            sectionLabel.rectTransform.offsetMin = new Vector2(212f, -50f);
-            sectionLabel.rectTransform.offsetMax = new Vector2(-370f, -15f);
-
-            progressLabel = Label("Extraction", header, "00%  /  EXTRACTION", 16f, Muted, TextAlignmentOptions.Right);
-            Place(progressLabel.rectTransform, Vector2.one, new Vector2(-270f, -32f), new Vector2(250f, 30f));
-            clockLabel = Label("ActiveTime", header, "0:00", 27f, White, TextAlignmentOptions.Right);
-            Place(clockLabel.rectTransform, Vector2.one, new Vector2(-75f, -44f), new Vector2(100f, 45f));
-
-            RectTransform track = Panel("RouteProgress", header, new Color(.22f, .28f, .35f, .7f));
-            track.anchorMin = Vector2.zero;
-            track.anchorMax = new Vector2(1f, 0f);
-            track.pivot = new Vector2(.5f, 0f);
-            track.offsetMin = new Vector2(214f, 23f);
-            track.offsetMax = new Vector2(-145f, 27f);
-            progressFill = Panel("ProgressFill", track, Day);
-            Stretch(progressFill);
-            progressFill.anchorMax = new Vector2(0f, 1f);
-            progressImage = progressFill.GetComponent<Image>();
-        }
-
-        private void BuildControls(RectTransform parent)
-        {
-            RectTransform panel = Panel("Controls", parent, Ink);
-            controlsRoot = panel.gameObject;
-            Place(panel, new Vector2(.5f, 0f), new Vector2(0f, 55f), new Vector2(810f, 56f));
-            Key(panel, "A / D", 20f, 76f);
-            FixedLabel(panel, "OR ARROWS", 14f, Muted, 108f, 17f, 110f, 23f);
-            steerControl = FixedLabel(panel, "STEER", 15f, White, 225f, 16f, 76f, 25f, true);
-            Key(panel, "SPACE", 334f, 94f);
-            switchControl = FixedLabel(panel, "SWITCH", 15f, White, 443f, 16f, 103f, 25f, true);
-            Key(panel, "ESC", 606f, 60f);
-            FixedLabel(panel, "PAUSE", 15f, Muted, 681f, 16f, 95f, 25f);
-        }
-
-        private void BuildFuel(RectTransform parent)
-        {
-            RectTransform panel = Panel("Fuel", parent, Ink);
-            TopLeft(panel, 30f, 136f, 235f, 64f);
-            fuelBorder = panel.GetComponent<Image>();
-            panel.gameObject.SetActive(!game.TutorialLevel);
-            fuelLabel = FixedLabel(panel, "FUEL  100%", 16f, Day, 16f, 10f, 205f, 22f, true);
-            RectTransform track = Panel("FuelTrack", panel, Surface);
-            TopLeft(track, 16f, 39f, 203f, 7f);
-            fuelFill = Panel("FuelRemaining", track, Day);
-            Stretch(fuelFill);
-            fuelImage = fuelFill.GetComponent<Image>();
-            speedLabel = FixedLabel(panel, "101 KM/H", 14f, Muted, 16f, 58f, 203f, 20f);
-
-            fuelWarningEdges = new Image[4];
-            for (int i = 0; i < 4; i++)
-            {
-                RectTransform edge = Panel("LowFuelEdge", parent, Color.clear);
-                Stretch(edge);
-                if (i < 2)
-                {
-                    edge.anchorMin = new Vector2(i, 0f); edge.anchorMax = new Vector2(i, 1f);
-                    edge.pivot = new Vector2(i, .5f); edge.sizeDelta = new Vector2(20f, 0f);
-                }
-                else
-                {
-                    edge.anchorMin = new Vector2(0f, i - 2); edge.anchorMax = new Vector2(1f, i - 2);
-                    edge.pivot = new Vector2(.5f, i - 2); edge.sizeDelta = new Vector2(0f, 16f);
-                }
-                fuelWarningEdges[i] = edge.GetComponent<Image>();
-            }
-        }
-
-        private void BuildMirror(RectTransform parent)
-        {
-            mirrorRoot = Panel("RearViewMirror", parent, White);
-            mirrorRoot.anchorMin = mirrorRoot.anchorMax = Vector2.one;
-            mirrorRoot.pivot = Vector2.one;
-            mirrorRoot.anchoredPosition = new Vector2(-30f, -136f);
-            mirrorRoot.sizeDelta = new Vector2(320f, 110f);
-            mirrorBorder = mirrorRoot.GetComponent<Image>();
-            RectTransform inside = Panel("MirrorBacking", mirrorRoot, Ink);
-            Stretch(inside, 2f, 2f, 2f, 2f);
-            RectTransform imageRoot = Rect("PoliceRearView", mirrorRoot);
-            TopLeft(imageRoot, 4f, 4f, 312f, 78f);
-            mirrorImage = imageRoot.gameObject.AddComponent<RawImage>();
-            mirrorImage.color = Color.white;
-            mirrorImage.raycastTarget = false;
-            pursuitLabel = FixedLabel(mirrorRoot, "POLICE", 13f, White, 10f, 85f, 300f, 19f, true);
-            pursuitLabel.characterSpacing = 1.1f;
         }
 
         private GameObject BuildReady(RectTransform parent)
