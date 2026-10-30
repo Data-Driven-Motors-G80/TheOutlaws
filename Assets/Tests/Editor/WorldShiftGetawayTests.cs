@@ -403,6 +403,67 @@ public sealed class WorldShiftGetawayTests
         Pose(game, 18f, 0f); Capture("loot-box-desert");
     }
 
+    [UnityTest]
+    public IEnumerator PowerupsUseEffectSymbolsAndRampsExplainAutomaticJumping()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
+        yield return new EnterPlayMode();
+        Flow("StartGetaway", false); yield return null; yield return null;
+        for (int environment = 0; environment < 2; environment++)
+        {
+            var game = Find(environment == 0 ? "WorldShiftCity" : "DesertShiftTrial"); game.enabled = false;
+            var hud = Find("WorldShiftGetaway"); var extras = Get(hud, "Extras");
+            foreach (string field in new[] { "shieldPickup", "magnetPickup", "boostPickup" })
+            {
+                var marker = (Transform)extras.GetType().GetField(field, Flags).GetValue(extras);
+                Assert.That(marker.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Power-up diamond"), Is.True);
+                Assert.That(marker.GetComponentsInChildren<TMP_Text>(true).Any(t => t.text.Contains("$")), Is.False);
+                Assert.That(marker.GetComponentsInChildren<Collider>(true).All(c => !c.enabled), Is.True);
+            }
+            var lootItems = ((System.Collections.IEnumerable)hud.GetType().GetField("loot", Flags).GetValue(hud)).Cast<object>().ToArray();
+            foreach (var item in lootItems)
+            {
+                float at = (float)item.GetType().GetField("At").GetValue(item);
+                float x = (float)item.GetType().GetField("X").GetValue(item);
+                if (environment == 1)
+                {
+                    for (int i = 0; i < 10; i++)
+                        if (Mathf.Abs(at - (float)Call(game, "FuelDistance", i)) < 1f)
+                            Assert.That(Mathf.Abs(x), Is.GreaterThan(2.5f), "Cash boxes must not hide fuel cans.");
+                }
+                else
+                {
+                    var fuel = ((System.Collections.IEnumerable)Get(game, "Pickups")).Cast<object>();
+                    foreach (var pickup in fuel)
+                    {
+                        float d = (float)pickup.GetType().GetField("Distance").GetValue(pickup);
+                        if (Mathf.Abs(at - d) > 1f) continue;
+                        float lane = (int)pickup.GetType().GetField("Lane").GetValue(pickup) * 10f / 3f;
+                        // Only compare the fuel in the same world as this cash box.
+                        if (!pickup.GetType().GetField("World").GetValue(pickup).Equals(item.GetType().GetField("World").GetValue(item))) continue;
+                        Assert.That(Mathf.Abs(x - lane), Is.GreaterThan(2.5f));
+                    }
+                }
+            }
+            Pose(game, 18f, 0f); Capture(environment == 0 ? "distinct-pickups-day" : "distinct-pickups-desert");
+            Call(game, "TrySwitch"); Capture(environment == 0 ? "distinct-pickups-night" : "distinct-pickups-desert-night");
+            Call(game, "TrySwitch");
+            float rampApproach = environment == 0 ? 580f : 1930f;
+            float takeoff = environment == 0 ? 660f : 2004f;
+            Pose(game, rampApproach, 0f); Call(hud, "Refresh");
+            var prompt = (TMP_Text)hud.GetType().GetField("guidance", Flags).GetValue(hud);
+            Assert.That(prompt.text, Is.EqualTo("Drive up the ramp to jump."));
+            Capture(environment == 0 ? "auto-jump-approach" : "auto-jump-desert-approach");
+            Advance(game, takeoff + 5f, 0f); Call(hud, "Refresh");
+            Assert.That(Get(game, environment == 0 ? "IsRelayAirborne" : "IsAirborne"), Is.True,
+                "Driving onto the ramp must jump without pressing Space.");
+            Assert.That(Get(game, "World").ToString(), Is.EqualTo("Day"));
+            Assert.That(prompt.text, Is.EqualTo("Space to land in night."));
+            Capture(environment == 0 ? "auto-jump-air" : "auto-jump-desert-air");
+            if (environment == 0) { Flow("FinishGetawayLeg", true); yield return null; yield return null; }
+        }
+    }
+
     private static void Advance(object game, float target, float lane)
     {
         for (int i = 0; i < 1200 && (float)Get(game, "Distance") < target; i++)

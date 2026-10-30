@@ -75,16 +75,16 @@ namespace Outlaws.WorldShift
             {
                 foreach (var pickup in WorldShiftLevel.FuelPickups)
                 {
-                    // Keep the exit approach clear and use existing reachable reward locations.
+                    // Offer a separate lane choice; never hide a fuel pickup inside a cash box.
                     if (pickup.Distance > environmentEnd - 100f) continue;
-                    AddLoot(pickup.Distance, pickup.Lane * WorldShiftLevel.RoadWidth / 3f, pickup.World, gold, handle);
+                    AddLoot(pickup.Distance, pickup.Lane == 0 ? -3.2f : 0f, pickup.World, gold, handle);
                 }
             }
             else
             {
                 // Alternate worlds on safe central stretches.
                 for (int i = 0; i < 10; i++)
-                    AddLoot(desert.FuelDistance(i), 0f, i % 2 == 0 ? ShiftWorld.Day : ShiftWorld.Echo, gold, handle);
+                    AddLoot(desert.FuelDistance(i), -3.2f, i % 2 == 0 ? ShiftWorld.Day : ShiftWorld.Echo, gold, handle);
             }
             Extras = gameObject.AddComponent<WorldShiftGetawayExtras>();
             Extras.Bind(this, Route, IsCity ? city.Player : desert.Player, environmentEnd, MakeMaterial);

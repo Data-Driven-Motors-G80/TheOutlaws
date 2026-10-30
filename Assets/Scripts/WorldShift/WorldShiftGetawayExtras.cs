@@ -32,8 +32,8 @@ namespace Outlaws.WorldShift
             ? game.World == ShiftWorld.Day
                 ? WorldShiftFlow.Escape.HasShield ? "Shield ready. Try night for more." : "Left for a shield."
                 : "Boost ahead. Magnet on the right."
-            : game.Distance >= Jump.Start - 32f && game.Distance < Jump.Start
-            ? "Right: jump. Left: road." : Jump.OnRamp ? "Let the ramp do the jumping." : "";
+            : game.Distance >= Jump.Start - 56f && game.Distance < Jump.Start
+            ? "Drive up the ramp to jump." : Jump.OnRamp ? "Drive up the ramp to jump." : "";
 
         public void Bind(WorldShiftGetaway owner, WorldShiftRoute road, Transform player, float environmentEnd, Func<Color, Material> material)
         {
@@ -41,9 +41,14 @@ namespace Outlaws.WorldShift
             Material gold = material(new Color(1f, .76f, .25f));
             Material deck = material(new Color(.10f, .17f, .22f));
             Material cyan = material(new Color(.25f, .85f, 1f));
+            Material orange = material(new Color(1f, .38f, .12f));
+            Material marker = material(new Color(.035f, .055f, .08f));
+            marker.DisableKeyword("_EMISSION");
+            marker.SetColor("_EmissionColor", Color.black);
             BuildRamp(deck, gold);
             var point = route.Sample(ShieldDistance);
             shieldPickup = Root("One-hit shield pickup", point.Position + point.Right * ShieldLane + Vector3.up * 1.5f, point.Forward);
+            PowerMarker(shieldPickup, marker, cyan);
             Line(shieldPickup, "Shield outline", new[] { new Vector3(0f, 1.3f, 0f), new Vector3(-.65f, 1f, 0f),
                 new Vector3(-.52f, .1f, 0f), new Vector3(0f, -.3f, 0f), new Vector3(.52f, .1f, 0f), new Vector3(.65f, 1f, 0f) }, cyan, .12f, true);
             Line(shieldPickup, "Shield check", new[] { new Vector3(-.27f, .45f, 0f), new Vector3(-.03f, .20f, 0f), new Vector3(.34f, .76f, 0f) }, cyan, .09f, false);
@@ -63,11 +68,13 @@ namespace Outlaws.WorldShift
             }
             Material purple = material(new Color(.85f, .45f, 1f));
             magnetPickup = Root("Loot magnet pickup", point.Position + point.Right * MagnetLane + Vector3.up * 1.5f, point.Forward);
+            PowerMarker(magnetPickup, marker, purple);
             Line(magnetPickup, "Magnet", new[] { new Vector3(-.6f, 1f, 0f), new Vector3(-.6f, .1f, 0f),
                 new Vector3(-.35f, -.25f, 0f), new Vector3(.35f, -.25f, 0f), new Vector3(.6f, .1f, 0f), new Vector3(.6f, 1f, 0f) }, purple, .22f, false);
             boostPickup = Root("Getaway boost pickup", point.Position + Vector3.up * 1.5f, point.Forward);
+            PowerMarker(boostPickup, marker, orange);
             Line(boostPickup, "Boost bolt", new[] { new Vector3(.3f, 1.3f, 0f), new Vector3(-.45f, .4f, 0f),
-                new Vector3(.2f, .4f, 0f), new Vector3(-.3f, -.4f, 0f) }, gold, .22f, false);
+                new Vector3(.2f, .4f, 0f), new Vector3(-.3f, -.4f, 0f) }, orange, .22f, false);
             magnetAura = new GameObject("Active magnet ring").transform;
             magnetAura.SetParent(player, false); magnetAura.localPosition = Vector3.up * .25f;
             var circle = new Vector3[48];
@@ -77,7 +84,7 @@ namespace Outlaws.WorldShift
             boostAura = new GameObject("Active boost trails").transform;
             boostAura.SetParent(player, false);
             foreach (float side in new[] { -.65f, .65f })
-                Line(boostAura, "Boost trail", new[] { new Vector3(side, .4f, -1.4f), new Vector3(side, .4f, -4.5f) }, gold, .16f, false);
+                Line(boostAura, "Boost trail", new[] { new Vector3(side, .4f, -1.4f), new Vector3(side, .4f, -4.5f) }, orange, .16f, false);
             Refresh();
         }
 
@@ -204,6 +211,21 @@ namespace Outlaws.WorldShift
                 var root = Root("Bonus landing marker", p.Position + Vector3.up * .09f, p.Forward);
                 Line(root, "Landing strip", new[] { new Vector3(1.8f, 0f, 0f), new Vector3(4.6f, 0f, 0f) }, gold, .12f, false);
             }
+        }
+
+        private static void PowerMarker(Transform parent, Material backing, Material icon)
+        {
+            // Diamond signs communicate a temporary effect; rectangular $ cases are money.
+            var plate = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            plate.name = "Power-up diamond";
+            plate.transform.SetParent(parent, false);
+            plate.transform.localPosition = new Vector3(0f, .5f, .16f);
+            plate.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+            plate.transform.localScale = new Vector3(1.8f, 1.8f, .12f);
+            plate.GetComponent<Renderer>().sharedMaterial = backing;
+            plate.GetComponent<Collider>().enabled = false;
+            Line(parent, "Power-up diamond border", new[] { new Vector3(0f, 1.78f, .08f), new Vector3(-1.28f, .5f, .08f),
+                new Vector3(0f, -.78f, .08f), new Vector3(1.28f, .5f, .08f) }, icon, .08f, true);
         }
 
         private Transform Root(string name, Vector3 position, Vector3 forward)

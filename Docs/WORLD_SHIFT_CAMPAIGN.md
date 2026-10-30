@@ -28,6 +28,8 @@ Collection removes the box immediately and briefly highlights/enlarges the exist
 
 ## Escape power-ups
 
+Power-ups use dark diamond markers with a cyan shield, purple magnet, or orange lightning bolt. They have no dollar symbols or cash-box geometry. Fuel uses a green can with an F on its face. Cash boxes occupy a different lane from fuel, so their visuals do not overlap. These are functional primitive markers, without decorative assets or audio.
+
 Near the start of each environment, choose one automatic pickup. Taking one removes the other choices for that visit; all can be skipped.
 
 | Power-up | Location | Effect |
@@ -36,13 +38,15 @@ Near the start of each environment, choose one automatic pickup. Taking one remo
 | Magnet | Night, right | Pulls loot across the road in the selected world for six driving seconds. Cannot collect elevated bags from underneath. |
 | Boost | Night, centre | Adds 20% forward speed with 20% less steering input for four driving seconds. Police keep their normal pace, creating separation. |
 
-Magnet and boost timers pause with the game and reset between environments. Cyan shield rings, a shrinking purple magnet ring, and gold boost trails show active effects. A carried shield still allows choosing a Night power on the next visit.
+Magnet and boost timers pause with the game and reset between environments. Cyan shield rings, a shrinking purple magnet ring, and orange boost trails show active effects. A carried shield still allows choosing a Night power on the next visit.
 
 ## Pace and guidance
 
 Normal cruising is 30.8 m/s in City and 26.4 m/s in Desert, 10% faster than the original pace. The pickup boost reaches 36.96 or 31.68 m/s respectively. Police match normal cruising with the existing small closing pressure. Tutorial speed stays at 18 m/s. Authored relay approaches, flight, landing recovery and steering retain their original curves, including the 42 m/s peak. The bonus ramp and recovery retain 28 m/s in City or 24 m/s in Desert; pickup boosts do not override jump sequences. Standalone development exercises retain their original pace.
 
 The driving HUD uses one contextual prompt in a compact, content-sized dark panel below the header, to the left of the mirror and above the road horizon. At the 1280×720 reference size it uses 26 px type, with a 24 px minimum, one line, and clear padding. The tutorial uses the same upper placement. The car and lower road remain free of guidance text.
+
+Ramp approaches use **Drive up the ramp to jump.** in the existing prompt slot. Driving onto a ramp triggers the jump automatically; Space remains world switching. Only after takeoff do required relay jumps show **Space to land in night/day.** Optional loot ramps require no world switch.
 
 The first crate uses **Drive through to collect**; **Grab loot. Exit to keep it.** is the brief opening fallback once that cue is no longer needed. Urgent road or landing guidance replaces it; pickup acknowledgements and route hints use that same slot. Loot collection updates the total without a separate text popup. The mirror border turns red for pursuit danger. Driving controls appear in Pause and the tutorial rather than a second on-road footer. Exit choices replace the prompt entirely. The header shows the amount without an extra “Your loot” caption. Pause and results hide the driving HUD. The home screen uses rounded, illustrated Day/Night cards for Escape and Practice, with a separate optional lesson link.
 

@@ -40,6 +40,8 @@ public sealed class WorldShiftRelayTests
             Call(game, "RetryCheckpoint");
             string target = i == 1 ? "Day" : "Echo";
             float initialGap = (float)Get(game, "PursuitGap");
+            Advance(game, ramps[i] - 20f);
+            Assert.That(Get(game, "SectionHint"), Is.EqualTo("Drive up the ramp to jump."));
             Advance(game, ramps[i] + 36f);
             Assert.That((float)Get(game, "Speed"), Is.EqualTo(42f).Within(.05f));
             var foot = Call(Get(game, "Route"), "Sample", ramps[i]);

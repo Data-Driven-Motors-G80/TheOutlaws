@@ -78,8 +78,10 @@ namespace Outlaws.WorldShift
             for (int i = 0; i < game.FuelCount; i++)
             {
                 Transform pickup = RoadRoot("Shared fuel " + i, game.FuelDistance(i));
-                Box(pickup, "Fuel can", new Vector3(0f, 1f, 0f), new Vector3(.8f, 1.4f, .7f), Material(Gold, .25f));
-                WorldText(pickup, "F", new Vector3(0f, 2.4f, 0f), Gold, 6f);
+                var green = Material(new Color(.2f, .85f, .45f));
+                Box(pickup, "Fuel can", new Vector3(0f, .8f, 0f), new Vector3(.8f, 1.4f, .7f), green);
+                Box(pickup, "Fuel spout", new Vector3(.2f, 1.6f, 0f), new Vector3(.22f, .3f, .35f), green);
+                WorldText(pickup, "F", new Vector3(0f, .85f, -.365f), Color.white, 7f);
                 fuelViews.Add(pickup.gameObject);
             }
             if (!game.GetawayMode) BuildHud();
@@ -315,7 +317,7 @@ namespace Outlaws.WorldShift
             title.text = "Desert practice";
             worldLabel.text = day ? "Day" : "Night";
             worldLabel.color = day ? Gold : Cyan;
-            hint.text = game.State == ShiftRunState.Retrying || game.Duration < 10f || game.IsAirborne ? game.Hint : "";
+            hint.text = game.State == ShiftRunState.Retrying || game.Duration < 10f || game.Relay?.SectionAt(game.Distance) != null ? game.Hint : "";
             controls.transform.parent.gameObject.SetActive(game.Duration < 8f || game.State != ShiftRunState.Running);
             controls.text = "A / D  STEER     SPACE  SWITCH     ESC  PAUSE";
             progress.text = "";

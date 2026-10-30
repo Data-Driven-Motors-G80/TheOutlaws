@@ -647,10 +647,10 @@ namespace Outlaws.WorldShift
                 chunks.Add(new Chunk { Root = root.gameObject, At = data.Distance });
                 var model = new GameObject("Collectible fuel").transform;
                 model.SetParent(root, false);
-                if (fuelPrefab != null) Visual(fuelPrefab, model, new Vector3(0f, .95f, 0f), new Vector3(1.2f, 1.4f, .7f));
-                else Box(model, "Fuel", new Vector3(0f, .95f, 0f), new Vector3(1.2f, 1.4f, .7f), warmEdge);
-                Label(model, "F", new Vector3(0f, 1f, -.38f), 1f, Color.white).fontSize = 7f;
-                Label(model, "FUEL", new Vector3(0f, 2.1f, 0f), 2f, new Color(.55f, 1f, .7f)).fontSize = 4f;
+                var green = RuntimeMaterials.Coloured(new Color(.2f, .85f, .45f));
+                Box(model, "Fuel can", new Vector3(0f, .8f, 0f), new Vector3(.8f, 1.4f, .7f), green);
+                Box(model, "Fuel spout", new Vector3(.2f, 1.6f, 0f), new Vector3(.22f, .3f, .35f), green);
+                Label(model, "F", new Vector3(0f, .85f, -.365f), .7f, Color.white).fontSize = 7f;
                 fuelModels.Add(model.gameObject);
             }
         }
