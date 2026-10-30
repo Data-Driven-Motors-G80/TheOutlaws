@@ -22,16 +22,15 @@ namespace Outlaws.WorldShift
         private DesertShiftTrial desert;
         private readonly List<Loot> loot = new List<Loot>();
         private readonly List<Material> materials = new List<Material>();
-        private TMP_Text haul, world, stage, guidance, fuelText, resultTitle, resultValue, resultNote, footer;
-        private TMP_Text pauseNote, mirrorLabel, choiceLeft, choiceRight;
-        private CanvasGroup chaseGoal;
+        private TMP_Text haul, world, stage, guidance, fuelText, resultTitle, resultValue, resultNote;
+        private TMP_Text pauseNote, choiceLeft, choiceRight;
+        private GameObject promptPanel;
+        private Image mirrorBorder;
         private RectTransform fuelFill, progressFill;
         private Image choiceLeftPanel, choiceRightPanel;
         private GameObject result, pause, choices, mirrorPanel, drivingHud;
         private RawImage mirror;
-        private bool continuePending;
-        private string pickupMessage;
-        private float pickupUntil;
+        private bool continuePending, openingGoalDismissed;
         private float environmentEnd;
         private int currentLeg;
         private static readonly Color Gold = new Color(1f, .77f, .25f);
@@ -133,9 +132,7 @@ namespace Outlaws.WorldShift
                 if (Mathf.Max(a, b) < item.X - reach || Mathf.Min(a, b) > item.X + reach) continue;
                 item.Taken = true;
                 item.Visual.gameObject.SetActive(false);
-                int amount = WorldShiftFlow.Escape.Collect(100);
-                pickupMessage = "+$" + amount;
-                pickupUntil = Time.unscaledTime + 1.1f;
+                WorldShiftFlow.Escape.Collect(100);
             }
         }
 
@@ -228,20 +225,23 @@ namespace Outlaws.WorldShift
             var hudRoot = WorldShiftMenu.Panel(safe, "Driving", Vector2.zero, Vector2.one, Color.clear);
             drivingHud = hudRoot.gameObject;
             var header = Panel(hudRoot, "Run", .02f, .89f, .98f, .98f);
-            world = Label(header, "DAY", .02f, .1f, .2f, .9f, 25f);
-            haul = Label(header, "$0", .28f, .1f, .65f, .9f, 32f);
+            world = Label(header, "Day", .02f, .1f, .2f, .9f, 22f);
+            haul = Label(header, "$0", .28f, .1f, .65f, .9f, 30f);
             haul.alignment = TextAlignmentOptions.Center; haul.color = Gold;
             stage = Label(header, "", .69f, .1f, .98f, .9f, 18f);
             stage.alignment = TextAlignmentOptions.Right;
-            // An objective in the moving chase, rather than another screen to dismiss.
-            var goalRoot = WorldShiftMenu.Panel(hudRoot, "Chase goal", new Vector2(.16f, .74f), new Vector2(.75f, .85f), Color.clear);
-            chaseGoal = goalRoot.gameObject.AddComponent<CanvasGroup>();
-            chaseGoal.interactable = false;
-            chaseGoal.blocksRaycasts = false;
-            var goalText = Label(goalRoot, "You're the getaway driver.\n<size=18>Grab loot. Reach an exit to keep it.</size>", 0f, 0f, 1f, 1f, 28f);
-            goalText.alignment = TextAlignmentOptions.Center;
-            goalText.outlineWidth = .18f;
-            goalText.outlineColor = Color.black;
+            // One shared prompt above the horizon, away from the car, mirror and road hazards.
+            var promptRoot = Panel(hudRoot, "One prompt", .14f, .77f, .75f, .85f);
+            promptRoot.GetComponent<Image>().color = new Color(.025f, .045f, .07f, .82f);
+            promptRoot.anchorMin = promptRoot.anchorMax = new Vector2(.445f, .81f);
+            promptRoot.sizeDelta = new Vector2(480f, 52f);
+            promptPanel = promptRoot.gameObject;
+            guidance = Label(promptRoot, "", .03f, .08f, .97f, .92f, 26f);
+            guidance.name = "Gameplay prompt";
+            guidance.alignment = TextAlignmentOptions.Center;
+            guidance.fontSizeMin = 24f;
+            guidance.fontSizeMax = 26f;
+            guidance.textWrappingMode = TextWrappingModes.NoWrap;
             var track = Panel(hudRoot, "Exit distance", .02f, .88f, .98f, .885f);
             progressFill = WorldShiftMenu.Panel(track, "Progress", Vector2.zero, Vector2.one, Gold);
             var fuelPanel = Panel(hudRoot, "Fuel", .02f, .04f, .20f, .13f);
@@ -249,18 +249,13 @@ namespace Outlaws.WorldShift
             var fuelTrack = Panel(fuelPanel, "Fuel track", .08f, .18f, .92f, .30f);
             fuelFill = WorldShiftMenu.Panel(fuelTrack, "Fuel remaining", Vector2.zero, Vector2.one, Gold);
             mirrorPanel = Panel(hudRoot, "Pursuit", .78f, .68f, .98f, .86f).gameObject;
+            mirrorBorder = mirrorPanel.GetComponent<Image>();
             var image = new GameObject("Mirror", typeof(RectTransform), typeof(RawImage));
             image.transform.SetParent(mirrorPanel.transform, false);
             mirror = image.GetComponent<RawImage>(); mirror.raycastTarget = false;
-            mirror.rectTransform.anchorMin = new Vector2(.02f, .25f);
+            mirror.rectTransform.anchorMin = new Vector2(.025f, .04f);
             mirror.rectTransform.anchorMax = new Vector2(.98f, .98f);
             mirror.rectTransform.offsetMin = mirror.rectTransform.offsetMax = Vector2.zero;
-            mirrorLabel = Label(mirrorPanel.transform, "POLICE", .04f, .02f, .96f, .24f, 14f);
-            guidance = Label(hudRoot, "", .23f, .15f, .77f, .23f, 24f);
-            guidance.alignment = TextAlignmentOptions.Center;
-            guidance.outlineWidth = .2f; guidance.outlineColor = Color.black;
-            footer = Label(hudRoot, "A / D to steer. Space to switch.", .23f, .04f, .77f, .10f, 16f);
-            footer.alignment = TextAlignmentOptions.Center;
             WorldShiftMenu.Button(hudRoot, "Pause", new Vector2(.85f, .04f), new Vector2(.98f, .11f), TogglePause);
 
             var choice = Panel(hudRoot, "Extraction choice", .16f, .65f, .76f, .84f);
@@ -276,6 +271,7 @@ namespace Outlaws.WorldShift
             Label(pause.transform, "Paused", .18f, .66f, .82f, .80f, 44f).alignment = TextAlignmentOptions.Center;
             pauseNote = Label(pause.transform, "", .18f, .51f, .82f, .63f, 22f);
             pauseNote.alignment = TextAlignmentOptions.Center;
+            Label(pause.transform, "A / D to steer. Space to switch.", .20f, .10f, .80f, .16f, 18f).alignment = TextAlignmentOptions.Center;
             WorldShiftMenu.Button(pause.transform, "Keep driving", new Vector2(.24f, .35f), new Vector2(.76f, .46f), TogglePause);
             WorldShiftMenu.Button(pause.transform, "Leave this run", new Vector2(.24f, .20f), new Vector2(.76f, .31f), WorldShiftFlow.Menu);
 
@@ -318,31 +314,26 @@ namespace Outlaws.WorldShift
             bool settled = run.Status == GetawayRunState.RunStatus.Banked || run.Status == GetawayRunState.RunStatus.Lost;
             world.text = World == ShiftWorld.Day ? "Day" : "Night";
             world.color = World == ShiftWorld.Day ? Gold : Cyan;
-            haul.text = "<size=14>Your loot</size>\n$" + run.Carried.ToString("N0");
+            haul.text = "$" + run.Carried.ToString("N0");
             stage.text = IsCity ? "City" : "Desert";
             fuelFill.anchorMax = new Vector2(Mathf.Clamp01(Fuel), 1f);
-            fuelText.text = Fuel < .25f ? "Fuel's low" : "Fuel";
+            fuelText.text = "Fuel";
             fuelText.color = Fuel < .25f ? new Color(1f, .3f, .2f) : Gold;
             progressFill.anchorMax = new Vector2(Mathf.Clamp01(Distance / Length), 1f);
             bool danger = Gap < 23f;
-            mirrorLabel.text = danger ? "They're close!" : "";
-            mirrorLabel.color = danger ? new Color(1f, .3f, .2f) : Color.white;
+            // The mirror border carries pursuit danger without another competing sentence.
+            mirrorBorder.color = danger ? new Color(.95f, .25f, .18f, .95f) : Ink;
             mirrorPanel.SetActive(RearView != null);
             if (RearView != null) mirror.texture = RearView.Texture;
             choices.SetActive(running && InExit);
-            choiceLeft.text = "Left: Cash out\nKeep $" + run.Carried.ToString("N0");
+            choiceLeft.text = "Left: Cash out\n$" + run.Carried.ToString("N0");
             choiceRight.text = "Right: Keep going\n" + (IsCity ? "Desert" : "City") + " / " + (1f + Mathf.Min(currentLeg + 1, 40) * .5f).ToString("0.#") + "x loot";
             choiceLeftPanel.color = Lateral < ContinueBoundary ? new Color(.08f, .3f, .2f, .98f) : Ink;
             choiceRightPanel.color = Lateral >= ContinueBoundary ? new Color(.35f, .23f, .06f, .98f) : Ink;
-            footer.gameObject.SetActive(Duration < 8f || State == ShiftRunState.Paused);
-            // Use driving time so pausing never consumes the chance to read the goal.
-            bool opening = running && currentLeg == 0 && Duration < 7f;
-            chaseGoal.alpha = opening ? 1f - Mathf.Clamp01((Duration - 5.5f) / 1.5f) : 0f;
-            // The goal stays readable even when the opening bags are collected.
-            // Keep immediate road guidance available; don't stack pickup messages beneath it.
-            guidance.text = !running || InExit ? "" : Extras.Feedback.Length > 0 ? Extras.Feedback
-                : Extras.Hint.Length > 0 ? Extras.Hint : opening ? (IsCity ? CityHint() : DesertHint())
-                : Time.unscaledTime < pickupUntil ? pickupMessage : IsCity ? CityHint() : DesertHint();
+            guidance.text = running && !InExit ? DrivingPrompt() : "";
+            promptPanel.SetActive(guidance.text.Length > 0);
+            float maxPromptWidth = Mathf.Max(300f, ((RectTransform)drivingHud.transform).rect.width * .61f);
+            ((RectTransform)promptPanel.transform).sizeDelta = new Vector2(Mathf.Min(maxPromptWidth, guidance.preferredWidth + 48f), 52f);
             drivingHud.SetActive(!settled && State != ShiftRunState.Paused);
             pause.SetActive(State == ShiftRunState.Paused);
             pauseNote.text = run.Carried > 0 ? "Leaving now means losing your $" + run.Carried.ToString("N0") + "." : "Take your time. We'll wait.";
@@ -355,17 +346,36 @@ namespace Outlaws.WorldShift
                 : "This run's loot is gone. You still have $" + WorldShiftFlow.Banked.ToString("N0") + " saved.";
         }
 
+        private string DrivingPrompt()
+        {
+            // Road instructions take precedence over the goal and pickup acknowledgements.
+            string road = IsCity ? CityHint() : DesertHint();
+            if (road.Length > 0) { openingGoalDismissed = true; return road; }
+            if (Extras.Feedback.Length > 0) { openingGoalDismissed = true; return Extras.Feedback; }
+            // Driving time pauses with the game; distance prevents replaying this after a teleport/restore.
+            if (!openingGoalDismissed && currentLeg == 0 && Duration < 2.2f && Distance < 80f) return "Grab loot. Exit to keep it.";
+            return Extras.Hint;
+        }
+
         private string CityHint()
         {
-            if (city.IsRelayAirborne) return city.SectionHint;
-            return city.SectionHint;
+            if (city.IsRelayAirborne || WorldShiftRelay.At(Distance) != null) return city.SectionHint;
+            foreach (var hazard in city.Hazards)
+            {
+                if (hazard.World != World || hazard.LaneMask != 7) continue;
+                hazard.BoundsAt(Distance, out float start, out float end);
+                if (start > Distance + 42f || end < Distance - 2f) continue;
+                return hazard.Kind == ShiftHazardKind.Gap ? "Space for solid road." : "Space to switch.";
+            }
+            return "";
         }
 
         private string DesertHint()
         {
-            if (desert.IsAirborne) return World == ShiftWorld.Day ? "Tap Space to land in night." : "Stay in night to land.";
-            if (Duration < 10f) return World == ShiftWorld.Day ? "Try Space to freeze things." : "Night freezes things. They're still solid.";
-            return DesertShiftLevel.InRockField(Distance) ? "Try night to freeze a gap." : "";
+            if (desert.IsAirborne) return World == ShiftWorld.Day ? "Space to land in night." : "Stay in night to land.";
+            if (desert.Relay?.SectionAt(Distance) != null) return desert.Hint;
+            if (desert.Switches == 0 && Distance >= 100f && Distance < 180f) return "Space freezes the rocks.";
+            return DesertShiftLevel.InRockField(Distance) && World == ShiftWorld.Day ? "Space to freeze a gap." : "";
         }
 
         private void OnDestroy() { foreach (var material in materials) if (material != null) Destroy(material); }

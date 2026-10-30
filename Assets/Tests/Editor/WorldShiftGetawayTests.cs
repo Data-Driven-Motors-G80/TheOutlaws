@@ -3,6 +3,7 @@ using System.Collections;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
+using TMPro;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -301,6 +302,60 @@ public sealed class WorldShiftGetawayTests
             Call(game, "Fail", "CAUGHT");
             Assert.That(Get(extras, "SpeedMultiplier"), Is.EqualTo(1f));
         }
+    }
+
+    [UnityTest]
+    public IEnumerator EscapeHudShowsOneReadablePromptAwayFromTheCarAndMirror()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
+        yield return new EnterPlayMode();
+        Flow("StartGetaway", false); yield return null; yield return null;
+        var game = Find("WorldShiftCity"); game.enabled = false;
+        var hud = Find("WorldShiftGetaway");
+        var prompt = (TMP_Text)hud.GetType().GetField("guidance", Flags).GetValue(hud);
+        var driving = (GameObject)hud.GetType().GetField("drivingHud", Flags).GetValue(hud);
+        Call(hud, "Refresh");
+        Assert.That(prompt.text, Is.EqualTo("Grab loot. Exit to keep it."));
+        Assert.That(driving.GetComponentsInChildren<TMP_Text>(true).Any(t => t.text.Contains("A / D to steer")), Is.False);
+        Assert.That(driving.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Chase goal"), Is.False);
+        Assert.That(prompt.fontSizeMin, Is.GreaterThanOrEqualTo(24f));
+        Assert.That(prompt.fontSizeMax, Is.EqualTo(26f));
+        var panel = (RectTransform)prompt.transform.parent;
+        var mirror = (GameObject)hud.GetType().GetField("mirrorPanel", Flags).GetValue(hud);
+        Assert.That(panel.anchorMin.y, Is.GreaterThanOrEqualTo(.75f));
+        Canvas.ForceUpdateCanvases();
+        var bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(driving.transform, panel);
+        float width = ((RectTransform)driving.transform).rect.width;
+        Assert.That(bounds.max.x, Is.LessThan(width * (((RectTransform)mirror.transform).anchorMin.x - .5f)));
+        prompt.ForceMeshUpdate();
+        Assert.That(prompt.isTextOverflowing, Is.False);
+        Assert.That(prompt.textInfo.lineCount, Is.EqualTo(1));
+        Capture("hud-clean-opening");
+
+        // A shield acknowledgement and the opening objective cannot stack with a road instruction.
+        Call(Get(hud, "Extras"), "Collect", 42f, 46f, -3.2f, -3.2f);
+        Pose(game, 60f, 0f);
+        Call(hud, "Refresh");
+        Assert.That(prompt.text, Is.EqualTo("Space to switch."));
+        Assert.That(driving.GetComponentsInChildren<TMP_Text>().Any(t => t.text == "They're close!"), Is.False);
+        Capture("hud-clean-road-cue");
+        Call(game, "TogglePause"); Call(hud, "Refresh");
+        Assert.That(driving.activeSelf, Is.False);
+        Assert.That(prompt.text, Is.Empty);
+        Capture("hud-clean-pause");
+        Call(game, "TogglePause");
+        Pose(game, (float)Get(game, "RunLength") - 90f, -3.2f);
+        Call(hud, "Refresh");
+        Assert.That(prompt.gameObject.activeInHierarchy, Is.False, "Exit choices replace the guidance prompt.");
+        Capture("hud-clean-exit");
+
+        Flow("FinishGetawayLeg", true); yield return null; yield return null;
+        game = Find("DesertShiftTrial"); game.enabled = false;
+        hud = Find("WorldShiftGetaway");
+        Pose(game, 1120f, 0f); Call(hud, "Refresh");
+        prompt = (TMP_Text)hud.GetType().GetField("guidance", Flags).GetValue(hud);
+        Assert.That(prompt.text, Is.EqualTo("Space to freeze a gap."));
+        Capture("hud-clean-desert");
     }
 
     private static void Advance(object game, float target, float lane)

@@ -30,10 +30,10 @@ namespace Outlaws.WorldShift
         public string Feedback => game.Duration < feedbackUntil ? feedback : "";
         public string Hint => !choiceTaken && game.Distance >= 12f && game.Distance < PowerDistance - 2f
             ? game.World == ShiftWorld.Day
-                ? WorldShiftFlow.Escape.HasShield ? "Shield ready. Night: boost or magnet." : "Left: shield. Night: boost or magnet."
-                : "Middle: boost. Right: magnet."
+                ? WorldShiftFlow.Escape.HasShield ? "Shield ready. Try night for more." : "Left for a shield."
+                : "Boost ahead. Magnet on the right."
             : game.Distance >= Jump.Start - 32f && game.Distance < Jump.Start
-            ? "Right for a jump. Left for the road." : Jump.OnRamp ? "The ramp does the jumping." : "";
+            ? "Right: jump. Left: road." : Jump.OnRamp ? "Let the ramp do the jumping." : "";
 
         public void Bind(WorldShiftGetaway owner, WorldShiftRoute road, Transform player, float environmentEnd, Func<Color, Material> material)
         {
@@ -108,17 +108,17 @@ namespace Outlaws.WorldShift
             {
                 if (!WorldShiftFlow.Escape.CollectShield()) return;
                 ShieldTaken = true;
-                Say("Shield on. One hit's covered.");
+                Say("Shield on.");
             }
             else if (lane == MagnetLane)
             {
                 magnetUntil = game.Duration + MagnetDuration;
-                Say("Magnet on. Scoop up the loot!");
+                Say("Magnet on!");
             }
             else
             {
                 boostUntil = game.Duration + BoostDuration;
-                Say("Boost! Easy on the steering.");
+                Say("Boost!");
             }
             choiceTaken = true;
             Refresh();

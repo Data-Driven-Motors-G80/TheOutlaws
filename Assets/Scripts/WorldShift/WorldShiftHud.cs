@@ -69,7 +69,7 @@ namespace Outlaws.WorldShift
         {
             canvasRoot = WorldShiftMenu.CreateCanvas(transform, "Learn to play");
             lessonDriving = WorldShiftMenu.Panel(canvasRoot, "One lesson at a time", Vector2.zero, Vector2.one, Color.clear).gameObject;
-            lessonHint = WorldShiftMenu.Label(lessonDriving.transform, "", .16f, .13f, .84f, .22f, 26f);
+            lessonHint = WorldShiftMenu.Label(lessonDriving.transform, "", .16f, .77f, .78f, .85f, 26f);
             lessonHint.alignment = TextAlignmentOptions.Center;
             lessonHint.outlineWidth = .18f;
             lessonHint.outlineColor = Color.black;

@@ -2,7 +2,8 @@
     "name": "MoneyHeist.Pickups.EditorTests",
     "rootNamespace": "",
     "references": [
-        "MoneyHeist.Pickups"
+        "MoneyHeist.Pickups",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [
         "Editor"
