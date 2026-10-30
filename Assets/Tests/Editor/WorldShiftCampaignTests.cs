@@ -59,6 +59,8 @@ public sealed class WorldShiftCampaignTests
                 Assert.That((float)Get(tutorial, "Distance"), Is.EqualTo(stoppedAt).Within(.01f), "The lesson waits safely for the player's shot.");
                 Assert.That((float)Get(tutorial, "PursuitGap"), Is.EqualTo(gap).Within(.01f));
                 Assert.That(Get(tutorial, "SectionHint"), Is.EqualTo("Click to shoot the block."));
+                Call(tutorial, "PresentWorldForCamera", Get(tutorial, "World"));
+                Call(Find("WorldShiftHud"), "Refresh");
                 Capture("tutorial-shoot");
                 var combat = Get(tutorial, "Combat");
                 Call(tutorial, "TogglePause"); Assert.That(Call(combat, "TryShoot"), Is.False);
