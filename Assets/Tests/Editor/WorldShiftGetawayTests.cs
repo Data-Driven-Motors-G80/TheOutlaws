@@ -41,7 +41,8 @@ public sealed class WorldShiftGetawayTests
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
         yield return new EnterPlayMode();
         Capture("menu");
-        Flow("StartGetaway", true); yield return null; yield return null;
+        UnityEngine.Object.FindObjectsByType<UnityEngine.UI.Button>(FindObjectsSortMode.None).Single(b => b.name == "Start tutorial").onClick.Invoke();
+        yield return null; yield return null;
         var tutorial = Find("WorldShiftCity"); tutorial.enabled = false;
         Assert.That(Get(tutorial, "TutorialLevel"), Is.True);
         Assert.That(Get(tutorial, "GetawayMode"), Is.False);

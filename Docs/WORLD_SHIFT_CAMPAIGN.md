@@ -1,16 +1,16 @@
 # World Shift playable flow
 
-The menu now starts the **Endless Getaway** mode: collect loot, steer left to bank at an exit, or right to continue into the next environment. City and Desert loop with increasing rewards and pursuit pressure. Capture, wrecks, or empty fuel lose the carried haul. Practice retains the original checkpoint flow described below.
+The menu now starts the **Endless Getaway** mode: collect loot, steer left to bank at an exit, or right to continue into the next environment. City and Desert loop with increasing rewards and pursuit pressure. Capture, wrecks, or empty fuel lose the carried haul. The optional Tutorial teaches the controls before offering an escape run. Checkpoint practice remains available through the standalone environment scenes for development.
 
 Open `Assets/Scenes/WorldShift_Menu.unity` and press Play, or use **The Outlaws > World Shift > Open Game Menu**. This scene is also first in Build Settings. Existing environment scenes remain available.
 
-The home screen separates **Endless escape** from **Practice**. Practice opens City and Desert route buttons; **New here? Learn to play** opens the tutorial. The available routes are:
+The home screen has two choices: **Endless escape** starts directly in City; **Tutorial** starts the short lesson. There is no Practice submenu or separate lesson link. The available routes are:
 
 - **City:** the existing 3,360 m route, three airborne relays and a final stretch of world-specific obstacles. Normal cruise is 30.8 m/s; jump sequences retain their original speed curves.
 - **Desert:** 2,880 m. Normal cruise is 26.4 m/s; the authored relay retains its original 24–42 m/s curve. 58 rocks (including six airborne rocks), 14 freezeable oncoming police cars, alternating world walls, six checkpoints, shared fuel and the existing police/mirror. The final 480 m retains manual Space switching and shows only the selected world.
 - **Tutorial:** an independent 720 m city course at 18 m/s (about 40 seconds). Steering, switching, returning to Day, and choosing whether to steer around an obstacle or switch worlds. No fuel drain. Retries restart the current lesson.
 
-The first escape includes the short tutorial. **New here? Learn to play** also opens it independently. Tutorial can also be selected independently; its Continue button leads to City. City practice completion offers **Try the desert** and **Back to menu**. Desert practice completion offers **Try again** and **Back to menu**. Pause screens offer a clear way to resume or leave.
+Escape never inserts the tutorial, including on the first visit. **Start tutorial** explicitly opens it; finishing or skipping that lesson offers **Start your escape** and leads into an Escape run. Standalone tutorial scenes can also be selected independently; their Continue button leads to City. City practice completion offers **Try the desert** and **Back to menu**. Desert practice completion offers **Try again** and **Back to menu**. Pause screens offer a clear way to resume or leave.
 
 ## Escape rules
 
@@ -59,7 +59,7 @@ The driving HUD uses one contextual prompt in a compact, content-sized dark pane
 
 Ramp approaches use **Drive up the ramp to jump.** in the existing prompt slot. Driving onto a ramp triggers the jump automatically; Space remains world switching. Only after takeoff do required relay jumps show **Space to land in night/day.** Optional loot ramps require no world switch.
 
-The first crate uses **Drive through to collect**; **Grab loot. Exit to keep it.** is the brief opening fallback once that cue is no longer needed. Urgent road or landing guidance replaces it; pickup acknowledgements and route hints use that same slot. Loot collection updates the total without a separate text popup. The mirror border turns red for pursuit danger. Driving controls appear in Pause and the tutorial rather than a second on-road footer. Exit choices replace the prompt entirely. The header shows the amount without an extra “Your loot” caption. Pause and results hide the driving HUD. The home screen uses rounded, illustrated Day/Night cards for Escape and Practice, with a separate optional lesson link.
+The first crate uses **Drive through to collect**; **Grab loot. Exit to keep it.** is the brief opening fallback once that cue is no longer needed. Urgent road or landing guidance replaces it; pickup acknowledgements and route hints use that same slot. Loot collection updates the total without a separate text popup. The mirror border turns red for pursuit danger. Driving controls appear in Pause and the tutorial rather than a second on-road footer. Exit choices replace the prompt entirely. The header shows the amount without an extra “Your loot” caption. Pause and results hide the driving HUD. The home screen uses rounded Day/Night cards for Endless escape and Tutorial, each with one clear action.
 
 ## Shared rules
 

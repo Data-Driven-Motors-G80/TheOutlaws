@@ -7,12 +7,12 @@ using UnityEngine.UI;
 
 namespace Outlaws.WorldShift
 {
-    // Escape is the primary action; practice keeps the original checkpoint flow.
+    // Escape starts immediately; the optional tutorial teaches the controls separately.
     public sealed class WorldShiftMenu : MonoBehaviour
     {
         private static readonly Color Ink = new Color(.025f, .045f, .07f, .98f);
         private static readonly Color Accent = new Color(.35f, .85f, 1f);
-        private GameObject home, practice;
+        private GameObject home;
 
         private Sprite rounded, backdrop;
         private Texture2D roundedTexture, backdropTexture;
@@ -41,33 +41,15 @@ namespace Outlaws.WorldShift
             Label(escape, "Endless escape", .065f, .35f, .94f, .48f, 30f).fontStyle = FontStyles.Bold;
             Label(escape, "Grab loot. Cash out before you're caught.", .065f, .22f, .94f, .34f, 19f).color = new Color(.76f, .81f, .85f);
             MenuButton(escape, "Play escape", new Vector2(.065f, .055f), new Vector2(.935f, .20f),
-                () => WorldShiftFlow.StartGetaway(WorldShiftFlow.TutorialFirst), true);
+                () => WorldShiftFlow.StartGetaway(false), true);
 
-            var training = ModeCard(home.transform, "Practice", .515f, .93f, true);
-            Label(training, "Practice", .065f, .35f, .94f, .48f, 30f).fontStyle = FontStyles.Bold;
-            Label(training, "Learn the roads. Retry as much as you like.", .065f, .22f, .94f, .34f, 19f).color = new Color(.76f, .81f, .85f);
-            MenuButton(training, "Choose a route", new Vector2(.065f, .055f), new Vector2(.935f, .20f), () => ShowPractice(true), false);
-            var learn = Button(home.transform, "New here? Learn to play", new Vector2(.30f, .055f), new Vector2(.71f, .125f),
-                () => WorldShiftFlow.Select(ShiftLevel.Tutorial, false));
-            learn.GetComponent<Image>().color = Color.clear;
-            var lessonLink = learn.GetComponentInChildren<TMP_Text>();
-            lessonLink.fontSizeMin = lessonLink.fontSizeMax = 18f;
-            lessonLink.color = new Color(.63f, .78f, .84f);
-
-            practice = Panel(safe, "Practice routes", Vector2.zero, Vector2.one, Color.clear).gameObject;
-            Label(practice.transform, "Find your rhythm.", .075f, .78f, .92f, .94f, 48f).fontStyle = FontStyles.Bold;
-            Label(practice.transform, "Pick a practice route. Mistakes are welcome.", .079f, .70f, .92f, .78f, 22f).color = new Color(.70f, .77f, .82f);
-            var city = ModeCard(practice.transform, "City route", .075f, .49f, false);
-            Label(city, "City", .065f, .35f, .94f, .48f, 30f).fontStyle = FontStyles.Bold;
-            Label(city, "Switch worlds. Find your way through.", .065f, .22f, .94f, .34f, 19f).color = new Color(.76f, .81f, .85f);
-            MenuButton(city, "City", new Vector2(.065f, .055f), new Vector2(.935f, .20f), () => WorldShiftFlow.Select(ShiftLevel.City, false), false);
-            var desert = ModeCard(practice.transform, "Desert route", .515f, .93f, true);
-            Label(desert, "Desert", .065f, .35f, .94f, .48f, 30f).fontStyle = FontStyles.Bold;
-            Label(desert, "Try night to freeze an opening.", .065f, .22f, .94f, .34f, 19f).color = new Color(.76f, .81f, .85f);
-            MenuButton(desert, "Desert", new Vector2(.065f, .055f), new Vector2(.935f, .20f), () => WorldShiftFlow.Select(ShiftLevel.Desert, false), false);
-            var back = Button(practice.transform, "Back", new Vector2(.075f, .055f), new Vector2(.24f, .125f), () => ShowPractice(false));
-            back.GetComponent<Image>().color = Color.clear;
-            ShowPractice(false);
+            var training = ModeCard(home.transform, "Tutorial", .515f, .93f, true);
+            Label(training, "Tutorial", .065f, .35f, .94f, .48f, 30f).fontStyle = FontStyles.Bold;
+            Label(training, "A quick spin to learn the controls.", .065f, .22f, .94f, .34f, 19f).color = new Color(.76f, .81f, .85f);
+            MenuButton(training, "Start tutorial", new Vector2(.065f, .055f), new Vector2(.935f, .20f),
+                () => WorldShiftFlow.StartGetaway(true), false);
+            if (EventSystem.current != null)
+                EventSystem.current.SetSelectedGameObject(escape.GetComponentInChildren<UnityEngine.UI.Button>().gameObject);
         }
 
         private RectTransform ModeCard(Transform parent, string name, float left, float right, bool desert)
@@ -148,18 +130,6 @@ namespace Outlaws.WorldShift
             if (backdrop != null) Destroy(backdrop);
             if (roundedTexture != null) Destroy(roundedTexture);
             if (backdropTexture != null) Destroy(backdropTexture);
-        }
-
-        private void ShowPractice(bool show)
-        {
-            practice.SetActive(show);
-            home.SetActive(!show);
-            if (EventSystem.current != null)
-            {
-                EventSystem.current.SetSelectedGameObject(null);
-                var first = (show ? practice : home).GetComponentInChildren<UnityEngine.UI.Button>();
-                if (first != null) EventSystem.current.SetSelectedGameObject(first.gameObject);
-            }
         }
 
         public static RectTransform CreateCanvas(Transform parent, string name)
