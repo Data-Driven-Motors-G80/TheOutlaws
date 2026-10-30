@@ -30,7 +30,7 @@ The bank and best haul save locally across sessions. A live haul is not saved an
 
 ## Clear screens and short guidance
 
-The home screen has two mode cards: **Endless escape** and **Practice**. Each gets a short, plain explanation and one action. Route selection appears only after choosing Practice. The home screen has no bank totals, keyboard legend, or tutorial toggle competing with the mode choices.
+The home screen has two mode cards: **Endless escape** and **Practice**. Each gets a short, plain explanation and one action. Rounded cards show small illustrated Day/Night roads; a gold Escape button and a quieter blue Practice button establish the action hierarchy. The background fades from dusk into night. The Practice route picker uses the same card style, and keyboard focus starts on the primary action. Route selection appears only after choosing Practice. The home screen has no bank totals, keyboard legend, or tutorial toggle competing with the mode choices.
 
 The lesson shows one friendly prompt at a time, such as **Tap Space to try night.** It has no driving statistics, sector headings, or extra control panels. Completion says **You've got it!** and names the next action: starting an escape or trying a practice route.
 
