@@ -1,5 +1,11 @@
 # Wee Woo Run (The Outlaws)
 
+## Transformation stunt prototype
+
+On `prototype/transform-stunt`, open `Assets/Scenes/Stunt_Menu.unity` or use **The Outlaws > Transform Stunt > Open Prototype**. This separate mode includes an interactive tutorial, City/Desert/Coast courses, size changes, rotation, airflow, moving machinery, automatic jumps, and **fuel pickups only**. See [prototype controls, build instructions, and playtest guide](Docs/TRANSFORM_STUNT.md).
+
+The original game described below remains available in its existing scenes.
+
 A fast-paced Unity police-chase game where players weave through traffic,
 manage limited fuel and ammunition, shoot obstacles, and
 survive an endless chase for as long as possible.

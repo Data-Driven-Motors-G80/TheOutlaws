@@ -6,6 +6,21 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/Stunt_Menu.unity
+    guid: 99f7f393f5aa3da49a7a3b0e0eea9df6
+  - enabled: 1
+    path: Assets/Scenes/Stunt_Tutorial.unity
+    guid: 769b5675c1e5d4f45bdd871199eea248
+  - enabled: 1
+    path: Assets/Scenes/Stunt_City.unity
+    guid: a15403644a5361f469559eed4f278fe3
+  - enabled: 1
+    path: Assets/Scenes/Stunt_Desert.unity
+    guid: 1749d3df766410b49a49ff45171a3a4d
+  - enabled: 1
+    path: Assets/Scenes/Stunt_Coast.unity
+    guid: 289e9607e53d0884b9f5beb1db666492
+  - enabled: 1
     path: Assets/Scenes/WorldShift_Menu.unity
     guid: b3898b99153c4324ea8801a527252292
   - enabled: 1
