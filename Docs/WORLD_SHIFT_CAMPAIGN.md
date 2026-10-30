@@ -20,6 +20,12 @@ The first escape includes the short tutorial. **New here? Learn to play** also o
 - Each new environment starts with full fuel and normal police separation. Bags start at $100; continued legs add 0.5 to the loot multiplier, capped at x21. Pursuit pressure also increases, capped after six continues. Driving speed does not increase between environments.
 - The bank and best haul persist locally. Live hauls are not saved. Snow and Ocean Coast are separate environment scenes and are not part of this loop. Banked money currently measures success; there is no shop or permanent upgrade system.
 
+## Loot readability and beta presentation
+
+Loot uses low-fidelity gold cash boxes made from primitive cubes: a short body, lid, handle, and a large dollar symbol on the face. Their colliders are disabled. There are no floating word labels, decorative textures, glowing materials, bobbing, particles, or pickup sounds. The first Day crate in the first environment uses **Drive through to collect** in the existing single prompt slot; road guidance still takes priority. The instruction stops after collection or passing that crate and does not repeat in later environments.
+
+Collection removes the box immediately and briefly highlights/enlarges the existing loot total for 0.35 driving seconds. This is functional confirmation without another text popup; pausing freezes it. WorldShift has no music or sound effects, including the removed Day/Night switch sound. Beta presentation changes are limited to communicating objects, state and actions; purely aesthetic art and effects are out of scope.
+
 ## Escape power-ups
 
 Near the start of each environment, choose one automatic pickup. Taking one removes the other choices for that visit; all can be skipped.
@@ -38,7 +44,7 @@ Normal cruising is 30.8 m/s in City and 26.4 m/s in Desert, 10% faster than the 
 
 The driving HUD uses one contextual prompt in a compact, content-sized dark panel below the header, to the left of the mirror and above the road horizon. At the 1280×720 reference size it uses 26 px type, with a 24 px minimum, one line, and clear padding. The tutorial uses the same upper placement. The car and lower road remain free of guidance text.
 
-The first chase starts with **Grab loot. Exit to keep it.** Urgent road or landing guidance replaces it; pickup acknowledgements and route hints use that same slot. Loot collection updates the total without a separate text popup. The mirror border turns red for pursuit danger. Driving controls appear in Pause and the tutorial rather than a second on-road footer. Exit choices replace the prompt entirely. The header shows the amount without an extra “Your loot” caption. Pause and results hide the driving HUD. The home screen uses rounded, illustrated Day/Night cards for Escape and Practice, with a separate optional lesson link.
+The first crate uses **Drive through to collect**; **Grab loot. Exit to keep it.** is the brief opening fallback once that cue is no longer needed. Urgent road or landing guidance replaces it; pickup acknowledgements and route hints use that same slot. Loot collection updates the total without a separate text popup. The mirror border turns red for pursuit danger. Driving controls appear in Pause and the tutorial rather than a second on-road footer. Exit choices replace the prompt entirely. The header shows the amount without an extra “Your loot” caption. Pause and results hide the driving HUD. The home screen uses rounded, illustrated Day/Night cards for Escape and Practice, with a separate optional lesson link.
 
 ## Shared rules
 

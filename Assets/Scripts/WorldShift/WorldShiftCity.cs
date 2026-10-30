@@ -39,8 +39,6 @@ namespace Outlaws.WorldShift
         private float checkpointGap = RiskRunState.InitialPursuitGap;
         private int checkpointIndex;
         private string lastFailure;
-        private AudioSource audioSource;
-        private AudioClip shiftSound;
 
         public ShiftRunState State { get; private set; } = ShiftRunState.Ready;
         public ShiftWorld World { get; private set; } = ShiftWorld.Day;
@@ -120,7 +118,6 @@ namespace Outlaws.WorldShift
             }, visual, WorldShiftLevel.Speed);
             presentation = gameObject.AddComponent<WorldShiftPresentation>();
             presentation.Build(this, Route, visual, view, sun, obstaclePrefab, policePrefab, streetlightPrefab, fuelPrefab);
-            ConfigureSound();
             ApplyWorld(ShiftWorld.Day);
             Police = ChaseCar.CreateForFiniteRoute(policePrefab, transform, Player, d => relay != null ? relay.SamplePolice(d) : Route.Sample(d));
             UpdatePolice(0f);
@@ -212,8 +209,6 @@ namespace Outlaws.WorldShift
                 else ApplyImpact(FindCollision(next, Distance, Distance, Lateral, Lateral, true), Lateral);
             }
             if (IsRelayAirborne) Notify(relay.Hint(Distance, World), 1.8f);
-            if (audioSource != null && shiftSound != null)
-            { audioSource.pitch = next == ShiftWorld.Echo ? 1.15f : 0.85f; audioSource.PlayOneShot(shiftSound, 0.14f); }
             return true;
         }
 
@@ -328,8 +323,6 @@ namespace Outlaws.WorldShift
             {
                 wasMerged = merged;
                 ApplyWorld(World);
-                if (merged && audioSource != null && shiftSound != null)
-                { audioSource.pitch = .65f; audioSource.PlayOneShot(shiftSound, .22f); }
                 Notify(merged ? "A / D  CROSS WORLDS" : "SPACE  SWITCH WORLDS", 3f);
             }
         }
@@ -518,25 +511,8 @@ namespace Outlaws.WorldShift
 
         private void Notify(string value, float seconds) { Message = value; MessageRemaining = seconds; }
 
-        private void ConfigureSound()
-        {
-            audioSource = gameObject.AddComponent<AudioSource>();
-            audioSource.playOnAwake = false;
-            audioSource.spatialBlend = 0f;
-            const int rate = 22050, samples = 2646;
-            var data = new float[samples];
-            for (int i = 0; i < samples; i++)
-            {
-                float t = i / (float)rate, envelope = Mathf.Sin(Mathf.PI * i / samples);
-                data[i] = Mathf.Sin(2f * Mathf.PI * (360f * t + 1000f * t * t)) * envelope * 0.2f;
-            }
-            shiftSound = AudioClip.Create("World switch cue", samples, 1, rate, false);
-            shiftSound.SetData(data, 0);
-        }
-
         private void OnDestroy()
         {
-            if (shiftSound != null) Destroy(shiftSound);
             if (RearView != null) Destroy(RearView.gameObject);
         }
     }

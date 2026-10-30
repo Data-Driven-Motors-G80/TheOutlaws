@@ -315,7 +315,7 @@ public sealed class WorldShiftGetawayTests
         var prompt = (TMP_Text)hud.GetType().GetField("guidance", Flags).GetValue(hud);
         var driving = (GameObject)hud.GetType().GetField("drivingHud", Flags).GetValue(hud);
         Call(hud, "Refresh");
-        Assert.That(prompt.text, Is.EqualTo("Grab loot. Exit to keep it."));
+        Assert.That(prompt.text, Is.EqualTo("Drive through to collect"));
         Assert.That(driving.GetComponentsInChildren<TMP_Text>(true).Any(t => t.text.Contains("A / D to steer")), Is.False);
         Assert.That(driving.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Chase goal"), Is.False);
         Assert.That(prompt.fontSizeMin, Is.GreaterThanOrEqualTo(24f));
@@ -356,6 +356,51 @@ public sealed class WorldShiftGetawayTests
         prompt = (TMP_Text)hud.GetType().GetField("guidance", Flags).GetValue(hud);
         Assert.That(prompt.text, Is.EqualTo("Space to freeze a gap."));
         Capture("hud-clean-desert");
+    }
+
+    [UnityTest]
+    public IEnumerator PrimitiveLootBoxesTeachCollectionAndGiveSilentPausedFeedback()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
+        yield return new EnterPlayMode();
+        Flow("StartGetaway", false); yield return null; yield return null;
+        var game = Find("WorldShiftCity"); game.enabled = false;
+        var hud = Find("WorldShiftGetaway");
+        var prompt = (TMP_Text)hud.GetType().GetField("guidance", Flags).GetValue(hud);
+        var total = (TMP_Text)hud.GetType().GetField("haul", Flags).GetValue(hud);
+        var crate = hud.GetComponentsInChildren<Transform>(true).Single(t => t.name == "Loot Day 35");
+        var symbol = crate.GetComponentInChildren<TMP_Text>(true);
+        Assert.That(symbol.text, Is.EqualTo("$"));
+        Assert.That(symbol.transform.localPosition.z, Is.LessThan(0f), "The dollar belongs on the box face, not floating above it.");
+        Assert.That(symbol.transform.localPosition.y, Is.LessThan(1f));
+        Assert.That(crate.GetComponentsInChildren<Collider>(true).All(c => !c.enabled), Is.True, "A collectible must not act as a road obstacle.");
+        Assert.That(crate.GetComponentsInChildren<MeshRenderer>(true).Where(r => r.GetComponent<TMP_Text>() == null)
+            .All(r => !r.sharedMaterial.IsKeywordEnabled("_EMISSION")), Is.True);
+        Assert.That(UnityEngine.Object.FindObjectsByType<AudioSource>(FindObjectsSortMode.None), Is.Empty);
+        Call(hud, "Refresh");
+        Assert.That(prompt.text, Is.EqualTo("Drive through to collect"));
+        Pose(game, 18f, 0f); Capture("loot-box-approach");
+        Pose(game, 0f, 0f);
+        Call(game, "StepSimulation", 1.2f, 0f, false); Call(hud, "Refresh");
+        Assert.That(Run.Carried, Is.EqualTo(100));
+        Assert.That(crate.gameObject.activeSelf, Is.False);
+        Assert.That(prompt.text, Is.Not.EqualTo("Drive through to collect"));
+        Assert.That(total.text, Is.EqualTo("$100"));
+        Assert.That(total.rectTransform.localScale.x, Is.GreaterThan(1f));
+        Capture("loot-total-feedback");
+        Call(game, "TogglePause"); Call(hud, "Refresh");
+        Vector3 pulse = total.rectTransform.localScale;
+        Call(game, "StepSimulation", 5f, 0f, false); Call(hud, "Refresh");
+        Assert.That(total.rectTransform.localScale, Is.EqualTo(pulse));
+        Call(game, "TogglePause"); Call(game, "StepSimulation", .5f, 0f, false); Call(hud, "Refresh");
+        Assert.That(total.rectTransform.localScale, Is.EqualTo(Vector3.one));
+        Flow("FinishGetawayLeg", true); yield return null; yield return null;
+        game = Find("DesertShiftTrial"); game.enabled = false;
+        hud = Find("WorldShiftGetaway"); Call(hud, "Refresh");
+        prompt = (TMP_Text)hud.GetType().GetField("guidance", Flags).GetValue(hud);
+        Assert.That(prompt.text, Is.Not.EqualTo("Drive through to collect"));
+        Assert.That(UnityEngine.Object.FindObjectsByType<AudioSource>(FindObjectsSortMode.None), Is.Empty);
+        Pose(game, 18f, 0f); Capture("loot-box-desert");
     }
 
     private static void Advance(object game, float target, float lane)

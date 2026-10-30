@@ -32,6 +32,7 @@ namespace Outlaws.WorldShift
         private RawImage mirror;
         private bool continuePending, openingGoalDismissed;
         private float environmentEnd;
+        private float lootFeedbackUntil = float.NegativeInfinity;
         private int currentLeg;
         private static readonly Color Gold = new Color(1f, .77f, .25f);
         private static readonly Color Cyan = new Color(.3f, .85f, 1f);
@@ -60,6 +61,12 @@ namespace Outlaws.WorldShift
             currentLeg = WorldShiftFlow.Escape.Leg;
             environmentEnd = IsCity ? WorldShiftLevel.Length : DesertShiftLevel.Length;
             Material gold = MakeMaterial(Gold), handle = MakeMaterial(new Color(.12f, .1f, .04f));
+            // Functional primitive markers only: no glow, decorative art or audio.
+            foreach (var material in new[] { gold, handle })
+            {
+                material.DisableKeyword("_EMISSION");
+                material.SetColor("_EmissionColor", Color.black);
+            }
             // The opening trail teaches collection without a separate instructions screen.
             AddLoot(35f, 0f, ShiftWorld.Day, gold, handle);
             AddLoot(55f, 0f, ShiftWorld.Day, gold, handle);
@@ -75,7 +82,7 @@ namespace Outlaws.WorldShift
             }
             else
             {
-                // Alternate worlds on safe central stretches before the joined finale.
+                // Alternate worlds on safe central stretches.
                 for (int i = 0; i < 10; i++)
                     AddLoot(desert.FuelDistance(i), 0f, i % 2 == 0 ? ShiftWorld.Day : ShiftWorld.Echo, gold, handle);
             }
@@ -109,10 +116,19 @@ namespace Outlaws.WorldShift
             RoadPathPoint point = Route.Sample(at);
             var root = new GameObject("Loot " + owner + " " + at).transform;
             root.SetParent(transform, false);
-            root.SetPositionAndRotation(point.Position + point.Right * x + Vector3.up * (.9f + rise), Quaternion.LookRotation(point.Forward));
-            Box(root, new Vector3(0f, 1.1f, 0f), new Vector3(1f, .7f, .45f), gold);
-            Box(root, new Vector3(0f, 1.55f, 0f), new Vector3(.45f, .16f, .16f), handle);
-            WorldLabel(root, "$", new Vector3(0f, 2.3f, 0f), Gold, 5f);
+            root.SetPositionAndRotation(point.Position + point.Right * x + Vector3.up * (.15f + rise), Quaternion.LookRotation(point.Forward));
+            // A low, chunky cash box differs from the tall road barriers. The symbol belongs on its face.
+            Box(root, new Vector3(0f, .6f, 0f), new Vector3(1.7f, 1f, 1.05f), gold);
+            Box(root, new Vector3(0f, 1.15f, 0f), new Vector3(1.8f, .16f, 1.12f), gold);
+            Box(root, new Vector3(-.28f, 1.36f, 0f), new Vector3(.13f, .3f, .16f), handle);
+            Box(root, new Vector3(.28f, 1.36f, 0f), new Vector3(.13f, .3f, .16f), handle);
+            Box(root, new Vector3(0f, 1.51f, 0f), new Vector3(.69f, .13f, .16f), handle);
+            Box(root, new Vector3(0f, .62f, -.54f), new Vector3(1.12f, .78f, .04f), handle);
+            WorldLabel(root, "$", new Vector3(0f, .62f, -.566f), Gold, 10f);
+            var symbol = root.GetComponentInChildren<TextMeshPro>();
+            symbol.name = "Loot dollar symbol";
+            symbol.rectTransform.sizeDelta = new Vector2(1.05f, .76f);
+            symbol.fontStyle = FontStyles.Bold;
             loot.Add(new Loot { At = at, X = x, World = owner, Visual = root, Bonus = bonus });
         }
 
@@ -132,7 +148,7 @@ namespace Outlaws.WorldShift
                 if (Mathf.Max(a, b) < item.X - reach || Mathf.Min(a, b) > item.X + reach) continue;
                 item.Taken = true;
                 item.Visual.gameObject.SetActive(false);
-                WorldShiftFlow.Escape.Collect(100);
+                if (WorldShiftFlow.Escape.Collect(100) > 0) lootFeedbackUntil = Duration + .35f;
             }
         }
 
@@ -159,7 +175,7 @@ namespace Outlaws.WorldShift
                     float pull = Extras.MagnetActive && (!item.Bonus || Extras.Jump.Traversing)
                         ? Mathf.Clamp01(1f - (item.At - Distance) / 18f) : 0f;
                     float x = Mathf.Lerp(item.X, Lateral, pull);
-                    item.Visual.position = point.Position + point.Right * x + Vector3.up * (.9f + (item.Bonus ? Extras.Jump.HeightAt(item.At) : 0f));
+                    item.Visual.position = point.Position + point.Right * x + Vector3.up * (.15f + (item.Bonus ? Extras.Jump.HeightAt(item.At) : 0f));
                 }
             }
         }
@@ -315,6 +331,9 @@ namespace Outlaws.WorldShift
             world.text = World == ShiftWorld.Day ? "Day" : "Night";
             world.color = World == ShiftWorld.Day ? Gold : Cyan;
             haul.text = "$" + run.Carried.ToString("N0");
+            float pickupPulse = Mathf.Clamp01((lootFeedbackUntil - Duration) / .35f);
+            haul.color = Color.Lerp(Gold, Color.white, pickupPulse);
+            haul.rectTransform.localScale = Vector3.one * (1f + .12f * pickupPulse);
             stage.text = IsCity ? "City" : "Desert";
             fuelFill.anchorMax = new Vector2(Mathf.Clamp01(Fuel), 1f);
             fuelText.text = "Fuel";
@@ -352,6 +371,8 @@ namespace Outlaws.WorldShift
             string road = IsCity ? CityHint() : DesertHint();
             if (road.Length > 0) { openingGoalDismissed = true; return road; }
             if (Extras.Feedback.Length > 0) { openingGoalDismissed = true; return Extras.Feedback; }
+            if (currentLeg == 0 && WorldShiftFlow.Escape.Carried == 0 && World == ShiftWorld.Day && Distance < 36.3f)
+                return "Drive through to collect";
             // Driving time pauses with the game; distance prevents replaying this after a teleport/restore.
             if (!openingGoalDismissed && currentLeg == 0 && Duration < 2.2f && Distance < 80f) return "Grab loot. Exit to keep it.";
             return Extras.Hint;
