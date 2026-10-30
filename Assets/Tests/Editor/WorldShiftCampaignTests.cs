@@ -48,7 +48,7 @@ public sealed class WorldShiftCampaignTests
         Assert.That(Get(tutorial, "State").ToString(), Is.EqualTo("Running"));
         Call(Find("WorldShiftHud"), "Refresh");
         Capture("tutorial-one-prompt");
-        bool learnedShooting = false;
+        bool learnedShooting = false, testedSwitchRetry = false;
         for (int i = 0; i < 850 && Get(tutorial, "State").ToString() == "Running"; i++)
         {
             float d = (float)Get(tutorial, "Distance");
@@ -70,9 +70,30 @@ public sealed class WorldShiftCampaignTests
                 learnedShooting = true;
             }
             string desired = d >= 130f && d < 260f ? "Echo" : "Day";
-            if (Get(tutorial, "World").ToString() != desired) Call(tutorial, "TrySwitch");
+            if (Get(tutorial, "World").ToString() != desired)
+            {
+                Call(tutorial, "TrySwitch");
+                if (d >= 120f && d < 380f)
+                {
+                    Assert.That(Get(tutorial, "SectionHint"), Is.Empty, "Switch instructions clear immediately after reaching the requested world.");
+                    if (desired == "Echo" && !testedSwitchRetry)
+                    {
+                        testedSwitchRetry = true;
+                        Call(tutorial, "TrySwitch");
+                        Assert.That(Get(tutorial, "SectionHint"), Is.Empty, "Completed instructions must not reappear after switching back.");
+                        Call(tutorial, "RetryCheckpoint");
+                        Assert.That(Get(tutorial, "SectionHint"), Is.EqualTo("Tap Space to try night."), "Retrying the lesson restores its instruction.");
+                        Call(tutorial, "TrySwitch");
+                        Assert.That(Get(tutorial, "SectionHint"), Is.Empty);
+                    }
+                }
+            }
             float target = d < 112f || d < 610f && d >= 400f ? 3.2f : d >= 610f ? -3.2f : 0f;
             Call(tutorial, "StepSimulation", .05f, Mathf.Clamp((target - (float)Get(tutorial, "Lateral")) * 2f, -1f, 1f), false);
+            if (d < 100f && Mathf.Abs((float)Get(tutorial, "Lateral")) >= .8f)
+                Assert.That(Get(tutorial, "SectionHint"), Is.Empty, "Steering clears the steering instruction.");
+            if (learnedShooting && d > 435f && d < 510f)
+                Assert.That(Get(tutorial, "SectionHint"), Is.Empty, "The shot acknowledgement is brief.");
         }
         Assert.That(Get(tutorial, "State").ToString(), Is.EqualTo("Won"));
         Assert.That(learnedShooting, Is.True);

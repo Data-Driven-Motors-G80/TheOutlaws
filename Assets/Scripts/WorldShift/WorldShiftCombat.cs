@@ -17,6 +17,7 @@ namespace Outlaws.WorldShift
         private float nextShot;
         private readonly List<ShotVisual> shots = new List<ShotVisual>();
         public int ShotsFired { get; private set; }
+        public float LastShotAt { get; private set; } = float.NegativeInfinity;
         public int Ammo => Escape ? WorldShiftFlow.Escape.Ammo : practiceAmmo;
         private bool Escape => city != null ? city.GetawayMode : desert.GetawayMode;
         private bool Running => (city != null ? city.State : desert.State) == ShiftRunState.Running;
@@ -65,6 +66,7 @@ namespace Outlaws.WorldShift
             if (Escape) return;
             practiceAmmo = GetawayRunState.MaximumAmmo; ShotsFired = 0; destroyed.Clear(); nextShot = 0f;
             ClearShots();
+            LastShotAt = float.NegativeInfinity;
             foreach (var pickup in pickups) pickup.Taken = false;
         }
         public bool TryShoot()
@@ -75,6 +77,7 @@ namespace Outlaws.WorldShift
             if (Escape) { if (!WorldShiftFlow.Escape.SpendShot()) return false; }
             else practiceAmmo--;
             nextShot = Duration + .18f; ShotsFired++;
+            LastShotAt = Duration;
             var target = FindTarget();
             if (target.Key != null && target.Breakable) destroyed.Add(target.Key);
             float end = target.Key != null ? target.At : Distance + OutlawProjectile.MaximumRange;

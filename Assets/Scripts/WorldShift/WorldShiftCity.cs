@@ -33,6 +33,8 @@ namespace Outlaws.WorldShift
         private readonly FuelState fuel = new FuelState();
         private readonly RiskRunState pursuit = new RiskRunState();
         private readonly System.Collections.Generic.HashSet<ShiftHazard> hitHazards = new System.Collections.Generic.HashSet<ShiftHazard>();
+        private bool tutorialHintCompleted;
+        private int tutorialCheckpointSwitches;
         private bool[] fuelTaken;
         private float retryRemaining, hintRemaining, fallVelocity;
         private float checkpointFuel = FuelState.MaximumFuel;
@@ -86,7 +88,9 @@ namespace Outlaws.WorldShift
         public string SectionTitle => Checkpoints[checkpointIndex].Title;
         public string SectionHint => TutorialShootingActive ? WaitingForTutorialShot
             ? World == ShiftWorld.Day ? "Click to shoot the block." : "Tap Space to go back to day."
-            : "Nice shot!" : relay != null && relay.Hint(Distance, World).Length > 0 ? relay.Hint(Distance, World)
+            : Duration - Combat.LastShotAt < 1f ? "Nice shot!" : ""
+            : tutorialLevel ? tutorialHintCompleted ? "" : Checkpoints[checkpointIndex].Hint
+            : relay != null && relay.Hint(Distance, World).Length > 0 ? relay.Hint(Distance, World)
             : hintRemaining > 0f ? Checkpoints[checkpointIndex].Hint : "";
         public WorldShiftCombat Combat { get; private set; }
         public WorldShiftRoute Route { get; private set; }
@@ -210,6 +214,7 @@ namespace Outlaws.WorldShift
             ShiftWorld next = World == ShiftWorld.Day ? ShiftWorld.Echo : ShiftWorld.Day;
             ApplyWorld(next);
             Switches++;
+            CompleteTutorialHint();
             // A switch always commits. Occupied destinations use the same impact
             // path as driving into a hazard; missing road still causes a fall.
             if (!IsRelayAirborne)
@@ -295,6 +300,7 @@ namespace Outlaws.WorldShift
                 nextLateral = ResolveDividers(previous, next, previousLateral, nextLateral, steer);
                 Distance = next;
                 Lateral = nextLateral;
+                CompleteTutorialHint();
                 UpdateMergeState();
                 presentation.StepPedestrians(dt);
                 CollectFuel(previous, next, previousLateral, nextLateral);
@@ -303,6 +309,9 @@ namespace Outlaws.WorldShift
                 if (checkpointIndex + 1 < Checkpoints.Length && Distance >= Checkpoints[checkpointIndex + 1].Distance)
                 {
                     checkpointIndex++;
+                    tutorialHintCompleted = false;
+                    tutorialCheckpointSwitches = Switches;
+                    CompleteTutorialHint();
                     // Keep retries viable even if a player reached a checkpoint nearly empty.
                     checkpointFuel = Mathf.Max(35f, fuel.CurrentFuel);
                     checkpointGap = Mathf.Max(32f, pursuit.PursuitGap);
@@ -455,9 +464,24 @@ namespace Outlaws.WorldShift
             return null;
         }
 
+        private void CompleteTutorialHint()
+        {
+            if (!tutorialLevel || tutorialHintCompleted) return;
+            switch (checkpointIndex)
+            {
+                case 0: tutorialHintCompleted = Mathf.Abs(Lateral - Checkpoints[0].Lateral) >= .8f; break;
+                case 1: tutorialHintCompleted = World == ShiftWorld.Echo; break;
+                case 2: tutorialHintCompleted = World == ShiftWorld.Day; break;
+                case 4: tutorialHintCompleted = Switches > tutorialCheckpointSwitches
+                    || Mathf.Abs(Lateral - Checkpoints[4].Lateral) >= .8f || Distance >= 596f; break;
+            }
+        }
+
         private void RestoreCheckpoint()
         {
             Combat?.ResetPractice();
+            tutorialHintCompleted = false;
+            tutorialCheckpointSwitches = Switches;
             ShiftCheckpoint checkpoint = Checkpoints[checkpointIndex];
             Distance = checkpoint.Distance;
             Lateral = checkpoint.Lateral;
