@@ -104,11 +104,13 @@ namespace Outlaws.WorldShift
         public float PursuitGap => pursuit.PursuitGap;
         public ChaseCar Police { get; private set; }
         public RearViewCamera RearView { get; private set; }
+        public WorldShiftCombat Combat { get; private set; }
         public WorldShiftRelay Relay { get; private set; }
         public bool IsAirborne => Relay != null && Relay.IsAirborne;
         public RoadPathPoint DriverPoint(float distance)
         {
             var ground = Relay != null ? Relay.SampleDriver(distance) : Route.Sample(distance);
+            ground = Route.SampleDriver(distance, ground, Lateral);
             return Getaway?.Extras != null ? Getaway.Extras.Sample(distance, ground) : ground;
         }
         public RoadPathPoint RockPoint(DesertTrialRock rock) => rock.Airborne
@@ -152,7 +154,7 @@ namespace Outlaws.WorldShift
             var road = new GameObject("Shared desert test road");
             road.transform.SetParent(transform, false);
             Route = road.AddComponent<WorldShiftRoute>();
-            Route.Build(roadTemplate, true, RunLength, true, fullLevel ? DesertShiftLevel.Relays : null);
+            Route.Build(roadTemplate, true, RunLength, true, fullLevel ? DesertShiftLevel.Relays : null, GetawayMode ? WorldShiftGetaway.ExitTail : 0f);
             if (fullLevel) Relay = new WorldShiftRelay(Route, DesertShiftLevel.Relays, Speed);
             Player = new GameObject("Shared player - continuous between worlds").transform;
             Player.SetParent(transform, false);
@@ -170,11 +172,12 @@ namespace Outlaws.WorldShift
             presentation.Build(this, view, sun, roadMaterial, sandMaterial, obstaclePrefab);
             if (fullLevel)
             {
-                Police = ChaseCar.CreateForFiniteRoute(policePrefab, transform, Player, Relay.SamplePolice);
+                Police = ChaseCar.CreateForFiniteRoute(policePrefab, transform, Player, d => Route.SampleDriver(d, Relay.SamplePolice(d), Lateral));
                 Police.StepFinite(0f, 0f, 0f, 6f);
                 RearView = RearViewCamera.Create(Player, new[] { Police });
                 RearView.transform.SetParent(transform, true);
             }
+            if (fullLevel) { Combat = gameObject.AddComponent<WorldShiftCombat>(); Combat.Bind(this); }
             if (GetawayMode) { Getaway = gameObject.AddComponent<WorldShiftGetaway>(); Getaway.Bind(this); }
             presentation.Refresh();
         }
@@ -195,6 +198,8 @@ namespace Outlaws.WorldShift
             float steer = key == null ? 0f : ((key.dKey.isPressed || key.rightArrowKey.isPressed) ? 1f : 0f)
                 - ((key.aKey.isPressed || key.leftArrowKey.isPressed) ? 1f : 0f);
             StepSimulation(Time.deltaTime, steer, key != null && key.spaceKey.wasPressedThisFrame);
+            if ((key != null && key.fKey.wasPressedThisFrame) || (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame
+                && (UnityEngine.EventSystems.EventSystem.current == null || !UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject()))) Combat?.TryShoot();
         }
         private void LateUpdate() { if (presentation != null) presentation.Refresh(); }
         public void Begin() { if (State == ShiftRunState.Ready) State = ShiftRunState.Running; }
@@ -242,10 +247,10 @@ namespace Outlaws.WorldShift
                 elapsed += dt;
                 float before = Distance, previousX = Lateral;
                 float speed = CurrentSpeed;
-                Getaway?.Extras.BeginStep(before, before + speed * dt, previousX);
+                Getaway?.BeginStep(before, before + speed * dt, driver);
                 if (Relay != null) Relay.BeginStep(Distance, Distance + speed * dt, World);
                 driver.StepExternal(dt, (IsAirborne ? steer * .65f : steer) * (JumpSequence ? 1f : Getaway?.Extras.SteeringMultiplier ?? 1f), speed);
-                Getaway?.Extras.FinishStep(driver.RoadPositionDistance, driver);
+                Getaway?.FinishStep(driver.RoadPositionDistance, driver);
                 Distance = Mathf.Min(RunLength, driver.RoadPositionDistance);
                 if (Relay != null)
                 {
@@ -285,6 +290,7 @@ namespace Outlaws.WorldShift
                 CheckGates(before, previousX);
                 if (State != ShiftRunState.Running) break;
                 Getaway?.Collect(before, Distance, previousX, Lateral);
+                Combat?.Step(before, Distance, previousX, Lateral);
                 int previousStage = Stage;
                 Stage = Mathf.Min(fullLevel ? 5 : 2, Mathf.FloorToInt(Distance / CheckpointSpacing));
                 if (Stage != previousStage)
@@ -308,6 +314,7 @@ namespace Outlaws.WorldShift
             foreach (var gate in ActiveGates)
             {
                 bool visible = gate.World == World;
+                if ((Combat?.IsDestroyed(gate) ?? false)) continue;
                 if (!visible || Distance + 1.5f < gate.Start || before - 1.5f > gate.End) continue;
                 float min = gate.HalfSide > 0 ? 0f : -5f, max = gate.HalfSide < 0 ? 0f : 5f;
                 if (Mathf.Max(previousX, Lateral) + .8f > min && Mathf.Min(previousX, Lateral) - .8f < max)
@@ -322,6 +329,7 @@ namespace Outlaws.WorldShift
                 ShiftWorld owner = rock.MergeSide > 0 ? ShiftWorld.Echo : ShiftWorld.Day;
                 float oldX = RockLateral(rock, IsMerged ? owner : World);
                 rock.Advance(dt, IsMerged ? ShiftWorld.Day : World);
+                if ((Combat?.IsDestroyed(rock) ?? false)) continue;
                 if (rock.Airborne != IsAirborne || (!IsMerged && !rock.VisibleIn(World))) continue;
                 if (Distance + 1.5f + rock.Radius < rock.Distance || before - 1.5f - rock.Radius > rock.Distance) continue;
                 float x = RockLateral(rock, IsMerged ? owner : World);
@@ -361,6 +369,8 @@ namespace Outlaws.WorldShift
                 }
             }
         }
+        internal void HitForkObstacle(float at) => Impact("fork" + at, "BARRIER HIT");
+
         private void Impact(string id, string reason)
         {
             if (State != ShiftRunState.Running || !contacts.Add(id)) return;
@@ -384,6 +394,7 @@ namespace Outlaws.WorldShift
         private void Notify(string text, float time) { Message = text; messageTime = time; }
         private void Restore()
         {
+            Combat?.ResetPractice();
             Distance = Stage * CheckpointSpacing;
             World = ShiftWorld.Day;
             State = ShiftRunState.Running;

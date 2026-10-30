@@ -90,7 +90,7 @@ public sealed class WorldShiftGetawayTests
         var safeWorld = typeof(WorldShiftCityTests).GetMethod("SafeWorld", Flags);
         var safeLane = typeof(WorldShiftCityTests).GetMethod("SafeLane", Flags);
         bool pictured = false;
-        for (int i = 0; i < 2600 && Get(game, "State").ToString() == "Running"; i++)
+        for (int i = 0; i < 3400 && Get(game, "State").ToString() == "Running"; i++)
         {
             float d = (float)Get(game, "Distance");
             string desired = d < 82f ? "Day" : (string)safeWorld.Invoke(null, new object[] { d });
@@ -465,7 +465,7 @@ public sealed class WorldShiftGetawayTests
     }
 
     [UnityTest]
-    public IEnumerator FuelPercentageAndSpeedShareTheSameStripInBothModesAndEnvironments()
+    public IEnumerator FuelPercentageAndAmmoShareTheSameStripInBothModesAndEnvironments()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
         yield return new EnterPlayMode();
@@ -481,11 +481,11 @@ public sealed class WorldShiftGetawayTests
             var strip = hud.GetType().GetField("statusStrip", Flags).GetValue(hud);
             var fuel = (FuelState)game.GetType().GetField("fuel", Flags).GetValue(game);
             fuel.Reset(100f); Call(hud, "Refresh");
-            var fuelText = (TMP_Text)Get(strip, "Fuel"); var speedText = (TMP_Text)Get(strip, "Speed");
+            var fuelText = (TMP_Text)Get(strip, "Fuel");
             Assert.That(fuelText.text, Is.EqualTo("Fuel 100%"));
-            Assert.That(speedText.text, Is.EqualTo(city ? "111 km/h" : "95 km/h"));
+            Assert.That(hud.GetComponentsInChildren<TMP_Text>(true).Any(t => t.name == "Speed km/h"), Is.False, "Driving should not add another numeric counter.");
             Assert.That(fuelText.rectTransform.anchorMin.x, Is.EqualTo(.37f));
-            Assert.That(speedText.rectTransform.anchorMin.x, Is.EqualTo(.56f));
+            Assert.That(((RectTransform)hud.GetComponentsInChildren<Transform>(true).Single(t => t.name == "Ammo")).anchorMin.x, Is.EqualTo(.56f));
             Assert.That(((RectTransform)fuelText.transform.parent).anchorMin.y, Is.GreaterThan(.85f));
             Assert.That(hud.GetComponentsInChildren<RectTransform>(true).Any(r => new[] { "Fuel track", "RouteProgress", "Exit distance", "Progress" }.Contains(r.name)), Is.False);
             fuel.Reset(12.25f); Call(hud, "Refresh");
@@ -501,7 +501,7 @@ public sealed class WorldShiftGetawayTests
             {
                 Call(game, "TrySwitch");
                 Call(Get(hud, "Extras"), "Collect", 42f, 46f, 0f, 0f); Call(hud, "Refresh");
-                Assert.That(speedText.text, Is.EqualTo("133 km/h"), "The speed readout must reflect an active boost.");
+                Assert.That((float)Get(game, "Speed"), Is.EqualTo(36.96f).Within(.01f), "Removing the speed label must preserve boost behavior.");
             }
         }
     }

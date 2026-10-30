@@ -18,12 +18,19 @@ namespace Outlaws.WorldShift
         private bool validation;
         private float length;
         private ShiftRelay[] relays;
+        public WorldShiftForkRoad Forks { get; private set; }
+        private float forkEnvironmentEnd = float.NaN;
+        public bool IsForkSurface(float distance) => !float.IsNaN(forkEnvironmentEnd) && WorldShiftForkRoad.Owns(forkEnvironmentEnd, distance);
+        public void AttachForks(WorldShiftForkRoad forks) { Forks = forks; SetWorld(ShiftWorld.Day); }
+        public RoadPathPoint SampleDriver(float distance, RoadPathPoint ground, float lateral)
+            => Forks != null ? Forks.SampleDriver(distance, ground, lateral) : ground;
 
         public void Build(RoadSegment template, bool straightValidation = false, float validationLength = WorldShiftSplitView.Length, bool desertProfile = false, ShiftRelay[] relayLayout = null, float extraLength = 0f)
         {
             validation = straightValidation;
             relays = relayLayout ?? (validation ? System.Array.Empty<ShiftRelay>() : WorldShiftRelay.Sections);
             length = validation ? validationLength : WorldShiftLevel.Length + extraLength;
+            if (extraLength >= WorldShiftGetaway.ExitTail) forkEnvironmentEnd = length - extraLength;
             dayRoad = RuntimeMaterials.Coloured(new Color(0.22f, 0.23f, 0.24f));
             echoRoad = RuntimeMaterials.Coloured(new Color(0.085f, 0.105f, 0.14f));
             Material lines = RuntimeMaterials.Coloured(new Color(0.85f, 0.88f, 0.87f));
@@ -34,6 +41,7 @@ namespace Outlaws.WorldShift
             if (!validation) foreach (float boundary in WorldShiftLevel.MergeBounds) cuts.Add(boundary);
             foreach (var jump in relays)
                 foreach (float cut in new[] { jump.Ramp - 20f, jump.Ramp, jump.Ramp + 24f, jump.Takeoff, jump.Landing, jump.End }) cuts.Add(cut);
+            if (!float.IsNaN(forkEnvironmentEnd)) foreach (float offset in new[] { 40f, 320f, 520f }) cuts.Add(forkEnvironmentEnd + offset);
             Pose entry = new Pose(Vector3.back * 80f, Quaternion.identity);
             float start = -80f;
             foreach (float end in cuts)
@@ -148,10 +156,11 @@ namespace Outlaws.WorldShift
 
         public void SetWorld(ShiftWorld world)
         {
+            Forks?.Present(world);
             foreach (var piece in pieces)
             {
                 float middle = (piece.Start + piece.End) * .5f;
-                bool exists = HasSurface(middle, world);
+                bool exists = HasSurface(middle, world) && !IsForkSurface(middle);
                 piece.Surface.enabled = exists;
                 piece.Surface.sharedMaterial = world == ShiftWorld.Day ? dayRoad : echoRoad;
                 piece.Markings.enabled = exists;

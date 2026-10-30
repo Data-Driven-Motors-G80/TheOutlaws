@@ -9,12 +9,26 @@ public sealed class GetawayRunState
     public int Carried { get; private set; }
     public int SettledHaul { get; private set; }
     public string Failure { get; private set; } = "";
+    public const int MaximumAmmo = 3;
+    public int Ammo { get; private set; }
     public bool HasShield { get; private set; }
     public float LootMultiplier => 1f + Math.Min(Leg, 40) * .5f;
     public float ExtraPursuitSpeed => Math.Min(Leg, 6) * .025f;
 
     public void Begin()
-    { Status = RunStatus.Running; Leg = Carried = SettledHaul = 0; Failure = ""; HasShield = false; }
+    { Status = RunStatus.Running; Leg = Carried = SettledHaul = 0; Failure = ""; HasShield = false; Ammo = MaximumAmmo; }
+
+    public bool SpendShot()
+    {
+        if (Status != RunStatus.Running || Ammo <= 0) return false;
+        Ammo--; return true;
+    }
+
+    public bool CollectAmmo()
+    {
+        if (Status != RunStatus.Running || Ammo >= MaximumAmmo) return false;
+        Ammo = MaximumAmmo; return true;
+    }
 
     public bool CollectShield()
     {
@@ -49,14 +63,14 @@ public sealed class GetawayRunState
     public int Bank()
     {
         if (Status != RunStatus.Running) return 0;
-        SettledHaul = Carried; Carried = 0; HasShield = false; Status = RunStatus.Banked;
+        SettledHaul = Carried; Carried = 0; HasShield = false; Ammo = 0; Status = RunStatus.Banked;
         return SettledHaul;
     }
 
     public void Lose(string reason)
     {
         if (Status != RunStatus.Running) return;
-        Failure = reason; SettledHaul = Carried; Carried = 0; HasShield = false; Status = RunStatus.Lost;
+        Failure = reason; SettledHaul = Carried; Carried = 0; HasShield = false; Ammo = 0; Status = RunStatus.Lost;
     }
 
     public void Leave() { Lose("RUN ABANDONED"); }

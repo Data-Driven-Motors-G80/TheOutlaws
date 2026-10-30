@@ -84,6 +84,7 @@ namespace Outlaws.WorldShift
         public string SectionTitle => Checkpoints[checkpointIndex].Title;
         public string SectionHint => relay != null && relay.Hint(Distance, World).Length > 0 ? relay.Hint(Distance, World)
             : hintRemaining > 0f ? Checkpoints[checkpointIndex].Hint : "";
+        public WorldShiftCombat Combat { get; private set; }
         public WorldShiftRoute Route { get; private set; }
         public Transform Player { get; private set; }
 
@@ -114,16 +115,18 @@ namespace Outlaws.WorldShift
             driver.ConfigureExternalRoute(d =>
             {
                 var ground = relay != null ? relay.SampleDriver(d) : Route.Sample(d);
+                ground = Route.SampleDriver(d, ground, Lateral);
                 return Getaway?.Extras != null ? Getaway.Extras.Sample(d, ground) : ground;
             }, visual, WorldShiftLevel.Speed);
             presentation = gameObject.AddComponent<WorldShiftPresentation>();
             presentation.Build(this, Route, visual, view, sun, obstaclePrefab, policePrefab, streetlightPrefab, fuelPrefab);
             ApplyWorld(ShiftWorld.Day);
-            Police = ChaseCar.CreateForFiniteRoute(policePrefab, transform, Player, d => relay != null ? relay.SamplePolice(d) : Route.Sample(d));
+            Police = ChaseCar.CreateForFiniteRoute(policePrefab, transform, Player, d => Route.SampleDriver(d, relay != null ? relay.SamplePolice(d) : Route.Sample(d), Lateral));
             UpdatePolice(0f);
             RearView = RearViewCamera.Create(Player, new[] { Police });
             RearView.transform.SetParent(transform, true);
             UpdateCamera(true);
+            if (!tutorialLevel && !splitViewValidation) { Combat = gameObject.AddComponent<WorldShiftCombat>(); Combat.Bind(this); }
             if (GetawayMode) { Getaway = gameObject.AddComponent<WorldShiftGetaway>(); Getaway.Bind(this); }
             else gameObject.AddComponent<WorldShiftHud>().Bind(this);
             if (splitViewValidation) gameObject.AddComponent<WorldShiftSplitView>().Initialize(this, view);
@@ -149,6 +152,8 @@ namespace Outlaws.WorldShift
                 ((keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed) ? 1f : 0f)
                 - ((keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed) ? 1f : 0f);
             StepSimulation(Time.deltaTime, steer, keyboard != null && keyboard.spaceKey.wasPressedThisFrame);
+            if ((keyboard != null && keyboard.fKey.wasPressedThisFrame) || (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame
+                && (UnityEngine.EventSystems.EventSystem.current == null || !UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject()))) Combat?.TryShoot();
         }
 
         private void LateUpdate()
@@ -241,7 +246,7 @@ namespace Outlaws.WorldShift
                 simulatedTime += dt;
                 float previous = Distance, previousLateral = Lateral;
                 float speed = Speed;
-                Getaway?.Extras.BeginStep(previous, previous + speed * dt, previousLateral);
+                Getaway?.BeginStep(previous, previous + speed * dt, driver);
                 if (relay != null)
                 {
                     driver.ExternalVerticalControl = WorldShiftRelay.At(previous) != null || (Getaway?.Extras.Jump.Traversing ?? false);
@@ -249,7 +254,7 @@ namespace Outlaws.WorldShift
                         Notify("SPACE  /  SWITCH TO LAND", 2.5f);
                 }
                 driver.StepExternal(dt, (IsRelayAirborne ? steer * .4f : steer) * (JumpSequence ? 1f : Getaway?.Extras.SteeringMultiplier ?? 1f), speed);
-                Getaway?.Extras.FinishStep(driver.RoadPositionDistance, driver);
+                Getaway?.FinishStep(driver.RoadPositionDistance, driver);
                 float nextLateral = driver.LateralOffset;
                 float next = Mathf.Min(RunLength, driver.RoadPositionDistance);
                 ShiftHazard hit = IsRelayAirborne ? null : FindCollision(World, previous, next, previousLateral, nextLateral, true);
@@ -290,6 +295,7 @@ namespace Outlaws.WorldShift
                 presentation.StepPedestrians(dt);
                 CollectFuel(previous, next, previousLateral, nextLateral);
                 Getaway?.Collect(previous, next, previousLateral, nextLateral);
+                Combat?.Step(previous, next, previousLateral, nextLateral);
                 if (checkpointIndex + 1 < Checkpoints.Length && Distance >= Checkpoints[checkpointIndex + 1].Distance)
                 {
                     checkpointIndex++;
@@ -326,6 +332,8 @@ namespace Outlaws.WorldShift
                 Notify(merged ? "A / D  CROSS WORLDS" : "SPACE  SWITCH WORLDS", 3f);
             }
         }
+
+        internal void HitForkObstacle(float at) => ApplyImpact(new ShiftHazard(World, ShiftHazardKind.Barrier, at, at + 2f, 4), Lateral);
 
         private void ApplyImpact(ShiftHazard hit, float lateral)
         {
@@ -402,6 +410,7 @@ namespace Outlaws.WorldShift
             foreach (var hazard in Hazards)
             {
                 bool merged = IsJoinedDistance(hazard.Start);
+                if ((Combat?.IsDestroyed(hazard) ?? false)) continue;
                 if ((!merged && hazard.World != world) || (skipHandled && hitHazards.Contains(hazard))) continue;
                 // A missing deck drops the car when its centre crosses the lip.
                 float halfLength = hazard.Kind == ShiftHazardKind.Gap ? 0f : 1.5f;
@@ -444,6 +453,7 @@ namespace Outlaws.WorldShift
 
         private void RestoreCheckpoint()
         {
+            Combat?.ResetPractice();
             ShiftCheckpoint checkpoint = Checkpoints[checkpointIndex];
             Distance = checkpoint.Distance;
             Lateral = checkpoint.Lateral;
@@ -493,7 +503,7 @@ namespace Outlaws.WorldShift
 
         private void UpdateCamera(bool immediate)
         {
-            RoadPathPoint point = Route.Sample(Distance);
+            RoadPathPoint point = Route.SampleDriver(Distance, Route.Sample(Distance), Lateral);
             float follow = splitViewValidation ? 0f : .28f;
             Vector3 desired = point.Position - point.Forward * 12f + Vector3.up * 6.4f + point.Right * Lateral * follow;
             bool falling = State == ShiftRunState.Retrying && (lastFailure == "NO ROAD" || lastFailure == "MISSED RELAY LANDING");
@@ -504,7 +514,7 @@ namespace Outlaws.WorldShift
             if (IsMerged)
                 view.transform.position -= point.Right * Vector3.Dot(view.transform.position - point.Position, point.Right);
             view.fieldOfView = Mathf.Lerp(70f, 76f, Mathf.InverseLerp(WorldShiftLevel.Speed * WorldShiftLevel.CruiseSpeedMultiplier, WorldShiftRelay.BoostSpeed, Speed));
-            Vector3 target = Route.Sample(Distance + 22f).Position + Vector3.up * 0.6f;
+            Vector3 target = Route.SampleDriver(Distance + 22f, Route.Sample(Distance + 22f), Lateral).Position + Vector3.up * 0.6f;
             if (falling) target = Player.position + point.Forward * 4f;
             view.transform.rotation = Quaternion.Slerp(view.transform.rotation, Quaternion.LookRotation(target - view.transform.position, Vector3.up), IsMerged ? 1f : blend);
         }

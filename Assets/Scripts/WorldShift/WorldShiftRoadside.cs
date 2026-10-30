@@ -148,7 +148,7 @@ namespace Outlaws.WorldShift
         {
             foreach (var piece in pieces)
             {
-                bool visible = piece.End > distance - 110f && piece.Start < distance + 300f;
+                bool visible = piece.End > distance - 110f && piece.Start < distance + 300f && !route.IsForkSurface((piece.Start + piece.End) * .5f);
                 if (piece.Root.activeSelf != visible) piece.Root.SetActive(visible);
             }
         }

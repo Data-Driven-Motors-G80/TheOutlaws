@@ -3,6 +3,23 @@ using NUnit.Framework;
 public sealed class GetawayRunStateTests
 {
     [Test]
+    public void AmmoIsLimitedCarriesAcrossLegsAndClearsOnSettlement()
+    {
+        var run = new GetawayRunState(); run.Begin();
+        Assert.That(run.Ammo, Is.EqualTo(3));
+        Assert.That(run.CollectAmmo(), Is.False);
+        run.SpendShot(); run.SpendShot(); run.Continue();
+        Assert.That(run.Ammo, Is.EqualTo(1));
+        Assert.That(run.SpendShot(), Is.True);
+        Assert.That(run.SpendShot(), Is.False);
+        Assert.That(run.CollectAmmo(), Is.True);
+        Assert.That(run.Ammo, Is.EqualTo(3));
+        run.Bank(); Assert.That(run.Ammo, Is.Zero);
+        Assert.That(run.CollectAmmo(), Is.False);
+        run.Begin(); run.Lose("CAUGHT"); Assert.That(run.Ammo, Is.Zero);
+    }
+
+    [Test]
     public void ShieldDoesNotStackAndCarriesUntilOneHitOrSettlement()
     {
         var run = new GetawayRunState(); run.Begin();

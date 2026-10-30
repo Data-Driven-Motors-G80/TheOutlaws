@@ -13,10 +13,11 @@ namespace Outlaws.WorldShift
         public TMP_Text World { get; private set; }
         public TMP_Text Loot { get; private set; }
         public TMP_Text Fuel { get; private set; }
-        public TMP_Text Speed { get; private set; }
         public GameObject MirrorPanel { get; private set; }
         private Image mirrorBorder;
         private RawImage mirror;
+        private GameObject ammoRoot;
+        private Image[] rounds;
 
         public static WorldShiftStatusStrip Create(Transform parent, bool showLoot = false)
         {
@@ -27,7 +28,14 @@ namespace Outlaws.WorldShift
             strip.Loot.gameObject.SetActive(showLoot);
             strip.Loot.color = Gold;
             strip.Fuel = Label(row, "Fuel percentage", .37f, .54f, 22f);
-            strip.Speed = Label(row, "Speed km/h", .56f, .75f, 22f);
+            var ammo = WorldShiftMenu.Panel(row, "Ammo", new Vector2(.56f, .1f), new Vector2(.75f, .9f), Color.clear);
+            strip.ammoRoot = ammo.gameObject;
+            var key = WorldShiftMenu.Label(ammo, "F", .02f, .1f, .23f, .9f, 18f);
+            key.alignment = TextAlignmentOptions.Center;
+            strip.rounds = new Image[3];
+            for (int i = 0; i < 3; i++)
+                strip.rounds[i] = WorldShiftMenu.Panel(ammo, "Round " + (i + 1), new Vector2(.32f + i * .21f, .28f), new Vector2(.42f + i * .21f, .72f), Color.white).GetComponent<Image>();
+            strip.ammoRoot.SetActive(false);
             var frame = WorldShiftMenu.Panel(parent, "Police mirror", new Vector2(.78f, .88f), new Vector2(.98f, .98f), Ink);
             strip.MirrorPanel = frame.gameObject;
             strip.mirrorBorder = frame.GetComponent<Image>();
@@ -50,7 +58,13 @@ namespace Outlaws.WorldShift
             return label;
         }
 
-        public void Refresh(ShiftWorld world, float fuelFraction, float metresPerSecond, Texture rearView, float pursuitGap,
+        public void SetAmmo(int ammo, bool visible)
+        {
+            ammoRoot.SetActive(visible);
+            for (int i = 0; i < rounds.Length; i++) rounds[i].color = i < ammo ? Color.white : new Color(.25f, .3f, .35f);
+        }
+
+        public void Refresh(ShiftWorld world, float fuelFraction, Texture rearView, float pursuitGap,
             bool showFuel = true, bool joined = false)
         {
             World.text = joined ? "Day + night" : world == ShiftWorld.Day ? "Day" : "Night";
@@ -58,7 +72,6 @@ namespace Outlaws.WorldShift
             Fuel.gameObject.SetActive(showFuel);
             Fuel.text = "Fuel " + Mathf.Clamp(Mathf.CeilToInt(fuelFraction * 100f), 0, 100) + "%";
             Fuel.color = fuelFraction < .25f ? Danger : Color.white;
-            Speed.text = Mathf.RoundToInt(Mathf.Max(0f, metresPerSecond) * 3.6f) + " km/h";
             MirrorPanel.SetActive(rearView != null);
             mirrorBorder.color = pursuitGap < 23f ? Danger : Ink;
             mirror.texture = rearView;

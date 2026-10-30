@@ -119,12 +119,14 @@ namespace Outlaws.WorldShift
                 hasState = true;
             }
 
-            statusStrip.Refresh(game.World, game.FuelFraction, game.Speed, game.RearView != null ? game.RearView.Texture : null,
+            statusStrip.SetAmmo(game.Combat != null ? game.Combat.Ammo : 0, game.Combat != null);
+            statusStrip.Refresh(game.World, game.FuelFraction, game.RearView != null ? game.RearView.Texture : null,
                 game.PursuitGap, joined: game.IsMerged);
 
-            if (previousHint != game.SectionHint)
+            string currentHint = !game.IsRelayAirborne && game.Combat != null && game.Combat.Hint.Length > 0 ? game.Combat.Hint : game.SectionHint;
+            if (previousHint != currentHint)
             {
-                previousHint = game.SectionHint;
+                previousHint = currentHint;
                 sectionHint.text = previousHint ?? string.Empty;
                 hintAge = 0f;
             }
@@ -191,7 +193,7 @@ namespace Outlaws.WorldShift
         {
             RectTransform card = MenuCard(parent, "Ready", 780f, 370f, Echo);
             FixedLabel(card, "City practice", 42f, White, 42f, 35f, 696f, 65f, true);
-            FixedLabel(card, "A / D to steer. Space to switch worlds.", 24f, Echo, 42f, 130f, 696f, 42f);
+            FixedLabel(card, game.Combat != null ? "A / D to steer. Space to switch. F to shoot." : "A / D to steer. Space to switch worlds.", 24f, Echo, 42f, 130f, 696f, 42f);
             FixedLabel(card, "Slip up? We'll restart nearby.", 20f, Muted, 42f, 192f, 696f, 40f);
             Button(card, "Let's drive", 42f, 270f, 338f, Echo, () => game.BeginRun());
             Button(card, "Back to menu", 400f, 270f, 338f, Surface, WorldShiftFlow.Menu, White);

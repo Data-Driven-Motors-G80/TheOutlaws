@@ -185,6 +185,7 @@ namespace Outlaws.WorldShift
                 float angle = i * Mathf.PI * 2f / belt.positionCount;
                 belt.SetPosition(i, new Vector3(0f, Mathf.Sin(angle) * .505f, Mathf.Cos(angle) * .505f));
             }
+            if (game.FullLevel) WorldShiftCombat.MarkBreakable(root, new Vector3(0f, 0f, -data.Radius - .03f));
             var frozen = new GameObject("Frozen pause pictogram");
             frozen.transform.SetParent(root, false);
             foreach (float x in new[] { -.2f, .2f })
@@ -232,6 +233,7 @@ namespace Outlaws.WorldShift
                 OriginalObstacle(solid.transform, new Vector3(lane * 3.33f, .7f, 0f), new Vector3(3.3f, 1.4f, 8f), Material(colour * .55f, .1f));
                 Box(solid.transform, "Wall reflective band", new Vector3(lane * 3.33f, 1.1f, -4.05f), new Vector3(3.2f, .16f, .12f), Material(colour, .35f));
             }
+            if (game.FullLevel) WorldShiftCombat.MarkBreakable(solid.transform, new Vector3(data.HalfSide * 2.5f, 1f, -4.15f));
             gates.Add(new GateView { Root = root, Solid = solid });
         }
 
@@ -261,8 +263,9 @@ namespace Outlaws.WorldShift
             for (int i = 0; i < rocks.Count; i++)
             {
                 RockView item = rocks[i]; DesertTrialRock data = game.Rocks[i];
-                item.Root.gameObject.SetActive(data.VisibleIn(world) && data.Distance > game.Distance - 40f && data.Distance < game.Distance + 240f);
-                item.Marker.SetActive(item.Root.gameObject.activeSelf);
+                item.Root.gameObject.SetActive(!(game.Combat?.IsDestroyed(data) ?? false) && data.VisibleIn(world) && data.Distance > game.Distance - 40f && data.Distance < game.Distance + 240f);
+                item.Marker.SetActive(data.Distance > game.Distance - 40f && data.Distance < game.Distance + 240f
+                    && (!(game.Combat?.IsDestroyed(data) ?? false) || game.HasGuards(data)));
                 RoadPathPoint point = game.RockPoint(data);
                 float x = game.RockLateral(data, world);
                 item.Root.SetPositionAndRotation(point.Position + point.Right * x + point.Up * data.Radius,
@@ -290,7 +293,7 @@ namespace Outlaws.WorldShift
             for (int i = 0; i < gates.Count; i++)
             {
                 var data = game.ActiveGates[i]; GateView item = gates[i];
-                bool active = data.World == world;
+                bool active = data.World == world && !(game.Combat?.IsDestroyed(data) ?? false);
                 item.Root.SetActive(data.End > game.Distance - 20f && data.Start < game.Distance + 220f);
                 item.Solid.SetActive(active);
             }
@@ -308,16 +311,17 @@ namespace Outlaws.WorldShift
             view.transform.SetPositionAndRotation(cameraPosition,
                 Quaternion.LookRotation(game.DriverPoint(game.Distance + 22f).Position + Vector3.up * .7f - cameraPosition));
             if (game.GetawayMode) return;
-            statusStrip.Refresh(game.World, game.FuelFraction, game.CurrentSpeed, game.RearView != null ? game.RearView.Texture : null,
+            statusStrip.SetAmmo(game.Combat != null ? game.Combat.Ammo : 0, game.Combat != null);
+            statusStrip.Refresh(game.World, game.FuelFraction, game.RearView != null ? game.RearView.Texture : null,
                 game.PursuitGap, game.FullLevel);
-            hint.text = game.State == ShiftRunState.Retrying || game.Duration < 10f || game.Relay?.SectionAt(game.Distance) != null ? game.Hint : "";
+            hint.text = !game.IsAirborne && game.Combat != null && game.Combat.Hint.Length > 0 ? game.Combat.Hint : game.State == ShiftRunState.Retrying || game.Duration < 10f || game.Relay?.SectionAt(game.Distance) != null ? game.Hint : "";
             bool menu = game.State == ShiftRunState.Ready || game.State == ShiftRunState.Paused || game.State == ShiftRunState.Won;
             modal.SetActive(menu);
             practiceHud.SetActive(!menu);
             modalText.text = game.State == ShiftRunState.Ready
                 ? "Desert practice\n\nThings move in day and freeze in night.\nGive Space a try."
                 : game.State == ShiftRunState.Won ? "Nice driving!\n\nFancy another go?"
-                : "Paused\n\nA / D to steer. Space to switch.";
+                : game.FullLevel ? "Paused\n\nA / D to steer. Space to switch. F / click to shoot." : "Paused\n\nA / D to steer. Space to switch.";
             actionLabel.text = game.State == ShiftRunState.Ready ? "Let's drive" : game.State == ShiftRunState.Won ? "Try again" : "Keep driving";
         }
 
