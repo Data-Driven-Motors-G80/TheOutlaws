@@ -56,7 +56,6 @@ namespace Outlaws.WorldShift
                 foreach (float side in new[] { -1f, 1f })
                 {
                     Box(entrance, "Field marker post", new Vector3(side * 5.6f, 1.8f, 0f), new Vector3(.15f, 3.6f, .15f), Material(Gold, .3f));
-                    WorldText(entrance, "SPACE\nFREEZE", new Vector3(side * 7.5f, 4f, 0f), Gold, 3f);
                 }
                 fieldSigns.Add(entrance);
             }
@@ -71,7 +70,6 @@ namespace Outlaws.WorldShift
             {
                 Transform marker = RoadRoot("Checkpoint", at);
                 Box(marker, "Checkpoint road marker", new Vector3(0f, .06f, 0f), new Vector3(10f, .09f, .5f), Material(Cyan, .2f));
-                WorldText(marker, at == game.RunLength ? "FINISH" : "CHECKPOINT", new Vector3(0f, 5f, 0f), Cyan, 4f);
             }
             for (int i = 0; i < game.FuelCount; i++)
             {
@@ -234,8 +232,6 @@ namespace Outlaws.WorldShift
                 OriginalObstacle(solid.transform, new Vector3(lane * 3.33f, .7f, 0f), new Vector3(3.3f, 1.4f, 8f), Material(colour * .55f, .1f));
                 Box(solid.transform, "Wall reflective band", new Vector3(lane * 3.33f, 1.1f, -4.05f), new Vector3(3.2f, .16f, .12f), Material(colour, .35f));
             }
-            if (data.HalfSide == 0)
-                WorldText(solid.transform, data.World == ShiftWorld.Day ? "Try night" : "Try day", new Vector3(0f, 2.6f, -4f), colour, 2.6f);
             gates.Add(new GateView { Root = root, Solid = solid });
         }
 

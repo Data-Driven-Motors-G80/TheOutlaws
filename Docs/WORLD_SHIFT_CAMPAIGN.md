@@ -55,7 +55,7 @@ The first crate uses **Drive through to collect**; **Grab loot. Exit to keep it.
 ## Shared rules
 
 - A/D or arrows steer. Space changes worlds throughout every route. Steering never changes worlds. Escape pauses. In Practice, R retries the current checkpoint.
-- All other-world hazard outlines and dashed relay landing previews are removed. Road lane markings and physical hazard signs remain.
+- Other-world hazard outlines, dashed relay landing previews, and roadside hazard/ramp/landing instructions are removed. Checkpoint and finish gates retain their geometry without word labels. Road markings, ramp pictograms and physical warnings remain; the single HUD prompt carries instructions. Loot and fuel keep their identifying $ and F symbols, and the cash-out/continue gate keeps Exit and Next labels.
 - Switching is allowed into occupied positions. It immediately applies the same collision penalty as driving into that obstacle, rather than refusing the switch. Switching onto missing road causes a fall; relay flight is still exempt until landing.
 - Solid impacts cost 22.5 m of the initial 45 m police gap; collision protection prevents one contact being charged repeatedly. Fuel is not lost on impact. In Practice, fuel exhaustion, capture and missed road retry the current checkpoint; in Escape they end the run and lose the carried haul.
 - Throughout the Desert, Day advances rocks and approaching traffic; Night pauses both at their current positions. Frozen objects remain solid. Finale rocks and walls belong to their assigned world and appear only when that world is selected. Space remains available through the finish. Checkpoints restore clocks, traffic travel and resources.

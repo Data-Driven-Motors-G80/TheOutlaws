@@ -14,7 +14,6 @@ namespace Outlaws.WorldShift
         {
             public ShiftHazard Data;
             public GameObject Solid, Ghost;
-            public TextMeshPro Label;
             public Transform Root;
             public Chunk Chunk;
         }
@@ -302,13 +301,7 @@ namespace Outlaws.WorldShift
                     pedestrians.Add(new PedestrianView { Hazard = data, Figure = figure, Lateral = person.localPosition.x });
                 }
             }
-            string label = data.Kind == ShiftHazardKind.Gap ? "ROAD ENDS / SHIFT" : data.Kind == ShiftHazardKind.Fire ? "FIRE"
-                : data.Kind == ShiftHazardKind.Spikes ? "SPIKES" : data.Kind == ShiftHazardKind.Barrier ? "BARRIER"
-                : data.Kind == ShiftHazardKind.Pedestrians ? "CROSSING" : data.Kind == ShiftHazardKind.Divider ? "CENTRE DIVIDER"
-                : data.Kind == ShiftHazardKind.Oncoming ? "ONCOMING" : "BLOCKADE";
-            var text = Label(root, data.World.ToString().ToUpperInvariant() + " / " + label,
-                new Vector3(data.World == ShiftWorld.Day ? -5.9f : 5.9f, 2.3f, -depth * 0.5f - 2f), 3.5f, outline.color);
-            hazards.Add(new HazardView { Data = data, Solid = solid, Ghost = ghost, Label = text, Root = root, Chunk = chunk });
+            hazards.Add(new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk });
         }
 
         private void BuildPitLighting(Transform parent, ShiftHazard gap)
@@ -359,8 +352,6 @@ namespace Outlaws.WorldShift
                 Material marker = RuntimeMaterials.Coloured(new Color(0.25f, 0.93f, 0.7f));
                 foreach (float x in new[] { -5.8f, 5.8f }) Box(root, "Checkpoint post", new Vector3(x, 2.5f, 0f), new Vector3(0.18f, 5f, 0.18f), marker);
                 Box(root, "Checkpoint lintel", new Vector3(0f, 5f, 0f), new Vector3(11.8f, 0.18f, 0.18f), marker);
-                Label(root, i == game.Checkpoints.Length ? "Finish" : "Checkpoint",
-                    new Vector3(0f, 5.7f, 0f), 6f, new Color(0.65f, 1f, 0.86f));
             }
         }
 
@@ -433,15 +424,8 @@ namespace Outlaws.WorldShift
             }
             foreach (var hazard in hazards)
             {
-                bool active = hazard.Data.World == world;
                 bool preview = ShouldPreview(hazard, distance);
                 hazard.Ghost.SetActive(preview);
-                // TMP labels are unlit. Fade distant labels too, otherwise they
-                // reveal the entire night layout through the shorter visibility.
-                float ahead = hazard.Chunk.At - distance;
-                float legibility = world == ShiftWorld.Day ? 1f : 1f - Mathf.InverseLerp(50f, 82f, ahead);
-                hazard.Label.gameObject.SetActive(hazard.Data.Kind != ShiftHazardKind.Gap && hazard.Data.Kind != ShiftHazardKind.HalfBarrier && active && legibility > 0f);
-                hazard.Label.alpha = (active ? 1f : .65f) * legibility;
             }
             if (game.IsMerged) RefreshFuel();
             UpdateNightReflectors();
@@ -591,8 +575,6 @@ namespace Outlaws.WorldShift
                 bool preview = ShouldPreview(hazard, game.Distance);
                 hazard.Solid.SetActive(active);
                 hazard.Ghost.SetActive(preview);
-                hazard.Label.gameObject.SetActive(hazard.Data.Kind != ShiftHazardKind.Gap && hazard.Data.Kind != ShiftHazardKind.HalfBarrier && active);
-                hazard.Label.alpha = active ? 1f : .65f;
             }
         }
 

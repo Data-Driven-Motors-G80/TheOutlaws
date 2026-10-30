@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using TMPro;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -47,8 +46,6 @@ namespace Outlaws.WorldShift
                             p.Position + p.Right * (x + .65f) + p.Up * .10f - p.Forward * .8f);
                 }
                 var signPoint = route.Sample(data.Ramp - 22f);
-                string source = data.Source == ShiftWorld.Day ? "DAY" : "NIGHT";
-                string target = data.Destination == ShiftWorld.Day ? "DAY" : "NIGHT";
                 foreach (float side in new[] { -1f, 1f })
                 {
                     Vector3 at = signPoint.Position + signPoint.Right * side * 5.75f;
@@ -63,8 +60,6 @@ namespace Outlaws.WorldShift
                         at + signPoint.Up * 3.25f + signPoint.Right * .5f,
                         at + signPoint.Up * 3.65f + signPoint.Right * 1f,
                         at + signPoint.Up * 3.5f + signPoint.Right * 1.5f);
-                    Label(view.Root.transform, source + " BOOST", at + signPoint.Up * 4.1f,
-                        signPoint, new Color(.4f, 1f, .65f), 3f);
                 }
                 view.SourceVoid = Child(view.Root.transform, "Launch world missing landing");
                 view.DestinationVoid = Child(view.Root.transform, "Landing world missing ramp");
@@ -77,9 +72,6 @@ namespace Outlaws.WorldShift
                 view.Preview = Child(view.Root.transform, "Other-world landing outline - no road here yet");
                 Material targetMaterial = data.Destination == ShiftWorld.Day ? amber : cyan;
                 LandingFrame(view.Landing.transform, data, targetMaterial, false);
-                RoadPathPoint landingPoint = route.Sample(data.Landing + 12f);
-                Label(view.Root.transform, target + " LANDING", landingPoint.Position + landingPoint.Up * 3.3f,
-                    landingPoint, data.Destination == ShiftWorld.Day ? new Color(1f, .75f, .35f) : new Color(.4f, .85f, 1f), 5f);
             }
             SetWorld(ShiftWorld.Day);
             Refresh(0f);
@@ -160,16 +152,6 @@ namespace Outlaws.WorldShift
             obj.transform.localScale = size;
             obj.GetComponent<Collider>().enabled = false;
             obj.GetComponent<Renderer>().sharedMaterial = material;
-        }
-        private static void Label(Transform parent, string text, Vector3 position, RoadPathPoint point, Color color, float width)
-        {
-            var label = Child(parent, text).AddComponent<TextMeshPro>();
-            label.transform.SetPositionAndRotation(position, Quaternion.LookRotation(point.Forward, point.Up));
-            label.text = text;
-            label.fontSize = 4f;
-            label.alignment = TextAlignmentOptions.Center;
-            label.color = color;
-            label.rectTransform.sizeDelta = new Vector2(width, 1.2f);
         }
         private void OnDestroy() { foreach (var material in owned) if (material != null) Destroy(material); }
     }
