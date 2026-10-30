@@ -24,6 +24,7 @@ namespace Outlaws.WorldShift
         private readonly List<Material> materials = new List<Material>();
         private TMP_Text haul, world, stage, guidance, fuelText, resultTitle, resultValue, resultNote, footer;
         private TMP_Text pauseNote, mirrorLabel, choiceLeft, choiceRight;
+        private CanvasGroup chaseGoal;
         private RectTransform fuelFill, progressFill;
         private Image choiceLeftPanel, choiceRightPanel;
         private GameObject result, pause, choices, mirrorPanel, drivingHud;
@@ -210,6 +211,15 @@ namespace Outlaws.WorldShift
             haul.alignment = TextAlignmentOptions.Center; haul.color = Gold;
             stage = Label(header, "", .69f, .1f, .98f, .9f, 18f);
             stage.alignment = TextAlignmentOptions.Right;
+            // An objective in the moving chase, rather than another screen to dismiss.
+            var goalRoot = WorldShiftMenu.Panel(hudRoot, "Chase goal", new Vector2(.16f, .74f), new Vector2(.75f, .85f), Color.clear);
+            chaseGoal = goalRoot.gameObject.AddComponent<CanvasGroup>();
+            chaseGoal.interactable = false;
+            chaseGoal.blocksRaycasts = false;
+            var goalText = Label(goalRoot, "You're the getaway driver.\n<size=18>Grab loot. Reach an exit to keep it.</size>", 0f, 0f, 1f, 1f, 28f);
+            goalText.alignment = TextAlignmentOptions.Center;
+            goalText.outlineWidth = .18f;
+            goalText.outlineColor = Color.black;
             var track = Panel(hudRoot, "Exit distance", .02f, .88f, .98f, .885f);
             progressFill = WorldShiftMenu.Panel(track, "Progress", Vector2.zero, Vector2.one, Gold);
             var fuelPanel = Panel(hudRoot, "Fuel", .02f, .04f, .20f, .13f);
@@ -302,8 +312,13 @@ namespace Outlaws.WorldShift
             choiceLeftPanel.color = Lateral < ContinueBoundary ? new Color(.08f, .3f, .2f, .98f) : Ink;
             choiceRightPanel.color = Lateral >= ContinueBoundary ? new Color(.35f, .23f, .06f, .98f) : Ink;
             footer.gameObject.SetActive(Duration < 8f || State == ShiftRunState.Paused);
-            guidance.text = !running || InExit ? "" : Time.unscaledTime < pickupUntil ? pickupMessage
-                : Duration < 4f ? "Grab the bags as you go." : IsCity ? CityHint() : DesertHint();
+            // Use driving time so pausing never consumes the chance to read the goal.
+            bool opening = running && currentLeg == 0 && Duration < 7f;
+            chaseGoal.alpha = opening ? 1f - Mathf.Clamp01((Duration - 5.5f) / 1.5f) : 0f;
+            // The goal stays readable even when the opening bags are collected.
+            // Keep immediate road guidance available; don't stack pickup messages beneath it.
+            guidance.text = !running || InExit ? "" : opening ? CityHint()
+                : Time.unscaledTime < pickupUntil ? pickupMessage : IsCity ? CityHint() : DesertHint();
             drivingHud.SetActive(!settled && State != ShiftRunState.Paused);
             pause.SetActive(State == ShiftRunState.Paused);
             pauseNote.text = run.Carried > 0 ? "Leaving now means losing your $" + run.Carried.ToString("N0") + "." : "Take your time. We'll wait.";

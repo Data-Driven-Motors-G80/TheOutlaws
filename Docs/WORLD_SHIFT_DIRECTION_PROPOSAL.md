@@ -34,6 +34,8 @@ The home screen has two mode cards: **Endless escape** and **Practice**. Each ge
 
 The lesson shows one friendly prompt at a time, such as **Tap Space to try night.** It has no driving statistics, sector headings, or extra control panels. Completion says **You've got it!** and names the next action: starting an escape or trying a practice route.
 
+As the first chase starts, a short cue appears over the moving road: **You're the getaway driver. Grab loot. Reach an exit to keep it.** It fades after seven seconds, pauses with the run, and does not repeat between environments. It adds no loading screen, button, or interruption.
+
 The escape HUD shows **Your loot**, the current world, the environment, a route progress bar, fuel, and the pursuit mirror. Leg numbers and persistent reward multipliers are removed; the next reward rate appears only at an exit, where it helps the decision. Controls fade after the opening. The exit offers **Left: Cash out** and **Right: Keep going**, with no extra instruction banner.
 
 Pause and results hide the driving HUD completely. **Leave this run** is paired with a short sentence saying how much loot will be lost. Success says **Nice getaway!** and shows the saved amount. Failure explains what happened in everyday language and offers **Play again**. Practice screens follow the same tone, without scorecards or retry counts.
