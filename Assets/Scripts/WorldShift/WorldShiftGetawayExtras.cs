@@ -81,6 +81,8 @@ namespace Outlaws.WorldShift
             Refresh();
         }
 
+        public bool IsJumpSequence(float distance) => Jump != null && distance >= Jump.Start - 32f && distance < Jump.End;
+
         public void BeginStep(float from, float to, float lateral) => Jump.BeginStep(from, to, lateral);
         public void FinishStep(float distance, AutoDriveCar driver)
         {

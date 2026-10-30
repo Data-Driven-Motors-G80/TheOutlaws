@@ -6,8 +6,8 @@ Open `Assets/Scenes/WorldShift_Menu.unity` and press Play, or use **The Outlaws 
 
 The home screen separates **Endless escape** from **Practice**. Practice opens City and Desert route buttons; **New here? Learn to play** opens the tutorial. The available routes are:
 
-- **City:** the existing 3,360 m route, three airborne relays and a final stretch of world-specific obstacles; roughly 114 seconds without retries.
-- **Desert:** 2,880 m, about 115 seconds without retries. Cruise at 24 m/s, boost at 42 m/s. 58 rocks (including six airborne rocks), 14 freezeable oncoming police cars, alternating world walls, six checkpoints, shared fuel and the existing police/mirror. The final 480 m retains manual Space switching and shows only the selected world.
+- **City:** the existing 3,360 m route, three airborne relays and a final stretch of world-specific obstacles. Normal cruise is 30.8 m/s; jump sequences retain their original speed curves.
+- **Desert:** 2,880 m. Normal cruise is 26.4 m/s; the authored relay retains its original 24–42 m/s curve. 58 rocks (including six airborne rocks), 14 freezeable oncoming police cars, alternating world walls, six checkpoints, shared fuel and the existing police/mirror. The final 480 m retains manual Space switching and shows only the selected world.
 - **Tutorial:** an independent 720 m city course at 18 m/s (about 40 seconds). Steering, switching, returning to Day, and choosing whether to steer around an obstacle or switch worlds. No fuel drain. Retries restart the current lesson.
 
 The first escape includes the short tutorial. **New here? Learn to play** also opens it independently. Tutorial can also be selected independently; its Continue button leads to City. City practice completion offers **Try the desert** and **Back to menu**. Desert practice completion offers **Try again** and **Back to menu**. Pause screens offer a clear way to resume or leave.

@@ -44,11 +44,13 @@ public sealed class WorldShiftGetawayTests
         var tutorial = Find("WorldShiftCity"); tutorial.enabled = false;
         Assert.That(Get(tutorial, "TutorialLevel"), Is.True);
         Assert.That(Get(tutorial, "GetawayMode"), Is.False);
+        Assert.That((float)Get(tutorial, "Speed"), Is.EqualTo(18f), "The lesson keeps its original pace.");
         Assert.That(Run.Status, Is.EqualTo(GetawayRunState.RunStatus.Running));
         object level = Enum.Parse(FlowType.Assembly.GetType("Outlaws.WorldShift.ShiftLevel"), "Tutorial");
         Flow("Next", level); yield return null; yield return null;
         var city = Find("WorldShiftCity"); city.enabled = false;
         Assert.That(Get(city, "GetawayMode"), Is.True);
+        Assert.That((float)Get(city, "Speed"), Is.EqualTo(30.8f).Within(.01f));
         Call(city, "StepSimulation", 3f, 0f, false);
         Assert.That(Run.Carried, Is.EqualTo(300));
         Call(city, "TogglePause"); float d = (float)Get(city, "Distance");
@@ -120,6 +122,7 @@ public sealed class WorldShiftGetawayTests
         Assert.That(Run.Leg, Is.EqualTo(1));
         Assert.That(Run.Carried, Is.EqualTo(300));
         var desert = Find("DesertShiftTrial"); desert.enabled = false;
+        Assert.That((float)Get(desert, "CurrentSpeed"), Is.EqualTo(26.4f).Within(.01f));
         Call(desert, "StepSimulation", 3.2f, 0f, false);
         Assert.That(Run.Carried, Is.GreaterThanOrEqualTo(750));
         Capture("desert-loot");
@@ -162,6 +165,8 @@ public sealed class WorldShiftGetawayTests
             string desired = leg < 2 ? "Echo" : "Day";
             if (Get(game, "World").ToString() != desired) Assert.That(Call(game, "TrySwitch"), Is.True);
             Advance(game, start - 1f, lane);
+            Assert.That((float)Get(game, game.GetType().Name == "WorldShiftCity" ? "Speed" : "CurrentSpeed"),
+                Is.EqualTo(leg == 1 ? 24f : 28f).Within(.01f), "Bonus jump and bypass keep the authored pace.");
             if (leg < 2) Capture(leg == 0 ? "city-bonus-approach" : "desert-bonus-approach");
             Advance(game, takeoff + 12f, lane);
             var player = (Transform)Get(game, "Player");
@@ -278,6 +283,8 @@ public sealed class WorldShiftGetawayTests
             Pose(game, 35f, 0f); Call(game, "TrySwitch");
             Call(game, "StepSimulation", .5f, 0f, false);
             Assert.That(Get(extras, "BoostActive"), Is.True);
+            Assert.That((float)Get(game, environment == 0 ? "Speed" : "CurrentSpeed"),
+                Is.EqualTo(environment == 0 ? 36.96f : 31.68f).Within(.01f));
             Assert.That(Get(extras, "SteeringMultiplier"), Is.EqualTo(.8f));
             float gap = (float)Get(game, "PursuitGap"), distance = (float)Get(game, "Distance");
             Call(game, "StepSimulation", 1f, 0f, false);

@@ -38,6 +38,12 @@ The first environment pays $100 per briefcase. Each continued leg adds 0.5 to th
 
 The bank and best haul save locally across sessions. A live haul is not saved and cannot be recovered after quitting. Banked money currently measures success; a shop and permanent upgrades are deferred until the risk loop has been playtested.
 
+## Driving pace
+
+City cruises at 30.8 m/s and Desert at 26.4 m/s, 10% faster than their original pace. That pace stays consistent across continued environments; there is no gradual speed escalation. The optional boost still adds 20% for four driving seconds, taking normal cruising to 36.96 m/s in City or 31.68 m/s in Desert. Police match normal cruising, with the existing small closing pressure; only the pickup boost creates extra separation.
+
+The tutorial retains 18 m/s. Authored relay approaches, flight, and landing recovery keep their original speed curves and steering, including their 42 m/s peak. The optional bonus ramp and its recovery also keep the original 28 m/s City or 24 m/s Desert pace. Pickup boosts do not override those jump sequences. The standalone short Desert exercise and rendering validation scene retain their original speeds.
+
 ## Clear screens and short guidance
 
 The home screen has two mode cards: **Endless escape** and **Practice**. Each gets a short, plain explanation and one action. Rounded cards show small illustrated Day/Night roads; a gold Escape button and a quieter blue Practice button establish the action hierarchy. The background fades from dusk into night. The Practice route picker uses the same card style, and keyboard focus starts on the primary action. Route selection appears only after choosing Practice. The home screen has no bank totals, keyboard legend, or tutorial toggle competing with the mode choices.

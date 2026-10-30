@@ -29,7 +29,7 @@ namespace Outlaws.WorldShift
         private WorldShiftRelay relay;
         public bool IsRelayAirborne => relay != null && relay.IsAirborne;
         public int RelaysCompleted => relay?.Completed ?? 0;
-        public bool IsBoosting => Speed > WorldShiftLevel.Speed + .1f;
+        public bool IsBoosting => Speed > WorldShiftLevel.Speed * WorldShiftLevel.CruiseSpeedMultiplier + .1f;
         private readonly FuelState fuel = new FuelState();
         private readonly RiskRunState pursuit = new RiskRunState();
         private readonly System.Collections.Generic.HashSet<ShiftHazard> hitHazards = new System.Collections.Generic.HashSet<ShiftHazard>();
@@ -70,7 +70,10 @@ namespace Outlaws.WorldShift
         public float JoinedViewSplit => splitViewValidation ? .5f : Mathf.Lerp(
             riftEntryWorld == ShiftWorld.Day ? 1f : 0f, .5f,
             Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((Distance - MergeStart) / 16f)));
-        public float Speed => (tutorialLevel ? 18f : relay?.SpeedAt(Distance) ?? WorldShiftLevel.Speed) * (Getaway?.Extras.SpeedMultiplier ?? 1f);
+        private bool JumpSequence => relay?.SectionAt(Distance) != null || (Getaway?.Extras.IsJumpSequence(Distance) ?? false);
+        private float BaseSpeed => tutorialLevel ? 18f : JumpSequence ? relay?.SpeedAt(Distance) ?? WorldShiftLevel.Speed
+            : WorldShiftLevel.Speed * (splitViewValidation ? 1f : WorldShiftLevel.CruiseSpeedMultiplier);
+        public float Speed => BaseSpeed * (JumpSequence ? 1f : Getaway?.Extras.SpeedMultiplier ?? 1f);
         public ChaseCar Police { get; private set; }
         public RearViewCamera RearView { get; private set; }
         public float PursuitGap => pursuit.PursuitGap;
@@ -250,7 +253,7 @@ namespace Outlaws.WorldShift
                     if (relay.BeginStep(previous, previous + speed * dt, World))
                         Notify("SPACE  /  SWITCH TO LAND", 2.5f);
                 }
-                driver.StepExternal(dt, (IsRelayAirborne ? steer * .4f : steer) * (Getaway?.Extras.SteeringMultiplier ?? 1f), speed);
+                driver.StepExternal(dt, (IsRelayAirborne ? steer * .4f : steer) * (JumpSequence ? 1f : Getaway?.Extras.SteeringMultiplier ?? 1f), speed);
                 Getaway?.Extras.FinishStep(driver.RoadPositionDistance, driver);
                 float nextLateral = driver.LateralOffset;
                 float next = Mathf.Min(RunLength, driver.RoadPositionDistance);
@@ -259,7 +262,7 @@ namespace Outlaws.WorldShift
                 if (!GetawayMode || !Getaway.InRecovery)
                 {
                     fuel.Tick(dt, tutorialLevel ? 0f : WorldShiftLevel.FuelConsumption);
-                    pursuit.Tick(dt, speed, speed / (Getaway?.Extras.SpeedMultiplier ?? 1f) + (tutorialLevel ? 0f : Mathf.Lerp(.03f, .14f, Progress)) + (GetawayMode ? WorldShiftFlow.Escape.ExtraPursuitSpeed : 0f));
+                    pursuit.Tick(dt, speed, BaseSpeed + (tutorialLevel ? 0f : Mathf.Lerp(.03f, .14f, Progress)) + (GetawayMode ? WorldShiftFlow.Escape.ExtraPursuitSpeed : 0f));
                 }
                 if (relay != null)
                 {
@@ -507,7 +510,7 @@ namespace Outlaws.WorldShift
             view.transform.position = Vector3.Lerp(view.transform.position, desired, blend);
             if (IsMerged)
                 view.transform.position -= point.Right * Vector3.Dot(view.transform.position - point.Position, point.Right);
-            view.fieldOfView = Mathf.Lerp(70f, 76f, Mathf.InverseLerp(WorldShiftLevel.Speed, WorldShiftRelay.BoostSpeed, Speed));
+            view.fieldOfView = Mathf.Lerp(70f, 76f, Mathf.InverseLerp(WorldShiftLevel.Speed * WorldShiftLevel.CruiseSpeedMultiplier, WorldShiftRelay.BoostSpeed, Speed));
             Vector3 target = Route.Sample(Distance + 22f).Position + Vector3.up * 0.6f;
             if (falling) target = Player.position + point.Forward * 4f;
             view.transform.rotation = Quaternion.Slerp(view.transform.rotation, Quaternion.LookRotation(target - view.transform.position, Vector3.up), IsMerged ? 1f : blend);

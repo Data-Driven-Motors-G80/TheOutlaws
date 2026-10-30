@@ -82,7 +82,9 @@ namespace Outlaws.WorldShift
     public static class WorldShiftLevel
     {
         public const float Length = 3360f;
+        // Authored hazards and jumps keep the original reference speed.
         public const float Speed = 28f;
+        public const float CruiseSpeedMultiplier = 1.1f;
         public const float RoadWidth = 10f;
         public const float TutorialEnd = 560f;
         public const float FuelConsumption = 2f;

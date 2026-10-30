@@ -247,7 +247,7 @@ public sealed class WorldShiftCityTests
         Assert.That(game.GetComponentsInChildren<Transform>(true)
             .Where(t => t.name == "Outline - belongs to other world").All(t => !t.gameObject.activeSelf), Is.True,
             "The joined finale shows real halves, without other-world ghost overlays.");
-        Assert.That((float)Get(game, "Duration"), Is.InRange(112f, 118f));
+        Assert.That((float)Get(game, "Duration"), Is.InRange(102f, 109f));
         Assert.That(Get(game, "RelaysCompleted"), Is.EqualTo(3));
         CapturePreview(game, "03-won");
 
@@ -359,7 +359,8 @@ public sealed class WorldShiftCityTests
         var people = game.GetComponentsInChildren<MonoBehaviour>(true)
             .Where(c => c.GetType().Name == "WorldShiftPedestrian").ToArray();
         Assert.That(people.Length, Is.GreaterThan(0));
-        Call(game, "StepSimulation", 11.65f, 0f, false);
+        for (int i = 0; i < 600 && (int)Get(game, "Hits") == 0; i++)
+            Call(game, "StepSimulation", .025f, 0f, false);
         Assert.That(Get(game, "State").ToString(), Is.EqualTo("Running"));
         Assert.That(Get(game, "Hits"), Is.EqualTo(1));
         Assert.That((float)Get(game, "PursuitGap"), Is.InRange(21f, 22.5f));

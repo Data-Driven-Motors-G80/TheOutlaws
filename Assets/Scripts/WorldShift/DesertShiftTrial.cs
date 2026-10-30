@@ -127,6 +127,10 @@ namespace Outlaws.WorldShift
         public ShiftRunState State { get; private set; } = ShiftRunState.Ready;
         public float Distance { get; private set; }
         public float Lateral => driver != null ? driver.LateralOffset : 0f;
+        private bool JumpSequence => Relay?.SectionAt(Distance) != null || (Getaway?.Extras.IsJumpSequence(Distance) ?? false);
+        private float BaseSpeed => !fullLevel ? Speed : JumpSequence ? Relay?.SpeedAt(Distance) ?? Speed
+            : Speed * WorldShiftLevel.CruiseSpeedMultiplier;
+        public float CurrentSpeed => BaseSpeed * (JumpSequence ? 1f : Getaway?.Extras.SpeedMultiplier ?? 1f);
         public float Duration { get; private set; }
         public int Stage { get; private set; }
         public int Retries { get; private set; }
@@ -237,10 +241,10 @@ namespace Outlaws.WorldShift
                 delta -= dt;
                 elapsed += dt;
                 float before = Distance, previousX = Lateral;
-                float speed = (Relay != null ? Relay.SpeedAt(Distance) : Speed) * (Getaway?.Extras.SpeedMultiplier ?? 1f);
+                float speed = CurrentSpeed;
                 Getaway?.Extras.BeginStep(before, before + speed * dt, previousX);
                 if (Relay != null) Relay.BeginStep(Distance, Distance + speed * dt, World);
-                driver.StepExternal(dt, (IsAirborne ? steer * .65f : steer) * (Getaway?.Extras.SteeringMultiplier ?? 1f), speed);
+                driver.StepExternal(dt, (IsAirborne ? steer * .65f : steer) * (JumpSequence ? 1f : Getaway?.Extras.SteeringMultiplier ?? 1f), speed);
                 Getaway?.Extras.FinishStep(driver.RoadPositionDistance, driver);
                 Distance = Mathf.Min(RunLength, driver.RoadPositionDistance);
                 if (Relay != null)
@@ -256,7 +260,7 @@ namespace Outlaws.WorldShift
                     if (!GetawayMode || !Getaway.InRecovery)
                     {
                         fuel.Tick(dt, 1.5f);
-                        pursuit.Tick(dt, speed, speed / (Getaway?.Extras.SpeedMultiplier ?? 1f) + .04f + (GetawayMode ? WorldShiftFlow.Escape.ExtraPursuitSpeed : 0f));
+                        pursuit.Tick(dt, speed, BaseSpeed + .04f + (GetawayMode ? WorldShiftFlow.Escape.ExtraPursuitSpeed : 0f));
                     }
                     for (int i = 0; i < FuelCount; i++)
                         if (!collectedFuel.Contains(i) && Distance + 1.3f >= FuelDistance(i) && before - 1.3f <= FuelDistance(i) && Mathf.Abs(Lateral) < 1.6f)
