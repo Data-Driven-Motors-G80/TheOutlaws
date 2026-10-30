@@ -3,8 +3,8 @@ using UnityEngine;
 public sealed class OutlawProjectile : MonoBehaviour
 {
     // Effectively unlimited range: the shot flies until it hits a block or leaves the visible road.
-    private const float Speed = 70f;
-    private const float MaximumRange = 200f;
+    public const float Speed = 70f;
+    public const float MaximumRange = 200f;
     private bool targetsPolice;
     private CarPickupEffects pickupEffects;
     private ObstacleSpawner obstacles;
@@ -12,6 +12,19 @@ public sealed class OutlawProjectile : MonoBehaviour
     private bool consumed;
     private float distanceTravelled;
     private Vector3 launchPosition;
+
+    // Shared by WorldShift so both versions display the same projectile.
+    public static GameObject CreateVisual(Vector3 position, bool targetsPolice = false)
+    {
+        GameObject projectile = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        projectile.name = targetsPolice ? "Rear Shot" : "Forward Shot";
+        projectile.transform.position = position;
+        projectile.transform.localScale = Vector3.one * 0.28f;
+        projectile.GetComponent<Renderer>().sharedMaterial = RuntimeMaterials.Coloured(targetsPolice
+            ? new Color(0.2f, 0.75f, 1f)
+            : new Color(1f, 0.75f, 0.05f));
+        return projectile;
+    }
 
     public static void Create(
         Vector3 position,
@@ -21,15 +34,7 @@ public sealed class OutlawProjectile : MonoBehaviour
         ObstacleSpawner obstacleSpawner,
         Collider[] playerColliders)
     {
-        GameObject projectile = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        projectile.name = targetsPolice ? "Rear Shot" : "Forward Shot";
-        projectile.transform.position = position;
-        projectile.transform.localScale = Vector3.one * 0.28f;
-
-        Renderer renderer = projectile.GetComponent<Renderer>();
-        renderer.sharedMaterial = RuntimeMaterials.Coloured(targetsPolice
-            ? new Color(0.2f, 0.75f, 1f)
-            : new Color(1f, 0.75f, 0.05f));
+        GameObject projectile = CreateVisual(position, targetsPolice);
 
         SphereCollider projectileCollider = projectile.GetComponent<SphereCollider>();
         projectileCollider.isTrigger = true;

@@ -50,7 +50,15 @@ public sealed class WorldShiftCombatRoutesTests
         var hazards = ((IEnumerable)Get(game, "Hazards")).Cast<object>().ToArray();
         var echoBarrier = hazards.Single(h => Field(h, "Kind").ToString() == "Barrier" && (float)Field(h, "Start") == 440f);
         Pose(game, 415f, 0f); Call(game, "TrySwitch");
+        Call(game, "StepSimulation", .001f, 0f, false);
         Assert.That(Call(combat, "TryShoot"), Is.True);
+        var bullet = game.GetComponentsInChildren<Transform>().Single(t => t.name == "Forward Shot");
+        Assert.That(bullet.localScale, Is.EqualTo(Vector3.one * .28f));
+        Assert.That(Vector4.Distance(bullet.GetComponent<Renderer>().sharedMaterial.color, new Vector4(1f, .75f, .05f, 1f)), Is.LessThan(.0001f));
+        Assert.That(bullet.GetComponent<Collider>().enabled, Is.False, "The original visual must not introduce a second collision system.");
+        Vector3 muzzle = bullet.position;
+        Call(game, "StepSimulation", .08f, 0f, false); Call(combat, "Present");
+        Assert.That(Vector3.Distance(muzzle, bullet.position), Is.EqualTo(5.6f).Within(.15f), "The visible bullet travels at the original 70 m/s.");
         Assert.That(Run.Ammo, Is.EqualTo(2));
         Assert.That(Call(combat, "IsDestroyed", echoBarrier), Is.True);
         Assert.That(Call(game, "FindCollision", Get(game, "World"), 441f, 442f, 0f, 0f, false), Is.Null);
@@ -58,6 +66,8 @@ public sealed class WorldShiftCombatRoutesTests
         Assert.That(root.Find("Solid - collides in this world").gameObject.activeSelf, Is.False);
         Capture("shooting-night-barrier");
         Call(game, "TogglePause"); Call(game, "StepSimulation", 4f, 0f, false);
+        Vector3 pausedShot = bullet.position; Call(combat, "Present");
+        Assert.That(bullet.position, Is.EqualTo(pausedShot));
         Assert.That(Call(combat, "TryShoot"), Is.False); Assert.That(Run.Ammo, Is.EqualTo(2));
         Call(game, "TogglePause"); Call(game, "StepSimulation", .25f, 0f, false);
         Pose(game, 462f, -3.2f); Call(game, "TrySwitch");

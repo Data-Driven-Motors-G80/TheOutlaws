@@ -8,13 +8,14 @@ namespace Outlaws.WorldShift
     {
         private sealed class AmmoPickup { public float At, X; public bool Taken; public Transform Visual; }
         private struct Target { public object Key; public float At, X; public bool Breakable; }
+        private sealed class ShotVisual { public Transform Body; public Vector3[] Path; public float Started; }
         private WorldShiftCity city;
         private DesertShiftTrial desert;
         private readonly HashSet<object> destroyed = new HashSet<object>();
         private readonly List<AmmoPickup> pickups = new List<AmmoPickup>();
         private int practiceAmmo = GetawayRunState.MaximumAmmo;
-        private float nextShot, tracerUntil;
-        private LineRenderer tracer;
+        private float nextShot;
+        private readonly List<ShotVisual> shots = new List<ShotVisual>();
         public int ShotsFired { get; private set; }
         public int Ammo => Escape ? WorldShiftFlow.Escape.Ammo : practiceAmmo;
         private bool Escape => city != null ? city.GetawayMode : desert.GetawayMode;
@@ -40,11 +41,9 @@ namespace Outlaws.WorldShift
         }
         public void Bind(WorldShiftCity game) { city = game; Initialize(); }
         public void Bind(DesertShiftTrial game) { desert = game; Initialize(); }
+        private void LateUpdate() => Present();
         private void Initialize()
         {
-            tracer = new GameObject("Shot path - silent hit feedback", typeof(LineRenderer)).GetComponent<LineRenderer>();
-            tracer.transform.SetParent(transform, false); tracer.sharedMaterial = RuntimeMaterials.Coloured(Color.white);
-            tracer.widthMultiplier = .08f; tracer.gameObject.SetActive(false);
             AddAmmoPickup(780f, 0f);
             if (Escape) AddAmmoPickup((city != null ? WorldShiftLevel.Length : DesertShiftLevel.Length) + 140f, -2.8f);
         }
@@ -63,7 +62,8 @@ namespace Outlaws.WorldShift
         public void ResetPractice()
         {
             if (Escape) return;
-            practiceAmmo = GetawayRunState.MaximumAmmo; ShotsFired = 0; destroyed.Clear(); nextShot = tracerUntil = 0f;
+            practiceAmmo = GetawayRunState.MaximumAmmo; ShotsFired = 0; destroyed.Clear(); nextShot = 0f;
+            ClearShots();
             foreach (var pickup in pickups) pickup.Taken = false;
         }
         public bool TryShoot()
@@ -74,9 +74,12 @@ namespace Outlaws.WorldShift
             nextShot = Duration + .18f; ShotsFired++;
             var target = FindTarget();
             if (target.Key != null && target.Breakable) destroyed.Add(target.Key);
-            float end = target.Key != null ? target.At : Distance + 45f;
+            float end = target.Key != null ? target.At : Distance + OutlawProjectile.MaximumRange;
             float x = target.Key != null ? target.X : Lateral;
-            var points = new List<Vector3> { Player.position + Player.forward * 2f + Vector3.up * .8f };
+            var driver = Player.GetComponent<AutoDriveCar>();
+            Transform frame = driver != null ? driver.FiringFrame : Player;
+            Vector3 muzzle = frame.position + frame.forward * 2.2f + frame.up * .55f;
+            var points = new List<Vector3> { muzzle };
             for (int i = 1; i <= 10; i++)
             {
                 float t = i / 10f, d = Mathf.Lerp(Distance + 2f, end, t), lane = Mathf.Lerp(Lateral, x, t);
@@ -91,7 +94,10 @@ namespace Outlaws.WorldShift
                     points.Add(Position(d, lane) + Route.Sample(d).Up * height);
                 }
             }
-            tracer.positionCount = points.Count; tracer.SetPositions(points.ToArray()); tracerUntil = Duration + .10f;
+            var bullet = OutlawProjectile.CreateVisual(muzzle);
+            bullet.transform.SetParent(transform, true);
+            bullet.GetComponent<Collider>().enabled = false;
+            shots.Add(new ShotVisual { Body = bullet.transform, Path = points.ToArray(), Started = Duration });
             Present();
             if (city != null) city.PresentWorldForCamera(World); else desert.PresentWorldForCamera(World);
             return true;
@@ -165,7 +171,29 @@ namespace Outlaws.WorldShift
                 pickup.Visual.gameObject.SetActive(!pickup.Taken && pickup.At > Distance - 8f && pickup.At < Distance + 170f);
                 pickup.Visual.position = Position(pickup.At, pickup.X) + Route.Sample(pickup.At).Up * 1.4f;
             }
-            if (tracer != null) tracer.gameObject.SetActive(Duration < tracerUntil && (city != null ? city.State : desert.State) != ShiftRunState.Lost);
+            if (!Running && (city != null ? city.State : desert.State) != ShiftRunState.Paused) { ClearShots(); return; }
+            for (int i = shots.Count - 1; i >= 0; i--)
+            {
+                var shot = shots[i];
+                float remaining = Mathf.Max(0f, Duration - shot.Started) * OutlawProjectile.Speed;
+                bool flying = false;
+                for (int segment = 1; segment < shot.Path.Length; segment++)
+                {
+                    float length = Vector3.Distance(shot.Path[segment - 1], shot.Path[segment]);
+                    if (remaining <= length)
+                    {
+                        shot.Body.position = Vector3.Lerp(shot.Path[segment - 1], shot.Path[segment], length > .001f ? remaining / length : 1f);
+                        flying = true; break;
+                    }
+                    remaining -= length;
+                }
+                if (!flying) { Destroy(shot.Body.gameObject); shots.RemoveAt(i); }
+            }
+        }
+        private void ClearShots()
+        {
+            foreach (var shot in shots) Destroy(shot.Body.gameObject);
+            shots.Clear();
         }
         public static void MarkBreakable(Transform parent, Vector3 position)
         {

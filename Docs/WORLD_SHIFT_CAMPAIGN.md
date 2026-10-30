@@ -33,7 +33,7 @@ Full City and Desert support **F or left-click** to fire in either world. Space 
 
 Start with three rounds; ammo carries into the next Escape environment. White three-round pickups refill to three, at 780 m and on the safe fork. A miss costs ammo. Empty ammo never blocks the clear left branch. Practice starts with three rounds and restores ammo, pickups and obstacles on checkpoint retry. The tutorial and short standalone Desert exercise retain their original controls.
 
-Breakable objects use a simple crack symbol; ammo pickups use three white capsules, distinct from money and power-ups. A short silent shot line confirms firing. The existing single prompt slot introduces shooting when a target is ahead. Fork guidance briefly says **Left: ammo. Right: more loot.**; no additional instruction panel appears. The end junction still alternates between the existing City and Desert environments; choosing among additional environments is deferred.
+Breakable objects use a simple crack symbol; ammo pickups use three white capsules, distinct from money and power-ups. Shots use the original game’s small yellow sphere, with the same 0.28 m size, muzzle offset and 70 m/s travel speed, replacing the white line. Visible bullets pause with driving time and are cleared on retry or run end. Lane-assisted hits still resolve immediately; this change matches the original projectile presentation without changing hit rules. The existing single prompt slot introduces shooting when a target is ahead. Fork guidance briefly says **Left: ammo. Right: more loot.**; no additional instruction panel appears. The end junction still alternates between the existing City and Desert environments; choosing among additional environments is deferred.
 
 ## Escape power-ups
 
