@@ -66,7 +66,7 @@ namespace Outlaws.TransformStunt
                     Center = new Vector3(x, 1.4f, z) + turn * new Vector3(side * (gap * .5f + 5), 0, 0),
                     Size = new Vector3(10, 2.8f, .35f), Yaw = yaw,
                     GateId = gateId,
-                    Motion = moving ? StuntMotion.Slide : StuntMotion.Static, Amplitude = moving ? 1.4f : 0,
+                    Motion = moving ? StuntMotion.Slide : StuntMotion.Static, Amplitude = moving ? .9f : 0,
                     Period = 9f });
         }
 
@@ -85,37 +85,37 @@ namespace Outlaws.TransformStunt
         {
             for (int i = 0; i < 8; i++) Checkpoints.Add(i * 140);
             Block(-3.5f, 90, 2); Block(3.5f, 110, 2);
-            Gate(205, 1.35f); Sign(175, "SPACE / SHRINK");
+            Gate(205, 1.6f); Sign(175, "SPACE / SHRINK");
             Gate(350, 1.7f, -45); Sign(310, "SHRINK + E / LEFT 45");
             Fuel.Add(new Vector3(0, .65f, 475));
-            Gate(630, 4, moving: true); Sign(590, "MOVING GATE\nWATCH THE OPENING");
-            Wind(735, 800, 1.8f); Sign(710, "FAN / SMALL DRIFTS MORE");
+            Gate(630, 4.5f, moving: true); Sign(590, "MOVING GATE\nFOLLOW THE OPENING");
+            Wind(735, 800, 1.3f); Sign(710, "FAN / SMALL DRIFTS MORE");
             Jump(900, 26, true);
-            Gate(1035, 1.35f); Gate(1080, 4, moving: true);
+            Gate(1035, 1.6f); Gate(1080, 4.5f, moving: true);
         }
 
         private void BuildCourse()
         {
-            Checkpoints.AddRange(new[] { 0f, 240f, 480f, 720f, 960f });
+            Checkpoints.AddRange(Environment == StuntEnvironment.City
+                ? new[] { 0f, 145f, 280f, 370f, 520f, 620f, 760f, 850f, 970f, 1050f }
+                : new[] { 0f, 155f, 270f, 380f, 490f, 610f, 760f, 940f, 1080f });
             for (float z = 110; z < Length - 20; z += 150) Fuel.Add(new Vector3(0, .65f, z));
             if (Environment == StuntEnvironment.City)
             {
-                // A tight left opening and a longer full-size slalom share this section.
-                Block(-4.4f, 80, 1.2f); Block(-1.5f, 80, 2); Block(3.5f, 125, 3);
-                Sign(40, "SMALL LEFT / FAST RIGHT");
-                Gate(195, 1.7f, -45); Gate(320, 4, moving: true);
-                Block(-2.8f, 405, 4); Block(2.8f, 445, 4);
-                Gate(570, 1.35f); Gate(660, 1.7f, 45);
-                Gate(810, 4, moving: true); Gate(900, 1.7f, -45);
-                Block(-3, 1015, 3); Gate(1090, 4, moving: true);
-                Sign(535, "SMALL PASSAGE"); Sign(620, "ANGLED OPENING / E");
+                Gate(80, 3.4f, x: -1.2f); Sign(40, "STEER THROUGH THE OPENING");
+                Gate(195, 1.7f, -45); Gate(320, 4.5f, moving: true);
+                Gate(405, 3.4f, x: 1.2f);
+                Gate(570, 1.6f); Gate(660, 1.7f, 45);
+                Gate(810, 4.5f, moving: true); Gate(900, 1.7f, -45);
+                Gate(1015, 3.4f, x: -1.2f); Gate(1090, 4.5f, moving: true);
+                Sign(535, "SPACE / SMALL PASSAGE"); Sign(620, "SHRINK + E / ANGLED OPENING");
             }
             else
             {
-                Wind(65, 130, 3); Sign(30, "CROSSWIND / NORMAL RESISTS");
-                Gate(195, 1.35f); Jump(315, 28, true);
-                Gate(420, 4, moving: true);
-                Wind(535, 600, -3); Sign(500, "WIND FROM THE RIGHT");
+                Wind(65, 130, 2); Sign(30, "CROSSWIND / NORMAL RESISTS");
+                Gate(195, 1.6f); Jump(315, 28, true);
+                Gate(420, 4.5f, moving: true);
+                Wind(535, 600, -2); Sign(500, "WIND FROM THE RIGHT");
                 Jump(650, 27, true);
                 if (Environment == StuntEnvironment.Coast)
                 {
@@ -126,7 +126,7 @@ namespace Outlaws.TransformStunt
                 // An optional small-car updraft extends a short ramp jump; normal cars can clear it unaided.
                 Wind(980, 1025, .8f, .8f); Jump(990, 28, false);
                 Sign(950, "UPDRAFT / SMALL GETS LIFT");
-                Gate(1120, 4, moving: true);
+                Gate(1120, 4.5f, moving: true);
                 for (int i = 0; i < Fuel.Count; i++)
                     foreach (var jump in Jumps)
                         if (Fuel[i].z > jump.Takeoff - 15 && Fuel[i].z < jump.Landing + 20)

@@ -8,7 +8,7 @@ namespace Outlaws.TransformStunt
     {
         public static readonly float[] Angles = { 0, -45, 90, 45 };
         public static readonly string[] AngleNames = { "STRAIGHT", "LEFT 45", "SIDEWAYS", "RIGHT 45" };
-        public const float SmallScale = .55f, NormalSpeed = 20, SmallSpeed = 11;
+        public const float SmallScale = .55f, NormalSpeed = 18, SmallSpeed = 10;
         public readonly StuntCourse Course;
         public readonly FuelState Fuel = new FuelState();
         public Vector3 Position { get; private set; }
@@ -210,7 +210,7 @@ namespace Outlaws.TransformStunt
         private void Snapshot() { checkpointClock = Clock; checkpointFuel = Fuel.CurrentFuel; Array.Copy(FuelTaken, checkpointTaken, FuelTaken.Length); }
         private void Finish() { Finished = true; Notify("COURSE COMPLETE"); }
         public void Notify(string message) { Feedback = message; FeedbackTime = 3; }
-        public void Fail(string reason) { if (RetryRemaining > 0 || Finished) return; Crashes++; RetryRemaining = 1; Notify(reason); }
+        public void Fail(string reason) { if (RetryRemaining > 0 || Finished) return; Crashes++; RetryRemaining = .45f; Notify(reason); }
         public void Retry() { if (!Started || Finished) return; Paused = false; Fail("RETRY CHECKPOINT"); }
         private void Restore()
         {

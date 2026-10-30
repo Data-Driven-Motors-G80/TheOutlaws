@@ -15,7 +15,7 @@ Use Unity **6000.3.23f1**, open `Assets/Scenes/Stunt_Menu.unity`, and press Play
 | R | Retry the current checkpoint or tutorial lesson |
 | Enter | Start from the ready screen |
 
-Forward travel is automatic even while the car faces sideways. Small mode is 55% scale and drives at 11 m/s; normal drives at 20 m/s. Both use 2 fuel per second; green fuel restores 30. There is no brake key. Shrinking slows ground travel but preserves airborne launch momentum.
+Forward travel is automatic even while the car faces sideways. Small mode is 55% scale and drives at 10 m/s; normal drives at 18 m/s. Both use 2 fuel per second; green fuel restores 30. There is no brake key. Shrinking slows ground travel but preserves airborne launch momentum.
 
 Fans affect small cars more strongly. Use normal size to resist crosswinds and approach long jumps; use small size for tight openings and updrafts. Purple machinery moves; orange barriers are static. Angled slots require shrinking, matching the angle, and steering diagonally through the opening. A transformation that would intersect an obstacle is refused.
 
@@ -23,7 +23,7 @@ Fans affect small cars more strongly. Use normal size to resist crosswinds and a
 
 Eight tutorial lessons teach steering, size, rotation, fuel, moving gates, airflow, automatic ramp jumps, and a combined finish. Lessons advance only when their required action succeeds. Failure restores the current lesson. Fuel cannot run out during training.
 
-City teaches passages and gates. Desert introduces crosswinds and jumps. Coast combines those skills with rotating machinery. Each course has five checkpoints. Crashes, falls, and empty fuel retry the current checkpoint with at least 60 fuel. Course time includes retries but excludes pauses. Full restart clears the timer. Best times are stored locally per browser/device; tutorial completion is stored separately.
+City teaches passages and gates. Desert introduces crosswinds and jumps. Coast combines those skills with rotating machinery. Checkpoints sit shortly before each major obstacle. Crashes, falls, and empty fuel retry the current checkpoint after a brief pause, with at least 60 fuel. Course time includes retries but excludes pauses. Full restart clears the timer. Best times are stored locally per browser/device; tutorial completion is stored separately.
 
 ## Implementation
 

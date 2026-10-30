@@ -30,6 +30,10 @@ public static class TransformStuntValidation
         slot.Obstacles.Clear(); slot.Gate(20, 1.5f, -45);
         Check(!fit.Clear(new Vector3(0, 0, 20), .55f, 0, 0), "small alone cannot bypass angled slot");
         Check(fit.Clear(new Vector3(0, 0, 20), .55f, -45, 0), "small aligned fits angled slot");
+        slot.Obstacles.Clear(); slot.Gate(20, 3.4f, x: -1.2f);
+        Check(!fit.Clear(new Vector3(-4, 0, 20), 1, 0, 0) &&
+              !fit.Clear(new Vector3(4, 0, 20), 1, 0, 0), "full-road gate cannot be bypassed at either edge");
+        Check(fit.Clear(new Vector3(-1.2f, 0, 20), 1, 0, 0), "normal car can use the intended opening");
 
         var empty = new StuntCourse(StuntEnvironment.City); empty.Obstacles.Clear(); empty.Fuel.Clear();
         var normal = new StuntRun(empty) { Started = true };
@@ -67,7 +71,7 @@ public static class TransformStuntValidation
         while (!jumping.Airborne && jumping.Crashes == 0) jumping.Advance(1f / 120, 0);
         jumping.Transform(true, false);
         for (int i = 0; i < 60; i++) jumping.Advance(1f / 120, 0);
-        Check(jumping.Airborne && Mathf.Abs(jumping.Speed - 20) < .01f && jumping.Small, "airborne shrink preserves launch momentum");
+        Check(jumping.Airborne && Mathf.Abs(jumping.Speed - StuntRun.NormalSpeed) < .01f && jumping.Small, "airborne shrink preserves launch momentum");
         for (int i = 0; i < 240 && jumping.Airborne; i++) jumping.Advance(1f / 120, 0);
         Check(!jumping.Airborne && jumping.Crashes == 0 && jumping.Position.z > 58, "actual successful landing");
         var shortJump = new StuntRun(jumpCourse) { Started = true }; shortJump.Transform(true, false);
@@ -81,8 +85,8 @@ public static class TransformStuntValidation
         Check(restoring.FuelTaken[0] && restoring.FuelTaken[1] && restoring.Checkpoint == 1, "checkpoint records prior fuel state");
         restoring.Transform(true, true); restoring.Retry();
         while (restoring.RetryRemaining > 0) restoring.Advance(1f / 120, 0);
-        Check(restoring.Position.z == 240 && !restoring.Small && restoring.AngleIndex == 0 && !restoring.Airborne, "retry restores safe pose");
-        Check(restoring.FuelTaken[0] && !restoring.FuelTaken[1] && Mathf.Abs(restoring.Clock - 12) < .02f, "retry restores pickups and machinery clock");
+        Check(restoring.Position.z == 145 && !restoring.Small && restoring.AngleIndex == 0 && !restoring.Airborne, "retry restores safe pose");
+        Check(restoring.FuelTaken[0] && !restoring.FuelTaken[1] && Mathf.Abs(restoring.Clock - 145f / StuntRun.NormalSpeed) < .02f, "retry restores pickups and machinery clock");
 
         var lesson = new StuntRun(new StuntCourse(StuntEnvironment.Tutorial)) { Started = true };
         for (int i = 0; i < 1800 && lesson.Crashes == 0; i++) lesson.Advance(1f / 120, 0);
@@ -145,7 +149,7 @@ public static class TransformStuntValidation
                     angle = a.Yaw < 0 ? 1 : 3;
                     float direction = Mathf.Sign(a.Yaw);
                     target = Mathf.Clamp(direction * (z - centreZ + .6f), -3f, 3f);
-                    if (Mathf.Abs(z - centreZ) < 3.5f) feed = direction * (course.Tutorial ? 7.7f : 11f);
+                    if (Mathf.Abs(z - centreZ) < 3.5f) feed = direction * (course.Tutorial ? StuntRun.SmallSpeed * .7f : StuntRun.SmallSpeed);
                 }
                 else target = centre.x;
             }
@@ -154,13 +158,6 @@ public static class TransformStuntValidation
         foreach (var jump in course.Jumps)
             if (z > jump.Takeoff - 38 && z < jump.Landing + 20)
             { small = run.Airborne || z > jump.Landing; angle = 0; target = 0; feed = 0; }
-        if (!course.Tutorial && course.Environment == StuntEnvironment.City)
-        {
-            if (z > 45 && z < 95) target = 1.7f;
-            if (z > 95 && z < 133) target = -1;
-            if (z > 375 && z < 418) target = 1.5f;
-            if (z > 418 && z < 455) target = -1.5f;
-        }
         if (course.Environment == StuntEnvironment.Coast && z > 770 && z < 840) target = 2.5f;
         if (course.Tutorial)
         {
