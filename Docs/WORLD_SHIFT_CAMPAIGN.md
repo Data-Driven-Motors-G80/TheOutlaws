@@ -1,6 +1,6 @@
 # World Shift playable flow
 
-The menu now starts the **Endless Getaway** mode: collect loot, steer left to bank at an exit, or right to continue into the next environment. City and Desert loop with increasing rewards and pursuit pressure. Capture, wrecks, or empty fuel lose the carried haul. Practice retains the original checkpoint flow described below. See [the getaway design](WORLD_SHIFT_DIRECTION_PROPOSAL.md).
+The menu now starts the **Endless Getaway** mode: collect loot, steer left to bank at an exit, or right to continue into the next environment. City and Desert loop with increasing rewards and pursuit pressure. Capture, wrecks, or empty fuel lose the carried haul. Practice retains the original checkpoint flow described below.
 
 Open `Assets/Scenes/WorldShift_Menu.unity` and press Play, or use **The Outlaws > World Shift > Open Game Menu**. This scene is also first in Build Settings. Existing environment scenes remain available.
 
@@ -12,12 +12,38 @@ The home screen separates **Endless escape** from **Practice**. Practice opens C
 
 The first escape includes the short tutorial. **New here? Learn to play** also opens it independently. Tutorial can also be selected independently; its Continue button leads to City. City practice completion offers **Try the desert** and **Back to menu**. Desert practice completion offers **Try again** and **Back to menu**. Pause screens offer a clear way to resume or leave.
 
+## Escape rules
+
+- **A/D or arrows** steer; **Space** switches Day/Night throughout the route; **Escape** pauses. Escape mode disables checkpoint retries. Leaving a live run loses its carried loot.
+- Each environment adds a 400 m clear extension. An optional automatic ramp on the right offers six elevated Night bags; the left ground route offers two Day bags. Elevated bags require taking the ramp. The jump lands safely in either world without a required switch.
+- The last 220 m offer green **Exit** markings on the left/centre and amber **Next** markings on the right. The final gate commits the choice: cash out once, or carry the haul into the next environment. Fuel drain and pursuit closing pause through this bonus/exit stretch.
+- Each new environment starts with full fuel and normal police separation. Bags start at $100; continued legs add 0.5 to the loot multiplier, capped at x21. Pursuit pressure also increases, capped after six continues. Driving speed does not increase between environments.
+- The bank and best haul persist locally. Live hauls are not saved. Snow and Ocean Coast are separate environment scenes and are not part of this loop. Banked money currently measures success; there is no shop or permanent upgrade system.
+
+## Escape power-ups
+
+Near the start of each environment, choose one automatic pickup. Taking one removes the other choices for that visit; all can be skipped.
+
+| Power-up | Location | Effect |
+| --- | --- | --- |
+| Shield | Day, left | Absorbs one solid impact, with brief protection against overlapping contacts. Does not stack; unused shields carry into the next environment. It cannot prevent falls, depleted pursuit, or empty fuel. |
+| Magnet | Night, right | Pulls loot across the road in the selected world for six driving seconds. Cannot collect elevated bags from underneath. |
+| Boost | Night, centre | Adds 20% forward speed with 20% less steering input for four driving seconds. Police keep their normal pace, creating separation. |
+
+Magnet and boost timers pause with the game and reset between environments. Cyan shield rings, a shrinking purple magnet ring, and gold boost trails show active effects. A carried shield still allows choosing a Night power on the next visit.
+
+## Pace and guidance
+
+Normal cruising is 30.8 m/s in City and 26.4 m/s in Desert, 10% faster than the original pace. The pickup boost reaches 36.96 or 31.68 m/s respectively. Police match normal cruising with the existing small closing pressure. Tutorial speed stays at 18 m/s. Authored relay approaches, flight, landing recovery and steering retain their original curves, including the 42 m/s peak. The bonus ramp and recovery retain 28 m/s in City or 24 m/s in Desert; pickup boosts do not override jump sequences. Standalone development exercises retain their original pace.
+
+The first chase briefly shows **You're the getaway driver. Grab loot. Reach an exit to keep it.** over the moving road, fading after seven driving seconds. The tutorial uses one short prompt at a time. The escape HUD shows loot, world, environment, route progress, fuel, and the pursuit mirror. Controls fade after the opening; the next reward multiplier appears at the exit. Pause and results hide the driving HUD. The home screen uses rounded, illustrated Day/Night cards for Escape and Practice, with a separate optional lesson link.
+
 ## Shared rules
 
-- A/D or arrows steer. Space changes worlds throughout every route. Steering never changes worlds. Escape pauses. R retries the current checkpoint.
+- A/D or arrows steer. Space changes worlds throughout every route. Steering never changes worlds. Escape pauses. In Practice, R retries the current checkpoint.
 - All other-world hazard outlines and dashed relay landing previews are removed. Road lane markings and physical hazard signs remain.
 - Switching is allowed into occupied positions. It immediately applies the same collision penalty as driving into that obstacle, rather than refusing the switch. Switching onto missing road causes a fall; relay flight is still exempt until landing.
-- Solid impacts cost 22.5 m of the initial 45 m police gap; collision protection prevents one contact being charged repeatedly. Fuel is not lost on impact. Fuel exhaustion, capture and missed road retry the current checkpoint.
+- Solid impacts cost 22.5 m of the initial 45 m police gap; collision protection prevents one contact being charged repeatedly. Fuel is not lost on impact. In Practice, fuel exhaustion, capture and missed road retry the current checkpoint; in Escape they end the run and lose the carried haul.
 - Throughout the Desert, Day advances rocks and approaching traffic; Night pauses both at their current positions. Frozen objects remain solid. Finale rocks and walls belong to their assigned world and appear only when that world is selected. Space remains available through the finish. Checkpoints restore clocks, traffic travel and resources.
 - The merged-world finale, portal, and split screen have been removed from City, Desert, and the tutorial. The standalone rendering validation scene retains its compositor for development checks only.
 
@@ -30,6 +56,6 @@ The first escape includes the short tutorial. **New here? Learn to play** also o
 
 ## Implementation / scope
 
-`WorldShiftFlow` owns scene routing; `WorldShiftMenu` builds the start UI. `WorldShiftTutorial` and `DesertShiftLevel` hold the new authored layouts. `DesertShiftTrial` supports both the original short trial and the full level. Gameplay renders the selected world directly; `IWorldShiftView` and the compositor remain available for the standalone rendering validation scene. All visuals remain simple geometry/materials.
+`GetawayRunState` owns loot, progression, shields and settlement. `WorldShiftGetaway` shares escape pickups, exits and UI; `WorldShiftGetawayExtras` owns power-up effects and optional ramp presentation, with `WorldShiftBonusJump` sharing the flight curve between driving and geometry. `WorldShiftFlow` owns scene routing and bank persistence; `WorldShiftMenu` builds the start UI. `WorldShiftTutorial` and `DesertShiftLevel` hold the new authored layouts. `DesertShiftTrial` supports both the original short trial and the full level. Gameplay renders the selected world directly; `IWorldShiftView` and the compositor remain available for the standalone rendering validation scene. All visuals remain simple geometry/materials.
 
 Focused verification covers menu/tutorial routing to either selected level, a collision caused by switching, missing-road failure, roll/freeze behavior, manual switching and consistent Night freezing through the finale, completion UI, and the existing complete city and short desert routes. This is a functional smoke check, not a full playtest of the new desert difficulty.
