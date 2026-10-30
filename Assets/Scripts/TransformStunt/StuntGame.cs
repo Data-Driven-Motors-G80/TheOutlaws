@@ -47,7 +47,7 @@ namespace Outlaws.TransformStunt
                 if (k.enterKey.wasPressedThisFrame && !Run.Started) Run.Started = true;
                 if (k.escapeKey.wasPressedThisFrame && Run.Started && !Run.Finished) Run.Paused = !Run.Paused;
                 if (k.rKey.wasPressedThisFrame) Run.Retry();
-                Run.Transform(k.spaceKey.wasPressedThisFrame, k.eKey.wasPressedThisFrame);
+                Run.Transform(k.qKey.wasPressedThisFrame, k.eKey.wasPressedThisFrame);
             }
             float steer = k == null ? 0 : ((k.dKey.isPressed || k.rightArrowKey.isPressed) ? 1 : 0) - ((k.aKey.isPressed || k.leftArrowKey.isPressed) ? 1 : 0);
             Run.Advance(Time.deltaTime, steer);
@@ -112,6 +112,7 @@ namespace Outlaws.TransformStunt
             var edgeMat = Mat(accent);
             var hazardMat = Mat(new Color(1f, .38f, .15f));
             var machineMat = Mat(new Color(.68f, .35f, .95f));
+            var weakMat = Mat(new Color(1f, .78f, .15f));
             var groundMat = Mat(environment == 2 ? new Color(.7f, .49f, .27f) : environment == 3 ? new Color(.06f, .4f, .5f) : new Color(.25f, .31f, .35f));
             var sceneMat = Mat(environment == 2 ? new Color(.57f, .35f, .20f) : new Color(.32f, .43f, .5f));
             var fuelMat = Mat(new Color(.25f, 1, .42f));
@@ -176,12 +177,20 @@ namespace Outlaws.TransformStunt
             }
             foreach (var obstacle in course.Obstacles)
             {
-                var obj = Box(obstacle.Motion == StuntMotion.Static ? "Solid obstacle" : "Moving machinery", obstacle.Center, obstacle.Size,
-                    obstacle.Motion == StuntMotion.Static ? hazardMat : machineMat, obstacle.Yaw);
+                var obj = Box(obstacle.Weak ? "Breakable gold support" : obstacle.Plate >= 0 ? "Plate door" : obstacle.Motion == StuntMotion.Static ? "Solid obstacle" : "Moving machinery", obstacle.Center, obstacle.Size,
+                    obstacle.Weak ? weakMat : obstacle.Plate >= 0 ? machineMat : obstacle.Motion == StuntMotion.Static ? hazardMat : machineMat, obstacle.Yaw);
                 obstacleViews.Add(obj);
                 var stripe = Box("Warning band", Vector3.zero, Vector3.one, edgeMat);
                 stripe.SetParent(obj, false); stripe.localPosition = new Vector3(0, .30f, -.505f); stripe.localScale = new Vector3(1, .08f, .015f);
             }
+            foreach (float plate in course.Plates)
+            {
+                Box("Heavy plate", new Vector3(0, .08f, plate), new Vector3(6, .16f, 3), weakMat);
+                courseSigns.Add(new KeyValuePair<Transform, float>(Label("LARGE PLATE", new Vector3(0, 3, plate - 8), .12f), plate + 3));
+            }
+            if (environment == 1)
+                for (float z = 445; z < 500; z += 5)
+                    Box("Medium speed ramp arrow", new Vector3(2.7f, .04f, z), new Vector3(1.5f, .05f, .6f), edgeMat);
             foreach (var point in course.Fuel)
             {
                 var pickup = Instantiate(fuelPrefab, point, Quaternion.identity, transform); VisualOnly(pickup);
@@ -251,10 +260,11 @@ namespace Outlaws.TransformStunt
             if (car == null) return;
             poseDriver.RestoreExternalPose(Run.Position.z, Run.Position.x);
             orientation.localScale = Vector3.one * Run.Scale;
-            orientation.localRotation = Quaternion.Euler(0, Run.Yaw, 0);
+            orientation.localRotation = Quaternion.identity;
             for (int i = 0; i < obstacleViews.Count; i++)
             {
                 var obstacle = Run.Course.Obstacles[i];
+                obstacleViews[i].gameObject.SetActive(!Run.Broken[i] && (obstacle.Plate < 0 || !Run.Activated[obstacle.Plate]));
                 obstacleViews[i].SetPositionAndRotation(obstacle.Position(Run.Clock), Quaternion.Euler(0, obstacle.Angle(Run.Clock), 0));
             }
             for (int i = 0; i < fuelViews.Count; i++) fuelViews[i].SetActive(!Run.FuelTaken[i]);
@@ -294,8 +304,8 @@ namespace Outlaws.TransformStunt
             Panel(new Rect(20, 20, 1240, 86), new Color(.025f, .045f, .065f, .94f));
             GUI.Label(new Rect(40, 28, 270, 34), environment == 0 ? "TRAINING / " + (Run.Lesson + 1) + " OF 8" : ((StuntEnvironment)environment).ToString().ToUpper() + " / STUNT RUN", subtitle);
             GUI.Label(new Rect(40, 65, 310, 28), Run.Duration.ToString("0.0") + "s   /   " + Run.Crashes + " retries   /   " + (Run.Position.z / Run.Course.Length * 100).ToString("0") + "%", small);
-            GUI.Label(new Rect(380, 28, 380, 30), (Run.Small ? "SMALL / SLOW" : "NORMAL / FAST") + "    " + StuntRun.AngleNames[Run.AngleIndex], subtitle);
-            GUI.Label(new Rect(380, 65, 400, 26), "E: NEXT " + StuntRun.AngleNames[(Run.AngleIndex + 1) % 4] + (Run.Airborne ? "   /   AIRBORNE" : ""), small);
+            GUI.Label(new Rect(380, 28, 380, 30), StuntRun.SizeNames[Run.SizeIndex] + "    " + Run.Speed.ToString("0.0") + " m/s", subtitle);
+            GUI.Label(new Rect(380, 65, 400, 26), "Q SHRINK   /   E GROW" + (Run.Airborne ? "   /   AIRBORNE" : ""), small);
             GUI.Label(new Rect(960, 28, 260, 30), "FUEL  " + Run.Fuel.CurrentFuel.ToString("0") + " / 100", subtitle);
             Panel(new Rect(960, 67, 260, 14), new Color(.15f, .2f, .25f));
             Panel(new Rect(960, 67, 260 * Run.Fuel.CurrentFuel / 100, 14), Run.Fuel.CurrentFuel < 25 ? new Color(1, .3f, .2f) : accent);
@@ -351,7 +361,7 @@ namespace Outlaws.TransformStunt
             }
             tutorialFirst = GUI.Toggle(new Rect(95, 510, 650, 40), tutorialFirst, "  PLAY TUTORIAL BEFORE SELECTED COURSE", toggle);
             if (GUI.Button(new Rect(90, 565, 345, 50), "TUTORIAL / PRACTICE", button)) { destination = 1; Load(0); }
-            GUI.Label(new Rect(480, 572, 700, 70), "A/D steer  ·  Space size  ·  E rotate\nFuel only. Unlimited checkpoint retries.", body);
+            GUI.Label(new Rect(480, 572, 700, 70), "A/D steer  ·  Q shrink  ·  E grow\nFuel only. Unlimited checkpoint retries.", body);
         }
 
         private void OnDestroy()

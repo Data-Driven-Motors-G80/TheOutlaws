@@ -38,12 +38,12 @@ public static class TransformStuntPreview
             var game = UnityEngine.Object.FindFirstObjectByType<StuntGame>();
             if (game == null || game.Run == null) return;
             var run = game.Run; run.Started = true; run.Paused = false;
-            float target = game.environment == 0 ? 315 : game.environment == 1 ? 155 : 290;
+            float target = game.environment == 0 ? 315 : game.environment == 1 ? 485 : 290;
             for (int step = 0; step < 18000 && run.Position.z < target; step++)
             {
-                TransformStuntValidation.Pilot(run, out bool small, out int angle, out float steer);
-                if (run.Small != small) run.Transform(true, false);
-                if (run.AngleIndex != angle) run.Transform(false, true);
+                TransformStuntValidation.Pilot(run, out int size, out float steer);
+                if (run.SizeIndex > size) run.Transform(true, false);
+                if (run.SizeIndex < size) run.Transform(false, true);
                 run.Advance(1f / 120, steer);
                 if (run.Crashes > 0) throw new InvalidOperationException("Preview pilot: " + run.Feedback);
             }

@@ -26,10 +26,7 @@ public static class TransformStuntValidation
         var fit = new StuntRun(slot);
         Check(!fit.Clear(new Vector3(0, 0, 20), 1, 0, 0), "normal cannot fit narrow slot");
         Check(fit.Clear(new Vector3(0, 0, 20), .55f, 0, 0), "small fits narrow slot");
-        Check(!fit.Clear(new Vector3(0, 0, 20), .55f, 90, 0), "sideways footprint changes collision");
-        slot.Obstacles.Clear(); slot.Gate(20, 1.5f, -45);
-        Check(!fit.Clear(new Vector3(0, 0, 20), .55f, 0, 0), "small alone cannot bypass angled slot");
-        Check(fit.Clear(new Vector3(0, 0, 20), .55f, -45, 0), "small aligned fits angled slot");
+        Check(!fit.Clear(new Vector3(0, 0, 20), 1.4f, 0, 0), "large cannot fit narrow slot");
         slot.Obstacles.Clear(); slot.Gate(20, 3.4f, x: -1.2f);
         Check(!fit.Clear(new Vector3(-4, 0, 20), 1, 0, 0) &&
               !fit.Clear(new Vector3(4, 0, 20), 1, 0, 0), "full-road gate cannot be bypassed at either edge");
@@ -38,7 +35,7 @@ public static class TransformStuntValidation
         var empty = new StuntCourse(StuntEnvironment.City); empty.Obstacles.Clear(); empty.Fuel.Clear();
         var normal = new StuntRun(empty) { Started = true };
         var tiny = new StuntRun(empty) { Started = true }; tiny.Transform(true, false);
-        for (int i = 0; i < 120; i++) { normal.Advance(1f / 60, 0); tiny.Advance(1f / 60, 0); }
+        for (int i = 0; i < 360; i++) { normal.Advance(1f / 60, 0); tiny.Advance(1f / 60, 0); }
         Check(normal.Position.z > tiny.Position.z * 1.6f, "small is slower");
         Check(Mathf.Abs(normal.Fuel.CurrentFuel - tiny.Fuel.CurrentFuel) < .01f, "fuel drains equally per second");
         float clock = normal.Clock, fuel = normal.Fuel.CurrentFuel; Vector3 position = normal.Position;
@@ -55,14 +52,38 @@ public static class TransformStuntValidation
         var windSmall = new StuntRun(windCourse) { Started = true }; windSmall.Transform(true, false);
         for (int i = 0; i < 60; i++) { windNormal.Advance(1f / 60, 0); windSmall.Advance(1f / 60, 0); }
         Check(windSmall.Position.x > windNormal.Position.x + .5f, "small responds more to wind");
+        var largeFuelCourse = new StuntCourse(StuntEnvironment.City);
+        largeFuelCourse.Obstacles.Clear(); largeFuelCourse.Fuel.Clear();
+        var largeFuel = new StuntRun(largeFuelCourse) { Started = true }; largeFuel.Transform(false, true);
+        for (int i = 0; i < 180; i++) largeFuel.Advance(1f / 60, 0);
+        Check(largeFuel.Large && largeFuel.Fuel.CurrentFuel < 94, "large size uses fuel faster");
+        Check(largeFuel.SizeIndex == 2 && largeFuel.Scale > 1.35f, "large reaches physical size");
+        largeFuel.Transform(true, false); Check(largeFuel.SizeIndex == 1, "Q returns large to medium directly");
+        largeFuel.Transform(true, false); Check(largeFuel.Small, "Q reaches small without cycling");
+
+        var heavy = new StuntCourse(StuntEnvironment.City); heavy.Obstacles.Clear(); heavy.Fuel.Clear(); heavy.Plates.Clear();
+        heavy.WeakWall(50); heavy.PlateDoor(80, 100);
+        var mediumHit = new StuntRun(heavy) { Started = true };
+        for (int i = 0; i < 600 && mediumHit.Crashes == 0; i++) mediumHit.Advance(1f / 120, 0);
+        Check(mediumHit.Crashes == 1 && !mediumHit.Broken[0], "medium cannot break marked wall");
+        var breaker = new StuntRun(heavy) { Started = true }; breaker.Transform(false, true);
+        for (int i = 0; i < 1100 && breaker.Crashes == 0; i++) breaker.Advance(1f / 120, 0);
+        Check(breaker.Crashes == 0 && breaker.Broken[0] && breaker.Activated[0], "large breaks wall and opens plate door");
+        breaker.Retry();
+        while (breaker.RetryRemaining > 0) breaker.Advance(1f / 120, 0);
+        Check(!breaker.Broken[0] && !breaker.Activated[0], "retry restores weak wall and plate door");
+        var plateOnly = new StuntCourse(StuntEnvironment.City); plateOnly.Obstacles.Clear(); plateOnly.Plates.Clear(); plateOnly.Fuel.Clear();
+        plateOnly.PlateDoor(20, 50);
+        var lightCar = new StuntRun(plateOnly) { Started = true }; lightCar.Transform(true, false);
+        for (int i = 0; i < 1200 && lightCar.Crashes == 0; i++) lightCar.Advance(1f / 120, 0);
+        Check(lightCar.Crashes == 1 && !lightCar.Activated[0], "small cannot activate heavy plate or pass closed door");
 
         var narrow = new StuntCourse(StuntEnvironment.City); narrow.Obstacles.Clear(); narrow.Gate(20, 1.35f);
         var inside = new StuntRun(narrow) { Started = true }; inside.Transform(true, false);
         while (inside.Position.z < 20) inside.Advance(1f / 240, 0);
-        inside.Transform(true, false);
-        Check(inside.Small && inside.Feedback.Contains("ROOM"), "growth inside slot rejected");
         inside.Transform(false, true);
-        Check(inside.AngleIndex == 0, "intermediate rotation cannot clip slot walls");
+        Check(inside.Small && inside.Feedback.Contains("ROOM"), "growth inside slot rejected");
+        Check(inside.SizeIndex == 0, "blocked growth preserves size");
 
         var jumpCourse = new StuntCourse(StuntEnvironment.City);
         jumpCourse.Obstacles.Clear(); jumpCourse.Fuel.Clear(); jumpCourse.Jumps.Clear();
@@ -85,7 +106,7 @@ public static class TransformStuntValidation
         Check(restoring.FuelTaken[0] && restoring.FuelTaken[1] && restoring.Checkpoint == 1, "checkpoint records prior fuel state");
         restoring.Transform(true, true); restoring.Retry();
         while (restoring.RetryRemaining > 0) restoring.Advance(1f / 120, 0);
-        Check(restoring.Position.z == 145 && !restoring.Small && restoring.AngleIndex == 0 && !restoring.Airborne, "retry restores safe pose");
+        Check(restoring.Position.z == 145 && restoring.SizeIndex == 1 && !restoring.Airborne, "retry restores safe pose");
         Check(restoring.FuelTaken[0] && !restoring.FuelTaken[1] && Mathf.Abs(restoring.Clock - 145f / StuntRun.NormalSpeed) < .02f, "retry restores pickups and machinery clock");
 
         var lesson = new StuntRun(new StuntCourse(StuntEnvironment.Tutorial)) { Started = true };
@@ -98,6 +119,7 @@ public static class TransformStuntValidation
             foreach (Vector3 pickup in course.Fuel) Check(course.HasRoad(pickup.z), environment + " fuel on reachable road");
             foreach (float cp in course.Checkpoints) Check(new StuntRun(course).Clear(new Vector3(0, 0, cp), 1, 0, 0), environment + " safe checkpoint");
             DriveCourse(environment);
+            if (environment == StuntEnvironment.City) DriveCourse(environment, true);
         }
         TransformStuntSetup.Create();
         foreach (string name in StuntGame.SceneNames)
@@ -112,26 +134,26 @@ public static class TransformStuntValidation
         File.WriteAllText("stunt-validation.txt", checks + " checks passed; tutorial and all three courses completed through real collision and fuel simulation.");
     }
 
-    public static void DriveCourse(StuntEnvironment environment)
+    public static void DriveCourse(StuntEnvironment environment, bool smallRoute = false)
     {
         var run = new StuntRun(new StuntCourse(environment)) { Started = true };
         for (int frame = 0; frame < 18000 && !run.Finished; frame++)
         {
-            Pilot(run, out bool small, out int angle, out float steer);
-            if (run.Small != small) run.Transform(true, false);
-            if (run.AngleIndex != angle) run.Transform(false, true);
+            Pilot(run, out int size, out float steer, smallRoute);
+            if (run.SizeIndex > size) run.Transform(true, false);
+            if (run.SizeIndex < size) run.Transform(false, true);
             run.Advance(1f / 120, steer);
             if (run.Crashes > 0) throw new InvalidOperationException($"STUNT ROUTE {environment}: {run.Feedback}, z={run.Position.z:F2}, x={run.Position.x:F2}, y={run.Position.y:F2}, yaw={run.Yaw:F1}, lesson={run.Lesson}");
         }
         Check(run.Finished, environment + " complete route");
-        Debug.Log($"STUNT_ROUTE_OK {environment}: {run.Duration:F1}s, {run.Collected} fuel");
+        Debug.Log($"STUNT_ROUTE_OK {environment} {(smallRoute ? "SMALL ROUTE" : "MEDIUM ROUTE")}: {run.Duration:F1}s, {run.Collected} fuel");
     }
 
     // This is a continuous steering/switching route, not a teleport or collision bypass.
-    public static void Pilot(StuntRun run, out bool small, out int angle, out float steer)
+    public static void Pilot(StuntRun run, out int size, out float steer, bool smallRoute = false)
     {
-        float z = run.Position.z, target = 0, feed = 0;
-        small = false; angle = 0;
+        float z = run.Position.z, target = 0;
+        size = 1;
         var course = run.Course;
         for (int i = 0; i + 1 < course.Obstacles.Count; i++)
         {
@@ -141,33 +163,28 @@ public static class TransformStuntValidation
             if (z < centreZ - 35 || z > centreZ + 10) continue;
             var centre = (a.Position(run.Clock) + b.Position(run.Clock)) / 2;
             if (a.Motion == StuntMotion.Slide) target = centre.x;
-            else
-            {
-                small = true;
-                if (a.Yaw != 0)
-                {
-                    angle = a.Yaw < 0 ? 1 : 3;
-                    float direction = Mathf.Sign(a.Yaw);
-                    target = Mathf.Clamp(direction * (z - centreZ + .6f), -3f, 3f);
-                    if (Mathf.Abs(z - centreZ) < 3.5f) feed = direction * (course.Tutorial ? StuntRun.SmallSpeed * .7f : StuntRun.SmallSpeed);
-                }
-                else target = centre.x;
-            }
+            else { size = 0; target = centre.x; }
             break;
         }
         foreach (var jump in course.Jumps)
             if (z > jump.Takeoff - 38 && z < jump.Landing + 20)
-            { small = run.Airborne || z > jump.Landing; angle = 0; target = 0; feed = 0; }
+            { size = run.Airborne || z > jump.Landing ? 0 : 1; target = 0; }
+        foreach (var o in course.Obstacles)
+            if (o.Weak && z > o.Center.z - 42 && z < o.Center.z + 10) { size = 2; target = 0; }
+        foreach (float plate in course.Plates)
+            if (z > plate - 40 && z < plate + 10) { size = 2; target = 0; }
+        if (course.Environment == StuntEnvironment.City && z > 437 && z < 510)
+        { size = smallRoute ? 0 : 1; target = smallRoute ? -3.35f : 2.7f; }
         if (course.Environment == StuntEnvironment.Coast && z > 770 && z < 840) target = 2.5f;
         if (course.Tutorial)
         {
             if (run.Lesson == 0) target = z < 28 ? -1.5f : z < 55 ? 1.5f : 0;
-            if (run.Lesson == 1 && z > 215) small = false;
-            if (run.Lesson == 5) small = z > 755 && z < 790;
+            if (run.Lesson == 1 && z > 215) size = 1;
+            if (run.Lesson == 5) size = z > 755 && z < 790 ? 0 : 1;
         }
         // Counteract steady wind while retaining steering inertia and bounded player input.
         float windCompensation = 0;
-        foreach (var w in course.Winds) if (w.Contains(run.Position)) windCompensation += w.Acceleration.x * (small ? 4 : 1);
-        steer = Mathf.Clamp((feed + (target - run.Position.x) * 9 - windCompensation * .5f) / Mathf.Max(1, Mathf.Min(14, run.Speed)), -1, 1);
+        foreach (var w in course.Winds) if (w.Contains(run.Position)) windCompensation += w.Acceleration.x * (size == 0 ? 4 : size == 2 ? .25f : 1);
+        steer = Mathf.Clamp(((target - run.Position.x) * 9 - windCompensation * .5f) / Mathf.Max(1, Mathf.Min(14, run.Speed)), -1, 1);
     }
 }

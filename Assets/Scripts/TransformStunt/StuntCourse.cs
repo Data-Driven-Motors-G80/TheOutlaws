@@ -14,6 +14,8 @@ namespace Outlaws.TransformStunt
         public float Yaw, Amplitude, Period = 6f, Phase;
         public StuntMotion Motion;
         public int GateId = -1;
+        public bool Weak;
+        public int Plate = -1;
         public Vector3 Position(float time) => Center + (Motion == StuntMotion.Slide
             ? Vector3.right * (Mathf.Sin(time * Mathf.PI * 2f / Period + Phase) * Amplitude) : Vector3.zero);
         public float Angle(float time) => Yaw + (Motion == StuntMotion.Rotate ? time * 360f / Period : 0f);
@@ -43,6 +45,7 @@ namespace Outlaws.TransformStunt
         public readonly List<StuntJump> Jumps = new List<StuntJump>();
         public readonly List<Vector3> Fuel = new List<Vector3>();
         public readonly List<float> Checkpoints = new List<float>();
+        public readonly List<float> Plates = new List<float>();
         public readonly List<KeyValuePair<float, string>> Signs = new List<KeyValuePair<float, string>>();
         public float Length;
         public bool Tutorial => Environment == StuntEnvironment.Tutorial;
@@ -56,6 +59,12 @@ namespace Outlaws.TransformStunt
 
         public void Block(float x, float z, float width, float depth = 1.2f)
             => Obstacles.Add(new StuntObstacle { Center = new Vector3(x, 1.4f, z), Size = new Vector3(width, 2.8f, depth) });
+        public void WeakWall(float z) => Obstacles.Add(new StuntObstacle { Center = new Vector3(0, 1.4f, z), Size = new Vector3(10, 2.8f, .7f), Weak = true });
+        public void PlateDoor(float plateZ, float doorZ)
+        {
+            int id = Plates.Count; Plates.Add(plateZ);
+            Obstacles.Add(new StuntObstacle { Center = new Vector3(0, 1.4f, doorZ), Size = new Vector3(10, 2.8f, .7f), Plate = id });
+        }
 
         public void Gate(float z, float gap, float yaw = 0, bool moving = false, float x = 0)
         {
@@ -86,9 +95,9 @@ namespace Outlaws.TransformStunt
             for (int i = 0; i < 8; i++) Checkpoints.Add(i * 140);
             Block(-3.5f, 90, 2); Block(3.5f, 110, 2);
             Gate(205, 1.6f); Sign(175, "SPACE / SHRINK");
-            Gate(350, 1.7f, -45); Sign(310, "SHRINK + E / LEFT 45");
+            WeakWall(350); Sign(310, "E / LARGE BREAKS GOLD WALLS");
             Fuel.Add(new Vector3(0, .65f, 475));
-            Gate(630, 4.5f, moving: true); Sign(590, "MOVING GATE\nFOLLOW THE OPENING");
+            PlateDoor(570, 630); Sign(540, "LARGE / PRESS GOLD PLATE");
             Wind(735, 800, 1.3f); Sign(710, "FAN / SMALL DRIFTS MORE");
             Jump(900, 26, true);
             Gate(1035, 1.6f); Gate(1080, 4.5f, moving: true);
@@ -103,12 +112,14 @@ namespace Outlaws.TransformStunt
             if (Environment == StuntEnvironment.City)
             {
                 Gate(80, 3.4f, x: -1.2f); Sign(40, "STEER THROUGH THE OPENING");
-                Gate(195, 1.7f, -45); Gate(320, 4.5f, moving: true);
-                Gate(405, 3.4f, x: 1.2f);
-                Gate(570, 1.6f); Gate(660, 1.7f, 45);
-                Gate(810, 4.5f, moving: true); Gate(900, 1.7f, -45);
-                Gate(1015, 3.4f, x: -1.2f); Gate(1090, 4.5f, moving: true);
-                Sign(535, "SPACE / SMALL PASSAGE"); Sign(620, "SHRINK + E / ANGLED OPENING");
+                Gate(195, 1.6f); Gate(320, 4.5f, moving: true);
+                WeakWall(405); Sign(365, "LARGE / BREAK THE SUPPORT");
+                // Two full-road openings: a small left vent and a Medium-width right speed route.
+                Block(-4.55f, 500, .9f, .7f); Block(-.525f, 500, 4.15f, .7f); Block(4.425f, 500, 1.15f, .7f);
+                Wind(470, 510, -.5f); Sign(445, "SMALL LEFT / FAST MEDIUM RIGHT");
+                PlateDoor(570, 630); Sign(540, "GROW LARGE / PRESS THE PLATE");
+                Gate(660, 1.6f); Gate(810, 4.5f, moving: true); Gate(900, 1.6f);
+                WeakWall(1015); Gate(1090, 4.5f, moving: true);
             }
             else
             {
@@ -122,7 +133,7 @@ namespace Outlaws.TransformStunt
                     Obstacles.Add(new StuntObstacle { Center = new Vector3(-2, .8f, 815), Size = new Vector3(5, 1.6f, .5f), Motion = StuntMotion.Rotate, Period = 10 });
                     Sign(775, "ROTATING ARM / PASS RIGHT");
                 }
-                else Gate(815, 1.7f, -45);
+                else Gate(815, 1.6f);
                 // An optional small-car updraft extends a short ramp jump; normal cars can clear it unaided.
                 Wind(980, 1025, .8f, .8f); Jump(990, 28, false);
                 Sign(950, "UPDRAFT / SMALL GETS LIFT");

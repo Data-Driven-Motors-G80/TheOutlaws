@@ -9,27 +9,27 @@ Use Unity **6000.3.23f1**, open `Assets/Scenes/Stunt_Menu.unity`, and press Play
 | Input | Action |
 |---|---|
 | A/D or Left/Right | Steer across the track |
-| Space | Toggle normal/small size |
-| E | Cycle straight, left 45°, sideways, right 45°, straight |
+| Q | Shrink one step: Large → Medium → Small |
+| E | Grow one step: Small → Medium → Large |
 | Escape | Pause/resume |
 | R | Retry the current checkpoint or tutorial lesson |
 | Enter | Start from the ready screen |
 
-Forward travel is automatic even while the car faces sideways. Small mode is 55% scale and drives at 10 m/s; normal drives at 18 m/s. Both use 2 fuel per second; green fuel restores 30. There is no brake key. Shrinking slows ground travel but preserves airborne launch momentum.
+Forward travel is automatic. Small is 55% scale and travels at 10 m/s, Medium travels at 18 m/s, and Large is 140% scale and travels at 13 m/s. Small and Medium consume 2 fuel per second; Large consumes 3.5. Green fuel restores 30. Ground speed changes gradually after resizing; an airborne resize preserves launch momentum.
 
-Fans affect small cars more strongly. Use normal size to resist crosswinds and approach long jumps; use small size for tight openings and updrafts. Purple machinery moves; orange barriers are static. Angled slots require shrinking, matching the angle, and steering diagonally through the opening. A transformation that would intersect an obstacle is refused.
+Fans affect Small strongly and Large weakly. Gold walls break only under a fully grown Large car; solid orange barriers remain solid. Heavy gold plates require Large and open a purple door. Small fits narrow vents. A transformation that would intersect an obstacle is refused. In City, breaking the support reveals a Small vent route on the left and a Medium speed strip on the right. Both reach the next checkpoint.
 
 ## Tutorial and courses
 
-Eight tutorial lessons teach steering, size, rotation, fuel, moving gates, airflow, automatic ramp jumps, and a combined finish. Lessons advance only when their required action succeeds. Failure restores the current lesson. Fuel cannot run out during training.
+Eight tutorial lessons teach steering, shrinking, breaking a weak wall with Large, fuel, heavy plates, airflow, automatic ramp jumps, and a combined finish. Lessons advance only when their required action succeeds. Failure restores the current lesson. Fuel cannot run out during training.
 
 City teaches passages and gates. Desert introduces crosswinds and jumps. Coast combines those skills with rotating machinery. Checkpoints sit shortly before each major obstacle. Crashes, falls, and empty fuel retry the current checkpoint after a brief pause, with at least 60 fuel. Course time includes retries but excludes pauses. Full restart clears the timer. Best times are stored locally per browser/device; tutorial completion is stored separately.
 
 ## Implementation
 
-`StuntCourse` owns authored geometry, fuel positions, wind volumes, jumps and checkpoints. `StuntRun` owns the deterministic simulation, oriented box collisions, transformations, lesson progression and checkpoint snapshots. `StuntGame` presents the simulation using the existing car, road, fuel and streetlight assets and the shared driver's finite-route pose interface. Prototype scenes instantiate no original gameplay managers or pickup spawners.
+`StuntCourse` owns authored geometry, fuel positions, wind volumes, jumps, plates and checkpoints. `StuntRun` owns the deterministic simulation, collisions, size changes, breaking, lesson progression and checkpoint snapshots. `StuntGame` presents the simulation using the existing car, road, fuel and streetlight assets and the shared driver's finite-route pose interface. Prototype scenes instantiate no original gameplay managers or pickup spawners.
 
-The simulation uses small time steps, including during transformation, to prevent passing through thin barriers. Visual scale and rotation match the collision footprint. Procedural scenery uses the project's existing road meshes and environment palette/materials, with simple obstacle and machinery geometry.
+The simulation uses small time steps, including during transformation, to prevent passing through thin barriers. Visual scale matches the collision footprint. Procedural scenery uses the project's existing road meshes and environment palette/materials, with simple obstacle and machinery geometry.
 
 ## Build and verification
 
@@ -42,9 +42,9 @@ Headless acceptance checks: launch Unity with `-batchmode -nographics -quit -pro
 Start with a fresh tutorial run without outside instructions. Record:
 
 - Which controls or lessons were unclear?
-- Did changing size and orientation feel predictable?
+- Did Q and E make changing size predictable?
 - Did both sizes feel useful? Did you stay small for most of a course?
 - Were gates, fans, jump openings, and failures readable early enough?
 - Did checkpoint retries help you improve, and did you want another attempt?
 
-This is a tuning prototype with geometric art. Human playtests should decide final speeds, wind strength, rotation sequence, and difficulty before adding more content.
+This is a tuning prototype with geometric art. Human playtests should decide final speeds, wind strength, and difficulty before adding more content.
