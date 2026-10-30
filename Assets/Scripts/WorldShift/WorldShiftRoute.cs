@@ -19,11 +19,11 @@ namespace Outlaws.WorldShift
         private float length;
         private ShiftRelay[] relays;
 
-        public void Build(RoadSegment template, bool straightValidation = false, float validationLength = WorldShiftSplitView.Length, bool desertProfile = false, ShiftRelay[] relayLayout = null)
+        public void Build(RoadSegment template, bool straightValidation = false, float validationLength = WorldShiftSplitView.Length, bool desertProfile = false, ShiftRelay[] relayLayout = null, float extraLength = 0f)
         {
             validation = straightValidation;
             relays = relayLayout ?? (validation ? System.Array.Empty<ShiftRelay>() : WorldShiftRelay.Sections);
-            length = validation ? validationLength : WorldShiftLevel.Length;
+            length = validation ? validationLength : WorldShiftLevel.Length + extraLength;
             dayRoad = RuntimeMaterials.Coloured(new Color(0.22f, 0.23f, 0.24f));
             echoRoad = RuntimeMaterials.Coloured(new Color(0.085f, 0.105f, 0.14f));
             Material lines = RuntimeMaterials.Coloured(new Color(0.85f, 0.88f, 0.87f));

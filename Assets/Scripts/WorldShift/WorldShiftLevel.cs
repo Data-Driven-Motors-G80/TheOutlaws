@@ -104,23 +104,23 @@ namespace Outlaws.WorldShift
         public static readonly ShiftCheckpoint[] Checkpoints =
         {
             new ShiftCheckpoint(0f, ShiftWorld.Day, 0f,
-                "CITY / FIRST SHIFT",
-                "Space changes the world. Shift when the road is blocked."),
+                "CITY",
+                "SPACE  /  SWITCH WORLDS"),
             new ShiftCheckpoint(560f, ShiftWorld.Day, 0f,
-                "RELAY 1 / DAY TO NIGHT",
-                "Take the arrow ramp. Once airborne, Space reveals the Night landing."),
+                "DAY RAMP",
+                "JUMP, THEN SWITCH TO NIGHT"),
             new ShiftCheckpoint(1120f, ShiftWorld.Echo, 0f,
-                "THE MISSING ROAD",
-                "A broken bridge has no safe lane. Shift before the edge and stay across."),
+                "BROKEN BRIDGE",
+                "SWITCH BEFORE THE GAP"),
             new ShiftCheckpoint(1680f, ShiftWorld.Echo, 0f,
-                "RELAY 2 / NIGHT TO DAY",
-                "Night ramp, Day landing. Boost first; switch in the air."),
+                "NIGHT RAMP",
+                "JUMP, THEN SWITCH TO DAY"),
             new ShiftCheckpoint(2240f, ShiftWorld.Day, 0f,
-                "RELAY 3 / THE LONG CROSSING",
-                "Day ramp, Night landing. The final rift waits beyond the jump."),
+                "FINAL JUMP",
+                "JUMP, THEN SWITCH TO NIGHT"),
             new ShiftCheckpoint(2800f, ShiftWorld.Day, -3.2f,
-                "THE LAST CROSSING",
-                "Rift crossed. Day left, Night right. Steer between the open halves; Space rests.")
+                "WORLDS JOIN",
+                "A / D  /  CROSS WORLDS")
         };
 
         public static readonly ShiftHazard[] Hazards =

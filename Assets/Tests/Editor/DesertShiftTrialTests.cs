@@ -101,7 +101,7 @@ public sealed class DesertShiftTrialTests
         Call(game, "Restart"); Call(game, "TrySwitch");
         Call(game, "StepSimulation", 8f, 0f, false);
         Assert.That(Get(game, "State").ToString(), Is.EqualTo("Retrying"));
-        Assert.That((string)Get(game, "Message"), Does.StartWith("ROCK CONTACT"));
+        Assert.That((string)Get(game, "Message"), Does.StartWith("ROCK HIT"));
         Call(game, "StepSimulation", 1f, 0f, false);
         Assert.That(Get(game, "Distance"), Is.EqualTo(0f));
         Assert.That(Get(game, "World").ToString(), Is.EqualTo("Day"));

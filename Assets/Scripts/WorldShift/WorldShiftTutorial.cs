@@ -14,11 +14,11 @@ namespace Outlaws.WorldShift
         };
         public static readonly ShiftCheckpoint[] Checkpoints =
         {
-            new ShiftCheckpoint(0f, ShiftWorld.Day, 0f, "1 / STEER", "A / D or arrows. Move away from the centre block."),
-            new ShiftCheckpoint(120f, ShiftWorld.Day, 0f, "2 / SWITCH", "SPACE: change the whole world. The orange wall exists only in Day."),
-            new ShiftCheckpoint(240f, ShiftWorld.Echo, 0f, "3 / SWITCH BACK", "The blue wall belongs to Night. SPACE returns to Day. Switching inside a wall counts as a hit."),
-            new ShiftCheckpoint(380f, ShiftWorld.Day, 0f, "4 / CHOOSE A ROUTE", "Steer around a half-width wall, or switch worlds. Solids hurt; gaps make you fall."),
-            new ShiftCheckpoint(520f, ShiftWorld.Day, 2.5f, "5 / WORLDS JOIN", "A / D crosses the seam: left is Day, right is Night. SPACE rests here.")
+            new ShiftCheckpoint(0f, ShiftWorld.Day, 0f, "STEER", "A / D  /  FOLLOW THE OPEN LANE"),
+            new ShiftCheckpoint(120f, ShiftWorld.Day, 0f, "SWITCH", "SPACE  /  SWITCH TO NIGHT"),
+            new ShiftCheckpoint(240f, ShiftWorld.Echo, 0f, "SWITCH BACK", "SPACE  /  SWITCH TO DAY"),
+            new ShiftCheckpoint(380f, ShiftWorld.Day, 0f, "YOUR ROUTE", "STEER AROUND OR SWITCH"),
+            new ShiftCheckpoint(520f, ShiftWorld.Day, 2.5f, "WORLDS JOIN", "A / D  /  CROSS BETWEEN WORLDS")
         };
     }
 }

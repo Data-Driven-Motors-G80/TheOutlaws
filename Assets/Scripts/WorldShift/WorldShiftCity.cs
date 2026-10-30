@@ -3,7 +3,7 @@ using UnityEngine.InputSystem;
 
 namespace Outlaws.WorldShift
 {
-    public enum ShiftRunState { Ready, Running, Paused, Retrying, Won }
+    public enum ShiftRunState { Ready, Running, Paused, Retrying, Won, Lost }
 
     /// <summary>Isolated two-world prototype. Distance is the same coordinate in both worlds.</summary>
     public sealed class WorldShiftCity : MonoBehaviour, IWorldShiftView
@@ -14,6 +14,8 @@ namespace Outlaws.WorldShift
         [SerializeField] private bool splitViewValidation;
         [SerializeField] private bool tutorialLevel;
         public bool TutorialLevel => tutorialLevel;
+        public bool GetawayMode { get; private set; }
+        public WorldShiftGetaway Getaway { get; private set; }
         [SerializeField] private RoadSegment roadTemplate;
         [SerializeField] private GameObject carPrefab;
         [SerializeField] private Camera view;
@@ -46,12 +48,12 @@ namespace Outlaws.WorldShift
         public float Lateral { get; private set; }
         public float Duration { get; private set; }
         public bool SplitViewValidation => splitViewValidation;
-        public float RunLength => tutorialLevel ? WorldShiftTutorial.Length : splitViewValidation ? WorldShiftSplitView.Length : WorldShiftLevel.Length;
+        public float RunLength => tutorialLevel ? WorldShiftTutorial.Length : splitViewValidation ? WorldShiftSplitView.Length : WorldShiftLevel.Length + (GetawayMode ? WorldShiftGetaway.ExitTail : 0f);
         public ShiftHazard[] Hazards => tutorialLevel ? WorldShiftTutorial.Hazards : splitViewValidation ? WorldShiftSplitView.Layout : WorldShiftLevel.Hazards;
         public ShiftFuelPickup[] Pickups => tutorialLevel ? System.Array.Empty<ShiftFuelPickup>() : splitViewValidation ? WorldShiftSplitView.Fuel : WorldShiftLevel.FuelPickups;
         public ShiftCheckpoint[] Checkpoints => tutorialLevel ? WorldShiftTutorial.Checkpoints : splitViewValidation ? WorldShiftSplitView.Checkpoints : WorldShiftLevel.Checkpoints;
         public bool IsJoinedDistance(float at) => splitViewValidation
-            ? at >= WorldShiftSplitView.JoinStart && at < WorldShiftSplitView.JoinEnd : tutorialLevel ? at >= MergeStart : WorldShiftLevel.IsMerged(at);
+            ? at >= WorldShiftSplitView.JoinStart && at < WorldShiftSplitView.JoinEnd : tutorialLevel ? at >= MergeStart : GetawayMode ? at >= MergeStart : WorldShiftLevel.IsMerged(at);
         public bool IsWorldVisible(ShiftWorld world, float at, float lateral, ShiftWorld current)
             => IsJoinedDistance(at) ? world == WorldShiftLevel.WorldAt(lateral) : world == current;
         public float Progress => Mathf.Clamp01(Distance / RunLength);
@@ -80,20 +82,21 @@ namespace Outlaws.WorldShift
         public string SectionTitle => Checkpoints[checkpointIndex].Title;
         public string SectionHint => relay != null && relay.Hint(Distance, World).Length > 0 ? relay.Hint(Distance, World)
             : !splitViewValidation && Distance >= MergeStart - 64f && Distance < MergeStart
-            ? "WORLD RIFT AHEAD - pass through, then steer between Day and Night."
+            ? "WORLDS JOIN AHEAD"
             : hintRemaining > 0f ? Checkpoints[checkpointIndex].Hint : "";
         public WorldShiftRoute Route { get; private set; }
         public Transform Player { get; private set; }
 
         private void Awake()
         {
+            GetawayMode = !tutorialLevel && !splitViewValidation && WorldShiftFlow.Escape.Status == GetawayRunState.RunStatus.Running;
             if (roadTemplate == null || carPrefab == null || view == null || sun == null)
             { Debug.LogError("WorldShiftCity: missing scene references.", this); enabled = false; return; }
             var roadObject = new GameObject("Shared finite city road");
             roadObject.transform.SetParent(transform, false);
             Route = roadObject.AddComponent<WorldShiftRoute>();
             fuelTaken = new bool[Pickups.Length];
-            Route.Build(roadTemplate, splitViewValidation || tutorialLevel, RunLength);
+            Route.Build(roadTemplate, splitViewValidation || tutorialLevel, RunLength, extraLength: GetawayMode ? WorldShiftGetaway.ExitTail : 0f);
             if (!splitViewValidation && !tutorialLevel) relay = new WorldShiftRelay(Route);
             Player = new GameObject("Player - same position in both worlds").transform;
             Player.SetParent(transform, false);
@@ -118,7 +121,8 @@ namespace Outlaws.WorldShift
             RearView = RearViewCamera.Create(Player, new[] { Police });
             RearView.transform.SetParent(transform, true);
             UpdateCamera(true);
-            gameObject.AddComponent<WorldShiftHud>().Bind(this);
+            if (GetawayMode) { Getaway = gameObject.AddComponent<WorldShiftGetaway>(); Getaway.Bind(this); }
+            else gameObject.AddComponent<WorldShiftHud>().Bind(this);
             gameObject.AddComponent<WorldShiftSplitView>().Initialize(this, view);
         }
 
@@ -134,8 +138,8 @@ namespace Outlaws.WorldShift
             {
                 if (keyboard.escapeKey.wasPressedThisFrame) TogglePause();
                 if (State == ShiftRunState.Ready && keyboard.enterKey.wasPressedThisFrame) BeginRun();
-                else if (State == ShiftRunState.Won && keyboard.enterKey.wasPressedThisFrame) WorldShiftFlow.Next(tutorialLevel ? ShiftLevel.Tutorial : ShiftLevel.City);
-                else if (State == ShiftRunState.Won && keyboard.rKey.wasPressedThisFrame) RestartRun();
+                else if (!GetawayMode && State == ShiftRunState.Won && keyboard.enterKey.wasPressedThisFrame) WorldShiftFlow.Next(tutorialLevel ? ShiftLevel.Tutorial : ShiftLevel.City);
+                else if (!GetawayMode && State == ShiftRunState.Won && keyboard.rKey.wasPressedThisFrame) RestartRun();
                 else if ((State == ShiftRunState.Running || State == ShiftRunState.Paused) && keyboard.rKey.wasPressedThisFrame) RetryCheckpoint();
             }
             float steer = keyboard == null ? 0f :
@@ -159,6 +163,7 @@ namespace Outlaws.WorldShift
 
         public void RestartRun()
         {
+            if (GetawayMode) { WorldShiftFlow.StartGetaway(false); return; }
             checkpointIndex = 0;
             Deaths = Switches = 0;
             Hits = 0;
@@ -178,7 +183,7 @@ namespace Outlaws.WorldShift
 
         public void RetryCheckpoint()
         {
-            if (State == ShiftRunState.Ready || State == ShiftRunState.Won) return;
+            if (GetawayMode || State == ShiftRunState.Ready || State == ShiftRunState.Won || State == ShiftRunState.Lost) return;
             RestoreCheckpoint();
         }
 
@@ -187,7 +192,7 @@ namespace Outlaws.WorldShift
             if (State != ShiftRunState.Running) return false;
             if (IsMerged)
             {
-                Notify("WORLDS JOINED - STEER LEFT / RIGHT TO CROSS", 1.5f);
+                Notify("A / D  CROSS WORLDS", 1.5f);
                 return false;
             }
             ShiftWorld next = World == ShiftWorld.Day ? ShiftWorld.Echo : ShiftWorld.Day;
@@ -208,7 +213,7 @@ namespace Outlaws.WorldShift
 
         public void StepSimulation(float delta, float steer, bool switchPressed)
         {
-            if (State == ShiftRunState.Paused || State == ShiftRunState.Ready || State == ShiftRunState.Won) return;
+            if (State == ShiftRunState.Paused || State == ShiftRunState.Ready || State == ShiftRunState.Won || State == ShiftRunState.Lost) return;
             delta = Mathf.Max(0f, delta);
             if (State == ShiftRunState.Retrying)
             {
@@ -239,15 +244,18 @@ namespace Outlaws.WorldShift
                 {
                     driver.ExternalVerticalControl = WorldShiftRelay.At(previous) != null;
                     if (relay.BeginStep(previous, previous + speed * dt, World))
-                        Notify("AIRBORNE - PRESS SPACE FOR THE OTHER LANDING", 2.5f);
+                        Notify("SPACE  /  SWITCH TO LAND", 2.5f);
                 }
                 driver.StepExternal(dt, IsRelayAirborne ? steer * .4f : steer, speed);
                 float nextLateral = driver.LateralOffset;
                 float next = Mathf.Min(RunLength, driver.RoadPositionDistance);
                 ShiftHazard hit = IsRelayAirborne ? null : FindCollision(World, previous, next, previousLateral, nextLateral, true);
                 Duration += dt;
-                fuel.Tick(dt, tutorialLevel ? 0f : WorldShiftLevel.FuelConsumption);
-                pursuit.Tick(dt, speed, speed + (tutorialLevel ? 0f : Mathf.Lerp(.03f, .14f, Progress)));
+                if (!GetawayMode || !Getaway.InExit)
+                {
+                    fuel.Tick(dt, tutorialLevel ? 0f : WorldShiftLevel.FuelConsumption);
+                    pursuit.Tick(dt, speed, speed + (tutorialLevel ? 0f : Mathf.Lerp(.03f, .14f, Progress)) + (GetawayMode ? WorldShiftFlow.Escape.ExtraPursuitSpeed : 0f));
+                }
                 if (relay != null)
                 {
                     bool safe = relay.FinishStep(next, World, out bool landed);
@@ -258,7 +266,7 @@ namespace Outlaws.WorldShift
                         Fail(!safe ? "MISSED RELAY LANDING" : "NO ROAD");
                         break;
                     }
-                    if (landed) Notify("RELAY LANDED - KEEP DRIVING", 1.2f);
+                    if (landed) Notify("LANDED", 1.2f);
                 }
                 if (hit != null)
                 {
@@ -278,6 +286,7 @@ namespace Outlaws.WorldShift
                 UpdateMergeState();
                 presentation.StepPedestrians(dt);
                 CollectFuel(previous, next, previousLateral, nextLateral);
+                Getaway?.Collect(previous, next, previousLateral, nextLateral);
                 if (checkpointIndex + 1 < Checkpoints.Length && Distance >= Checkpoints[checkpointIndex + 1].Distance)
                 {
                     checkpointIndex++;
@@ -285,14 +294,19 @@ namespace Outlaws.WorldShift
                     checkpointFuel = Mathf.Max(35f, fuel.CurrentFuel);
                     checkpointGap = Mathf.Max(32f, pursuit.PursuitGap);
                     hintRemaining = 10f;
-                    Notify(IsMerged ? "RIFT CROSSED - A / D TO CROSS WORLDS" : "CHECKPOINT " + (checkpointIndex + 1), IsMerged ? 3f : 1.8f);
+                    Notify(IsMerged ? "A / D  CROSS WORLDS" : "CHECKPOINT " + (checkpointIndex + 1), IsMerged ? 3f : 1.8f);
                 }
                 if (pursuit.IsGameOver) Fail("CAUGHT");
-                else if (Distance >= RunLength) State = ShiftRunState.Won;
                 else if (fuel.IsEmpty) Fail("OUT OF FUEL");
+                else if (Distance >= RunLength)
+                {
+                    State = ShiftRunState.Won;
+                    Getaway?.Finish(Lateral);
+                }
             }
             UpdatePolice(simulatedTime);
             presentation.UpdateVisibility(Distance);
+            Getaway?.Present(World);
         }
 
         private void UpdateMergeState()
@@ -308,7 +322,7 @@ namespace Outlaws.WorldShift
                 ApplyWorld(World);
                 if (merged && audioSource != null && shiftSound != null)
                 { audioSource.pitch = .65f; audioSource.PlayOneShot(shiftSound, .22f); }
-                Notify(merged ? "RIFT CROSSED - A / D TO CROSS WORLDS" : "WORLDS SEPARATED - SPACE TO SWITCH", 3f);
+                Notify(merged ? "A / D  CROSS WORLDS" : "SPACE  SWITCH WORLDS", 3f);
             }
         }
 
@@ -320,7 +334,7 @@ namespace Outlaws.WorldShift
             if (!pursuit.TryCrash(CollisionPursuitDrain)) return;
             Hits++;
             presentation.OnHazardImpact(hit, lateral);
-            Notify("HIT - POLICE 22.5 m CLOSER", 1.3f);
+            Notify("POLICE CLOSER", 1.3f);
             if (pursuit.IsGameOver) Fail("CAUGHT");
         }
 
@@ -348,12 +362,18 @@ namespace Outlaws.WorldShift
 
         private void Fail(string reason)
         {
+            if (GetawayMode)
+            {
+                State = ShiftRunState.Lost;
+                Getaway.Lose(reason == "CAUGHT" ? "CAUGHT" : reason == "OUT OF FUEL" ? "OUT OF FUEL" : reason == "MISSED RELAY LANDING" ? "MISSED LANDING" : "FELL OFF ROAD");
+                return;
+            }
             Deaths++;
             State = ShiftRunState.Retrying;
             lastFailure = reason;
             fallVelocity = -1f;
             retryRemaining = reason == "NO ROAD" || reason == "MISSED RELAY LANDING" ? 1.05f : 0.7f;
-            Notify(reason + " - returning to checkpoint", 1.1f);
+            Notify(reason, 1.1f);
         }
 
         private void CollectFuel(float from, float to, float fromLateral, float toLateral)
@@ -446,7 +466,7 @@ namespace Outlaws.WorldShift
             ApplyWorld(IsMerged ? WorldShiftLevel.WorldAt(Lateral) : checkpoint.World);
             UpdatePolice(0f);
             UpdateCamera(true);
-            Notify("CHECKPOINT " + (checkpointIndex + 1) + (IsMerged ? " - STEER ACROSS THE SEAM" : " - SPACE TO SWITCH"), 2f);
+            Notify("CHECKPOINT " + (checkpointIndex + 1), 2f);
         }
 
         private void ApplyWorld(ShiftWorld world)
@@ -455,6 +475,7 @@ namespace Outlaws.WorldShift
             Route.SetWorld(world);
             presentation.SetWorld(world);
             presentation.UpdateVisibility(Distance);
+            Getaway?.Present(world);
         }
 
         // Rendering can visit both visual states without advancing simulation or
@@ -464,6 +485,7 @@ namespace Outlaws.WorldShift
             Route.SetWorld(displayedWorld);
             presentation.SetWorld(displayedWorld);
             presentation.UpdateVisibility(Distance);
+            Getaway?.Present(displayedWorld);
         }
 
         private void UpdateCamera(bool immediate)

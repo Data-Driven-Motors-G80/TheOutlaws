@@ -1,0 +1,333 @@
+using System.Collections.Generic;
+using TMPro;
+using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.UI;
+
+namespace Outlaws.WorldShift
+{
+    /// <summary>Shared escape pickups, extraction gate and concise UI for both environments.</summary>
+    public sealed class WorldShiftGetaway : MonoBehaviour
+    {
+        public const float ExitTail = 220f;
+        public const float ContinueBoundary = 1.8f;
+        private sealed class Loot
+        {
+            public float At, X;
+            public ShiftWorld World;
+            public bool Taken;
+            public Transform Visual;
+        }
+        private WorldShiftCity city;
+        private DesertShiftTrial desert;
+        private readonly List<Loot> loot = new List<Loot>();
+        private readonly List<Material> materials = new List<Material>();
+        private TMP_Text haul, world, stage, guidance, fuelText, resultTitle, resultValue, resultNote, footer;
+        private TMP_Text pauseNote, mirrorLabel, choiceLeft, choiceRight;
+        private RectTransform fuelFill, progressFill;
+        private Image choiceLeftPanel, choiceRightPanel;
+        private GameObject result, pause, choices, mirrorPanel;
+        private RawImage mirror;
+        private bool continuePending;
+        private string pickupMessage;
+        private float pickupUntil;
+        private float environmentEnd;
+        private int currentLeg;
+        private static readonly Color Gold = new Color(1f, .77f, .25f);
+        private static readonly Color Cyan = new Color(.3f, .85f, 1f);
+        private static readonly Color Green = new Color(.4f, 1f, .68f);
+        private static readonly Color Ink = new Color(.025f, .045f, .07f, .96f);
+        public bool InExit => Distance >= environmentEnd + 20f;
+        private bool IsCity => city != null;
+        private float Distance => IsCity ? city.Distance : desert.Distance;
+        private float Lateral => IsCity ? city.Lateral : desert.Lateral;
+        private float Duration => IsCity ? city.Duration : desert.Duration;
+        private float Length => environmentEnd + ExitTail;
+        private float Fuel => IsCity ? city.FuelFraction : desert.FuelFraction;
+        private float Gap => IsCity ? city.PursuitGap : desert.PursuitGap;
+        private bool Merged => IsCity ? city.IsMerged : desert.IsMerged;
+        private ShiftWorld World => IsCity ? city.World : desert.World;
+        private ShiftRunState State => IsCity ? city.State : desert.State;
+        private WorldShiftRoute Route => IsCity ? city.Route : desert.Route;
+        private RearViewCamera RearView => IsCity ? city.RearView : desert.RearView;
+
+        public void Bind(WorldShiftCity controller) { city = controller; Initialize(); }
+        public void Bind(DesertShiftTrial controller) { desert = controller; Initialize(); }
+
+        private void Initialize()
+        {
+            currentLeg = WorldShiftFlow.Escape.Leg;
+            environmentEnd = IsCity ? WorldShiftLevel.Length : DesertShiftLevel.Length;
+            Material gold = MakeMaterial(Gold), handle = MakeMaterial(new Color(.12f, .1f, .04f));
+            // The opening trail teaches collection without a separate instructions screen.
+            AddLoot(35f, 0f, ShiftWorld.Day, gold, handle);
+            AddLoot(55f, 0f, ShiftWorld.Day, gold, handle);
+            AddLoot(75f, 0f, ShiftWorld.Day, gold, handle);
+            if (IsCity)
+            {
+                foreach (var pickup in WorldShiftLevel.FuelPickups)
+                {
+                    // Keep the exit approach clear and use existing reachable reward locations.
+                    if (pickup.Distance > environmentEnd - 100f) continue;
+                    AddLoot(pickup.Distance, pickup.Lane * WorldShiftLevel.RoadWidth / 3f, pickup.World, gold, handle);
+                }
+            }
+            else
+            {
+                // Alternate worlds on safe central stretches before the joined finale.
+                for (int i = 0; i < 10; i++)
+                    AddLoot(desert.FuelDistance(i), 0f, i % 2 == 0 ? ShiftWorld.Day : ShiftWorld.Echo, gold, handle);
+            }
+            BuildExit();
+            BuildHud();
+            Present(World);
+        }
+
+        private Material MakeMaterial(Color color)
+        {
+            var material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            material.color = color;
+            material.EnableKeyword("_EMISSION");
+            material.SetColor("_EmissionColor", color * .6f);
+            materials.Add(material);
+            return material;
+        }
+
+        private void AddLoot(float at, float x, ShiftWorld owner, Material gold, Material handle)
+        {
+            RoadPathPoint point = Route.Sample(at);
+            var root = new GameObject("Loot " + owner + " " + at).transform;
+            root.SetParent(transform, false);
+            root.SetPositionAndRotation(point.Position + point.Right * x + Vector3.up * .9f, Quaternion.LookRotation(point.Forward));
+            Box(root, new Vector3(0f, 1.1f, 0f), new Vector3(1f, .7f, .45f), gold);
+            Box(root, new Vector3(0f, 1.55f, 0f), new Vector3(.45f, .16f, .16f), handle);
+            WorldLabel(root, "$", new Vector3(0f, 2.3f, 0f), Gold, 5f);
+            loot.Add(new Loot { At = at, X = x, World = owner, Visual = root });
+        }
+
+        public void Collect(float from, float to, float fromX, float toX)
+        {
+            if (State != ShiftRunState.Running) return;
+            foreach (var item in loot)
+            {
+                if (item.Taken || to < item.At - 1.3f || from > item.At + 1.3f) continue;
+                bool joined = IsCity ? city.IsJoinedDistance(item.At) : item.At >= desert.MergeStart;
+                if (joined ? item.World != WorldShiftLevel.WorldAt(item.X) : item.World != World) continue;
+                float entry = Mathf.InverseLerp(from, to, item.At - 1.3f);
+                float exit = Mathf.InverseLerp(from, to, item.At + 1.3f);
+                float a = Mathf.Lerp(fromX, toX, entry), b = Mathf.Lerp(fromX, toX, exit);
+                if (Mathf.Max(a, b) < item.X - 1.35f || Mathf.Min(a, b) > item.X + 1.35f) continue;
+                item.Taken = true;
+                item.Visual.gameObject.SetActive(false);
+                int amount = WorldShiftFlow.Escape.Collect(100);
+                pickupMessage = "+$" + amount;
+                pickupUntil = Time.unscaledTime + 1.1f;
+            }
+        }
+
+        // Called only when simulation crosses the finish gate, never by UI refresh/rendering.
+        public void Finish(float lateral)
+        {
+            if (WorldShiftFlow.Escape.Status != GetawayRunState.RunStatus.Running || continuePending) return;
+            if (lateral >= ContinueBoundary) continuePending = true;
+            else WorldShiftFlow.FinishGetawayLeg(false);
+        }
+
+        public void Lose(string reason) => WorldShiftFlow.Escape.Lose(reason);
+
+        public void Present(ShiftWorld displayedWorld)
+        {
+            foreach (var item in loot)
+            {
+                bool visible = !item.Taken && item.World == displayedWorld && item.At > Distance - 10f && item.At < Distance + 180f;
+                item.Visual.gameObject.SetActive(visible);
+            }
+        }
+
+        private void BuildExit()
+        {
+            Material safe = MakeMaterial(Green), risk = MakeMaterial(Gold);
+            for (float at = environmentEnd + 25f; at < Length; at += 18f)
+            {
+                RoadPathPoint point = Route.Sample(at);
+                var root = new GameObject("Extraction lane marker").transform;
+                root.SetParent(transform, false);
+                root.SetPositionAndRotation(point.Position, Quaternion.LookRotation(point.Forward));
+                Box(root, new Vector3(-2.4f, .045f, 0f), new Vector3(.3f, .06f, 4f), safe);
+                Box(root, new Vector3(3.3f, .045f, 0f), new Vector3(.3f, .06f, 4f), risk);
+                Box(root, new Vector3(ContinueBoundary, .04f, 0f), new Vector3(.08f, .05f, 6f), risk);
+            }
+            foreach (float at in new[] { environmentEnd + 60f, Length })
+            {
+                RoadPathPoint point = Route.Sample(at);
+                var root = new GameObject("Bank or continue gate").transform;
+                root.SetParent(transform, false);
+                root.SetPositionAndRotation(point.Position, Quaternion.LookRotation(point.Forward));
+                Box(root, new Vector3(-5.3f, 3f, 0f), new Vector3(.15f, 6f, .15f), safe);
+                Box(root, new Vector3(5.3f, 3f, 0f), new Vector3(.15f, 6f, .15f), risk);
+                WorldLabel(root, "BANK", new Vector3(-2.4f, 5f, 0f), Green, 4f);
+                WorldLabel(root, "RISK", new Vector3(3.3f, 5f, 0f), Gold, 4f);
+            }
+        }
+
+        private static void Box(Transform parent, Vector3 position, Vector3 size, Material material)
+        {
+            var box = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            box.transform.SetParent(parent, false);
+            box.transform.localPosition = position;
+            box.transform.localScale = size;
+            box.GetComponent<Renderer>().sharedMaterial = material;
+            box.GetComponent<Collider>().enabled = false;
+        }
+
+        private static void WorldLabel(Transform parent, string value, Vector3 position, Color color, float size)
+        {
+            var root = new GameObject(value, typeof(TextMeshPro));
+            root.transform.SetParent(parent, false);
+            root.transform.localPosition = position;
+            var label = root.GetComponent<TextMeshPro>();
+            label.font = TMP_Settings.defaultFontAsset;
+            label.text = value; label.fontSize = size; label.color = color;
+            label.alignment = TextAlignmentOptions.Center;
+            label.rectTransform.sizeDelta = new Vector2(5f, 2f);
+        }
+
+        private void BuildHud()
+        {
+            var canvas = WorldShiftMenu.CreateCanvas(transform, "Getaway HUD");
+            // Safe area also applies to overlays and buttons on narrow/notched displays.
+            var safe = new GameObject("Safe area", typeof(RectTransform)).GetComponent<RectTransform>();
+            safe.SetParent(canvas, false);
+            var screen = Screen.safeArea;
+            safe.anchorMin = new Vector2(screen.xMin / Screen.width, screen.yMin / Screen.height);
+            safe.anchorMax = new Vector2(screen.xMax / Screen.width, screen.yMax / Screen.height);
+            safe.offsetMin = safe.offsetMax = Vector2.zero;
+            var header = Panel(safe, "Run", .02f, .89f, .98f, .98f);
+            world = Label(header, "DAY", .02f, .1f, .2f, .9f, 25f);
+            haul = Label(header, "$0", .28f, .1f, .65f, .9f, 32f);
+            haul.alignment = TextAlignmentOptions.Center; haul.color = Gold;
+            stage = Label(header, "", .69f, .1f, .98f, .9f, 18f);
+            stage.alignment = TextAlignmentOptions.Right;
+            var track = Panel(safe, "Exit distance", .02f, .88f, .98f, .885f);
+            progressFill = WorldShiftMenu.Panel(track, "Progress", Vector2.zero, Vector2.one, Gold);
+            var fuelPanel = Panel(safe, "Fuel", .02f, .04f, .20f, .13f);
+            fuelText = Label(fuelPanel, "FUEL", .08f, .4f, .92f, .95f, 17f);
+            var fuelTrack = Panel(fuelPanel, "Fuel track", .08f, .18f, .92f, .30f);
+            fuelFill = WorldShiftMenu.Panel(fuelTrack, "Fuel remaining", Vector2.zero, Vector2.one, Gold);
+            mirrorPanel = Panel(safe, "Pursuit", .78f, .68f, .98f, .86f).gameObject;
+            var image = new GameObject("Mirror", typeof(RectTransform), typeof(RawImage));
+            image.transform.SetParent(mirrorPanel.transform, false);
+            mirror = image.GetComponent<RawImage>(); mirror.raycastTarget = false;
+            mirror.rectTransform.anchorMin = new Vector2(.02f, .25f);
+            mirror.rectTransform.anchorMax = new Vector2(.98f, .98f);
+            mirror.rectTransform.offsetMin = mirror.rectTransform.offsetMax = Vector2.zero;
+            mirrorLabel = Label(mirrorPanel.transform, "POLICE", .04f, .02f, .96f, .24f, 14f);
+            guidance = Label(safe, "", .23f, .15f, .77f, .23f, 24f);
+            guidance.alignment = TextAlignmentOptions.Center;
+            guidance.outlineWidth = .2f; guidance.outlineColor = Color.black;
+            footer = Label(safe, "A / D  STEER     SPACE  SWITCH", .23f, .04f, .77f, .10f, 16f);
+            footer.alignment = TextAlignmentOptions.Center;
+            Label(safe, "ESC  PAUSE", .83f, .04f, .98f, .1f, 14f).alignment = TextAlignmentOptions.Right;
+
+            var choice = Panel(safe, "Extraction choice", .16f, .65f, .76f, .84f);
+            choices = choice.gameObject;
+            choiceLeftPanel = Panel(choice, "Bank lane", .01f, .05f, .49f, .95f).GetComponent<Image>();
+            choiceRightPanel = Panel(choice, "Risk lane", .51f, .05f, .99f, .95f).GetComponent<Image>();
+            choiceLeft = Label(choiceLeftPanel.transform, "", .05f, .05f, .95f, .95f, 23f);
+            choiceRight = Label(choiceRightPanel.transform, "", .05f, .05f, .95f, .95f, 23f);
+            choiceLeft.alignment = choiceRight.alignment = TextAlignmentOptions.Center;
+            choiceLeft.color = Green; choiceRight.color = Gold;
+
+            pause = Panel(safe, "Pause backdrop", 0f, 0f, 1f, 1f).gameObject;
+            Label(pause.transform, "PAUSED", .18f, .66f, .82f, .80f, 44f).alignment = TextAlignmentOptions.Center;
+            pauseNote = Label(pause.transform, "", .18f, .51f, .82f, .63f, 22f);
+            pauseNote.alignment = TextAlignmentOptions.Center;
+            WorldShiftMenu.Button(pause.transform, "RESUME", new Vector2(.24f, .35f), new Vector2(.76f, .46f), TogglePause);
+            WorldShiftMenu.Button(pause.transform, "ABANDON LOOT", new Vector2(.24f, .20f), new Vector2(.76f, .31f), WorldShiftFlow.Menu);
+
+            result = Panel(safe, "Result backdrop", 0f, 0f, 1f, 1f).gameObject;
+            resultTitle = Label(result.transform, "", .15f, .69f, .85f, .83f, 42f);
+            resultValue = Label(result.transform, "", .15f, .49f, .85f, .68f, 64f);
+            resultNote = Label(result.transform, "", .15f, .36f, .85f, .48f, 21f);
+            resultTitle.alignment = resultValue.alignment = resultNote.alignment = TextAlignmentOptions.Center;
+            WorldShiftMenu.Button(result.transform, "NEW ESCAPE", new Vector2(.20f, .18f), new Vector2(.49f, .29f), () => WorldShiftFlow.StartGetaway(false));
+            WorldShiftMenu.Button(result.transform, "MENU", new Vector2(.51f, .18f), new Vector2(.80f, .29f), WorldShiftFlow.Menu);
+            Refresh();
+        }
+
+        private static RectTransform Panel(Transform parent, string name, float x0, float y0, float x1, float y1)
+            => WorldShiftMenu.Panel(parent, name, new Vector2(x0, y0), new Vector2(x1, y1), Ink);
+        private static TMP_Text Label(Transform parent, string value, float x0, float y0, float x1, float y1, float size)
+            => WorldShiftMenu.Label(parent, value, x0, y0, x1, y1, size);
+
+        private void TogglePause() { if (IsCity) city.TogglePause(); else desert.TogglePause(); }
+
+        private void Update()
+        {
+            if (continuePending)
+            {
+                continuePending = false;
+                WorldShiftFlow.FinishGetawayLeg(true);
+                return;
+            }
+            bool settled = WorldShiftFlow.Escape.Status == GetawayRunState.RunStatus.Banked || WorldShiftFlow.Escape.Status == GetawayRunState.RunStatus.Lost;
+            if (settled && Keyboard.current != null && Keyboard.current.enterKey.wasPressedThisFrame)
+                WorldShiftFlow.StartGetaway(false);
+            Refresh();
+        }
+
+        private void Refresh()
+        {
+            var run = WorldShiftFlow.Escape;
+            bool running = State == ShiftRunState.Running;
+            bool settled = run.Status == GetawayRunState.RunStatus.Banked || run.Status == GetawayRunState.RunStatus.Lost;
+            world.text = Merged ? "DAY | NIGHT" : World == ShiftWorld.Day ? "DAY" : "NIGHT";
+            world.color = World == ShiftWorld.Day ? Gold : Cyan;
+            haul.text = "$" + run.Carried.ToString("N0") + " <size=14>AT RISK</size>";
+            stage.text = (IsCity ? "CITY" : "DESERT") + "  /  " + (currentLeg + 1) + "\nLOOT x" + run.LootMultiplier.ToString("0.#");
+            fuelFill.anchorMax = new Vector2(Mathf.Clamp01(Fuel), 1f);
+            fuelText.text = Fuel < .25f ? "LOW FUEL" : "FUEL";
+            fuelText.color = Fuel < .25f ? new Color(1f, .3f, .2f) : Gold;
+            progressFill.anchorMax = new Vector2(Mathf.Clamp01(Distance / Length), 1f);
+            bool danger = Gap < 23f;
+            mirrorLabel.text = danger ? "POLICE CLOSE" : "POLICE";
+            mirrorLabel.color = danger ? new Color(1f, .3f, .2f) : Color.white;
+            mirrorPanel.SetActive(RearView != null);
+            if (RearView != null) mirror.texture = RearView.Texture;
+            choices.SetActive(running && InExit);
+            choiceLeft.text = "LEFT  /  BANK\n$" + run.Carried.ToString("N0");
+            choiceRight.text = "RIGHT  /  RISK\n" + (IsCity ? "DESERT" : "CITY") + "  x" + (1f + Mathf.Min(currentLeg + 1, 40) * .5f).ToString("0.#");
+            choiceLeftPanel.color = Lateral < ContinueBoundary ? new Color(.08f, .3f, .2f, .98f) : Ink;
+            choiceRightPanel.color = Lateral >= ContinueBoundary ? new Color(.35f, .23f, .06f, .98f) : Ink;
+            footer.gameObject.SetActive(Duration < 8f || State == ShiftRunState.Paused);
+            guidance.text = !running ? "" : InExit ? "STEER TO CHOOSE" : Time.unscaledTime < pickupUntil ? pickupMessage
+                : Duration < 4f ? "COLLECT LOOT. REACH THE EXIT." : IsCity ? CityHint() : DesertHint();
+            pause.SetActive(State == ShiftRunState.Paused);
+            pauseNote.text = "$" + run.Carried.ToString("N0") + " at risk\nA / D  Steer     SPACE  Switch";
+            result.SetActive(settled);
+            bool banked = run.Status == GetawayRunState.RunStatus.Banked;
+            resultTitle.text = banked ? "LOOT BANKED" : run.Failure;
+            resultValue.text = (banked ? "+$" : "-$") + run.SettledHaul.ToString("N0");
+            resultValue.color = banked ? Green : new Color(1f, .4f, .3f);
+            resultNote.text = banked ? "BANK $" + WorldShiftFlow.Banked.ToString("N0") + "     BEST $" + WorldShiftFlow.BestHaul.ToString("N0")
+                : "Carried loot lost. Bank safe: $" + WorldShiftFlow.Banked.ToString("N0");
+        }
+
+        private string CityHint()
+        {
+            if (city.IsRelayAirborne) return city.SectionHint;
+            if (city.IsMerged && Distance < city.MergeStart + 80f) return "A / D  CROSS WORLDS";
+            return city.SectionHint;
+        }
+
+        private string DesertHint()
+        {
+            if (desert.IsAirborne) return World == ShiftWorld.Day ? "SPACE  /  LAND IN NIGHT" : "NIGHT LANDING";
+            if (Merged) return Distance < desert.MergeStart + 70f ? "A / D  CROSS WORLDS" : "";
+            if (Duration < 10f) return World == ShiftWorld.Day ? "DAY MOVES" : "NIGHT FREEZES";
+            return DesertShiftLevel.InRockField(Distance) ? "NIGHT FREEZES" : "";
+        }
+
+        private void OnDestroy() { foreach (var material in materials) if (material != null) Destroy(material); }
+    }
+}

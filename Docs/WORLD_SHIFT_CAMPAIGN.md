@@ -1,5 +1,7 @@
 # World Shift playable flow
 
+The menu now starts the **Endless Getaway** mode: collect loot, steer left to bank at an exit, or right to continue into the next environment. City and Desert loop with increasing rewards and pursuit pressure. Capture, wrecks, or empty fuel lose the carried haul. Practice retains the original checkpoint flow described below. See [the getaway design](WORLD_SHIFT_DIRECTION_PROPOSAL.md).
+
 Open `Assets/Scenes/WorldShift_Menu.unity` and press Play, or use **The Outlaws > World Shift > Open Game Menu**. This scene is also first in Build Settings. Existing environment scenes remain available.
 
 The menu has three entries:

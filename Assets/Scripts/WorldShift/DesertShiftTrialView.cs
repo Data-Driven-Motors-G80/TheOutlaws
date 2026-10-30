@@ -58,7 +58,7 @@ namespace Outlaws.WorldShift
                 foreach (float side in new[] { -1f, 1f })
                 {
                     Box(entrance, "Field marker post", new Vector3(side * 5.6f, 1.8f, 0f), new Vector3(.15f, 3.6f, .15f), Material(Gold, .3f));
-                    WorldText(entrance, "ROCK FIELD\nSPACE: FREEZE", new Vector3(side * 7.5f, 4f, 0f), Gold, 3f);
+                    WorldText(entrance, "SPACE\nFREEZE", new Vector3(side * 7.5f, 4f, 0f), Gold, 3f);
                 }
                 fieldSigns.Add(entrance);
             }
@@ -69,7 +69,7 @@ namespace Outlaws.WorldShift
                 OriginalObstacle(row, new Vector3(block.y * WorldShiftLevel.RoadWidth / 3f, .7f, 0f),
                     new Vector3(1.8f, 1.4f, 2.5f));
             }
-            for (float at = game.CheckpointSpacing; at <= game.RunLength; at += game.CheckpointSpacing)
+            for (float at = game.GetawayMode ? float.PositiveInfinity : game.CheckpointSpacing; at <= game.RunLength; at += game.CheckpointSpacing)
             {
                 if (Mathf.Abs(at - game.MergeStart) < 1f) continue;
                 Transform marker = RoadRoot("Checkpoint", at);
@@ -83,7 +83,7 @@ namespace Outlaws.WorldShift
                 WorldText(pickup, "F", new Vector3(0f, 2.4f, 0f), Gold, 6f);
                 fuelViews.Add(pickup.gameObject);
             }
-            BuildHud();
+            if (!game.GetawayMode) BuildHud();
         }
 
         private void BuildOriginalDesertSand()
@@ -242,6 +242,7 @@ namespace Outlaws.WorldShift
         public void Present(ShiftWorld world)
         {
             if (game == null) return;
+            game.Getaway?.Present(world);
             bool day = world == ShiftWorld.Day;
             if (relayViews != null) { relayViews.SetWorld(world); relayViews.Refresh(game.Distance); }
             if (displayed != world)
@@ -311,13 +312,15 @@ namespace Outlaws.WorldShift
             Vector3 cameraPosition = follow.Position - follow.Forward * 12f + Vector3.up * 6.6f + follow.Right * game.Lateral * .28f * followX;
             view.transform.SetPositionAndRotation(cameraPosition,
                 Quaternion.LookRotation(game.DriverPoint(game.Distance + 22f).Position + Vector3.up * .7f - cameraPosition));
+            if (game.GetawayMode) return;
             title.text = "DESERT / " + (game.FullLevel ? DesertShiftLevel.Titles[game.Stage] : new[] { "1  FREEZE AN OPENING", "2  CONNECT TWO OPENINGS", "3  RELEASE + FREEZE AGAIN" }[game.Stage]);
-            worldLabel.text = game.IsMerged ? "LEFT MOVES | RIGHT FROZEN" : day ? "DAY  /  ROCKS + TRAFFIC MOVE" : "NIGHT  /  ROCKS + TRAFFIC FROZEN";
+            worldLabel.text = game.IsMerged ? "DAY | NIGHT" : day ? "DAY / MOVING" : "NIGHT / FROZEN";
             worldLabel.color = day ? Gold : Cyan;
-            hint.text = game.Hint;
-            controls.text = game.IsMerged ? "A / D  CROSS WORLDS     SPACE  RESTING     R  RETRY     ESC  PAUSE"
-                : "A / D  STEER     SPACE  ROLL / FREEZE     R  RETRY     ESC  PAUSE";
-            progress.text = Mathf.FloorToInt(game.Distance / game.RunLength * 100f) + "%     " + game.Duration.ToString("0.0") + "s     RETRIES " + game.Retries;
+            hint.text = game.State == ShiftRunState.Retrying || game.Duration < 10f || game.IsAirborne || game.IsMerged && game.Distance < game.MergeStart + 70f ? game.Hint : "";
+            controls.transform.parent.gameObject.SetActive(game.Duration < 8f || game.State != ShiftRunState.Running);
+            controls.text = game.IsMerged ? "A / D  CROSS     ESC  PAUSE"
+                : "A / D  STEER     SPACE  SWITCH     ESC  PAUSE";
+            progress.text = Mathf.FloorToInt(game.Distance / game.RunLength * 100f) + "%";
             progressFill.anchorMax = new Vector2(game.Distance / game.RunLength, 1f);
             status.text = game.FullLevel ? "FUEL " + Mathf.CeilToInt(game.FuelFraction * 100f) + "%    POLICE " + Mathf.CeilToInt(game.PursuitGap) + " m" : "";
             status.color = game.FuelFraction < .25f || game.PursuitGap < 23f ? new Color(1f, .3f, .2f) : Gold;
@@ -326,10 +329,10 @@ namespace Outlaws.WorldShift
             bool menu = game.State == ShiftRunState.Ready || game.State == ShiftRunState.Paused || game.State == ShiftRunState.Won;
             modal.SetActive(menu);
             modalText.text = game.State == ShiftRunState.Ready
-                ? "ROLL. FREEZE. PASS.\n\nDay moves the rocks. Night stops them.\nFrozen rocks still block the road.\n\nA / D steer     SPACE changes world\n" + (game.FullLevel ? "Two hits let police catch you. Collect F. / ~2 minutes" : "~40 seconds")
-                : game.State == ShiftRunState.Won ? "ROUTE CONNECTED\n\n" + game.Duration.ToString("0.0") + " seconds   /   " + game.Switches + " switches\n\n" + (game.FullLevel ? "BOTH WORLDS. ONE ESCAPE." : "PRACTICE COMPLETE")
-                : "PAUSED\n\nESC TO CONTINUE";
-            actionLabel.text = game.State == ShiftRunState.Ready ? "START / ENTER" : game.State == ShiftRunState.Won ? "REPLAY" : "RESUME / ESC";
+                ? "DESERT PRACTICE\n\nDay moves. Night freezes.\n\nA / D  Steer     SPACE  Switch"
+                : game.State == ShiftRunState.Won ? "PRACTICE COMPLETE\n\n" + game.Duration.ToString("0.0") + "s   /   " + game.Retries + " retries"
+                : "PAUSED\n\nA / D  Steer     SPACE  Switch";
+            actionLabel.text = game.State == ShiftRunState.Ready ? "DRIVE / ENTER" : game.State == ShiftRunState.Won ? "REPLAY" : "RESUME / ESC";
         }
 
         private void BuildHud()
@@ -359,7 +362,7 @@ namespace Outlaws.WorldShift
             mirror.rectTransform.offsetMin = mirror.rectTransform.offsetMax = Vector2.zero;
             var footer = Panel(canvas, "Controls", new Vector2(.13f, .025f), new Vector2(.87f, .09f));
             controls = Text(footer, Vector2.zero, Vector2.one, 20f); controls.alignment = TextAlignmentOptions.Center;
-            controls.text = "A / D  STEER     SPACE  ROLL / FREEZE     R  RETRY     ESC  PAUSE";
+            controls.text = "A / D  STEER     SPACE  SWITCH     ESC  PAUSE";
             modal = Panel(canvas, "State", new Vector2(.17f, .22f), new Vector2(.83f, .71f)).gameObject;
             modalText = Text(modal.transform, new Vector2(.04f, .24f), new Vector2(.96f, .96f), 25f);
             modalText.alignment = TextAlignmentOptions.Center;
@@ -367,7 +370,7 @@ namespace Outlaws.WorldShift
                 new GameObject("Desert UI input", typeof(UnityEngine.EventSystems.EventSystem), typeof(UnityEngine.InputSystem.UI.InputSystemUIInputModule)).transform.SetParent(transform, false);
             actionLabel = WorldShiftMenu.Button(modal.transform, "START", new Vector2(.04f, .04f), new Vector2(.48f, .21f), () =>
             { if (game.State == ShiftRunState.Ready) game.Begin(); else if (game.State == ShiftRunState.Won) game.Restart(); else game.TogglePause(); }).GetComponentInChildren<TMP_Text>();
-            WorldShiftMenu.Button(modal.transform, "LEVEL SELECT", new Vector2(.52f, .04f), new Vector2(.96f, .21f), WorldShiftFlow.Menu);
+            WorldShiftMenu.Button(modal.transform, "MENU", new Vector2(.52f, .04f), new Vector2(.96f, .21f), WorldShiftFlow.Menu);
         }
         private static RectTransform Panel(Transform parent, string name, Vector2 min, Vector2 max)
         {

@@ -54,8 +54,10 @@ namespace Outlaws.WorldShift
         [SerializeField] private bool fullLevel;
         [SerializeField] private GameObject policePrefab;
         public bool FullLevel => fullLevel;
+        public bool GetawayMode { get; private set; }
+        public WorldShiftGetaway Getaway { get; private set; }
         public bool SplitViewValidation => false;
-        public float RunLength => fullLevel ? DesertShiftLevel.Length : Length;
+        public float RunLength => fullLevel ? DesertShiftLevel.Length + (GetawayMode ? WorldShiftGetaway.ExitTail : 0f) : Length;
         public float MergeStart => fullLevel ? DesertShiftLevel.MergeStart : float.PositiveInfinity;
         public bool IsMerged => fullLevel && Distance >= MergeStart;
         public float JoinedViewSplit => Mathf.Lerp(entryWorld == ShiftWorld.Day ? 1f : 0f, .5f,
@@ -126,22 +128,16 @@ namespace Outlaws.WorldShift
         public int Retries { get; private set; }
         public int Switches { get; private set; }
         public string Message { get; private set; } = "";
-        public string Hint => messageTime > 0f ? Message : IsMerged
-            ? "LEFT KEEPS MOVING / RIGHT STAYS FROZEN. A / D crosses worlds. SPACE rests."
+        public string Hint => State == ShiftRunState.Retrying ? Message : IsMerged
+            ? "A / D  /  CROSS WORLDS"
             : Relay != null && Relay.SectionAt(Distance) != null ? IsAirborne
-                ? World == ShiftWorld.Day ? "AIRBORNE - SPACE FREEZES THE ROCKS. LAND IN NIGHT."
-                    : "FROZEN - STEER THROUGH THE AIRBORNE OPENING. STAY IN NIGHT TO LAND."
+                ? World == ShiftWorld.Day ? "SPACE  /  LAND IN NIGHT" : "NIGHT LANDING"
                 : Relay.Hint(Distance, World)
-            : fullLevel && Distance > MergeStart - 120f ? "RIFT AHEAD - left is Day, right is Night. Steer to cross."
-            : fullLevel && DesertShiftLevel.InRockField(Distance) ? "FREEZE EACH GROUP. Blue walls require DAY, then freeze the next opening."
-            : World == ShiftWorld.Echo
-            ? "ROCKS + TRAFFIC FROZEN. Still solid. Return to Day at a blue wall."
-            : Stage == 0 ? "Let the rock leave the centre, then SPACE to freeze the opening."
-            : Stage == 1 ? "Watch both rocks. Freeze when the centre route is clear."
-            : "Freeze, pass, then return to Day to release the next rock. Freeze again.";
+            : World == ShiftWorld.Echo ? "NIGHT FREEZES. ROCKS STAY SOLID." : "DAY MOVES. SPACE TO FREEZE.";
 
         private void Awake()
         {
+            GetawayMode = fullLevel && WorldShiftFlow.Escape.Status == GetawayRunState.RunStatus.Running;
             if (roadTemplate == null || carPrefab == null || view == null || sun == null)
             { Debug.LogError("DesertShiftTrial: scene references missing."); enabled = false; return; }
             ActiveGates = fullLevel ? DesertShiftLevel.CreateGates() : Gates;
@@ -175,6 +171,7 @@ namespace Outlaws.WorldShift
                 var rift = gameObject.AddComponent<WorldShiftRift>(); rift.Build(this, Route);
                 gameObject.AddComponent<WorldShiftSplitView>().Initialize(this, view);
             }
+            if (GetawayMode) { Getaway = gameObject.AddComponent<WorldShiftGetaway>(); Getaway.Bind(this); }
             presentation.Refresh();
         }
 
@@ -186,7 +183,7 @@ namespace Outlaws.WorldShift
             var key = Keyboard.current;
             if (key != null)
             {
-                if (key.enterKey.wasPressedThisFrame)
+                if (!GetawayMode && key.enterKey.wasPressedThisFrame)
                 { if (State == ShiftRunState.Won && fullLevel) WorldShiftFlow.Next(ShiftLevel.Desert); else if (State == ShiftRunState.Won) Restart(); else Begin(); }
                 if (key.escapeKey.wasPressedThisFrame) TogglePause();
                 if (key.rKey.wasPressedThisFrame) Retry();
@@ -204,6 +201,7 @@ namespace Outlaws.WorldShift
         }
         public void Restart()
         {
+            if (GetawayMode) { WorldShiftFlow.StartGetaway(false); return; }
             Stage = Retries = Switches = 0; Duration = checkpointDaySeconds = checkpointNightSeconds = 0f;
             checkpointFuel = 100f; checkpointGap = 45f; collectedFuel.Clear();
             System.Array.Clear(checkpointTraffic, 0, checkpointTraffic.Length);
@@ -211,7 +209,7 @@ namespace Outlaws.WorldShift
             Restore();
         }
         public void Retry()
-        { if (State != ShiftRunState.Ready) { Retries++; Restore(); } }
+        { if (!GetawayMode && State != ShiftRunState.Ready) { Retries++; Restore(); } }
         public bool TrySwitch()
         {
             if (State != ShiftRunState.Running) return false;
@@ -219,7 +217,7 @@ namespace Outlaws.WorldShift
             ShiftWorld next = World == ShiftWorld.Day ? ShiftWorld.Echo : ShiftWorld.Day;
             World = next;
             Switches++;
-            Notify(next == ShiftWorld.Echo ? "FROZEN - ROCKS + TRAFFIC ARE STILL SOLID" : "RELEASED - ROCKS + TRAFFIC MOVE AGAIN", 1.3f);
+            Notify(next == ShiftWorld.Echo ? "NIGHT FREEZES" : "DAY MOVES", 1.3f);
             if (!IsAirborne && !Route.HasSurface(Distance, World)) Fail("NO ROAD - USE THE DAY BOOST RAMP");
             else if (!IsAirborne) CheckGates(Distance, Lateral);
             CheckRockContacts(Distance, Lateral, 0f);
@@ -229,7 +227,7 @@ namespace Outlaws.WorldShift
 
         public void StepSimulation(float delta, float steer, bool shift)
         {
-            if (State == ShiftRunState.Paused || State == ShiftRunState.Ready || State == ShiftRunState.Won) return;
+            if (State == ShiftRunState.Paused || State == ShiftRunState.Ready || State == ShiftRunState.Won || State == ShiftRunState.Lost) return;
             if (State == ShiftRunState.Retrying)
             { retryTime -= Mathf.Max(0f, delta); if (retryTime <= 0f) Restore(); return; }
             if (shift) TrySwitch();
@@ -247,7 +245,7 @@ namespace Outlaws.WorldShift
                 if (Relay != null)
                 {
                     if (!Relay.FinishStep(Distance, World, out bool landed)) { Fail("MISSED LANDING - SWITCH TO NIGHT IN THE AIR"); break; }
-                    if (landed) Notify("NIGHT LANDING - BACK ON THE ROAD", 1.5f);
+                    if (landed) Notify("LANDED", 1.5f);
                 }
                 if (!IsAirborne && !Route.HasSurface(Distance, World)) { Fail("NO ROAD - USE THE DAY BOOST RAMP"); break; }
                 if (IsMerged)
@@ -257,7 +255,7 @@ namespace Outlaws.WorldShift
                         entryWorld = World;
                         foreach (var rock in Rocks) rock.CaptureNight();
                         foreach (var car in Traffic) car.CaptureNight();
-                        Notify("RIFT - LEFT MOVES / RIGHT STAYS FROZEN", 3f);
+                        Notify("A / D  CROSS WORLDS", 3f);
                     }
                     World = WorldShiftLevel.WorldAt(Lateral);
                 }
@@ -265,8 +263,11 @@ namespace Outlaws.WorldShift
                 messageTime -= dt;
                 if (fullLevel)
                 {
-                    fuel.Tick(dt, 1.5f);
-                    pursuit.Tick(dt, speed, speed + .04f);
+                    if (!GetawayMode || !Getaway.InExit)
+                    {
+                        fuel.Tick(dt, 1.5f);
+                        pursuit.Tick(dt, speed, speed + .04f + (GetawayMode ? WorldShiftFlow.Escape.ExtraPursuitSpeed : 0f));
+                    }
                     for (int i = 0; i < FuelCount; i++)
                         if (!collectedFuel.Contains(i) && Distance + 1.3f >= FuelDistance(i) && before - 1.3f <= FuelDistance(i) && Mathf.Abs(Lateral) < 1.6f)
                         { collectedFuel.Add(i); fuel.Refill(26f); Notify("FUEL +26", 1f); }
@@ -279,16 +280,17 @@ namespace Outlaws.WorldShift
                     foreach (float offset in CrossingGuardOffsets)
                         if (Distance + 1.5f >= rock.Distance + offset - 1.25f && before - 1.5f <= rock.Distance + offset + 1.25f
                             && Mathf.Max(Mathf.Abs(previousX), Mathf.Abs(Lateral)) + .8f > 2.25f)
-                            Impact("guard" + rock.Distance, "SIDE BARRIER - use the centre opening");
+                            Impact("guard" + rock.Distance, "BARRIER HIT");
                 if (State != ShiftRunState.Running) break;
                 foreach (var block in ActiveObstacles)
                     if (Distance + 1.5f >= block.x - 1.25f && before - 1.5f <= block.x + 1.25f
                         && Mathf.Max(previousX, Lateral) >= block.y * WorldShiftLevel.RoadWidth / 3f - 1.7f
                         && Mathf.Min(previousX, Lateral) <= block.y * WorldShiftLevel.RoadWidth / 3f + 1.7f)
-                        Impact("block" + block, "ROADBLOCK - use the open lane");
+                        Impact("block" + block, "ROADBLOCK");
                 if (State != ShiftRunState.Running) break;
                 CheckGates(before, previousX);
                 if (State != ShiftRunState.Running) break;
+                Getaway?.Collect(before, Distance, previousX, Lateral);
                 int previousStage = Stage;
                 Stage = Mathf.Min(fullLevel ? 5 : 2, Mathf.FloorToInt(Distance / CheckpointSpacing));
                 if (Stage != previousStage)
@@ -298,8 +300,9 @@ namespace Outlaws.WorldShift
                     for (int i = 0; i < Traffic.Length; i++)
                     { checkpointTraffic[i] = Traffic[i].Travel; checkpointNightTraffic[i] = Traffic[i].NightTravel; }
                 }
-                if (fullLevel && fuel.IsEmpty) Fail("OUT OF FUEL");
-                else if (Distance >= RunLength) State = ShiftRunState.Won;
+                if (fullLevel && pursuit.IsGameOver) Fail("CAUGHT");
+                else if (fullLevel && fuel.IsEmpty) Fail("OUT OF FUEL");
+                else if (Distance >= RunLength) { State = ShiftRunState.Won; Getaway?.Finish(Lateral); }
             }
             if (Police != null) Police.StepFinite(elapsed, Distance, Lateral, Mathf.Lerp(.45f, 6f, Mathf.Clamp01(PursuitGap / 45f)));
             GetComponent<WorldShiftRift>()?.Refresh(Distance);
@@ -315,7 +318,7 @@ namespace Outlaws.WorldShift
                 if (!visible || Distance + 1.5f < gate.Start || before - 1.5f > gate.End) continue;
                 float min = gate.HalfSide > 0 ? 0f : -5f, max = gate.HalfSide < 0 ? 0f : 5f;
                 if (Mathf.Max(previousX, Lateral) + .8f > min && Mathf.Min(previousX, Lateral) - .8f < max)
-                    Impact("gate" + gate.Start, "WORLD WALL - switch or cross before reaching it");
+                    Impact("gate" + gate.Start, "SWITCH BEFORE THE WALL");
             }
         }
 
@@ -331,7 +334,7 @@ namespace Outlaws.WorldShift
                 float x = RockLateral(rock, IsMerged ? owner : World);
                 float radius = rock.Radius + .8f;
                 bool hit = Mathf.Min(previousX - oldX, Lateral - x) < radius && Mathf.Max(previousX - oldX, Lateral - x) > -radius;
-                if (hit) Impact("rock" + rock.Distance, "ROCK CONTACT - freeze, then steer through the opening");
+                if (hit) Impact("rock" + rock.Distance, "ROCK HIT");
             }
         }
 
@@ -361,7 +364,7 @@ namespace Outlaws.WorldShift
                     if (Distance + 1.5f < position - DesertShiftTraffic.HalfLength || before - 1.5f > oldPosition + DesertShiftTraffic.HalfLength) continue;
                     bool hit = IsMerged ? TouchesHalf(previousX, Lateral, x, x, DesertShiftTraffic.HalfWidth, world)
                         : Mathf.Max(previousX, Lateral) + .8f > x - DesertShiftTraffic.HalfWidth && Mathf.Min(previousX, Lateral) - .8f < x + DesertShiftTraffic.HalfWidth;
-                    if (hit) Impact("traffic" + car.Start, "ONCOMING POLICE - freeze, then steer around");
+                    if (hit) Impact("traffic" + car.Start, "TRAFFIC HIT");
                 }
             }
         }
@@ -370,12 +373,20 @@ namespace Outlaws.WorldShift
             if (State != ShiftRunState.Running || !contacts.Add(id)) return;
             if (!fullLevel) { Fail(reason); return; }
             if (!pursuit.TryCrash(.5f)) return;
-            Notify("HIT - POLICE 22.5 m CLOSER", 1.3f);
+            Notify("POLICE CLOSER", 1.3f);
             if (pursuit.IsGameOver) Fail("CAUGHT");
         }
 
         private void Fail(string reason)
-        { Retries++; State = ShiftRunState.Retrying; retryTime = .7f; Notify(reason, 2f); }
+        {
+            if (GetawayMode)
+            {
+                State = ShiftRunState.Lost;
+                Getaway.Lose(reason == "CAUGHT" ? "CAUGHT" : reason == "OUT OF FUEL" ? "OUT OF FUEL" : reason.StartsWith("MISSED LANDING") ? "MISSED LANDING" : "FELL OFF ROAD");
+                return;
+            }
+            Retries++; State = ShiftRunState.Retrying; retryTime = .7f; Notify(reason, 2f);
+        }
         private void Notify(string text, float time) { Message = text; messageTime = time; }
         private void Restore()
         {
@@ -393,7 +404,7 @@ namespace Outlaws.WorldShift
             driver.RestoreExternalPose(Distance, 0f);
             if (IsMerged) { World = ShiftWorld.Echo; entryWorld = ShiftWorld.Echo; }
             if (Police != null) Police.StepFinite(0f, Distance, Lateral, Mathf.Lerp(.45f, 6f, Mathf.Clamp01(PursuitGap / 45f)));
-            Notify("CHECKPOINT - DAY ROLLS / NIGHT FREEZES", 1.6f);
+            Notify("CHECKPOINT", 1.6f);
             presentation.Refresh();
         }
     }

@@ -352,6 +352,7 @@ namespace Outlaws.WorldShift
 
         private void BuildCheckpoints()
         {
+            if (game.GetawayMode) return;
             for (int i = 0; i <= game.Checkpoints.Length; i++)
             {
                 float at = i == game.Checkpoints.Length ? game.RunLength : game.Checkpoints[i].Distance;
