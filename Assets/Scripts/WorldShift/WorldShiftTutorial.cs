@@ -14,11 +14,11 @@ namespace Outlaws.WorldShift
         };
         public static readonly ShiftCheckpoint[] Checkpoints =
         {
-            new ShiftCheckpoint(0f, ShiftWorld.Day, 0f, "STEER", "A / D  /  FOLLOW THE OPEN LANE"),
-            new ShiftCheckpoint(120f, ShiftWorld.Day, 0f, "SWITCH", "SPACE  /  SWITCH TO NIGHT"),
-            new ShiftCheckpoint(240f, ShiftWorld.Echo, 0f, "SWITCH BACK", "SPACE  /  SWITCH TO DAY"),
-            new ShiftCheckpoint(380f, ShiftWorld.Day, 0f, "YOUR ROUTE", "STEER AROUND OR SWITCH"),
-            new ShiftCheckpoint(520f, ShiftWorld.Day, 2.5f, "WORLDS JOIN", "A / D  /  CROSS BETWEEN WORLDS")
+            new ShiftCheckpoint(0f, ShiftWorld.Day, 0f, "STEER", "Use A / D or arrow keys to steer."),
+            new ShiftCheckpoint(120f, ShiftWorld.Day, 0f, "SWITCH", "Tap Space to try night."),
+            new ShiftCheckpoint(240f, ShiftWorld.Echo, 0f, "SWITCH BACK", "Tap Space to go back to day."),
+            new ShiftCheckpoint(380f, ShiftWorld.Day, 0f, "YOUR ROUTE", "Go around it, or switch worlds."),
+            new ShiftCheckpoint(520f, ShiftWorld.Day, 2.5f, "WORLDS JOIN", "Now steer between day and night.")
         };
     }
 }

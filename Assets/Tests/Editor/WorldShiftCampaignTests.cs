@@ -32,13 +32,21 @@ public sealed class WorldShiftCampaignTests
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
         yield return new EnterPlayMode();
-        Assert.That(UnityEngine.Object.FindObjectsByType<Button>(FindObjectsSortMode.None).Length, Is.EqualTo(5));
+        var menuButtons = UnityEngine.Object.FindObjectsByType<Button>(FindObjectsSortMode.None);
+        Assert.That(menuButtons.Select(b => b.name), Is.EquivalentTo(new[] { "Play escape", "Choose a route", "New here? Learn to play" }));
+        menuButtons.Single(b => b.name == "Choose a route").onClick.Invoke();
+        var practiceButtons = UnityEngine.Object.FindObjectsByType<Button>(FindObjectsSortMode.None);
+        Assert.That(practiceButtons.Select(b => b.name), Is.EquivalentTo(new[] { "City", "Desert", "Back" }));
+        Capture("practice-choices");
+        practiceButtons.Single(b => b.name == "Back").onClick.Invoke();
         Capture("01-menu");
         Flow("Select", Level("City"), true);
         yield return null; yield return null;
         var tutorial = Find("WorldShiftCity"); tutorial.enabled = false;
         Assert.That(Get(tutorial, "TutorialLevel"), Is.EqualTo(true));
         Assert.That(Get(tutorial, "State").ToString(), Is.EqualTo("Running"));
+        Call(Find("WorldShiftHud"), "Refresh");
+        Capture("tutorial-one-prompt");
         for (int i = 0; i < 850 && Get(tutorial, "State").ToString() == "Running"; i++)
         {
             float d = (float)Get(tutorial, "Distance");
@@ -50,6 +58,8 @@ public sealed class WorldShiftCampaignTests
         Assert.That(Get(tutorial, "State").ToString(), Is.EqualTo("Won"));
         Assert.That(Get(tutorial, "Deaths"), Is.EqualTo(0));
         Assert.That(Get(tutorial, "Hits"), Is.EqualTo(0));
+        Call(Find("WorldShiftHud"), "Refresh");
+        Capture("tutorial-ready");
         Flow("Next", Level("Tutorial"));
         yield return null; yield return null;
         Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo("City_WorldShift"));

@@ -17,6 +17,7 @@ namespace Outlaws.WorldShift
         public static int Banked => PlayerPrefs.GetInt(BankKey, 0);
         public static int BestHaul => PlayerPrefs.GetInt(BestKey, 0);
         private static bool getawayAfterTutorial;
+        public static bool TutorialStartsEscape => getawayAfterTutorial;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetSession()

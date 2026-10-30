@@ -129,11 +129,11 @@ namespace Outlaws.WorldShift
         public int Switches { get; private set; }
         public string Message { get; private set; } = "";
         public string Hint => State == ShiftRunState.Retrying ? Message : IsMerged
-            ? "A / D  /  CROSS WORLDS"
+            ? "Steer between day and night."
             : Relay != null && Relay.SectionAt(Distance) != null ? IsAirborne
-                ? World == ShiftWorld.Day ? "SPACE  /  LAND IN NIGHT" : "NIGHT LANDING"
+                ? World == ShiftWorld.Day ? "Tap Space to land in night." : "Stay in night to land."
                 : Relay.Hint(Distance, World)
-            : World == ShiftWorld.Echo ? "NIGHT FREEZES. ROCKS STAY SOLID." : "DAY MOVES. SPACE TO FREEZE.";
+            : World == ShiftWorld.Echo ? "Night freezes things. They're still solid." : "Try Space to freeze things.";
 
         private void Awake()
         {

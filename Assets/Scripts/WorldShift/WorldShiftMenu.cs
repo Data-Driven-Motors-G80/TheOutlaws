@@ -10,39 +10,51 @@ namespace Outlaws.WorldShift
     // Escape is the primary action; practice keeps the original checkpoint flow.
     public sealed class WorldShiftMenu : MonoBehaviour
     {
-        private TMP_Text tutorialToggle;
         private static readonly Color Ink = new Color(.025f, .045f, .07f, .98f);
         private static readonly Color Accent = new Color(.35f, .85f, 1f);
+        private GameObject home, practice;
+
         private void Awake()
         {
             Time.timeScale = 1f;
             var root = CreateCanvas(transform, "WorldShift menu");
             Panel(root, "Background", Vector2.zero, Vector2.one, Ink);
-            Label(root, "WORLDSHIFT", .08f, .77f, .92f, .93f, 62f);
-            Label(root, "GRAB LOOT. KNOW WHEN TO LEAVE.", .08f, .68f, .92f, .76f, 23f);
-            Label(root, "BANK $" + WorldShiftFlow.Banked.ToString("N0") + "     BEST HAUL $" + WorldShiftFlow.BestHaul.ToString("N0"),
-                .08f, .57f, .92f, .65f, 21f);
-            Button(root, "START ESCAPE", new Vector2(.08f, .40f), new Vector2(.59f, .53f),
+            home = Panel(root, "Choose a mode", Vector2.zero, Vector2.one, Color.clear).gameObject;
+            Label(home.transform, "WorldShift", .08f, .78f, .92f, .93f, 58f);
+            Label(home.transform, "How do you want to play?", .08f, .69f, .92f, .77f, 25f);
+
+            var escape = Panel(home.transform, "Endless escape", new Vector2(.08f, .25f), new Vector2(.49f, .63f), new Color(.07f, .15f, .19f));
+            Label(escape, "Endless escape", .06f, .72f, .94f, .94f, 31f);
+            Label(escape, "Grab loot. Cash out or keep going.\nGet caught and this run's loot is gone.", .06f, .35f, .94f, .68f, 21f);
+            Button(escape, "Play escape", new Vector2(.06f, .07f), new Vector2(.94f, .28f),
                 () => WorldShiftFlow.StartGetaway(WorldShiftFlow.TutorialFirst));
-            tutorialToggle = Button(root, "", new Vector2(.62f, .40f), new Vector2(.92f, .53f), () =>
-            {
-                WorldShiftFlow.TutorialFirst = !WorldShiftFlow.TutorialFirst;
-                RefreshToggle();
-            }).GetComponentInChildren<TMP_Text>();
-            Label(root, "Extract to bank. Get caught, lose your haul.", .08f, .31f, .92f, .38f, 20f);
-            Label(root, "PRACTICE  /  CHECKPOINT RETRIES", .08f, .22f, .92f, .28f, 16f);
-            string[] names = { "CITY", "DESERT", "BASICS" };
-            for (int i = 0; i < names.Length; i++)
-            {
-                int index = i;
-                float x = .08f + i * .285f;
-                Button(root, names[i], new Vector2(x, .11f), new Vector2(x + .265f, .21f),
-                    () => WorldShiftFlow.Select((ShiftLevel)index, false));
-            }
-            Label(root, "A / D  STEER     SPACE  SWITCH     ESC  PAUSE", .08f, .025f, .92f, .08f, 16f);
-            RefreshToggle();
+
+            var training = Panel(home.transform, "Practice", new Vector2(.52f, .25f), new Vector2(.93f, .63f), new Color(.07f, .10f, .14f));
+            Label(training, "Practice", .06f, .72f, .94f, .94f, 31f);
+            Label(training, "Get to know the roads.\nMake a mistake? Just try that bit again.", .06f, .35f, .94f, .68f, 21f);
+            Button(training, "Choose a route", new Vector2(.06f, .07f), new Vector2(.94f, .28f), () => ShowPractice(true));
+            var learn = Button(home.transform, "New here? Learn to play", new Vector2(.30f, .09f), new Vector2(.71f, .18f),
+                () => WorldShiftFlow.Select(ShiftLevel.Tutorial, false));
+            learn.GetComponent<Image>().color = Color.clear;
+            var lessonLink = learn.GetComponentInChildren<TMP_Text>();
+            lessonLink.fontSizeMin = lessonLink.fontSizeMax = 19f;
+
+            practice = Panel(root, "Practice routes", Vector2.zero, Vector2.one, Ink).gameObject;
+            Label(practice.transform, "Practice", .12f, .76f, .88f, .91f, 48f);
+            Label(practice.transform, "Pick a route. We'll restart nearby if you slip up.", .12f, .64f, .88f, .74f, 23f);
+            Button(practice.transform, "City", new Vector2(.12f, .42f), new Vector2(.48f, .58f), () => WorldShiftFlow.Select(ShiftLevel.City, false));
+            Button(practice.transform, "Desert", new Vector2(.52f, .42f), new Vector2(.88f, .58f), () => WorldShiftFlow.Select(ShiftLevel.Desert, false));
+            Label(practice.transform, "No loot to lose here. Just driving.", .12f, .29f, .88f, .39f, 21f);
+            Button(practice.transform, "Back", new Vector2(.12f, .12f), new Vector2(.36f, .23f), () => ShowPractice(false));
+            ShowPractice(false);
         }
-        private void RefreshToggle() => tutorialToggle.text = "TUTORIAL " + (WorldShiftFlow.TutorialFirst ? "ON" : "OFF");
+
+        private void ShowPractice(bool show)
+        {
+            practice.SetActive(show);
+            home.SetActive(!show);
+            if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
+        }
 
         public static RectTransform CreateCanvas(Transform parent, string name)
         {

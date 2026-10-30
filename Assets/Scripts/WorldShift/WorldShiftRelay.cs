@@ -102,11 +102,11 @@ namespace Outlaws.WorldShift
             string source = section.Source == ShiftWorld.Day ? "DAY" : "NIGHT";
             string target = section.Destination == ShiftWorld.Day ? "DAY" : "NIGHT";
             if (flying != null) return world == section.Destination
-                ? target + " LANDING"
-                : "SPACE  /  LAND IN " + target;
-            if (distance >= section.Landing) return "LANDED";
-            return world == section.Source ? "JUMP, THEN SWITCH"
-                : "SPACE  /  " + source + " RAMP";
+                ? "Stay in " + target.ToLowerInvariant() + " to land."
+                : "Tap Space to land in " + target.ToLowerInvariant() + ".";
+            if (distance >= section.Landing) return "Nice landing!";
+            return world == section.Source ? "Take the jump, then switch worlds."
+                : "Switch to " + source.ToLowerInvariant() + " for the ramp.";
         }
     }
 }

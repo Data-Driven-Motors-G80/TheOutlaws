@@ -4,13 +4,13 @@ The menu now starts the **Endless Getaway** mode: collect loot, steer left to ba
 
 Open `Assets/Scenes/WorldShift_Menu.unity` and press Play, or use **The Outlaws > World Shift > Open Game Menu**. This scene is also first in Build Settings. Existing environment scenes remain available.
 
-The menu has three entries:
+The home screen separates **Endless escape** from **Practice**. Practice opens City and Desert route buttons; **New here? Learn to play** opens the tutorial. The available routes are:
 
 - **City:** the existing 3,360 m route, three airborne relays and final Day/Night intersection; roughly 114 seconds without retries.
 - **Desert:** 2,880 m, about 115 seconds without retries. Cruise at 24 m/s, boost at 42 m/s. 58 rocks (including six airborne rocks), 14 freezeable oncoming police cars, alternating world walls, six checkpoints, shared fuel and the existing police/mirror. The final 480 m uses the same full-frame Day/Night compositor as City. No replacement half-road is generated.
 - **Tutorial:** an independent 720 m city course at 18 m/s (about 40 seconds). Steering, switching, returning to Day, half-road obstacles, then steering across a short intersection. No fuel drain. Retries restart the current lesson.
 
-The **Play tutorial before this level** switch sends the player through the tutorial and then to the selected City or Desert level. Tutorial can also be selected independently; its Continue button leads to City. City completion offers Next Level (Desert), Level Select and Replay. Desert completion offers Replay and Level Select. Pause menus also return to Level Select.
+The first escape includes the short tutorial. **New here? Learn to play** also opens it independently. Tutorial can also be selected independently; its Continue button leads to City. City practice completion offers **Try the desert** and **Back to menu**. Desert practice completion offers **Try again** and **Back to menu**. Pause screens offer a clear way to resume or leave.
 
 ## Shared rules
 

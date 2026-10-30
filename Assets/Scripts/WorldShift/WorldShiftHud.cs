@@ -38,8 +38,6 @@ namespace Outlaws.WorldShift
         private TMP_Text sectionHint;
         private TMP_Text message;
         private TMP_Text retryMessage;
-        private TMP_Text resultTime;
-        private TMP_Text resultDeaths;
         private GameObject controlsRoot;
         private RectTransform fuelFill;
         private Image fuelImage;
@@ -64,10 +62,54 @@ namespace Outlaws.WorldShift
         private int previousWidth;
         private int previousHeight;
 
+        private TMP_Text lessonHint;
+        private GameObject lessonReady, lessonPause, lessonDone, lessonDriving;
+
+        private void BuildLesson()
+        {
+            canvasRoot = WorldShiftMenu.CreateCanvas(transform, "Learn to play");
+            lessonDriving = WorldShiftMenu.Panel(canvasRoot, "One lesson at a time", Vector2.zero, Vector2.one, Color.clear).gameObject;
+            lessonHint = WorldShiftMenu.Label(lessonDriving.transform, "", .16f, .13f, .84f, .22f, 26f);
+            lessonHint.alignment = TextAlignmentOptions.Center;
+            lessonHint.outlineWidth = .18f;
+            lessonHint.outlineColor = Color.black;
+            WorldShiftMenu.Button(lessonDriving.transform, "Pause", new Vector2(.85f, .89f), new Vector2(.97f, .96f), game.TogglePause);
+
+            lessonReady = LessonPanel("Let's take a quick spin.", "You'll pick it up as we go.");
+            WorldShiftMenu.Button(lessonReady.transform, "Let's drive", new Vector2(.26f, .25f), new Vector2(.74f, .36f), game.BeginRun);
+            WorldShiftMenu.Button(lessonReady.transform, "Back to menu", new Vector2(.36f, .11f), new Vector2(.64f, .20f), WorldShiftFlow.Menu);
+            lessonPause = LessonPanel("Paused", "Take your time.");
+            WorldShiftMenu.Button(lessonPause.transform, "Keep going", new Vector2(.26f, .32f), new Vector2(.74f, .43f), game.TogglePause);
+            WorldShiftMenu.Button(lessonPause.transform, "Skip the lesson", new Vector2(.26f, .18f), new Vector2(.74f, .29f), () => WorldShiftFlow.Next(ShiftLevel.Tutorial));
+            WorldShiftMenu.Button(lessonPause.transform, "Back to menu", new Vector2(.36f, .06f), new Vector2(.64f, .14f), WorldShiftFlow.Menu);
+            lessonDone = LessonPanel("You've got it!", "Ready for a drive?");
+            string next = WorldShiftFlow.TutorialStartsEscape ? "Start your escape" : "Try the " + WorldShiftFlow.TutorialDestination.ToLowerInvariant();
+            WorldShiftMenu.Button(lessonDone.transform, next, new Vector2(.26f, .25f), new Vector2(.74f, .36f), () => WorldShiftFlow.Next(ShiftLevel.Tutorial));
+            WorldShiftMenu.Button(lessonDone.transform, "Back to menu", new Vector2(.36f, .11f), new Vector2(.64f, .20f), WorldShiftFlow.Menu);
+        }
+
+        private GameObject LessonPanel(string title, string subtitle)
+        {
+            var panel = WorldShiftMenu.Panel(canvasRoot, title, Vector2.zero, Vector2.one, Ink).gameObject;
+            WorldShiftMenu.Label(panel.transform, title, .14f, .62f, .86f, .78f, 44f).alignment = TextAlignmentOptions.Center;
+            WorldShiftMenu.Label(panel.transform, subtitle, .14f, .48f, .86f, .58f, 23f).alignment = TextAlignmentOptions.Center;
+            return panel;
+        }
+
+        private void RefreshLesson()
+        {
+            lessonReady.SetActive(game.State == ShiftRunState.Ready);
+            lessonPause.SetActive(game.State == ShiftRunState.Paused);
+            lessonDone.SetActive(game.State == ShiftRunState.Won);
+            bool driving = game.State == ShiftRunState.Running || game.State == ShiftRunState.Retrying;
+            lessonDriving.SetActive(driving);
+            lessonHint.text = game.State == ShiftRunState.Retrying ? "Let's try that bit again." : game.SectionHint;
+        }
+
         public void Bind(WorldShiftCity controller)
         {
             game = controller;
-            if (canvasRoot == null) Build();
+            if (canvasRoot == null) { if (game.TutorialLevel) BuildLesson(); else Build(); }
             hasState = false;
             previousHint = null;
             Refresh();
@@ -80,6 +122,7 @@ namespace Outlaws.WorldShift
 
         private void Refresh()
         {
+            if (game.TutorialLevel) { RefreshLesson(); return; }
             RefreshSafeArea();
             bool running = game.State == ShiftRunState.Running;
             bool retrying = game.State == ShiftRunState.Retrying;
@@ -92,13 +135,8 @@ namespace Outlaws.WorldShift
                 pausePanel.SetActive(game.State == ShiftRunState.Paused);
                 wonPanel.SetActive(game.State == ShiftRunState.Won);
                 retryPanel.SetActive(retrying);
-                hud.alpha = menu ? .32f : 1f;
+                hud.alpha = menu ? 0f : 1f;
                 if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
-                if (game.State == ShiftRunState.Won)
-                {
-                    resultTime.text = FormatTime(game.Duration);
-                    resultDeaths.text = game.Deaths.ToString();
-                }
                 previousState = game.State;
                 hasState = true;
             }
@@ -107,13 +145,15 @@ namespace Outlaws.WorldShift
             worldMark.color = accent;
             worldBackground.color = new Color(accent.r, accent.g, accent.b, .11f);
             worldLabel.color = accent;
-            worldLabel.text = game.IsMerged ? "DAY | NIGHT" : game.World == ShiftWorld.Day ? "DAY" : "NIGHT";
+            worldLabel.text = game.IsMerged ? "Day + night" : game.World == ShiftWorld.Day ? "Day" : "Night";
             worldLabel.fontSize = game.IsMerged ? 17f : 26f;
             worldSubLabel.text = game.IsMerged ? "A / D  CROSS" : game.IsRelayAirborne ? "AIRBORNE" : "";
             steerControl.text = game.IsMerged ? "CROSS" : "STEER";
             switchControl.text = game.IsMerged ? "RESTING" : game.IsRelayAirborne ? "LAND" : "SWITCH";
             switchControl.color = game.IsMerged ? Muted : White;
-            sectionLabel.text = game.SectionTitle ?? "CITY RUN";
+            sectionLabel.text = "City practice";
+            clockLabel.gameObject.SetActive(false);
+            progressLabel.gameObject.SetActive(false);
             progressImage.color = accent;
             progressFill.anchorMax = new Vector2(Mathf.Clamp01(game.Progress), 1f);
             progressLabel.text = $"{Mathf.RoundToInt(Mathf.Clamp01(game.Progress) * 100f)}%";
@@ -123,7 +163,8 @@ namespace Outlaws.WorldShift
             fuelFill.anchorMax = new Vector2(Mathf.Clamp01(game.FuelFraction), 1f);
             fuelImage.color = fuelColor;
             fuelBorder.color = lowFuel ? new Color(.34f, .06f, .05f, .94f) : Ink;
-            fuelLabel.text = lowFuel ? "LOW FUEL" : "FUEL";
+            fuelLabel.text = lowFuel ? "Fuel's low" : "Fuel";
+            speedLabel.gameObject.SetActive(false);
             fuelLabel.color = fuelColor;
             speedLabel.text = Mathf.RoundToInt(game.Speed * 3.6f) + " KM/H";
             float edgeAlpha = running && lowFuel ? .05f + .09f * (.5f + .5f * Mathf.Sin(Time.unscaledTime * 5f)) : 0f;
@@ -139,7 +180,7 @@ namespace Outlaws.WorldShift
                 Color pursuitColor = Color.Lerp(White, new Color(1f, .23f, .19f), danger);
                 mirrorBorder.color = pursuitColor;
                 pursuitLabel.color = pursuitColor;
-                pursuitLabel.text = game.PursuitGap < 23f ? "POLICE CLOSE" : "POLICE";
+                pursuitLabel.text = game.PursuitGap < 23f ? "They're close!" : "";
             }
 
             if (previousHint != game.SectionHint)
@@ -153,11 +194,13 @@ namespace Outlaws.WorldShift
                 ? game.TutorialLevel ? 1f : 1f - Mathf.Clamp01((hintAge - 3f) / .5f) : 0f;
             controlsRoot.SetActive(!running || game.Duration < 8f);
 
-            bool showMessage = running && game.MessageRemaining > 0f && !string.IsNullOrEmpty(game.Message);
+            bool usefulMessage = game.Message == "FUEL +26" || game.Message == "POLICE CLOSER" || game.Message == "LANDED";
+            bool showMessage = running && game.MessageRemaining > 0f && usefulMessage;
             messageGroup.alpha = showMessage ? Mathf.Clamp01(game.MessageRemaining * 3f) : 0f;
-            if (showMessage) message.text = game.Message;
-            if (retrying) retryMessage.text = string.IsNullOrEmpty(game.Message)
-                ? "Your route resumes at the last checkpoint." : game.Message;
+            if (showMessage) message.text = game.Message == "FUEL +26" ? "Fuel topped up." : game.Message == "LANDED" ? "Nice landing!" : "They're getting close.";
+            if (retrying) retryMessage.text = game.Message == "NO ROAD" ? "Try switching before the gap."
+                : game.Message == "MISSED RELAY LANDING" ? "Switch worlds before you land."
+                : game.Message == "OUT OF FUEL" ? "Grab a fuel can on the way." : "Let's try that bit again.";
         }
 
         private void Build()
@@ -208,7 +251,7 @@ namespace Outlaws.WorldShift
             Place(retry, new Vector2(.5f, 1f), new Vector2(0f, -220f), new Vector2(760f, 100f));
             retryPanel = retry.gameObject;
             AddAccent(retry, Day);
-            FixedLabel(retry, "TRY AGAIN", 17f, Day, 28f, 18f, 704f, 23f, true);
+            FixedLabel(retry, "Let's try that again.", 17f, Day, 28f, 18f, 704f, 23f, true);
             retryMessage = FixedLabel(retry, string.Empty, 21f, White, 28f, 48f, 704f, 30f);
 
             RectTransform backdrop = Panel("MenuBackdrop", canvasRoot, new Color(.015f, .029f, .052f, .76f));
@@ -282,7 +325,7 @@ namespace Outlaws.WorldShift
         private void BuildFuel(RectTransform parent)
         {
             RectTransform panel = Panel("Fuel", parent, Ink);
-            TopLeft(panel, 30f, 136f, 235f, 90f);
+            TopLeft(panel, 30f, 136f, 235f, 64f);
             fuelBorder = panel.GetComponent<Image>();
             panel.gameObject.SetActive(!game.TutorialLevel);
             fuelLabel = FixedLabel(panel, "FUEL  100%", 16f, Day, 16f, 10f, 205f, 22f, true);
@@ -334,45 +377,33 @@ namespace Outlaws.WorldShift
         private GameObject BuildReady(RectTransform parent)
         {
             RectTransform card = MenuCard(parent, "Ready", 780f, 370f, Echo);
-            FixedLabel(card, game.TutorialLevel ? "THE BASICS" : "PRACTICE", 42f, White, 42f, 35f, 696f, 65f, true);
-            FixedLabel(card, "A / D  STEER     SPACE  SWITCH", 24f, Echo, 42f, 130f, 696f, 42f);
-            FixedLabel(card, "Learn as you drive. Checkpoint retries are on.", 20f, Muted, 42f, 192f, 696f, 40f);
-            Button(card, "DRIVE / ENTER", 42f, 270f, 338f, Echo, () => game.BeginRun());
-            Button(card, "MENU", 400f, 270f, 338f, Surface, WorldShiftFlow.Menu, White);
+            FixedLabel(card, "City practice", 42f, White, 42f, 35f, 696f, 65f, true);
+            FixedLabel(card, "A / D to steer. Space to switch worlds.", 24f, Echo, 42f, 130f, 696f, 42f);
+            FixedLabel(card, "Slip up? We'll restart nearby.", 20f, Muted, 42f, 192f, 696f, 40f);
+            Button(card, "Let's drive", 42f, 270f, 338f, Echo, () => game.BeginRun());
+            Button(card, "Back to menu", 400f, 270f, 338f, Surface, WorldShiftFlow.Menu, White);
             return card.gameObject;
         }
 
         private GameObject BuildPause(RectTransform parent)
         {
             RectTransform card = MenuCard(parent, "Paused", 780f, 370f, Echo);
-            FixedLabel(card, "PAUSED", 44f, White, 42f, 35f, 696f, 65f, true);
-            FixedLabel(card, "A / D  STEER     SPACE  SWITCH", 21f, Muted, 42f, 120f, 696f, 40f);
-            Button(card, "RESUME / ESC", 42f, 200f, 338f, Echo, () => game.TogglePause());
-            Button(card, "MENU", 400f, 200f, 338f, Surface, WorldShiftFlow.Menu, White);
-            Button(card, game.TutorialLevel ? "SKIP" : "RESTART", 42f, 278f, 338f, Surface,
-                () => { if (game.TutorialLevel) WorldShiftFlow.Next(ShiftLevel.Tutorial); else game.RestartRun(); }, White);
+            FixedLabel(card, "Paused", 44f, White, 42f, 35f, 696f, 65f, true);
+            FixedLabel(card, "Take your time.", 21f, Muted, 42f, 120f, 696f, 40f);
+            Button(card, "Keep driving", 42f, 200f, 338f, Echo, () => game.TogglePause());
+            Button(card, "Back to menu", 400f, 200f, 338f, Surface, WorldShiftFlow.Menu, White);
+            Button(card, "Start over", 42f, 278f, 338f, Surface, game.RestartRun, White);
             return card.gameObject;
         }
 
         private GameObject BuildWon(RectTransform parent)
         {
             RectTransform card = MenuCard(parent, "Complete", 780f, 440f, Success);
-            FixedLabel(card, game.TutorialLevel ? "YOU'RE READY" : "PRACTICE COMPLETE", 42f, White, 42f, 35f, 696f, 65f, true);
-            resultTime = ResultMetric(card, "TIME", "0:00", 42f);
-            resultDeaths = ResultMetric(card, "RETRIES", "0", 280f);
-            Button(card, game.TutorialLevel ? "CONTINUE" : "NEXT / DESERT", 42f, 340f, 338f, Success,
-                () => WorldShiftFlow.Next(game.TutorialLevel ? ShiftLevel.Tutorial : ShiftLevel.City));
-            Button(card, "MENU", 400f, 340f, 338f, Surface, WorldShiftFlow.Menu, White);
+            FixedLabel(card, "Nice driving!", 42f, White, 42f, 35f, 696f, 65f, true);
+            FixedLabel(card, "Want to try the desert?", 24f, Muted, 42f, 140f, 696f, 45f);
+            Button(card, "Try the desert", 42f, 300f, 338f, Success, () => WorldShiftFlow.Next(ShiftLevel.City));
+            Button(card, "Back to menu", 400f, 300f, 338f, Surface, WorldShiftFlow.Menu, White);
             return card.gameObject;
-        }
-
-        private TMP_Text ResultMetric(RectTransform parent, string title, string value, float x)
-        {
-            RectTransform panel = Panel(title, parent, Surface);
-            TopLeft(panel, x, 228f, 220f, 88f);
-            TMP_Text number = FixedLabel(panel, value, 34f, White, 20f, 9f, 180f, 43f, true);
-            FixedLabel(panel, title, 12f, Muted, 20f, 58f, 180f, 17f).characterSpacing = 1.2f;
-            return number;
         }
 
         private RectTransform MenuCard(RectTransform parent, string name, float width, float height, Color accent)

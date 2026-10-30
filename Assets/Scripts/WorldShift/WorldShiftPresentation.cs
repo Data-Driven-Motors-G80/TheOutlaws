@@ -352,7 +352,7 @@ namespace Outlaws.WorldShift
 
         private void BuildCheckpoints()
         {
-            if (game.GetawayMode) return;
+            if (game.GetawayMode || game.TutorialLevel) return;
             for (int i = 0; i <= game.Checkpoints.Length; i++)
             {
                 float at = i == game.Checkpoints.Length ? game.RunLength : game.Checkpoints[i].Distance;
@@ -365,7 +365,7 @@ namespace Outlaws.WorldShift
                 Material marker = RuntimeMaterials.Coloured(new Color(0.25f, 0.93f, 0.7f));
                 foreach (float x in new[] { -5.8f, 5.8f }) Box(root, "Checkpoint post", new Vector3(x, 2.5f, 0f), new Vector3(0.18f, 5f, 0.18f), marker);
                 Box(root, "Checkpoint lintel", new Vector3(0f, 5f, 0f), new Vector3(11.8f, 0.18f, 0.18f), marker);
-                Label(root, i == game.Checkpoints.Length ? "EXTRACTION" : "SECTOR " + (i + 1).ToString("00"),
+                Label(root, i == game.Checkpoints.Length ? "Finish" : "Checkpoint",
                     new Vector3(0f, 5.7f, 0f), 6f, new Color(0.65f, 1f, 0.86f));
             }
         }

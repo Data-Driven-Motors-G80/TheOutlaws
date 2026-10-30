@@ -4,17 +4,17 @@ WorldShift is an endless escape through Day and Night. Collect loot, reach an ex
 
 ## Play the escape
 
-Open `Assets/Scenes/WorldShift_Menu.unity` and choose **Start Escape**. The optional tutorial teaches steering, switching, and crossing the joined worlds before the escape starts. Practice buttons open City, Desert, or the basics with checkpoint retries and no bank rewards.
+Open `Assets/Scenes/WorldShift_Menu.unity` and choose **Play escape** under **Endless escape**. The first escape includes a short lesson in steering, switching, and crossing the joined worlds. **Practice** opens a separate route picker for City or Desert, with nearby retries and no bank rewards. **New here? Learn to play** opens the lesson on its own.
 
 - **A / D or arrows:** steer.
 - **Space:** switch Day and Night. In joined sections, steer between the two halves instead.
-- **Escape:** pause. Leaving through **Abandon Loot** forfeits the carried haul.
+- **Escape:** pause. Choosing **Leave this run** forfeits the carried haul; the pause screen states the amount before you choose.
 
 The first version alternates City and Desert indefinitely. Snow and Ocean Coast remain existing environment scenes; they are not yet connected to this escape loop. More environments can join the same segment boundary once they have validated WorldShift routes.
 
 ## The risk decision
 
-Each environment ends with a clear 220-metre approach, beyond its authored hazards. Green **Bank** markings cover the left and centre of the road. Amber **Risk** markings occupy the right lane. The HUD highlights the lane currently selected and shows the amount that can be banked and the next environment's loot multiplier.
+Each environment ends with a clear 220-metre approach, beyond its authored hazards. Green **Exit** markings cover the left and centre of the road. Amber **Next** markings occupy the right lane. The HUD highlights the lane currently selected and shows the amount that can be banked and the next environment's loot multiplier.
 
 The choice commits at the final gate. Steer right of the marked lane boundary to continue; otherwise extract. No extra button or timed popup is needed. Fuel consumption and pursuit closing pause inside the marked exit approach so the player can read the choice. Steering and forward motion continue.
 
@@ -30,13 +30,13 @@ The bank and best haul save locally across sessions. A live haul is not saved an
 
 ## Clear screens and short guidance
 
-The main menu gives priority to **Start Escape**, followed by a tutorial toggle and optional practice. It states the stakes in one sentence.
+The home screen has two mode cards: **Endless escape** and **Practice**. Each gets a short, plain explanation and one action. Route selection appears only after choosing Practice. The home screen has no bank totals, keyboard legend, or tutorial toggle competing with the mode choices.
 
-The escape HUD shows carried loot with **At Risk**, the current world, environment leg, a route progress bar, fuel, and the pursuit mirror. It removes sector descriptions, switch counts, retry counts, and the speed readout. Controls fade after the opening and remain available in pause.
+The lesson shows one friendly prompt at a time, such as **Tap Space to try night.** It has no driving statistics, sector headings, or extra control panels. Completion says **You've got it!** and names the next action: starting an escape or trying a practice route.
 
-Guidance appears near the moment it matters: **Switch worlds**, **Jump, then switch**, **Land in Night**, or **Cross worlds**. The tutorial presents one action per lesson, without paragraphs. The exit uses two short choices: **Left / Bank** and **Right / Risk**. Results show money banked or lost and offer **New Escape** and **Menu**.
+The escape HUD shows **Your loot**, the current world, the environment, a route progress bar, fuel, and the pursuit mirror. Leg numbers and persistent reward multipliers are removed; the next reward rate appears only at an exit, where it helps the decision. Controls fade after the opening. The exit offers **Left: Cash out** and **Right: Keep going**, with no extra instruction banner.
 
-Practice retains its checkpoint safety net and uses shorter ready, pause, and completion screens. This keeps learning separate from the stakes of a scored escape.
+Pause and results hide the driving HUD completely. **Leave this run** is paired with a short sentence saying how much loot will be lost. Success says **Nice getaway!** and shows the saved amount. Failure explains what happened in everyday language and offers **Play again**. Practice screens follow the same tone, without scorecards or retry counts.
 
 ## Implementation
 

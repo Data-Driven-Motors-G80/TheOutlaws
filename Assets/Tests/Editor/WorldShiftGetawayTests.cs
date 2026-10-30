@@ -52,6 +52,11 @@ public sealed class WorldShiftGetawayTests
         Call(city, "StepSimulation", 3f, 0f, false);
         Assert.That(Run.Carried, Is.EqualTo(300));
         Call(city, "TogglePause"); float d = (float)Get(city, "Distance");
+        var getawayHud = Find("WorldShiftGetaway");
+        Call(getawayHud, "Refresh");
+        var drivingHud = (GameObject)getawayHud.GetType().GetField("drivingHud", Flags).GetValue(getawayHud);
+        Assert.That(drivingHud.activeSelf, Is.False, "Pause must hide the driving UI.");
+        Capture("paused");
         Call(city, "StepSimulation", 2f, 1f, true);
         Assert.That(Get(city, "Distance"), Is.EqualTo(d));
         Assert.That(Run.Carried, Is.EqualTo(300));
@@ -69,6 +74,7 @@ public sealed class WorldShiftGetawayTests
         Assert.That(PlayerPrefs.GetInt("WorldShift.Getaway.Bank"), Is.EqualTo(total));
         Assert.That(Run.Carried, Is.Zero);
         Capture("banked");
+        Assert.That(drivingHud.activeSelf, Is.False, "Results must hide the driving UI.");
     }
 
     [UnityTest]

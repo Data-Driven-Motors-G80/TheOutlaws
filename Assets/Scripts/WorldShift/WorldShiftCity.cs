@@ -82,7 +82,7 @@ namespace Outlaws.WorldShift
         public string SectionTitle => Checkpoints[checkpointIndex].Title;
         public string SectionHint => relay != null && relay.Hint(Distance, World).Length > 0 ? relay.Hint(Distance, World)
             : !splitViewValidation && Distance >= MergeStart - 64f && Distance < MergeStart
-            ? "WORLDS JOIN AHEAD"
+            ? "Day and night meet up ahead."
             : hintRemaining > 0f ? Checkpoints[checkpointIndex].Hint : "";
         public WorldShiftRoute Route { get; private set; }
         public Transform Player { get; private set; }

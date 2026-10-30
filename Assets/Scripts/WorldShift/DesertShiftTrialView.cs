@@ -25,7 +25,7 @@ namespace Outlaws.WorldShift
         private ShiftWorld? displayed;
         private Material rockDay, rockNight, sandDay, sandNight;
         private TMP_Text title, worldLabel, hint, progress, modalText;
-        private GameObject modal;
+        private GameObject modal, practiceHud;
         private RectTransform progressFill;
         private GameObject obstaclePrefab;
         private readonly List<GameObject> fuelViews = new List<GameObject>();
@@ -313,26 +313,27 @@ namespace Outlaws.WorldShift
             view.transform.SetPositionAndRotation(cameraPosition,
                 Quaternion.LookRotation(game.DriverPoint(game.Distance + 22f).Position + Vector3.up * .7f - cameraPosition));
             if (game.GetawayMode) return;
-            title.text = "DESERT / " + (game.FullLevel ? DesertShiftLevel.Titles[game.Stage] : new[] { "1  FREEZE AN OPENING", "2  CONNECT TWO OPENINGS", "3  RELEASE + FREEZE AGAIN" }[game.Stage]);
-            worldLabel.text = game.IsMerged ? "DAY | NIGHT" : day ? "DAY / MOVING" : "NIGHT / FROZEN";
+            title.text = "Desert practice";
+            worldLabel.text = game.IsMerged ? "Day + night" : day ? "Day" : "Night";
             worldLabel.color = day ? Gold : Cyan;
             hint.text = game.State == ShiftRunState.Retrying || game.Duration < 10f || game.IsAirborne || game.IsMerged && game.Distance < game.MergeStart + 70f ? game.Hint : "";
             controls.transform.parent.gameObject.SetActive(game.Duration < 8f || game.State != ShiftRunState.Running);
             controls.text = game.IsMerged ? "A / D  CROSS     ESC  PAUSE"
                 : "A / D  STEER     SPACE  SWITCH     ESC  PAUSE";
-            progress.text = Mathf.FloorToInt(game.Distance / game.RunLength * 100f) + "%";
+            progress.text = "";
             progressFill.anchorMax = new Vector2(game.Distance / game.RunLength, 1f);
-            status.text = game.FullLevel ? "FUEL " + Mathf.CeilToInt(game.FuelFraction * 100f) + "%    POLICE " + Mathf.CeilToInt(game.PursuitGap) + " m" : "";
+            status.text = game.FullLevel ? "Fuel " + Mathf.CeilToInt(game.FuelFraction * 100f) + "%" + (game.PursuitGap < 23f ? "   They're close!" : "") : "";
             status.color = game.FuelFraction < .25f || game.PursuitGap < 23f ? new Color(1f, .3f, .2f) : Gold;
             mirrorPanel.SetActive(game.RearView != null);
             if (game.RearView != null) mirror.texture = game.RearView.Texture;
             bool menu = game.State == ShiftRunState.Ready || game.State == ShiftRunState.Paused || game.State == ShiftRunState.Won;
             modal.SetActive(menu);
+            practiceHud.SetActive(!menu);
             modalText.text = game.State == ShiftRunState.Ready
-                ? "DESERT PRACTICE\n\nDay moves. Night freezes.\n\nA / D  Steer     SPACE  Switch"
-                : game.State == ShiftRunState.Won ? "PRACTICE COMPLETE\n\n" + game.Duration.ToString("0.0") + "s   /   " + game.Retries + " retries"
-                : "PAUSED\n\nA / D  Steer     SPACE  Switch";
-            actionLabel.text = game.State == ShiftRunState.Ready ? "DRIVE / ENTER" : game.State == ShiftRunState.Won ? "REPLAY" : "RESUME / ESC";
+                ? "Desert practice\n\nThings move in day and freeze in night.\nGive Space a try."
+                : game.State == ShiftRunState.Won ? "Nice driving!\n\nFancy another go?"
+                : "Paused\n\nTake your time.";
+            actionLabel.text = game.State == ShiftRunState.Ready ? "Let's drive" : game.State == ShiftRunState.Won ? "Try again" : "Keep driving";
         }
 
         private void BuildHud()
@@ -342,7 +343,10 @@ namespace Outlaws.WorldShift
             canvasObject.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
             var scaler = canvasObject.GetComponent<CanvasScaler>(); scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1280f, 720f); scaler.matchWidthOrHeight = .5f;
-            Transform canvas = canvasObject.transform;
+            var driving = Panel(canvasObject.transform, "Practice drive", Vector2.zero, Vector2.one);
+            driving.GetComponent<Image>().color = Color.clear;
+            practiceHud = driving.gameObject;
+            Transform canvas = driving;
             var header = Panel(canvas, "Header", new Vector2(.02f, .83f), new Vector2(.98f, .98f));
             title = Text(header, new Vector2(.02f, .50f), new Vector2(.65f, .98f), 24f);
             worldLabel = Text(header, new Vector2(.02f, .05f), new Vector2(.62f, .50f), 22f);
@@ -363,14 +367,14 @@ namespace Outlaws.WorldShift
             var footer = Panel(canvas, "Controls", new Vector2(.13f, .025f), new Vector2(.87f, .09f));
             controls = Text(footer, Vector2.zero, Vector2.one, 20f); controls.alignment = TextAlignmentOptions.Center;
             controls.text = "A / D  STEER     SPACE  SWITCH     ESC  PAUSE";
-            modal = Panel(canvas, "State", new Vector2(.17f, .22f), new Vector2(.83f, .71f)).gameObject;
+            modal = Panel(canvasObject.transform, "State", new Vector2(.17f, .22f), new Vector2(.83f, .71f)).gameObject;
             modalText = Text(modal.transform, new Vector2(.04f, .24f), new Vector2(.96f, .96f), 25f);
             modalText.alignment = TextAlignmentOptions.Center;
             if (UnityEngine.EventSystems.EventSystem.current == null)
                 new GameObject("Desert UI input", typeof(UnityEngine.EventSystems.EventSystem), typeof(UnityEngine.InputSystem.UI.InputSystemUIInputModule)).transform.SetParent(transform, false);
             actionLabel = WorldShiftMenu.Button(modal.transform, "START", new Vector2(.04f, .04f), new Vector2(.48f, .21f), () =>
             { if (game.State == ShiftRunState.Ready) game.Begin(); else if (game.State == ShiftRunState.Won) game.Restart(); else game.TogglePause(); }).GetComponentInChildren<TMP_Text>();
-            WorldShiftMenu.Button(modal.transform, "MENU", new Vector2(.52f, .04f), new Vector2(.96f, .21f), WorldShiftFlow.Menu);
+            WorldShiftMenu.Button(modal.transform, "Back to menu", new Vector2(.52f, .04f), new Vector2(.96f, .21f), WorldShiftFlow.Menu);
         }
         private static RectTransform Panel(Transform parent, string name, Vector2 min, Vector2 max)
         {

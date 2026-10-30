@@ -105,22 +105,22 @@ namespace Outlaws.WorldShift
         {
             new ShiftCheckpoint(0f, ShiftWorld.Day, 0f,
                 "CITY",
-                "SPACE  /  SWITCH WORLDS"),
+                "Tap Space to switch worlds."),
             new ShiftCheckpoint(560f, ShiftWorld.Day, 0f,
                 "DAY RAMP",
-                "JUMP, THEN SWITCH TO NIGHT"),
+                "Take the jump, then switch to night."),
             new ShiftCheckpoint(1120f, ShiftWorld.Echo, 0f,
                 "BROKEN BRIDGE",
-                "SWITCH BEFORE THE GAP"),
+                "Switch worlds before the gap."),
             new ShiftCheckpoint(1680f, ShiftWorld.Echo, 0f,
                 "NIGHT RAMP",
-                "JUMP, THEN SWITCH TO DAY"),
+                "Take the jump, then switch to day."),
             new ShiftCheckpoint(2240f, ShiftWorld.Day, 0f,
                 "FINAL JUMP",
-                "JUMP, THEN SWITCH TO NIGHT"),
+                "Take the jump, then switch to night."),
             new ShiftCheckpoint(2800f, ShiftWorld.Day, -3.2f,
                 "WORLDS JOIN",
-                "A / D  /  CROSS WORLDS")
+                "Now steer between day and night.")
         };
 
         public static readonly ShiftHazard[] Hazards =
