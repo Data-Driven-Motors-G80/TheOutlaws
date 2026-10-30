@@ -117,7 +117,7 @@ namespace Outlaws.WorldShift
                 "Drive up the ramp to jump."),
             new ShiftCheckpoint(2800f, ShiftWorld.Day, -3.2f,
                 "HOME STRETCH",
-                "Switch worlds or steer around the walls.")
+                "Steer around it or tap Space.")
         };
 
         public static readonly ShiftHazard[] Hazards =

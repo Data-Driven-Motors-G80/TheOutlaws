@@ -37,7 +37,7 @@ namespace Outlaws.WorldShift
                 var target = FindTarget();
                 if (target.Key == null || !target.Breakable) return "";
                 if (Ammo > 0) return "F or click to break it.";
-                return target.Key is WorldShiftForkRoad.Blocker ? "Steer around it." : "Steer or switch around it.";
+                return target.Key is WorldShiftForkRoad.Blocker ? "Steer around it." : "Steer around it or tap Space.";
             }
         }
         public void Bind(WorldShiftCity game) { city = game; Initialize(); }
