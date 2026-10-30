@@ -106,7 +106,11 @@ namespace Outlaws.WorldShift
         public RearViewCamera RearView { get; private set; }
         public WorldShiftRelay Relay { get; private set; }
         public bool IsAirborne => Relay != null && Relay.IsAirborne;
-        public RoadPathPoint DriverPoint(float distance) => Relay != null ? Relay.SampleDriver(distance) : Route.Sample(distance);
+        public RoadPathPoint DriverPoint(float distance)
+        {
+            var ground = Relay != null ? Relay.SampleDriver(distance) : Route.Sample(distance);
+            return Getaway?.Extras != null ? Getaway.Extras.Sample(distance, ground) : ground;
+        }
         public RoadPathPoint RockPoint(DesertTrialRock rock) => rock.Airborne
             ? Relay.SampleFlight(DesertShiftLevel.Relays[0], rock.Distance) : Route.Sample(rock.Distance);
         public bool IsFuelTaken(int index) => collectedFuel.Contains(index);
@@ -239,8 +243,10 @@ namespace Outlaws.WorldShift
                 elapsed += dt;
                 float before = Distance, previousX = Lateral;
                 float speed = Relay != null ? Relay.SpeedAt(Distance) : Speed;
+                Getaway?.Extras.BeginStep(before, before + speed * dt, previousX);
                 if (Relay != null) Relay.BeginStep(Distance, Distance + speed * dt, World);
                 driver.StepExternal(dt, IsAirborne ? steer * .65f : steer, speed);
+                Getaway?.Extras.FinishStep(driver.RoadPositionDistance, driver);
                 Distance = Mathf.Min(RunLength, driver.RoadPositionDistance);
                 if (Relay != null)
                 {
@@ -263,7 +269,7 @@ namespace Outlaws.WorldShift
                 messageTime -= dt;
                 if (fullLevel)
                 {
-                    if (!GetawayMode || !Getaway.InExit)
+                    if (!GetawayMode || !Getaway.InRecovery)
                     {
                         fuel.Tick(dt, 1.5f);
                         pursuit.Tick(dt, speed, speed + .04f + (GetawayMode ? WorldShiftFlow.Escape.ExtraPursuitSpeed : 0f));
@@ -372,6 +378,7 @@ namespace Outlaws.WorldShift
         {
             if (State != ShiftRunState.Running || !contacts.Add(id)) return;
             if (!fullLevel) { Fail(reason); return; }
+            if (Getaway != null && Getaway.Extras.BlocksImpact(pursuit.CollisionProtectionRemaining > 0f)) return;
             if (!pursuit.TryCrash(.5f)) return;
             Notify("POLICE CLOSER", 1.3f);
             if (pursuit.IsGameOver) Fail("CAUGHT");

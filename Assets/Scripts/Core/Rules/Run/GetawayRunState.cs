@@ -9,11 +9,26 @@ public sealed class GetawayRunState
     public int Carried { get; private set; }
     public int SettledHaul { get; private set; }
     public string Failure { get; private set; } = "";
+    public bool HasShield { get; private set; }
     public float LootMultiplier => 1f + Math.Min(Leg, 40) * .5f;
     public float ExtraPursuitSpeed => Math.Min(Leg, 6) * .025f;
 
     public void Begin()
-    { Status = RunStatus.Running; Leg = Carried = SettledHaul = 0; Failure = ""; }
+    { Status = RunStatus.Running; Leg = Carried = SettledHaul = 0; Failure = ""; HasShield = false; }
+
+    public bool CollectShield()
+    {
+        if (Status != RunStatus.Running || HasShield) return false;
+        HasShield = true;
+        return true;
+    }
+
+    public bool AbsorbHit()
+    {
+        if (Status != RunStatus.Running || !HasShield) return false;
+        HasShield = false;
+        return true;
+    }
 
     public int Collect(int baseValue)
     {
@@ -34,14 +49,14 @@ public sealed class GetawayRunState
     public int Bank()
     {
         if (Status != RunStatus.Running) return 0;
-        SettledHaul = Carried; Carried = 0; Status = RunStatus.Banked;
+        SettledHaul = Carried; Carried = 0; HasShield = false; Status = RunStatus.Banked;
         return SettledHaul;
     }
 
     public void Lose(string reason)
     {
         if (Status != RunStatus.Running) return;
-        Failure = reason; SettledHaul = Carried; Carried = 0; Status = RunStatus.Lost;
+        Failure = reason; SettledHaul = Carried; Carried = 0; HasShield = false; Status = RunStatus.Lost;
     }
 
     public void Leave() { Lose("RUN ABANDONED"); }

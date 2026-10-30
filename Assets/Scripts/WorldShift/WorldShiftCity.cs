@@ -111,7 +111,11 @@ namespace Outlaws.WorldShift
             // Keep a consistently recognisable player in both palettes.
             body.GetComponent<Renderer>().sharedMaterial = RuntimeMaterials.Coloured(new Color(1f, 0.76f, 0.18f));
             driver = Player.gameObject.AddComponent<AutoDriveCar>();
-            driver.ConfigureExternalRoute(d => relay != null ? relay.SampleDriver(d) : Route.Sample(d), visual, WorldShiftLevel.Speed);
+            driver.ConfigureExternalRoute(d =>
+            {
+                var ground = relay != null ? relay.SampleDriver(d) : Route.Sample(d);
+                return Getaway?.Extras != null ? Getaway.Extras.Sample(d, ground) : ground;
+            }, visual, WorldShiftLevel.Speed);
             presentation = gameObject.AddComponent<WorldShiftPresentation>();
             presentation.Build(this, Route, visual, view, sun, obstaclePrefab, policePrefab, streetlightPrefab, fuelPrefab);
             ConfigureSound();
@@ -240,18 +244,20 @@ namespace Outlaws.WorldShift
                 simulatedTime += dt;
                 float previous = Distance, previousLateral = Lateral;
                 float speed = Speed;
+                Getaway?.Extras.BeginStep(previous, previous + speed * dt, previousLateral);
                 if (relay != null)
                 {
-                    driver.ExternalVerticalControl = WorldShiftRelay.At(previous) != null;
+                    driver.ExternalVerticalControl = WorldShiftRelay.At(previous) != null || (Getaway?.Extras.Jump.Traversing ?? false);
                     if (relay.BeginStep(previous, previous + speed * dt, World))
                         Notify("SPACE  /  SWITCH TO LAND", 2.5f);
                 }
                 driver.StepExternal(dt, IsRelayAirborne ? steer * .4f : steer, speed);
+                Getaway?.Extras.FinishStep(driver.RoadPositionDistance, driver);
                 float nextLateral = driver.LateralOffset;
                 float next = Mathf.Min(RunLength, driver.RoadPositionDistance);
                 ShiftHazard hit = IsRelayAirborne ? null : FindCollision(World, previous, next, previousLateral, nextLateral, true);
                 Duration += dt;
-                if (!GetawayMode || !Getaway.InExit)
+                if (!GetawayMode || !Getaway.InRecovery)
                 {
                     fuel.Tick(dt, tutorialLevel ? 0f : WorldShiftLevel.FuelConsumption);
                     pursuit.Tick(dt, speed, speed + (tutorialLevel ? 0f : Mathf.Lerp(.03f, .14f, Progress)) + (GetawayMode ? WorldShiftFlow.Escape.ExtraPursuitSpeed : 0f));
@@ -331,6 +337,8 @@ namespace Outlaws.WorldShift
             if (hit == null) return;
             if (hit.Kind == ShiftHazardKind.Gap) { Fail("NO ROAD"); return; }
             hitHazards.Add(hit);
+            if (Getaway != null && Getaway.Extras.BlocksImpact(pursuit.CollisionProtectionRemaining > 0f))
+            { presentation.OnHazardImpact(hit, lateral); return; }
             if (!pursuit.TryCrash(CollisionPursuitDrain)) return;
             Hits++;
             presentation.OnHazardImpact(hit, lateral);
@@ -495,7 +503,7 @@ namespace Outlaws.WorldShift
                 Mathf.InverseLerp(MergeStart - 56f, MergeStart - 16f, Distance)));
             Vector3 desired = point.Position - point.Forward * 12f + Vector3.up * 6.4f + point.Right * Lateral * follow;
             bool falling = State == ShiftRunState.Retrying && (lastFailure == "NO ROAD" || lastFailure == "MISSED RELAY LANDING");
-            if (IsRelayAirborne && !falling) desired.y += Player.position.y - point.Position.y - .08f;
+            if ((IsRelayAirborne || (Getaway?.Extras.Jump.Traversing ?? false)) && !falling) desired.y += Player.position.y - point.Position.y - .08f;
             if (falling) desired = point.Position - point.Forward * 2f + Vector3.up * 10f;
             float blend = immediate ? 1f : 1f - Mathf.Exp(-8f * Time.unscaledDeltaTime);
             view.transform.position = Vector3.Lerp(view.transform.position, desired, blend);

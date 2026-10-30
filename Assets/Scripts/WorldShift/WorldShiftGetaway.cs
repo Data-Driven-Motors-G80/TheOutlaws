@@ -9,13 +9,13 @@ namespace Outlaws.WorldShift
     /// <summary>Shared escape pickups, extraction gate and concise UI for both environments.</summary>
     public sealed class WorldShiftGetaway : MonoBehaviour
     {
-        public const float ExitTail = 220f;
+        public const float ExitTail = 400f;
         public const float ContinueBoundary = 1.8f;
         private sealed class Loot
         {
             public float At, X;
             public ShiftWorld World;
-            public bool Taken;
+            public bool Taken, Bonus;
             public Transform Visual;
         }
         private WorldShiftCity city;
@@ -38,16 +38,18 @@ namespace Outlaws.WorldShift
         private static readonly Color Cyan = new Color(.3f, .85f, 1f);
         private static readonly Color Green = new Color(.4f, 1f, .68f);
         private static readonly Color Ink = new Color(.025f, .045f, .07f, .96f);
-        public bool InExit => Distance >= environmentEnd + 20f;
+        public bool InRecovery => Distance >= environmentEnd + 20f;
+        public bool InExit => Distance >= environmentEnd + 180f;
+        public WorldShiftGetawayExtras Extras { get; private set; }
         private bool IsCity => city != null;
-        private float Distance => IsCity ? city.Distance : desert.Distance;
+        internal float Distance => IsCity ? city.Distance : desert.Distance;
         private float Lateral => IsCity ? city.Lateral : desert.Lateral;
-        private float Duration => IsCity ? city.Duration : desert.Duration;
+        internal float Duration => IsCity ? city.Duration : desert.Duration;
         private float Length => environmentEnd + ExitTail;
         private float Fuel => IsCity ? city.FuelFraction : desert.FuelFraction;
         private float Gap => IsCity ? city.PursuitGap : desert.PursuitGap;
         private bool Merged => IsCity ? city.IsMerged : desert.IsMerged;
-        private ShiftWorld World => IsCity ? city.World : desert.World;
+        internal ShiftWorld World => IsCity ? city.World : desert.World;
         private ShiftRunState State => IsCity ? city.State : desert.State;
         private WorldShiftRoute Route => IsCity ? city.Route : desert.Route;
         private RearViewCamera RearView => IsCity ? city.RearView : desert.RearView;
@@ -79,6 +81,13 @@ namespace Outlaws.WorldShift
                 for (int i = 0; i < 10; i++)
                     AddLoot(desert.FuelDistance(i), 0f, i % 2 == 0 ? ShiftWorld.Day : ShiftWorld.Echo, gold, handle);
             }
+            Extras = gameObject.AddComponent<WorldShiftGetawayExtras>();
+            Extras.Bind(this, Route, IsCity ? city.Player : desert.Player, environmentEnd, MakeMaterial);
+            foreach (float at in new[] { Extras.Jump.Start + 8f, Extras.Jump.Start + 22f, Extras.Jump.Takeoff + 8f,
+                Extras.Jump.Takeoff + 24f, Extras.Jump.Takeoff + 42f, Extras.Jump.Landing - 8f })
+                AddLoot(at, WorldShiftBonusJump.Lane, ShiftWorld.Echo, gold, handle, Extras.Jump.HeightAt(at), true);
+            AddLoot(Extras.Jump.Start + 16f, -3.2f, ShiftWorld.Day, gold, handle);
+            AddLoot(Extras.Jump.Start + 60f, -3.2f, ShiftWorld.Day, gold, handle);
             BuildExit();
             BuildHud();
             Present(World);
@@ -94,23 +103,25 @@ namespace Outlaws.WorldShift
             return material;
         }
 
-        private void AddLoot(float at, float x, ShiftWorld owner, Material gold, Material handle)
+        private void AddLoot(float at, float x, ShiftWorld owner, Material gold, Material handle, float rise = 0f, bool bonus = false)
         {
             RoadPathPoint point = Route.Sample(at);
             var root = new GameObject("Loot " + owner + " " + at).transform;
             root.SetParent(transform, false);
-            root.SetPositionAndRotation(point.Position + point.Right * x + Vector3.up * .9f, Quaternion.LookRotation(point.Forward));
+            root.SetPositionAndRotation(point.Position + point.Right * x + Vector3.up * (.9f + rise), Quaternion.LookRotation(point.Forward));
             Box(root, new Vector3(0f, 1.1f, 0f), new Vector3(1f, .7f, .45f), gold);
             Box(root, new Vector3(0f, 1.55f, 0f), new Vector3(.45f, .16f, .16f), handle);
             WorldLabel(root, "$", new Vector3(0f, 2.3f, 0f), Gold, 5f);
-            loot.Add(new Loot { At = at, X = x, World = owner, Visual = root });
+            loot.Add(new Loot { At = at, X = x, World = owner, Visual = root, Bonus = bonus });
         }
 
         public void Collect(float from, float to, float fromX, float toX)
         {
             if (State != ShiftRunState.Running) return;
+            Extras.Collect(from, to, fromX, toX);
             foreach (var item in loot)
             {
+                if (item.Bonus && !Extras.Jump.Traversing) continue;
                 if (item.Taken || to < item.At - 1.3f || from > item.At + 1.3f) continue;
                 bool joined = IsCity ? city.IsJoinedDistance(item.At) : item.At >= desert.MergeStart;
                 if (joined ? item.World != WorldShiftLevel.WorldAt(item.X) : item.World != World) continue;
@@ -138,6 +149,7 @@ namespace Outlaws.WorldShift
 
         public void Present(ShiftWorld displayedWorld)
         {
+            Extras?.Present(displayedWorld);
             foreach (var item in loot)
             {
                 bool visible = !item.Taken && item.World == displayedWorld && item.At > Distance - 10f && item.At < Distance + 180f;
@@ -148,7 +160,7 @@ namespace Outlaws.WorldShift
         private void BuildExit()
         {
             Material safe = MakeMaterial(Green), risk = MakeMaterial(Gold);
-            for (float at = environmentEnd + 25f; at < Length; at += 18f)
+            for (float at = environmentEnd + 200f; at < Length; at += 18f)
             {
                 RoadPathPoint point = Route.Sample(at);
                 var root = new GameObject("Extraction lane marker").transform;
@@ -158,7 +170,7 @@ namespace Outlaws.WorldShift
                 Box(root, new Vector3(3.3f, .045f, 0f), new Vector3(.3f, .06f, 4f), risk);
                 Box(root, new Vector3(ContinueBoundary, .04f, 0f), new Vector3(.08f, .05f, 6f), risk);
             }
-            foreach (float at in new[] { environmentEnd + 60f, Length })
+            foreach (float at in new[] { environmentEnd + 240f, Length })
             {
                 RoadPathPoint point = Route.Sample(at);
                 var root = new GameObject("Bank or continue gate").transform;
@@ -291,6 +303,7 @@ namespace Outlaws.WorldShift
         private void Refresh()
         {
             var run = WorldShiftFlow.Escape;
+            Extras.Refresh();
             bool running = State == ShiftRunState.Running;
             bool settled = run.Status == GetawayRunState.RunStatus.Banked || run.Status == GetawayRunState.RunStatus.Lost;
             world.text = Merged ? "Day + night" : World == ShiftWorld.Day ? "Day" : "Night";
@@ -317,7 +330,8 @@ namespace Outlaws.WorldShift
             chaseGoal.alpha = opening ? 1f - Mathf.Clamp01((Duration - 5.5f) / 1.5f) : 0f;
             // The goal stays readable even when the opening bags are collected.
             // Keep immediate road guidance available; don't stack pickup messages beneath it.
-            guidance.text = !running || InExit ? "" : opening ? CityHint()
+            guidance.text = !running || InExit ? "" : Extras.Feedback.Length > 0 ? Extras.Feedback
+                : Extras.Hint.Length > 0 ? Extras.Hint : opening ? (IsCity ? CityHint() : DesertHint())
                 : Time.unscaledTime < pickupUntil ? pickupMessage : IsCity ? CityHint() : DesertHint();
             drivingHud.SetActive(!settled && State != ShiftRunState.Paused);
             pause.SetActive(State == ShiftRunState.Paused);

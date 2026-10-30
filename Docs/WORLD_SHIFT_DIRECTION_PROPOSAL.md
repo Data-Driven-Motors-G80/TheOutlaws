@@ -14,15 +14,19 @@ The first version alternates City and Desert indefinitely. Snow and Ocean Coast 
 
 ## The risk decision
 
-Each environment ends with a clear 220-metre approach, beyond its authored hazards. Green **Exit** markings cover the left and centre of the road. Amber **Next** markings occupy the right lane. The HUD highlights the lane currently selected and shows the amount that can be banked and the next environment's loot multiplier.
+Each environment ends with a clear 400-metre extension beyond its authored hazards. The first part offers an optional loot ramp; the final 220 metres offer extraction. Green **Exit** markings cover the left and centre of the road. Amber **Next** markings occupy the right lane. The HUD highlights the lane currently selected and shows the amount that can be banked and the next environment's loot multiplier.
 
-The choice commits at the final gate. Steer right of the marked lane boundary to continue; otherwise extract. No extra button or timed popup is needed. Fuel consumption and pursuit closing pause inside the marked exit approach so the player can read the choice. Steering and forward motion continue.
+The choice commits at the final gate. Steer right of the marked lane boundary to continue; otherwise extract. No extra button or timed popup is needed. Fuel consumption and pursuit closing pause through this clear bonus and exit stretch so the player can read the choice. Steering and forward motion continue.
 
 Extraction deposits the carried amount once, updates the best banked haul, and shows the result. Continuing preserves the entire carried haul and loads the next environment automatically. Each new environment starts with a full tank and normal police separation, providing a brief recovery between legs.
 
 ## Rewards and difficulty
 
 Gold briefcases marked with a dollar sign are loot. Collect them by driving through them in their world. The opening trail provides a safe introduction; later rewards follow existing fuel locations to offer world and lane choices. Each pickup can be collected once per environment visit.
+
+A cyan shield pickup sits on the left near the start of each escape leg, in Day. Driving through it automatically equips one shield, shown by cyan rings around the car. It absorbs one solid impact, with a brief grace period for overlapping contacts. Shields do not stack, carry across continued environments, and disappear when used or the run ends. They do not prevent falls, capture from a depleted pursuit gap, or running out of fuel.
+
+Before each extraction, an optional right-lane ramp leads through six elevated bags. A wide ground route on the left offers two bags. The ramp takes off automatically, guides the short approach with low rails, and restores full steering in the air. The landing is supported by the ordinary road in either world; this bonus jump never requires a world switch. Bags follow the actual flight arc, and their rewards require taking the ramp, so they cannot be collected by driving underneath. Existing world-switch relay jumps remain unchanged.
 
 The first environment pays $100 per briefcase. Each continued leg adds 0.5 to the loot multiplier: x1, x1.5, x2, and so on, capped at x21. Later legs also add pursuit closing speed, capped after six continues. Existing hazards, relays, and the desert's freeze mechanic remain. Repeated visits reuse the authored layouts; procedural generation is a later extension.
 
@@ -45,6 +49,7 @@ Pause and results hide the driving HUD completely. **Leave this run** is paired 
 - `GetawayRunState` owns carried loot, leg progression, reward scaling, and one-time settlement.
 - `WorldShiftFlow` owns the escape session, scene transitions, and local bank persistence.
 - `WorldShiftGetaway` shares pickups, exit geometry, and escape UI between City and Desert.
+- `WorldShiftBonusJump` shares the optional ramp and flight curve across simulation and geometry. `WorldShiftGetawayExtras` adds the ramp, landing markings, shield pickup, protection grace period, and visible shield rings.
 - Existing City and Desert simulations collect loot through swept road-coordinate checks and end the escape on failure. Checkpoint retry commands are disabled in escape mode.
 - The existing Day/Night compositor presents each loot pickup in its owning world without advancing the simulation twice.
 

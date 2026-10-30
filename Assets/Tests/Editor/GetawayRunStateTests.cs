@@ -3,6 +3,23 @@ using NUnit.Framework;
 public sealed class GetawayRunStateTests
 {
     [Test]
+    public void ShieldDoesNotStackAndCarriesUntilOneHitOrSettlement()
+    {
+        var run = new GetawayRunState(); run.Begin();
+        Assert.That(run.CollectShield(), Is.True);
+        Assert.That(run.CollectShield(), Is.False);
+        run.Continue();
+        Assert.That(run.HasShield, Is.True);
+        Assert.That(run.AbsorbHit(), Is.True);
+        Assert.That(run.AbsorbHit(), Is.False);
+        run.CollectShield(); run.Bank();
+        Assert.That(run.HasShield, Is.False);
+        Assert.That(run.CollectShield(), Is.False);
+        run.Begin(); run.CollectShield(); run.Lose("FELL OFF ROAD");
+        Assert.That(run.HasShield, Is.False);
+    }
+
+    [Test]
     public void ContinuingRisksExistingHaulAndRaisesFutureRewards()
     {
         var run = new GetawayRunState();

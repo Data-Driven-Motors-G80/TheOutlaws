@@ -141,6 +141,101 @@ public sealed class WorldShiftGetawayTests
         yield return null; Capture("caught");
     }
 
+    [UnityTest]
+    public IEnumerator OptionalJumpsWorkInBothEnvironmentsAndGroundRouteCannotCollectAirLoot()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
+        yield return new EnterPlayMode();
+        Flow("StartGetaway", false); yield return null; yield return null;
+        for (int leg = 0; leg < 3; leg++)
+        {
+            var game = Find(leg == 1 ? "DesertShiftTrial" : "WorldShiftCity"); game.enabled = false;
+            var getaway = Get(game, "Getaway");
+            var extras = Get(getaway, "Extras"); var jump = Get(extras, "Jump");
+            float start = (float)jump.GetType().GetField("Start").GetValue(jump);
+            float takeoff = (float)jump.GetType().GetField("Takeoff").GetValue(jump);
+            float landing = (float)jump.GetType().GetField("Landing").GetValue(jump);
+            int before = Run.Carried;
+            float lane = leg == 2 ? -3.2f : 3.2f;
+            Pose(game, start - 8f, lane);
+            Advance(game, start - 1f, lane);
+            if (leg < 2) Capture(leg == 0 ? "city-bonus-approach" : "desert-bonus-approach");
+            Advance(game, takeoff + 12f, lane);
+            var player = (Transform)Get(game, "Player");
+            object point = Call(Get(game, "Route"), "Sample", Get(game, "Distance"));
+            float height = player.position.y - ((Vector3)Get(point, "Position")).y;
+            Assert.That(Get(jump, "Airborne"), Is.EqualTo(leg != 2));
+            Assert.That(height, leg == 2 ? Is.LessThan(.4f) : Is.GreaterThan(4f));
+            if (leg == 0)
+            {
+                Call(game, "TogglePause"); float distance = (float)Get(game, "Distance");
+                Call(game, "StepSimulation", 1f, -1f, false);
+                Assert.That(Get(game, "Distance"), Is.EqualTo(distance));
+                Assert.That(player.position.y, Is.EqualTo(((Vector3)Get(point, "Position")).y + height));
+                Call(game, "TogglePause");
+            }
+            Capture(leg == 2 ? "ground-bypass" : leg == 0 ? "city-bonus-air" : "desert-bonus-air");
+            Advance(game, landing + 18f, lane);
+            Assert.That(Get(jump, "Completed"), Is.EqualTo(leg != 2));
+            int reward = (int)Math.Round((leg == 2 ? 200 : 600) * Run.LootMultiplier);
+            Assert.That(Run.Carried - before, Is.EqualTo(reward), "A ground bypass must only award ground bags.");
+            Assert.That(Get(game, "State").ToString(), Is.EqualTo("Running"));
+            if (leg < 2) { Flow("FinishGetawayLeg", true); yield return null; yield return null; }
+        }
+    }
+
+    [UnityTest]
+    public IEnumerator ShieldPickupCarriesAcrossScenesBlocksOneHitAndDoesNotSaveAFall()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
+        yield return new EnterPlayMode();
+        Flow("StartGetaway", false); yield return null; yield return null;
+        var city = Find("WorldShiftCity"); city.enabled = false;
+        Pose(city, 35f, -3.2f); Call(city, "StepSimulation", .5f, 0f, false);
+        Assert.That(Run.HasShield, Is.True);
+        Capture("shield-on");
+        Flow("FinishGetawayLeg", true); yield return null; yield return null;
+        var desert = Find("DesertShiftTrial"); desert.enabled = false;
+        Assert.That(Run.HasShield, Is.True, "An unused shield travels with the haul.");
+        float gap = (float)Get(desert, "PursuitGap");
+        Call(desert, "Impact", "first-test-rock", "ROCK HIT");
+        Assert.That(Run.HasShield, Is.False);
+        Assert.That(Get(desert, "PursuitGap"), Is.EqualTo(gap));
+        Call(desert, "Impact", "same-field-rock", "ROCK HIT");
+        Assert.That(Get(desert, "PursuitGap"), Is.EqualTo(gap), "One overlap must not charge a second hit immediately.");
+        Call(desert, "StepSimulation", 1.2f, 0f, false);
+        float afterDriving = (float)Get(desert, "PursuitGap");
+        Call(desert, "Impact", "second-test-rock", "ROCK HIT");
+        Assert.That((float)Get(desert, "PursuitGap"), Is.EqualTo(afterDriving - 22.5f).Within(.02f));
+
+        Flow("StartGetaway", false); yield return null; yield return null;
+        city = Find("WorldShiftCity"); city.enabled = false;
+        Pose(city, 35f, -3.2f); Call(city, "StepSimulation", .5f, 0f, false);
+        Assert.That(Run.HasShield, Is.True);
+        float cityGap = (float)Get(city, "PursuitGap");
+        Call(city, "TrySwitch"); Pose(city, 105f, 0f); Call(city, "TrySwitch");
+        Assert.That(Get(city, "PursuitGap"), Is.EqualTo(cityGap));
+        Assert.That(Run.HasShield, Is.False);
+        Assert.That(Get(city, "Hits"), Is.EqualTo(0));
+
+        Flow("StartGetaway", false); yield return null; yield return null;
+        city = Find("WorldShiftCity"); city.enabled = false;
+        Pose(city, 35f, -3.2f); Call(city, "StepSimulation", .5f, 0f, false);
+        Pose(city, 1255f, 0f); Call(city, "TrySwitch");
+        Assert.That(Get(city, "State").ToString(), Is.EqualTo("Lost"));
+        Assert.That(Run.HasShield, Is.False, "A shield protects impacts, not missing road.");
+    }
+
+    private static void Advance(object game, float target, float lane)
+    {
+        for (int i = 0; i < 1200 && (float)Get(game, "Distance") < target; i++)
+        {
+            Call(game, "StepSimulation", .025f, Mathf.Clamp((lane - (float)Get(game, "Lateral")) * 2f, -1f, 1f), false);
+            Assert.That(Get(game, "State").ToString(), Is.EqualTo("Running"));
+        }
+        Assert.That((float)Get(game, "Distance"), Is.GreaterThanOrEqualTo(target));
+    }
+
     private static void Capture(string name)
     {
         // Simulations are stepped manually; refresh camera and presentation before capturing.
