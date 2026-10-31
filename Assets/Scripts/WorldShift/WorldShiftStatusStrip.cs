@@ -18,10 +18,11 @@ namespace Outlaws.WorldShift
         private RawImage mirror;
         private GameObject ammoRoot;
         private Image[] rounds;
+        private bool showPurpose;
 
         public static WorldShiftStatusStrip Create(Transform parent, bool showLoot = false)
         {
-            var strip = new WorldShiftStatusStrip();
+            var strip = new WorldShiftStatusStrip { showPurpose = showLoot };
             var row = WorldShiftMenu.Panel(parent, "Driving status", new Vector2(.02f, .88f), new Vector2(.98f, .98f), Ink);
             strip.World = Label(row, "World", .02f, .13f, 22f);
             strip.Loot = Label(row, "Loot total", .15f, .35f, 30f);
@@ -67,7 +68,7 @@ namespace Outlaws.WorldShift
         public void Refresh(ShiftWorld world, float fuelFraction, Texture rearView, float pursuitGap,
             bool showFuel = true, bool joined = false)
         {
-            World.text = joined ? "Day + night" : world == ShiftWorld.Day ? "Day" : "Night";
+            World.text = joined ? "Day + night" : showPurpose ? world == ShiftWorld.Day ? "Day / loot" : "Night / freeze" : world == ShiftWorld.Day ? "Day" : "Night";
             World.color = world == ShiftWorld.Day ? Gold : new Color(.3f, .85f, 1f);
             Fuel.gameObject.SetActive(showFuel);
             Fuel.text = "Fuel " + Mathf.Clamp(Mathf.CeilToInt(fuelFraction * 100f), 0, 100) + "%";

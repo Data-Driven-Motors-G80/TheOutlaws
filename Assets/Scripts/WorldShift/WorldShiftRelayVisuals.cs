@@ -82,10 +82,10 @@ namespace Outlaws.WorldShift
             foreach (var view in views)
             {
                 bool launch = world == view.Data.Source;
-                view.Ramp.SetActive(launch);
-                view.SourceVoid.SetActive(launch);
-                view.DestinationVoid.SetActive(!launch);
-                view.Landing.SetActive(!launch);
+                view.Ramp.SetActive(route.SharedWorldRules || launch);
+                view.SourceVoid.SetActive(!route.SharedWorldRules && launch);
+                view.DestinationVoid.SetActive(!route.SharedWorldRules && !launch);
+                view.Landing.SetActive(route.SharedWorldRules || !launch);
                 view.Preview.SetActive(false);
             }
         }

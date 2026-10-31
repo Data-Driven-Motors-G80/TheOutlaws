@@ -42,6 +42,94 @@ public sealed class WorldShiftCombatRoutesTests
     }
 
     [UnityTest]
+    public IEnumerator EscapeRampsLaunchAtNightAndLandInEitherWorldInCityAndDesert()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
+        for (int pass = 0; pass < 4; pass++)
+        {
+            Flow("StartGetaway", false); yield return null; yield return null;
+            bool desert = pass >= 2;
+            if (desert) { Flow("FinishGetawayLeg", true); yield return null; yield return null; }
+            var game = Find(desert ? "DesertShiftTrial" : "WorldShiftCity"); game.enabled = false;
+            float takeoff = desert ? 2004f : 660f, landing = desert ? 2172f : 744f;
+            Call(game, "TrySwitch"); Pose(game, takeoff - 28f, 0f);
+            Advance(game, takeoff + 5f, 0f);
+            Assert.That(Get(game, desert ? "IsAirborne" : "IsRelayAirborne"), Is.True, "Night must retain the launch ramp.");
+            Advance(game, landing - 12f, 0f);
+            if (pass % 2 == 1) Call(game, "TrySwitch");
+            Advance(game, landing + 6f, 0f);
+            Assert.That(Get(game, desert ? "IsAirborne" : "IsRelayAirborne"), Is.False);
+            Assert.That(Get(game, "State").ToString(), Is.EqualTo("Running"));
+            Assert.That((float)Get(game, "PursuitGap"), Is.GreaterThan(44f), "Both landings must be reachable without an impact.");
+            Capture("shared-ramp-" + pass);
+        }
+    }
+
+    [UnityTest]
+    public IEnumerator DayEarnsAndNightFreezesWithoutRemovingHazardsOrResourcesInBothEnvironments()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
+        for (int environment = 0; environment < 2; environment++)
+        {
+            Flow("StartGetaway", false); yield return null; yield return null;
+            if (environment == 1) { Flow("FinishGetawayLeg", true); yield return null; yield return null; }
+            var game = Find(environment == 0 ? "WorldShiftCity" : "DesertShiftTrial"); game.enabled = false;
+            var combat = Get(game, "Combat"); var hud = Get(game, "Getaway"); var extras = Get(hud, "Extras");
+            var fuel = (FuelState)Field(game, "fuel"); fuel.Reset(50f);
+            Call(game, "TrySwitch"); Call(combat, "TryShoot");
+            Call(game, "StepSimulation", 2.2f, 0f, false);
+            Assert.That(Run.Carried, Is.Zero, "Night cannot award loot.");
+            Assert.That(Get(extras, "BoostActive"), Is.False); Assert.That(Run.HasShield, Is.False);
+            var boxes = ((IEnumerable)Field(hud, "loot")).Cast<object>().ToArray();
+            Assert.That(boxes.All(b => !((Transform)Field(b, "Visual")).gameObject.activeSelf), Is.True);
+            foreach (string name in new[] { "shieldPickup", "boostPickup", "magnetPickup" })
+                Assert.That(((Transform)Field(extras, name)).gameObject.activeSelf, Is.False);
+            if (environment == 0) { Pose(game, 260f, 0f); Call(game, "StepSimulation", .6f, 0f, false); }
+            Assert.That(fuel.CurrentFuel, Is.GreaterThan(50f), "Fuel remains collectible in Night.");
+            Assert.That(Run.Ammo, Is.EqualTo(2));
+            Call(combat, "Step", 779f, 781f, 0f, 0f);
+            Assert.That(Run.Ammo, Is.EqualTo(3), "Ammo remains collectible in Night.");
+
+            Call(game, "TrySwitch"); Pose(game, 30f, 0f); Call(game, "StepSimulation", .5f, 0f, false);
+            Assert.That(Run.Carried, Is.GreaterThan(0), "Returning to Day restores earning.");
+            Assert.That(Get(extras, "BoostActive"), Is.True, "Day offers the power-up lane choices.");
+            Pose(game, (float)Get(game, "RunLength") - 739f, -2.8f);
+            Call(game, "StepSimulation", 4.2f, 0f, false);
+            Assert.That(Get(extras, "BoostActive"), Is.False);
+            object mover;
+            string clock;
+            if (environment == 0)
+            {
+                mover = ((IEnumerable)Get(game, "Hazards")).Cast<object>().Single(h => (float)Field(h, "Start") == 300f);
+                clock = "MotionTravel"; Pose(game, 150f, 0f);
+            }
+            else
+            {
+                mover = ((IEnumerable)Get(game, "Traffic")).Cast<object>().First();
+                clock = "Travel"; Pose(game, 450f, 0f);
+            }
+            float initial = (float)Get(mover, clock);
+            Call(game, "StepSimulation", .25f, 0f, false);
+            Assert.That((float)Get(mover, clock), Is.GreaterThan(initial));
+            Call(game, "TrySwitch"); float frozen = (float)Get(mover, clock);
+            float gap = (float)Get(game, "PursuitGap");
+            Call(game, "StepSimulation", .4f, 0f, false);
+            Assert.That((float)Get(mover, clock), Is.EqualTo(frozen));
+            Assert.That((float)Get(game, "PursuitGap"), Is.LessThan(gap), "The chase continues in Night.");
+            Call(game, "TrySwitch");
+            Assert.That((float)Get(mover, clock), Is.EqualTo(frozen), "Switching must not teleport an obstacle.");
+            Call(game, "StepSimulation", .2f, 0f, false);
+            Assert.That((float)Get(mover, clock), Is.GreaterThan(frozen));
+            var route = Get(game, "Route"); object day = Get(game, "World"); Call(game, "TrySwitch"); object night = Get(game, "World");
+            foreach (float distance in new[] { 600f, 660f, 744f, 1255f, 1740f, 1896f, 1944f, 2004f, 2172f, 2360f })
+            { Assert.That(Call(route, "HasSurface", distance, day), Is.True); Assert.That(Call(route, "HasSurface", distance, night), Is.True); }
+            if (environment == 0)
+                Assert.That(Call(game, "FindCollision", night, 105f, 106f, -3.2f, -3.2f, false), Is.Not.Null, "Frozen hazards remain solid.");
+            Capture(environment == 0 ? "day-night-city" : "day-night-desert");
+        }
+    }
+
+    [UnityTest]
     public IEnumerator CityShotsClearBothWorldsRespectPauseAmmoAndCurvedRoads()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
@@ -62,7 +150,7 @@ public sealed class WorldShiftCombatRoutesTests
         Assert.That(Run.Ammo, Is.EqualTo(2));
         Assert.That(Call(combat, "IsDestroyed", echoBarrier), Is.True);
         Assert.That(Call(game, "FindCollision", Get(game, "World"), 441f, 442f, 0f, 0f, false), Is.Null);
-        var root = game.GetComponentsInChildren<Transform>(true).Single(t => t.name == "Echo Barrier 440");
+        var root = game.GetComponentsInChildren<Transform>(true).Single(t => t.name == "Day Barrier 440");
         Assert.That(root.Find("Solid - collides in this world").gameObject.activeSelf, Is.False);
         Capture("shooting-night-barrier");
         Call(game, "TogglePause"); Call(game, "StepSimulation", 4f, 0f, false);
@@ -70,8 +158,8 @@ public sealed class WorldShiftCombatRoutesTests
         Assert.That(bullet.position, Is.EqualTo(pausedShot));
         Assert.That(Call(combat, "TryShoot"), Is.False); Assert.That(Run.Ammo, Is.EqualTo(2));
         Call(game, "TogglePause"); Call(game, "StepSimulation", .25f, 0f, false);
-        Pose(game, 462f, -3.2f); Call(game, "TrySwitch");
-        var dayWall = hazards.Single(h => Field(h, "Kind").ToString() == "HalfBarrier" && (float)Field(h, "Start") == 480f);
+        Pose(game, 1020f, 0f); Call(game, "TrySwitch");
+        var dayWall = hazards.Single(h => Field(h, "Kind").ToString() == "Barrier" && (float)Field(h, "Start") == 1050f);
         Assert.That(Call(combat, "TryShoot"), Is.True);
         Assert.That(Call(combat, "IsDestroyed", dayWall), Is.True); Assert.That(Run.Ammo, Is.EqualTo(1));
         // A real bend: the shot clears the visible Day barrier at 900 m.
@@ -134,7 +222,7 @@ public sealed class WorldShiftCombatRoutesTests
             for (int i = 0; i < 900 && (float)Get(game, "Distance") < end + 324f; i++)
             {
                 float d = (float)Get(game, "Distance");
-                if (right && ((string)Get(combat, "Hint")).StartsWith("F")) Call(combat, "TryShoot");
+                if (right && ((string)Get(combat, "Hint")).StartsWith("Click")) Call(combat, "TryShoot");
                 Call(game, "StepSimulation", .025f, Mathf.Clamp(((right ? 3.2f : -2.8f) - (float)Get(game, "Lateral")) * 2f, -1f, 1f), false);
                 Assert.That(Get(game, "State").ToString(), Is.EqualTo("Running"));
                 if (!pictured && d > end + 195f)

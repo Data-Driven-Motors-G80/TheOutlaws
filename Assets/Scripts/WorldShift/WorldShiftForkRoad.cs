@@ -43,7 +43,7 @@ namespace Outlaws.WorldShift
                 : RewardSeparated(distance) ? RewardBranch != 0 ? RewardBranch : lateral >= WorldShiftGetaway.ContinueBoundary ? 1 : -1 : 0;
         public bool ContinueSelected(float lateral) => ExitBranch != 0 ? ExitBranch > 0 : lateral >= WorldShiftGetaway.ContinueBoundary;
         public string Hint(float d)
-            => d >= ForkStart - 70f && d < ChoiceAt ? "Left: ammo. Right: more loot." : "";
+            => d >= ForkStart - 70f && d < ChoiceAt ? game.World == ShiftWorld.Day ? "Left: ammo. Right: more loot." : "Left: ammo. Day brings loot." : "";
 
         public void Bind(WorldShiftGetaway owner, WorldShiftRoute path, float environmentEnd, bool desert, Func<Color, Material> material)
         {

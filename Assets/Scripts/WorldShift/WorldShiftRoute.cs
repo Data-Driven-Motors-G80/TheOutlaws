@@ -18,6 +18,7 @@ namespace Outlaws.WorldShift
         private bool validation;
         private float length;
         private ShiftRelay[] relays;
+        public bool SharedWorldRules { get; set; }
         public WorldShiftForkRoad Forks { get; private set; }
         private float forkEnvironmentEnd = float.NaN;
         public bool IsForkSurface(float distance) => !float.IsNaN(forkEnvironmentEnd) && WorldShiftForkRoad.Owns(forkEnvironmentEnd, distance);
@@ -140,6 +141,7 @@ namespace Outlaws.WorldShift
 
         public bool HasSurface(float distance, ShiftWorld world)
         {
+            if (SharedWorldRules) return true;
             foreach (var jump in relays)
                 if (!jump.HasDeck(distance, world)) return false;
             foreach (var h in validation ? WorldShiftSplitView.Layout : WorldShiftLevel.Hazards)

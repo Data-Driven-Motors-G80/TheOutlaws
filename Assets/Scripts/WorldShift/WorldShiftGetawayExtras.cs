@@ -28,10 +28,8 @@ namespace Outlaws.WorldShift
         public WorldShiftBonusJump Jump { get; private set; }
         public bool ShieldTaken { get; private set; }
         public string Feedback => game.Duration < feedbackUntil ? feedback : "";
-        public string Hint => !choiceTaken && game.Distance >= 12f && game.Distance < PowerDistance - 2f
-            ? game.World == ShiftWorld.Day
-                ? WorldShiftFlow.Escape.HasShield ? "Shield ready. Try night for more." : "Left for a shield."
-                : "Boost ahead. Magnet on the right."
+        public string Hint => !choiceTaken && game.World == ShiftWorld.Day && game.Distance >= 12f && game.Distance < PowerDistance - 2f
+            ? WorldShiftFlow.Escape.HasShield ? "Boost middle. Magnet right." : "Shield left. Boost middle. Magnet right."
             : game.Distance >= Jump.Start - 56f && game.Distance < Jump.Start
             ? "Drive up the ramp to jump." : Jump.OnRamp ? "Drive up the ramp to jump." : "";
 
@@ -105,13 +103,13 @@ namespace Outlaws.WorldShift
 
         public void Collect(float from, float to, float fromX, float toX)
         {
-            if (!Active || choiceTaken || to < PowerDistance - 1.3f || from > PowerDistance + 1.3f) return;
+            if (!Active || game.World != ShiftWorld.Day || choiceTaken || to < PowerDistance - 1.3f || from > PowerDistance + 1.3f) return;
             float entry = Mathf.InverseLerp(from, to, PowerDistance - 1.3f);
             float exit = Mathf.InverseLerp(from, to, PowerDistance + 1.3f);
             float a = Mathf.Lerp(fromX, toX, entry), b = Mathf.Lerp(fromX, toX, exit);
-            float lane = game.World == ShiftWorld.Day ? ShieldLane : Mathf.Abs((a + b) * .5f - MagnetLane) < Mathf.Abs((a + b) * .5f) ? MagnetLane : 0f;
+            float lane = (a + b) * .5f < -1.6f ? ShieldLane : (a + b) * .5f > 1.6f ? MagnetLane : 0f;
             if (Mathf.Max(a, b) < lane - 1.35f || Mathf.Min(a, b) > lane + 1.35f) return;
-            if (game.World == ShiftWorld.Day)
+            if (lane == ShieldLane)
             {
                 if (!WorldShiftFlow.Escape.CollectShield()) return;
                 ShieldTaken = true;
@@ -147,8 +145,8 @@ namespace Outlaws.WorldShift
             if (shieldPickup == null) return;
             bool visible = Active && !choiceTaken && game.Distance < PowerDistance + 10f && game.Distance > PowerDistance - 180f;
             shieldPickup.gameObject.SetActive(visible && !WorldShiftFlow.Escape.HasShield && displayedWorld == ShiftWorld.Day);
-            magnetPickup.gameObject.SetActive(visible && displayedWorld == ShiftWorld.Echo);
-            boostPickup.gameObject.SetActive(visible && displayedWorld == ShiftWorld.Echo);
+            magnetPickup.gameObject.SetActive(visible && displayedWorld == ShiftWorld.Day);
+            boostPickup.gameObject.SetActive(visible && displayedWorld == ShiftWorld.Day);
         }
         public void Refresh()
         {

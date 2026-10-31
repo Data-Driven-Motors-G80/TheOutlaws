@@ -82,7 +82,7 @@ public sealed class WorldShiftCampaignTests
                         Call(tutorial, "TrySwitch");
                         Assert.That(Get(tutorial, "SectionHint"), Is.Empty, "Completed instructions must not reappear after switching back.");
                         Call(tutorial, "RetryCheckpoint");
-                        Assert.That(Get(tutorial, "SectionHint"), Is.EqualTo("Tap Space to try night."), "Retrying the lesson restores its instruction.");
+                        Assert.That(Get(tutorial, "SectionHint"), Is.EqualTo("Tap Space to freeze traffic."), "Retrying the lesson restores its instruction.");
                         Call(tutorial, "TrySwitch");
                         Assert.That(Get(tutorial, "SectionHint"), Is.Empty);
                     }
@@ -98,7 +98,7 @@ public sealed class WorldShiftCampaignTests
         Assert.That(Get(tutorial, "State").ToString(), Is.EqualTo("Won"));
         Assert.That(learnedShooting, Is.True);
         Assert.That(Get(tutorial, "Deaths"), Is.EqualTo(0));
-        Assert.That(Get(tutorial, "Hits"), Is.EqualTo(0));
+        Assert.That(Get(tutorial, "Hits"), Is.EqualTo(0), "Hit hazards: " + string.Join(", ", ((System.Collections.IEnumerable)tutorial.GetType().GetField("hitHazards", Flags).GetValue(tutorial)).Cast<object>().Select(h => h.GetType().GetField("Start").GetValue(h))));
         Call(Find("WorldShiftHud"), "Refresh");
         Capture("tutorial-ready");
         Flow("Next", Level("Tutorial"));

@@ -29,8 +29,17 @@ namespace Outlaws.WorldShift
         public readonly float MotionSpeed;
         // -1: wall to centre on the left, +1: centre to wall on the right.
         public readonly int HalfSide;
+        public readonly bool SharedAcrossWorlds;
+        public float MotionTravel { get; private set; }
+        public bool VisibleIn(ShiftWorld world) => SharedAcrossWorlds || World == world;
+        public void Advance(float delta, float playerDistance, ShiftWorld world)
+        {
+            if (SharedAcrossWorlds && world == ShiftWorld.Day && playerDistance >= Start - 150f && playerDistance <= End + 20f)
+                MotionTravel += MotionSpeed * delta;
+        }
+        public void ResetMotion() => MotionTravel = 0f;
 
-        public ShiftHazard(ShiftWorld world, ShiftHazardKind kind, float start, float end, int laneMask, float motionSpeed = 0f, int halfSide = 0)
+        public ShiftHazard(ShiftWorld world, ShiftHazardKind kind, float start, float end, int laneMask, float motionSpeed = 0f, int halfSide = 0, bool sharedAcrossWorlds = false)
         {
             World = world;
             Kind = kind;
@@ -39,6 +48,7 @@ namespace Outlaws.WorldShift
             LaneMask = laneMask;
             MotionSpeed = motionSpeed;
             HalfSide = halfSide;
+            SharedAcrossWorlds = sharedAcrossWorlds;
         }
 
         // Both collision and rendering sample the same deterministic road coordinates.
@@ -46,7 +56,7 @@ namespace Outlaws.WorldShift
         public void BoundsAt(float playerDistance, out float start, out float end)
         {
             float travel = System.Math.Max(0f, playerDistance - (Start - 150f));
-            start = Start - travel * MotionSpeed / WorldShiftLevel.Speed;
+            start = Start - (SharedAcrossWorlds ? MotionTravel : travel * MotionSpeed / WorldShiftLevel.Speed);
             end = start + End - Start;
         }
     }
@@ -119,6 +129,36 @@ namespace Outlaws.WorldShift
                 "HOME STRETCH",
                 "Steer around it or tap Space.")
         };
+
+        // Escape uses one physical layout. Every static obstacle has a steering bypass.
+        public static ShiftFuelPickup[] CreateEscapeFuel()
+        {
+            var result = new System.Collections.Generic.List<ShiftFuelPickup>();
+            foreach (var p in FuelPickups)
+                if (!result.Exists(other => other.Distance == p.Distance)) result.Add(new ShiftFuelPickup(ShiftWorld.Day, p.Distance, 0));
+            return result.ToArray();
+        }
+
+        public static ShiftHazard[] CreateEscapeHazards()
+        {
+            // Shared obstacles need reaction space on one road, including when frozen.
+            // Keep the three ramp/flight/recovery stretches clear.
+            var result = new System.Collections.Generic.List<ShiftHazard>
+            {
+                new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.Fire, 100f, 116f, 1, sharedAcrossWorlds: true),
+                new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.Police, 200f, 216f, 4, sharedAcrossWorlds: true)
+            };
+            int[] at = { 300, 440, 520, 900, 1050, 1160, 1280, 1400, 1520, 1640, 2030, 2130, 2230, 2600, 2700, 2800, 2900, 3000, 3100, 3200, 3300 };
+            int[] lane = { 1, 2, 2, 1, 2, 4, 1, 2, 4, 1, 1, 2, 4, 1, 2, 4, 1, 4, 2, 1, 4 };
+            for (int i = 0; i < at.Length; i++)
+            {
+                bool barrier = at[i] == 440 || at[i] == 900 || at[i] == 1050 || at[i] == 1520 || at[i] == 2030
+                    || at[i] == 2600 || at[i] == 2800 || at[i] == 3000 || at[i] == 3200;
+                result.Add(new ShiftHazard(ShiftWorld.Day, barrier ? ShiftHazardKind.Barrier : ShiftHazardKind.Oncoming,
+                    at[i], at[i] + (barrier ? 8f : 5.5f), lane[i], barrier ? 0f : 14f, sharedAcrossWorlds: true));
+            }
+            return result.ToArray();
+        }
 
         public static readonly ShiftHazard[] Hazards =
         {

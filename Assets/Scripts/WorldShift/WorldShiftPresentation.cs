@@ -301,7 +301,7 @@ namespace Outlaws.WorldShift
                     pedestrians.Add(new PedestrianView { Hazard = data, Figure = figure, Lateral = person.localPosition.x });
                 }
             }
-            if (!game.SplitViewValidation && (!game.TutorialLevel || data == WorldShiftTutorial.ShootingObstacle)
+            if (!game.SplitViewValidation && (!game.TutorialLevel || data == game.TutorialShootingObstacle)
                 && (data.Kind == ShiftHazardKind.Barrier || data.Kind == ShiftHazardKind.HalfBarrier))
                 WorldShiftCombat.MarkBreakable(solid.transform, new Vector3(data.Kind == ShiftHazardKind.HalfBarrier ? data.HalfSide * 2.5f : 0f, 1.3f, -depth * .5f - .12f));
             hazards.Add(new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk });
@@ -400,7 +400,7 @@ namespace Outlaws.WorldShift
                 foreach (ShiftHazard hazard in game.Hazards)
                     if (hazard.World == world && hazard.Kind == ShiftHazardKind.Gap && hazard.End > distance)
                         clearRoad = Mathf.Min(clearRoad, Mathf.Max(0f, hazard.Start - distance - 4f));
-                if (!game.SplitViewValidation)
+                if (!game.SplitViewValidation && !route.SharedWorldRules)
                     foreach (var jump in WorldShiftRelay.Sections)
                     {
                         float edge = world == jump.Source ? jump.Takeoff : jump.Ramp;
@@ -575,7 +575,7 @@ namespace Outlaws.WorldShift
         {
             foreach (var hazard in hazards)
             {
-                bool active = hazard.Data.World == world && !(game.Combat?.IsDestroyed(hazard.Data) ?? false);
+                bool active = hazard.Data.VisibleIn(world) && !(game.Combat?.IsDestroyed(hazard.Data) ?? false);
                 bool preview = ShouldPreview(hazard, game.Distance);
                 hazard.Solid.SetActive(active);
                 hazard.Ghost.SetActive(preview);
@@ -644,7 +644,7 @@ namespace Outlaws.WorldShift
         public void RefreshFuel()
         {
             for (int i = 0; i < fuelModels.Count; i++)
-                fuelModels[i].SetActive((game.Pickups[i].World == world) && !game.IsFuelCollected(i));
+                fuelModels[i].SetActive((game.GetawayMode || game.Pickups[i].World == world) && !game.IsFuelCollected(i));
         }
 
         private void SpikeStrip(Transform parent, float x, float depth)

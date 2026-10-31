@@ -36,8 +36,8 @@ namespace Outlaws.WorldShift
             {
                 var target = FindTarget();
                 if (target.Key == null || !target.Breakable) return "";
-                if (Ammo > 0) return "F or click to break it.";
-                return target.Key is WorldShiftForkRoad.Blocker ? "Steer around it." : "Steer around it or tap Space.";
+                if (Ammo > 0) return "Click to shoot.";
+                return target.Key is WorldShiftForkRoad.Blocker ? "Steer around it." : "Steer around it.";
             }
         }
         public void Bind(WorldShiftCity game) { city = game; Initialize(); }
@@ -71,8 +71,8 @@ namespace Outlaws.WorldShift
         }
         public bool TryShoot()
         {
-            if (city != null && city.TutorialLevel && (!city.TutorialShootingActive || World != ShiftWorld.Day
-                || IsDestroyed(WorldShiftTutorial.ShootingObstacle))) return false;
+            if (city != null && city.TutorialLevel && (!city.TutorialShootingActive
+                || IsDestroyed(city.TutorialShootingObstacle))) return false;
             if (!Running || Ammo <= 0 || Duration < nextShot) return false;
             if (Escape) { if (!WorldShiftFlow.Escape.SpendShot()) return false; }
             else practiceAmmo--;
@@ -115,8 +115,8 @@ namespace Outlaws.WorldShift
             {
                 foreach (var h in city.Hazards)
                 {
-                    if (city.TutorialLevel && (!city.TutorialShootingActive || h != WorldShiftTutorial.ShootingObstacle)) continue;
-                    if (IsDestroyed(h) || h.World != World || Airborne || h.Kind == ShiftHazardKind.Gap || h.Kind == ShiftHazardKind.Fire || h.Kind == ShiftHazardKind.Spikes) continue;
+                    if (city.TutorialLevel && (!city.TutorialShootingActive || h != city.TutorialShootingObstacle)) continue;
+                    if (IsDestroyed(h) || !h.VisibleIn(World) || Airborne || h.Kind == ShiftHazardKind.Gap || h.Kind == ShiftHazardKind.Fire || h.Kind == ShiftHazardKind.Spikes) continue;
                     h.BoundsAt(Distance, out float at, out float end);
                     float x = Lateral;
                     bool occupied = h.Kind == ShiftHazardKind.HalfBarrier ? h.HalfSide < 0 ? Lateral < .7f : Lateral > -.7f
@@ -129,11 +129,11 @@ namespace Outlaws.WorldShift
             else
             {
                 foreach (var rock in desert.Rocks)
-                    if (!IsDestroyed(rock) && rock.VisibleIn(World) && rock.Airborne == Airborne)
+                    if (!IsDestroyed(rock) && desert.RockVisible(rock, World) && rock.Airborne == Airborne)
                         Offer(ref best, rock, rock.Distance - rock.Radius, desert.RockLateral(rock, World), true, rock.Radius + .7f);
                 if (!Airborne) foreach (var gate in desert.ActiveGates)
                 {
-                    if (IsDestroyed(gate) || gate.World != World) continue;
+                    if (IsDestroyed(gate) || (!desert.GetawayMode && gate.World != World)) continue;
                     if (gate.HalfSide < 0 && Lateral > .7f || gate.HalfSide > 0 && Lateral < -.7f) continue;
                     Offer(ref best, gate, gate.Start, Lateral, true);
                 }

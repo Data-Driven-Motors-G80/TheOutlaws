@@ -263,7 +263,7 @@ namespace Outlaws.WorldShift
             for (int i = 0; i < rocks.Count; i++)
             {
                 RockView item = rocks[i]; DesertTrialRock data = game.Rocks[i];
-                item.Root.gameObject.SetActive(!(game.Combat?.IsDestroyed(data) ?? false) && data.VisibleIn(world) && data.Distance > game.Distance - 40f && data.Distance < game.Distance + 240f);
+                item.Root.gameObject.SetActive(!(game.Combat?.IsDestroyed(data) ?? false) && game.RockVisible(data, world) && data.Distance > game.Distance - 40f && data.Distance < game.Distance + 240f);
                 item.Marker.SetActive(data.Distance > game.Distance - 40f && data.Distance < game.Distance + 240f
                     && (!(game.Combat?.IsDestroyed(data) ?? false) || game.HasGuards(data)));
                 RoadPathPoint point = game.RockPoint(data);
@@ -293,7 +293,7 @@ namespace Outlaws.WorldShift
             for (int i = 0; i < gates.Count; i++)
             {
                 var data = game.ActiveGates[i]; GateView item = gates[i];
-                bool active = data.World == world && !(game.Combat?.IsDestroyed(data) ?? false);
+                bool active = (game.GetawayMode || data.World == world) && !(game.Combat?.IsDestroyed(data) ?? false);
                 item.Root.SetActive(data.End > game.Distance - 20f && data.Start < game.Distance + 220f);
                 item.Solid.SetActive(active);
             }

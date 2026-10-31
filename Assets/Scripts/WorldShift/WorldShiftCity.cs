@@ -49,8 +49,10 @@ namespace Outlaws.WorldShift
         public float Duration { get; private set; }
         public bool SplitViewValidation => splitViewValidation;
         public float RunLength => tutorialLevel ? WorldShiftTutorial.Length : splitViewValidation ? WorldShiftSplitView.Length : WorldShiftLevel.Length + (GetawayMode ? WorldShiftGetaway.ExitTail : 0f);
-        public ShiftHazard[] Hazards => tutorialLevel ? WorldShiftTutorial.Hazards : splitViewValidation ? WorldShiftSplitView.Layout : WorldShiftLevel.Hazards;
-        public ShiftFuelPickup[] Pickups => tutorialLevel ? System.Array.Empty<ShiftFuelPickup>() : splitViewValidation ? WorldShiftSplitView.Fuel : WorldShiftLevel.FuelPickups;
+        private ShiftHazard[] escapeHazards, tutorialHazards;
+        private ShiftFuelPickup[] escapeFuel;
+        public ShiftHazard[] Hazards => tutorialLevel ? tutorialHazards : splitViewValidation ? WorldShiftSplitView.Layout : GetawayMode ? escapeHazards : WorldShiftLevel.Hazards;
+        public ShiftFuelPickup[] Pickups => tutorialLevel ? System.Array.Empty<ShiftFuelPickup>() : splitViewValidation ? WorldShiftSplitView.Fuel : GetawayMode ? escapeFuel : WorldShiftLevel.FuelPickups;
         public ShiftCheckpoint[] Checkpoints => tutorialLevel ? WorldShiftTutorial.Checkpoints : splitViewValidation ? WorldShiftSplitView.Checkpoints : WorldShiftLevel.Checkpoints;
         // Side-by-side worlds are retained only in the standalone rendering validation scene.
         public bool IsJoinedDistance(float at) => splitViewValidation
@@ -71,8 +73,9 @@ namespace Outlaws.WorldShift
             riftEntryWorld == ShiftWorld.Day ? 1f : 0f, .5f,
             Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((Distance - MergeStart) / 16f)));
         private bool JumpSequence => relay?.SectionAt(Distance) != null || (Getaway?.Extras.IsJumpSequence(Distance) ?? false);
+        public ShiftHazard TutorialShootingObstacle => tutorialLevel ? tutorialHazards[3] : null;
         public bool TutorialShootingActive => tutorialLevel && Distance >= 380f && Distance < 520f;
-        private bool WaitingForTutorialShot => TutorialShootingActive && !(Combat?.IsDestroyed(WorldShiftTutorial.ShootingObstacle) ?? false);
+        private bool WaitingForTutorialShot => TutorialShootingActive && !(Combat?.IsDestroyed(TutorialShootingObstacle) ?? false);
         private float BaseSpeed => tutorialLevel ? WaitingForTutorialShot && Distance >= 410f ? 0f : 18f : JumpSequence ? relay?.SpeedAt(Distance) ?? WorldShiftLevel.Speed
             : WorldShiftLevel.Speed * (splitViewValidation ? 1f : WorldShiftLevel.CruiseSpeedMultiplier);
         public float Speed => BaseSpeed * (JumpSequence ? 1f : Getaway?.Extras.SpeedMultiplier ?? 1f);
@@ -87,26 +90,30 @@ namespace Outlaws.WorldShift
         public float MessageRemaining { get; private set; }
         public string SectionTitle => Checkpoints[checkpointIndex].Title;
         public string SectionHint => TutorialShootingActive ? WaitingForTutorialShot
-            ? World == ShiftWorld.Day ? "Click to shoot the block." : "Tap Space to go back to day."
+            ? "Click to shoot the block."
             : Duration - Combat.LastShotAt < 1f ? "Nice shot!" : ""
             : tutorialLevel ? tutorialHintCompleted ? "" : Checkpoints[checkpointIndex].Hint
             : relay != null && relay.Hint(Distance, World).Length > 0 ? relay.Hint(Distance, World)
             : hintRemaining > 0f ? Checkpoints[checkpointIndex].Hint : "";
         public WorldShiftCombat Combat { get; private set; }
+        public WorldShiftTutorialRewards TutorialRewards { get; private set; }
         public WorldShiftRoute Route { get; private set; }
         public Transform Player { get; private set; }
 
         private void Awake()
         {
             GetawayMode = !tutorialLevel && !splitViewValidation && WorldShiftFlow.Escape.Status == GetawayRunState.RunStatus.Running;
+            if (GetawayMode) { escapeHazards = WorldShiftLevel.CreateEscapeHazards(); escapeFuel = WorldShiftLevel.CreateEscapeFuel(); }
+            if (tutorialLevel) tutorialHazards = WorldShiftTutorial.CreateHazards();
             if (roadTemplate == null || carPrefab == null || view == null || sun == null)
             { Debug.LogError("WorldShiftCity: missing scene references.", this); enabled = false; return; }
             var roadObject = new GameObject("Shared finite city road");
             roadObject.transform.SetParent(transform, false);
             Route = roadObject.AddComponent<WorldShiftRoute>();
             fuelTaken = new bool[Pickups.Length];
+            Route.SharedWorldRules = GetawayMode || tutorialLevel;
             Route.Build(roadTemplate, splitViewValidation || tutorialLevel, RunLength, extraLength: GetawayMode ? WorldShiftGetaway.ExitTail : 0f);
-            if (!splitViewValidation && !tutorialLevel) relay = new WorldShiftRelay(Route);
+            if (!splitViewValidation && !tutorialLevel) relay = new WorldShiftRelay(Route, sharedWorldRules: GetawayMode);
             Player = new GameObject("Player - same position in both worlds").transform;
             Player.SetParent(transform, false);
             var visual = new GameObject("Original driving body").transform;
@@ -135,6 +142,7 @@ namespace Outlaws.WorldShift
             RearView.transform.SetParent(transform, true);
             UpdateCamera(true);
             if (!splitViewValidation) { Combat = gameObject.AddComponent<WorldShiftCombat>(); Combat.Bind(this); }
+            if (tutorialLevel) { TutorialRewards = gameObject.AddComponent<WorldShiftTutorialRewards>(); TutorialRewards.Bind(this); }
             if (GetawayMode) { Getaway = gameObject.AddComponent<WorldShiftGetaway>(); Getaway.Bind(this); }
             else gameObject.AddComponent<WorldShiftHud>().Bind(this);
             if (splitViewValidation) gameObject.AddComponent<WorldShiftSplitView>().Initialize(this, view);
@@ -254,6 +262,7 @@ namespace Outlaws.WorldShift
                 delta -= dt;
                 simulatedTime += dt;
                 float previous = Distance, previousLateral = Lateral;
+                foreach (var hazard in Hazards) hazard.Advance(dt, Distance, World);
                 float speed = Speed;
                 Getaway?.BeginStep(previous, previous + speed * dt, driver);
                 if (relay != null)
@@ -306,6 +315,7 @@ namespace Outlaws.WorldShift
                 CollectFuel(previous, next, previousLateral, nextLateral);
                 Getaway?.Collect(previous, next, previousLateral, nextLateral);
                 Combat?.Step(previous, next, previousLateral, nextLateral);
+                TutorialRewards?.Step(previous, next, previousLateral, nextLateral);
                 if (checkpointIndex + 1 < Checkpoints.Length && Distance >= Checkpoints[checkpointIndex + 1].Distance)
                 {
                     checkpointIndex++;
@@ -329,6 +339,7 @@ namespace Outlaws.WorldShift
             UpdatePolice(simulatedTime);
             presentation.UpdateVisibility(Distance);
             Getaway?.Present(World);
+            TutorialRewards?.Present(World);
         }
 
         private void UpdateMergeState()
@@ -405,7 +416,7 @@ namespace Outlaws.WorldShift
             for (int i = 0; i < fuelTaken.Length; i++)
             {
                 ShiftFuelPickup pickup = Pickups[i];
-                if (fuelTaken[i] || !IsWorldVisible(pickup.World, pickup.Distance, pickup.Lane * WorldShiftLevel.RoadWidth / 3f, World) || to + 1.3f < pickup.Distance || from - 1.3f > pickup.Distance) continue;
+                if (fuelTaken[i] || (!GetawayMode && !IsWorldVisible(pickup.World, pickup.Distance, pickup.Lane * WorldShiftLevel.RoadWidth / 3f, World)) || to + 1.3f < pickup.Distance || from - 1.3f > pickup.Distance) continue;
                 float t = Mathf.InverseLerp(from, to, pickup.Distance);
                 if (Mathf.Abs(Mathf.Lerp(fromLateral, toLateral, t) - pickup.Lane * WorldShiftLevel.RoadWidth / 3f) > 1.35f) continue;
                 fuelTaken[i] = true;
@@ -424,7 +435,7 @@ namespace Outlaws.WorldShift
             {
                 bool merged = IsJoinedDistance(hazard.Start);
                 if ((Combat?.IsDestroyed(hazard) ?? false)) continue;
-                if ((!merged && hazard.World != world) || (skipHandled && hitHazards.Contains(hazard))) continue;
+                if ((!merged && !hazard.VisibleIn(world)) || (skipHandled && hitHazards.Contains(hazard))) continue;
                 // A missing deck drops the car when its centre crosses the lip.
                 float halfLength = hazard.Kind == ShiftHazardKind.Gap ? 0f : 1.5f;
                 hazard.BoundsAt(from, out float start, out float end);
@@ -480,9 +491,11 @@ namespace Outlaws.WorldShift
         private void RestoreCheckpoint()
         {
             Combat?.ResetPractice();
+            if (tutorialLevel) foreach (var hazard in Hazards) hazard.ResetMotion();
             tutorialHintCompleted = false;
             tutorialCheckpointSwitches = Switches;
             ShiftCheckpoint checkpoint = Checkpoints[checkpointIndex];
+            TutorialRewards?.Restore(checkpoint.Distance);
             Distance = checkpoint.Distance;
             Lateral = checkpoint.Lateral;
             retryRemaining = 0f;
@@ -517,6 +530,7 @@ namespace Outlaws.WorldShift
             presentation.SetWorld(world);
             presentation.UpdateVisibility(Distance);
             Getaway?.Present(world);
+            TutorialRewards?.Present(world);
         }
 
         // Rendering can visit both visual states without advancing simulation or
@@ -527,6 +541,7 @@ namespace Outlaws.WorldShift
             presentation.SetWorld(displayedWorld);
             presentation.UpdateVisibility(Distance);
             Getaway?.Present(displayedWorld);
+            TutorialRewards?.Present(displayedWorld);
         }
 
         private void UpdateCamera(bool immediate)

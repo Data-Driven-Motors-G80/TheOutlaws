@@ -74,7 +74,7 @@ namespace Outlaws.WorldShift
             AddLoot(75f, 0f, ShiftWorld.Day, gold, handle);
             if (IsCity)
             {
-                foreach (var pickup in WorldShiftLevel.FuelPickups)
+                foreach (var pickup in city.Pickups)
                 {
                     // Offer a separate lane choice; never hide a fuel pickup inside a cash box.
                     if (pickup.Distance > environmentEnd - 100f) continue;
@@ -119,9 +119,14 @@ namespace Outlaws.WorldShift
 
         private void AddLoot(float at, float x, ShiftWorld owner, Material gold, Material handle, float rise = 0f, bool bonus = false, bool anyWorld = false)
         {
-            RoadPathPoint point = Route.Sample(at);
-            var root = new GameObject("Loot " + owner + " " + at).transform;
-            root.SetParent(transform, false);
+            var root = CreateLootBox(transform, "Loot " + owner + " " + at, Route.Sample(at), x, gold, handle, rise);
+            loot.Add(new Loot { At = at, X = x, World = ShiftWorld.Day, Visual = root, Bonus = bonus, AnyWorld = anyWorld });
+        }
+
+        public static Transform CreateLootBox(Transform parent, string name, RoadPathPoint point, float x, Material gold, Material handle, float rise = 0f)
+        {
+            var root = new GameObject(name).transform;
+            root.SetParent(parent, false);
             root.SetPositionAndRotation(point.Position + point.Right * x + Vector3.up * (.15f + rise), Quaternion.LookRotation(point.Forward));
             // A low, chunky cash box differs from the tall road barriers. The symbol belongs on its face.
             Box(root, new Vector3(0f, .6f, 0f), new Vector3(1.7f, 1f, 1.05f), gold);
@@ -135,7 +140,7 @@ namespace Outlaws.WorldShift
             symbol.name = "Loot dollar symbol";
             symbol.rectTransform.sizeDelta = new Vector2(1.05f, .76f);
             symbol.fontStyle = FontStyles.Bold;
-            loot.Add(new Loot { At = at, X = x, World = owner, Visual = root, Bonus = bonus, AnyWorld = anyWorld });
+            return root;
         }
 
         public void Collect(float from, float to, float fromX, float toX)
@@ -147,7 +152,7 @@ namespace Outlaws.WorldShift
             {
                 if (item.Bonus && !Extras.Jump.Traversing) continue;
                 if (item.Taken || to < item.At - 1.3f || from > item.At + 1.3f) continue;
-                if (!item.AnyWorld && item.World != World) continue;
+                if (World != ShiftWorld.Day) continue;
                 if (Routing.RewardSeparated(item.At) && Mathf.Sign(item.X) != Routing.Branch(item.At, toX)) continue;
                 float entry = Mathf.InverseLerp(from, to, item.At - 1.3f);
                 float exit = Mathf.InverseLerp(from, to, item.At + 1.3f);
@@ -177,7 +182,7 @@ namespace Outlaws.WorldShift
             Combat?.Present();
             foreach (var item in loot)
             {
-                bool visible = !item.Taken && (item.AnyWorld || item.World == displayedWorld) && item.At > Distance - 10f && item.At < Distance + 180f;
+                bool visible = !item.Taken && displayedWorld == ShiftWorld.Day && item.At > Distance - 10f && item.At < Distance + 180f;
                 item.Visual.gameObject.SetActive(visible);
                 if (visible)
                 {
@@ -368,20 +373,12 @@ namespace Outlaws.WorldShift
         private string CityHint()
         {
             if (city.IsRelayAirborne || WorldShiftRelay.At(Distance) != null) return city.SectionHint;
-            foreach (var hazard in city.Hazards)
-            {
-                if (hazard.World != World || hazard.LaneMask != 7 || (Combat?.IsDestroyed(hazard) ?? false)) continue;
-                hazard.BoundsAt(Distance, out float start, out float end);
-                if (start > Distance + 42f || end < Distance - 2f) continue;
-                return hazard.Kind == ShiftHazardKind.Gap ? "Space for solid road."
-                    : hazard.Kind == ShiftHazardKind.Barrier && Combat != null && Combat.Ammo > 0 ? "Space to switch. F to shoot." : "Space to switch.";
-            }
             return "";
         }
 
         private string DesertHint()
         {
-            if (desert.IsAirborne) return World == ShiftWorld.Day ? "Space to land in night." : "Stay in night to land.";
+            if (desert.IsAirborne) return World == ShiftWorld.Day ? "Space freezes the rocks." : "";
             if (desert.Relay?.SectionAt(Distance) != null) return desert.Hint;
             if (desert.Switches == 0 && Distance >= 100f && Distance < 180f) return "Space freezes the rocks.";
             return DesertShiftLevel.InRockField(Distance) && World == ShiftWorld.Day ? "Space to freeze a gap." : "";

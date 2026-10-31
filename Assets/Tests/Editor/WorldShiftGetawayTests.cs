@@ -88,17 +88,16 @@ public sealed class WorldShiftGetawayTests
         yield return new EnterPlayMode();
         Flow("StartGetaway", false); yield return null; yield return null;
         var game = Find("WorldShiftCity"); game.enabled = false;
-        var safeWorld = typeof(WorldShiftCityTests).GetMethod("SafeWorld", Flags);
-        var safeLane = typeof(WorldShiftCityTests).GetMethod("SafeLane", Flags);
+
         bool pictured = false;
         for (int i = 0; i < 3400 && Get(game, "State").ToString() == "Running"; i++)
         {
             float d = (float)Get(game, "Distance");
-            string desired = d < 82f ? "Day" : (string)safeWorld.Invoke(null, new object[] { d });
+            string desired = d < 82f ? "Day" : "Echo";
             if (!(bool)Get(game, "IsMerged") && Get(game, "World").ToString() != desired) Call(game, "TrySwitch");
-            float target = d > 3380f ? -3.2f : (float)safeLane.Invoke(null, new object[] { d });
+            float target = d > 3380f ? -3.2f : EscapeSafeLane(game, d);
             Call(game, "StepSimulation", .05f, Mathf.Clamp((target - (float)Get(game, "Lateral")) * 2f, -1f, 1f), false);
-            Assert.That(Get(game, "Hits"), Is.EqualTo(0), "Unexpected collision at " + d);
+            Assert.That(Get(game, "Hits"), Is.EqualTo(0), "Unexpected collision at " + d + " lateral=" + Get(game, "Lateral") + " target=" + target);
             Assert.That(Get(game, "State").ToString(), Is.Not.EqualTo("Lost"), "Escape failed at " + d);
             if (!pictured && d > 3450f) { Capture("full-run-exit"); pictured = true; }
         }
@@ -164,7 +163,7 @@ public sealed class WorldShiftGetawayTests
             float lane = leg == 2 ? -3.2f : 3.2f;
             Pose(game, start - 8f, lane);
             Assert.That(Get(game, "IsMerged"), Is.False);
-            string desired = leg < 2 ? "Echo" : "Day";
+            string desired = "Day";
             if (Get(game, "World").ToString() != desired) Assert.That(Call(game, "TrySwitch"), Is.True);
             Advance(game, start - 1f, lane);
             Assert.That((float)Get(game, game.GetType().Name == "WorldShiftCity" ? "Speed" : "CurrentSpeed"),
@@ -223,7 +222,7 @@ public sealed class WorldShiftGetawayTests
         Pose(city, 35f, -3.2f); Call(city, "StepSimulation", .5f, 0f, false);
         Assert.That(Run.HasShield, Is.True);
         float cityGap = (float)Get(city, "PursuitGap");
-        Call(city, "TrySwitch"); Pose(city, 105f, 0f); Call(city, "TrySwitch");
+        Call(city, "TrySwitch"); Pose(city, 105f, -3.2f); Call(city, "TrySwitch");
         Assert.That(Get(city, "PursuitGap"), Is.EqualTo(cityGap));
         Assert.That(Run.HasShield, Is.False);
         Assert.That(Get(city, "Hits"), Is.EqualTo(0));
@@ -232,8 +231,10 @@ public sealed class WorldShiftGetawayTests
         city = Find("WorldShiftCity"); city.enabled = false;
         Pose(city, 35f, -3.2f); Call(city, "StepSimulation", .5f, 0f, false);
         Pose(city, 1255f, 0f); Call(city, "TrySwitch");
-        Assert.That(Get(city, "State").ToString(), Is.EqualTo("Lost"));
-        Assert.That(Run.HasShield, Is.False, "A shield protects impacts, not missing road.");
+        Assert.That(Get(city, "State").ToString(), Is.EqualTo("Running"), "Switching never removes the road in Escape.");
+        Assert.That(Run.HasShield, Is.True);
+        Call(city, "Fail", "MISSED RELAY LANDING");
+        Assert.That(Run.HasShield, Is.False, "A shield cannot protect a failed run.");
     }
 
     [UnityTest]
@@ -247,9 +248,9 @@ public sealed class WorldShiftGetawayTests
             if (environment == 1) { Flow("FinishGetawayLeg", true); yield return null; yield return null; }
             var game = Find(environment == 0 ? "WorldShiftCity" : "DesertShiftTrial"); game.enabled = false;
             var getaway = Find("WorldShiftGetaway"); var extras = Get(getaway, "Extras");
-            Pose(game, 35f, 3.2f);
+            Pose(game, 35f, 3.2f); Call(game, "TrySwitch");
             Call(game, "StepSimulation", .5f, 0f, false);
-            Assert.That(Get(extras, "MagnetActive"), Is.False, "Night powers cannot be taken in Day.");
+            Assert.That(Get(extras, "MagnetActive"), Is.False, "No power-ups can be taken in Night.");
             Pose(game, 35f, 3.2f); Call(game, "TrySwitch");
             Capture(environment == 0 ? "city-power-choices" : "desert-power-choices");
             Call(game, "StepSimulation", .5f, 0f, false);
@@ -267,7 +268,7 @@ public sealed class WorldShiftGetawayTests
             Pose(game, 60f, 3.2f);
             int beforeLoot = Run.Carried;
             Call(game, "StepSimulation", .4f, 0f, false);
-            Assert.That(Run.Carried, Is.GreaterThan(beforeLoot), "Magnet must collect the opposite lane's Night bag.");
+            Assert.That(Run.Carried, Is.GreaterThan(beforeLoot), "Magnet must collect the opposite lane's Day bag.");
             Capture(environment == 0 ? "city-magnet" : "desert-magnet");
             int beforeAir = Run.Carried;
             object jump = Get(extras, "Jump");
@@ -282,7 +283,7 @@ public sealed class WorldShiftGetawayTests
             if (environment == 1) { Flow("FinishGetawayLeg", true); yield return null; yield return null; }
             game = Find(environment == 0 ? "WorldShiftCity" : "DesertShiftTrial"); game.enabled = false;
             getaway = Find("WorldShiftGetaway"); extras = Get(getaway, "Extras");
-            Pose(game, 35f, 0f); Call(game, "TrySwitch");
+            Pose(game, 35f, 0f);
             Call(game, "StepSimulation", .5f, 0f, false);
             Assert.That(Get(extras, "BoostActive"), Is.True);
             Assert.That((float)Get(game, environment == 0 ? "Speed" : "CurrentSpeed"),
@@ -337,7 +338,7 @@ public sealed class WorldShiftGetawayTests
         Call(Get(hud, "Extras"), "Collect", 42f, 46f, -3.2f, -3.2f);
         Pose(game, 60f, 0f);
         Call(hud, "Refresh");
-        Assert.That(prompt.text, Is.EqualTo("Space to switch."));
+        Assert.That(prompt.text, Is.EqualTo("Shield on."), "A shared obstacle cannot be removed by switching worlds.");
         Assert.That(driving.GetComponentsInChildren<TMP_Text>().Any(t => t.text == "They're close!"), Is.False);
         Capture("hud-clean-road-cue");
         Call(game, "TogglePause"); Call(hud, "Refresh");
@@ -393,7 +394,7 @@ public sealed class WorldShiftGetawayTests
         Vector3 pulse = total.rectTransform.localScale;
         Call(game, "StepSimulation", 5f, 0f, false); Call(hud, "Refresh");
         Assert.That(total.rectTransform.localScale, Is.EqualTo(pulse));
-        Call(game, "TogglePause"); Call(game, "StepSimulation", .5f, 0f, false); Call(hud, "Refresh");
+        Call(game, "TogglePause"); Pose(game, 80f, 0f); Call(game, "StepSimulation", .5f, 0f, false); Call(hud, "Refresh");
         Assert.That(total.rectTransform.localScale, Is.EqualTo(Vector3.one));
         Flow("FinishGetawayLeg", true); yield return null; yield return null;
         game = Find("DesertShiftTrial"); game.enabled = false;
@@ -459,7 +460,7 @@ public sealed class WorldShiftGetawayTests
             Assert.That(Get(game, environment == 0 ? "IsRelayAirborne" : "IsAirborne"), Is.True,
                 "Driving onto the ramp must jump without pressing Space.");
             Assert.That(Get(game, "World").ToString(), Is.EqualTo("Day"));
-            Assert.That(prompt.text, Is.EqualTo("Space to land in night."));
+            Assert.That(prompt.text, Is.Not.EqualTo("Space to land in night."), "Shared ramps land safely in either world.");
             Capture(environment == 0 ? "auto-jump-air" : "auto-jump-desert-air");
             if (environment == 0) { Flow("FinishGetawayLeg", true); yield return null; yield return null; }
         }
@@ -500,11 +501,26 @@ public sealed class WorldShiftGetawayTests
             Call(game, "TogglePause"); fuel.Reset(100f);
             if (mode == 0)
             {
-                Call(game, "TrySwitch");
                 Call(Get(hud, "Extras"), "Collect", 42f, 46f, 0f, 0f); Call(hud, "Refresh");
                 Assert.That((float)Get(game, "Speed"), Is.EqualTo(36.96f).Within(.01f), "Removing the speed label must preserve boost behavior.");
             }
         }
+    }
+
+    private static float EscapeSafeLane(object game, float d)
+    {
+        // Hold a clear lane through each obstacle cluster, then return for shared fuel.
+        float current = Mathf.Round((float)Get(game, "Lateral") / 3.2f) * 3.2f;
+        if (Call(game, "FindCollision", Get(game, "World"), d, d + 35f, current, current, false) == null)
+        {
+            bool cluster = new[] { 0f, -3.2f, 3.2f }.Any(x => Call(game, "FindCollision", Get(game, "World"), d - 12f, d + 40f, x, x, false) != null);
+            if (cluster) return current;
+        }
+        foreach (float x in new[] { 0f, 3.2f, -3.2f })
+            if (Call(game, "FindCollision", Get(game, "World"), d, d + 35f, x, x, false) == null) return x;
+        foreach (float x in new[] { 0f, -3.2f, 3.2f })
+            if (Call(game, "FindCollision", Get(game, "World"), d, d + 28f, x, x, false) == null) return x;
+        return (float)Get(game, "Lateral");
     }
 
     private static void Advance(object game, float target, float lane)

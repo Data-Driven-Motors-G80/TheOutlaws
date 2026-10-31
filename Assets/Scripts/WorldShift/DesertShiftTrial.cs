@@ -93,7 +93,8 @@ namespace Outlaws.WorldShift
         public bool FrozenView(ShiftWorld world) => IsMerged ? world == ShiftWorld.Echo : World == ShiftWorld.Echo;
         public Vector2[] ActiveObstacles => fullLevel ? System.Array.Empty<Vector2>() : OrdinaryObstacles;
         public float CheckpointSpacing => fullLevel ? DesertShiftLevel.CheckpointSpacing : 300f;
-        public bool HasGuards(DesertTrialRock rock) => !fullLevel || rock.Distance == 180f || rock.Guarded;
+        public bool RockVisible(DesertTrialRock rock, ShiftWorld world) => GetawayMode || rock.VisibleIn(world);
+        public bool HasGuards(DesertTrialRock rock) => !GetawayMode && (!fullLevel || rock.Distance == 180f || rock.Guarded);
         private readonly RiskRunState pursuit = new RiskRunState();
         private readonly FuelState fuel = new FuelState();
         private readonly System.Collections.Generic.HashSet<string> contacts = new System.Collections.Generic.HashSet<string>();
@@ -149,13 +150,20 @@ namespace Outlaws.WorldShift
             if (roadTemplate == null || carPrefab == null || view == null || sun == null)
             { Debug.LogError("DesertShiftTrial: scene references missing."); enabled = false; return; }
             ActiveGates = fullLevel ? DesertShiftLevel.CreateGates() : Gates;
+            if (GetawayMode)
+                for (int i = 0; i < ActiveGates.Length; i++)
+                {
+                    var gate = ActiveGates[i];
+                    ActiveGates[i] = new DesertTrialGate(gate.Start, gate.World, gate.HalfSide == 0 ? i % 2 == 0 ? -1 : 1 : gate.HalfSide);
+                }
             if (fullLevel) { Rocks = DesertShiftLevel.CreateRocks(); Traffic = DesertShiftLevel.CreateTraffic(); }
             checkpointTraffic = new float[Traffic.Length]; checkpointNightTraffic = new float[Traffic.Length];
             var road = new GameObject("Shared desert test road");
             road.transform.SetParent(transform, false);
             Route = road.AddComponent<WorldShiftRoute>();
+            Route.SharedWorldRules = GetawayMode;
             Route.Build(roadTemplate, true, RunLength, true, fullLevel ? DesertShiftLevel.Relays : null, GetawayMode ? WorldShiftGetaway.ExitTail : 0f);
-            if (fullLevel) Relay = new WorldShiftRelay(Route, DesertShiftLevel.Relays, Speed);
+            if (fullLevel) Relay = new WorldShiftRelay(Route, DesertShiftLevel.Relays, Speed, GetawayMode);
             Player = new GameObject("Shared player - continuous between worlds").transform;
             Player.SetParent(transform, false);
             var visual = new GameObject("Original driving body").transform;
@@ -313,7 +321,7 @@ namespace Outlaws.WorldShift
             if (IsAirborne) return;
             foreach (var gate in ActiveGates)
             {
-                bool visible = gate.World == World;
+                bool visible = GetawayMode || gate.World == World;
                 if ((Combat?.IsDestroyed(gate) ?? false)) continue;
                 if (!visible || Distance + 1.5f < gate.Start || before - 1.5f > gate.End) continue;
                 float min = gate.HalfSide > 0 ? 0f : -5f, max = gate.HalfSide < 0 ? 0f : 5f;
@@ -330,7 +338,7 @@ namespace Outlaws.WorldShift
                 float oldX = RockLateral(rock, IsMerged ? owner : World);
                 rock.Advance(dt, IsMerged ? ShiftWorld.Day : World);
                 if ((Combat?.IsDestroyed(rock) ?? false)) continue;
-                if (rock.Airborne != IsAirborne || (!IsMerged && !rock.VisibleIn(World))) continue;
+                if (rock.Airborne != IsAirborne || (!IsMerged && !RockVisible(rock, World))) continue;
                 if (Distance + 1.5f + rock.Radius < rock.Distance || before - 1.5f - rock.Radius > rock.Distance) continue;
                 float x = RockLateral(rock, IsMerged ? owner : World);
                 float radius = rock.Radius + .8f;
