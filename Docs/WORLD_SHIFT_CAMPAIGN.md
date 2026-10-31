@@ -49,7 +49,7 @@ Powers use dark diamond markers: cyan shield, orange bolt, purple magnet. Fuel u
 
 ## Tutorial and guidance
 
-The separate 720 m tutorial runs at 18 m/s, with no fuel drain. It teaches steering, freezing shared traffic with Space, returning to Day for a small loot trail, shooting a marked block, and steering through an opening. The first moving traffic encounter leaves room to finish the steering lesson. Its cash boxes use the same primitive appearance and Day-only collection rule as Escape, without adding a currency HUD.
+The separate 576 m tutorial runs at 18 m/s (about 32 seconds of driving, plus time spent on the shooting lesson), with no fuel drain. It teaches steering, freezing shared traffic with Space, returning to Day for a small loot trail, shooting a marked block, and steering through an opening. The first moving traffic encounter leaves room to finish the steering lesson. The final steering section follows shooting closely, with obstacles at 510 m and 558 m and the finish just after the last one. Its cash boxes use the same primitive appearance and Day-only collection rule as Escape, without adding a currency HUD.
 
 At the shooting lesson, forward movement waits safely before the block until the player clicks or presses F. **Click to shoot the block.** becomes **Nice shot!** for one driving second. Earlier lessons keep shooting disabled. Steering and switching instructions clear after their actions and stay dismissed for that lesson; retrying restores them. Tutorial completion offers **Start your escape**.
 

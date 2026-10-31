@@ -4,7 +4,8 @@ namespace Outlaws.WorldShift
 {
     public static class WorldShiftTutorial
     {
-        public const float Length = 720f, MergeStart = 520f;
+        public const float Length = 576f, FinalLessonStart = 480f, MergeStart = FinalLessonStart;
+        public const float FirstFinalObstacle = 510f, LastFinalObstacle = 558f;
         public static readonly ShiftHazard ShootingObstacle = new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.Barrier, 440f, 446f, 7);
         public static readonly ShiftHazard[] Hazards =
         {
@@ -12,8 +13,8 @@ namespace Outlaws.WorldShift
             new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.Barrier, 174f, 180f, 7),
             new ShiftHazard(ShiftWorld.Echo, ShiftHazardKind.Barrier, 314f, 320f, 7),
             ShootingObstacle,
-            new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.HalfBarrier, 584f, 590f, 3, halfSide: -1),
-            new ShiftHazard(ShiftWorld.Echo, ShiftHazardKind.HalfBarrier, 652f, 658f, 6, halfSide: 1)
+            new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.HalfBarrier, FirstFinalObstacle, FirstFinalObstacle + 6f, 3, halfSide: -1),
+            new ShiftHazard(ShiftWorld.Echo, ShiftHazardKind.HalfBarrier, LastFinalObstacle, LastFinalObstacle + 6f, 6, halfSide: 1)
         };
         public static ShiftHazard[] CreateHazards()
         {
@@ -33,7 +34,7 @@ namespace Outlaws.WorldShift
             new ShiftCheckpoint(120f, ShiftWorld.Day, 0f, "SWITCH", "Tap Space to freeze traffic."),
             new ShiftCheckpoint(240f, ShiftWorld.Echo, 0f, "SWITCH BACK", "Tap Space for day and loot."),
             new ShiftCheckpoint(380f, ShiftWorld.Day, 0f, "SHOOT", "Click to shoot the block."),
-            new ShiftCheckpoint(520f, ShiftWorld.Day, 2.5f, "YOUR CHOICE", "Steer through the gap.")
+            new ShiftCheckpoint(FinalLessonStart, ShiftWorld.Day, 2.5f, "YOUR CHOICE", "Steer through the gap.")
         };
     }
     // A tiny Day-only trail demonstrates the same reward rule without another HUD.

@@ -52,7 +52,7 @@ public sealed class WorldShiftCampaignTests
         for (int i = 0; i < 850 && Get(tutorial, "State").ToString() == "Running"; i++)
         {
             float d = (float)Get(tutorial, "Distance");
-            if (!learnedShooting && d >= 410f && d < 520f)
+            if (!learnedShooting && d >= 410f && d < 480f)
             {
                 float stoppedAt = d, gap = (float)Get(tutorial, "PursuitGap");
                 Call(tutorial, "StepSimulation", 3f, 0f, false);
@@ -88,11 +88,11 @@ public sealed class WorldShiftCampaignTests
                     }
                 }
             }
-            float target = d < 112f || d < 610f && d >= 400f ? 3.2f : d >= 610f ? -3.2f : 0f;
+            float target = d < 112f || d < 534f && d >= 400f ? 3.2f : d >= 534f ? -3.2f : 0f;
             Call(tutorial, "StepSimulation", .05f, Mathf.Clamp((target - (float)Get(tutorial, "Lateral")) * 2f, -1f, 1f), false);
             if (d < 100f && Mathf.Abs((float)Get(tutorial, "Lateral")) >= .8f)
                 Assert.That(Get(tutorial, "SectionHint"), Is.Empty, "Steering clears the steering instruction.");
-            if (learnedShooting && d > 435f && d < 510f)
+            if (learnedShooting && d > 435f && d < 478f)
                 Assert.That(Get(tutorial, "SectionHint"), Is.Empty, "The shot acknowledgement is brief.");
         }
         Assert.That(Get(tutorial, "State").ToString(), Is.EqualTo("Won"));

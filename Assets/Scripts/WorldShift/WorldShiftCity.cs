@@ -35,6 +35,7 @@ namespace Outlaws.WorldShift
         private readonly System.Collections.Generic.HashSet<ShiftHazard> hitHazards = new System.Collections.Generic.HashSet<ShiftHazard>();
         private bool tutorialHintCompleted;
         private int tutorialCheckpointSwitches;
+        private float tutorialCheckpointLateral;
         private bool[] fuelTaken;
         private float retryRemaining, hintRemaining, fallVelocity;
         private float checkpointFuel = FuelState.MaximumFuel;
@@ -74,7 +75,7 @@ namespace Outlaws.WorldShift
             Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((Distance - MergeStart) / 16f)));
         private bool JumpSequence => relay?.SectionAt(Distance) != null || (Getaway?.Extras.IsJumpSequence(Distance) ?? false);
         public ShiftHazard TutorialShootingObstacle => tutorialLevel ? tutorialHazards[3] : null;
-        public bool TutorialShootingActive => tutorialLevel && Distance >= 380f && Distance < 520f;
+        public bool TutorialShootingActive => tutorialLevel && Distance >= 380f && Distance < WorldShiftTutorial.FinalLessonStart;
         private bool WaitingForTutorialShot => TutorialShootingActive && !(Combat?.IsDestroyed(TutorialShootingObstacle) ?? false);
         private float BaseSpeed => tutorialLevel ? WaitingForTutorialShot && Distance >= 410f ? 0f : 18f : JumpSequence ? relay?.SpeedAt(Distance) ?? WorldShiftLevel.Speed
             : WorldShiftLevel.Speed * (splitViewValidation ? 1f : WorldShiftLevel.CruiseSpeedMultiplier);
@@ -321,6 +322,7 @@ namespace Outlaws.WorldShift
                     checkpointIndex++;
                     tutorialHintCompleted = false;
                     tutorialCheckpointSwitches = Switches;
+                    tutorialCheckpointLateral = Lateral;
                     CompleteTutorialHint();
                     // Keep retries viable even if a player reached a checkpoint nearly empty.
                     checkpointFuel = Mathf.Max(35f, fuel.CurrentFuel);
@@ -484,7 +486,7 @@ namespace Outlaws.WorldShift
                 case 1: tutorialHintCompleted = World == ShiftWorld.Echo; break;
                 case 2: tutorialHintCompleted = World == ShiftWorld.Day; break;
                 case 4: tutorialHintCompleted = Switches > tutorialCheckpointSwitches
-                    || Mathf.Abs(Lateral - Checkpoints[4].Lateral) >= .8f || Distance >= 596f; break;
+                    || Mathf.Abs(Lateral - tutorialCheckpointLateral) >= .8f || Distance >= WorldShiftTutorial.FirstFinalObstacle + 12f; break;
             }
         }
 
@@ -495,6 +497,7 @@ namespace Outlaws.WorldShift
             tutorialHintCompleted = false;
             tutorialCheckpointSwitches = Switches;
             ShiftCheckpoint checkpoint = Checkpoints[checkpointIndex];
+            tutorialCheckpointLateral = checkpoint.Lateral;
             TutorialRewards?.Restore(checkpoint.Distance);
             Distance = checkpoint.Distance;
             Lateral = checkpoint.Lateral;
