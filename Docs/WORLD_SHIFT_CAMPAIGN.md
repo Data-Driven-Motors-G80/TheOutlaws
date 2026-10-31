@@ -17,15 +17,19 @@ The header labels the selected state **Day / loot** or **Night / freeze**. Switc
 
 ## Routes and decisions
 
-City has a 3,360 m authored route with three automatic jumps. Its Escape layout uses 23 shared hazards, including moving oncoming traffic, shootable single-lane blocks, and fixed fire/police obstacles with steering bypasses. The former overlapping world-specific closures were replaced with spaced obstacles on one road. Moving traffic uses a Day-only simulation clock after entering its approach range; collision checks and rendering use the same positions.
+City has a 3,360 m authored route with three automatic jumps. Its Escape layout uses spaced shared hazards, including moving oncoming traffic, shootable single-lane blocks, and fixed fire/police obstacles with steering bypasses. The former overlapping world-specific closures were replaced with spaced obstacles on one road. Gentle street bends lead into straight fork and ramp approaches. Moving traffic uses a Day-only simulation clock after entering its approach range; collision checks and rendering use the same positions.
 
-Desert has a 2,880 m route with rolling rocks, freezeable oncoming traffic and an airborne rock section. Its Escape walls are shared half-width barriers, with room to steer around them. Finale rocks are present in both worlds. The former centre-only crossing guards are omitted in Escape so freezing a rock does not force a collision. Rocks continue rolling in Day and preserve their exact positions in Night.
+Desert has a 2,880 m route with rolling rocks, freezeable oncoming traffic and an airborne rock section. Its Escape walls are shared half-width barriers, with room to steer around them. Finale rocks are present in both worlds. The former centre-only crossing guards are omitted in Escape so freezing a rock does not force a collision. Rocks continue rolling in Day and preserve their exact positions in Night. Broad desert curves follow the open landscape; the canyon choice has a straight approach and opens back out before later hazards.
 
-Each environment adds a 760 m extension:
+Each environment has one fork during the main chase:
 
-1. A physical fork offers ammo and two cash boxes on the left, or two breakable obstacles and six cash boxes on the right. All cash remains Day-only. Obstacles change lane between visits. Steering commits the branch as the roads separate, and the branches rejoin before the optional ramp. The left branch stays clear without ammo.
-2. An optional right ramp offers six elevated Day cash boxes. The ground bypass offers two Day boxes. Elevated rewards require taking the ramp; either world can launch and land safely.
-3. A visible junction offers green **Exit** on the left and amber **Next** on the right. Steering commits the choice as the roads separate. The gate banks the haul once or carries it into the next environment.
+- **City, 1,120–1,400 m:** a broad main road on the left and a narrower side street on the right. Plain building boundaries mark the side street's usable space.
+- **Desert, 720–1,000 m:** an open road on the left and a narrow canyon on the right. Plain canyon walls communicate its reduced visibility and steering room.
+- The left branch offers ammo and two Day cash boxes. The right offers six Day cash boxes behind two breakable obstacles. The left has more steering room (up to 5.8 m of road width versus 3.8 m on the right) and stays clear without ammo.
+- Both paths are visible before steering commits the choice; no new controls or decision screen are used. The roads rejoin before later hazards and ramps. Switching Day/Night preserves the chosen road and its geometry. All cash stays Day-only.
+- Normal road hazards, traffic, buildings and central pickups are cleared or repositioned around the fork so nothing sits in the gap between roads. Ammo before the fork is at 780 m in City and 640 m in Desert; the left fork offers another refill. Fuel remains available in both worlds.
+
+A shorter 440 m extension follows each environment. An optional right ramp offers six elevated Day cash boxes, while the ground bypass offers two Day boxes. Elevated rewards require the ramp; either world can launch and land safely. A separate final junction offers green **Exit** on the left and amber **Next** on the right. Steering commits the choice as the roads separate; the gate banks the haul once or carries it into the next environment. The previous end-of-environment reward fork has been moved into the chase rather than duplicated.
 
 Continued legs increase loot by 0.5 per leg, capped at x21, and pursuit pressure, capped after six continues. Each environment restores fuel and normal police separation. Cruise speed stays stable between environments. Results show the best banked getaway, total savings and a new-best message when beaten. Snow and Ocean Coast remain separate development scenes outside this loop.
 
@@ -33,7 +37,7 @@ Continued legs increase loot by 0.5 per leg, capped at x21, and pursuit pressure
 
 **A/D or arrows** steer. **Space** switches Day/Night. **Left-click or F** shoots. **Escape** pauses. Leaving a live run loses the carried haul. Escape has no checkpoint retries.
 
-Start with three rounds. White three-round pickups refill to three at 780 m and on the safe fork. Ammo carries between Escape environments. Shots clear cracked barriers and rocks in either world, with modest assistance in the current lane. Cars, fire and spikes cannot be destroyed. Shared fork obstacles cannot be removed by switching worlds.
+Start with three rounds. White three-round pickups refill to three before the main fork and again on its safe branch. Ammo carries between Escape environments. Shots clear cracked barriers and rocks in either world, with modest assistance in the current lane. Cars, fire and spikes cannot be destroyed. Shared fork obstacles cannot be removed by switching worlds.
 
 Shots use the original game's small yellow sphere, with the same 0.28 m size, muzzle offset and 70 m/s travel speed. The visible shot follows the road around bends. Hit resolution remains immediate, removing both the obstacle and its collision. Visible bullets pause with driving time and clear on retry or run end. There are no shot sounds.
 

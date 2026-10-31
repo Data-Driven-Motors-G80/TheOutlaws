@@ -118,7 +118,14 @@ namespace Outlaws.WorldShift
             ? Relay.SampleFlight(DesertShiftLevel.Relays[0], rock.Distance) : Route.Sample(rock.Distance);
         public bool IsFuelTaken(int index) => collectedFuel.Contains(index);
         public int FuelCount => fullLevel ? 12 : 0;
-        public float FuelDistance(int index) => index / 2 * 480f + (index % 2 == 0 ? 24f : 460f);
+        public float FuelDistance(int index)
+        {
+            float at = index / 2 * 480f + (index % 2 == 0 ? 24f : 460f);
+            if (GetawayMode && WorldShiftForkRoad.InMainFork(DesertShiftLevel.Length, at))
+                return index % 2 == 1 ? WorldShiftForkRoad.MainForkStart(DesertShiftLevel.Length) - 40f
+                    : WorldShiftForkRoad.MainForkStart(DesertShiftLevel.Length) + 320f;
+            return at;
+        }
         private AutoDriveCar driver;
         private DesertShiftTrialView presentation;
         private float retryTime, messageTime;
@@ -157,6 +164,12 @@ namespace Outlaws.WorldShift
                     ActiveGates[i] = new DesertTrialGate(gate.Start, gate.World, gate.HalfSide == 0 ? i % 2 == 0 ? -1 : 1 : gate.HalfSide);
                 }
             if (fullLevel) { Rocks = DesertShiftLevel.CreateRocks(); Traffic = DesertShiftLevel.CreateTraffic(); }
+            if (GetawayMode)
+            {
+                Rocks = System.Array.FindAll(Rocks, r => !WorldShiftForkRoad.InMainFork(DesertShiftLevel.Length, r.Distance, 25f));
+                Traffic = System.Array.FindAll(Traffic, t => !WorldShiftForkRoad.InMainFork(DesertShiftLevel.Length, t.Start, 35f));
+                ActiveGates = System.Array.FindAll(ActiveGates, g => !WorldShiftForkRoad.InMainFork(DesertShiftLevel.Length, g.Start, 25f));
+            }
             checkpointTraffic = new float[Traffic.Length]; checkpointNightTraffic = new float[Traffic.Length];
             var road = new GameObject("Shared desert test road");
             road.transform.SetParent(transform, false);

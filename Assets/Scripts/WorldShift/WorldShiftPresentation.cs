@@ -423,7 +423,7 @@ namespace Outlaws.WorldShift
             foreach (var chunk in chunks)
             {
                 bool visible = Mathf.Max(chunk.At, chunk.End) > distance - chunk.Tail && chunk.At < distance + 270f
-                    && (!chunk.CityBlock || !route.IsForkSurface(chunk.At));
+                    && (!chunk.CityBlock || !route.IsForkScenery(chunk.At));
                 if (chunk.Root.activeSelf != visible) chunk.Root.SetActive(visible);
             }
             foreach (var hazard in hazards)

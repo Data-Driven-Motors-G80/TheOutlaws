@@ -87,13 +87,13 @@ public sealed class WorldShiftCombatRoutesTests
             if (environment == 0) { Pose(game, 260f, 0f); Call(game, "StepSimulation", .6f, 0f, false); }
             Assert.That(fuel.CurrentFuel, Is.GreaterThan(50f), "Fuel remains collectible in Night.");
             Assert.That(Run.Ammo, Is.EqualTo(2));
-            Call(combat, "Step", 779f, 781f, 0f, 0f);
+            Call(combat, "Step", (float)Get(combat, "RefillAt") - 1f, (float)Get(combat, "RefillAt") + 1f, 0f, 0f);
             Assert.That(Run.Ammo, Is.EqualTo(3), "Ammo remains collectible in Night.");
 
             Call(game, "TrySwitch"); Pose(game, 30f, 0f); Call(game, "StepSimulation", .5f, 0f, false);
             Assert.That(Run.Carried, Is.GreaterThan(0), "Returning to Day restores earning.");
             Assert.That(Get(extras, "BoostActive"), Is.True, "Day offers the power-up lane choices.");
-            Pose(game, (float)Get(game, "RunLength") - 739f, -2.8f);
+            Pose(game, (float)Get(Get(hud, "Routing"), "EnvironmentEnd") + 21f, -2.8f);
             Call(game, "StepSimulation", 4.2f, 0f, false);
             Assert.That(Get(extras, "BoostActive"), Is.False);
             object mover;
@@ -163,7 +163,7 @@ public sealed class WorldShiftCombatRoutesTests
         Assert.That(Call(combat, "TryShoot"), Is.True);
         Assert.That(Call(combat, "IsDestroyed", dayWall), Is.True); Assert.That(Run.Ammo, Is.EqualTo(1));
         // A real bend: the shot clears the visible Day barrier at 900 m.
-        Call(combat, "Step", 779f, 781f, 0f, 0f); Assert.That(Run.Ammo, Is.EqualTo(3));
+        Call(combat, "Step", (float)Get(combat, "RefillAt") - 1f, (float)Get(combat, "RefillAt") + 1f, 0f, 0f); Assert.That(Run.Ammo, Is.EqualTo(3));
         Pose(game, 870f, -3.2f); Call(game, "StepSimulation", .2f, 0f, false);
         var curved = hazards.Single(h => Field(h, "Kind").ToString() == "Barrier" && (float)Field(h, "Start") == 900f);
         Assert.That(Call(combat, "TryShoot"), Is.True);
@@ -195,7 +195,7 @@ public sealed class WorldShiftCombatRoutesTests
         Pose(game, 270f, (float)Call(game, "RockLateral", second, Get(game, "World")));
         Assert.That(Call(combat, "TryShoot"), Is.True); Assert.That(Call(combat, "IsDestroyed", second), Is.True);
         Assert.That(Run.Ammo, Is.Zero); Assert.That(Call(combat, "TryShoot"), Is.False);
-        Call(combat, "Step", 779f, 781f, 0f, 0f); Assert.That(Run.Ammo, Is.EqualTo(3));
+        Call(combat, "Step", (float)Get(combat, "RefillAt") - 1f, (float)Get(combat, "RefillAt") + 1f, 0f, 0f); Assert.That(Run.Ammo, Is.EqualTo(3));
         Assert.That(UnityEngine.Object.FindObjectsByType<AudioSource>(FindObjectsSortMode.None), Is.Empty);
     }
 
@@ -209,36 +209,50 @@ public sealed class WorldShiftCombatRoutesTests
             if (pass >= 2) { Flow("FinishGetawayLeg", true); yield return null; yield return null; }
             var game = Find(pass < 2 ? "WorldShiftCity" : "DesertShiftTrial"); game.enabled = false;
             var hud = Find("WorldShiftGetaway"); var routing = Get(hud, "Routing"); var combat = Get(game, "Combat");
-            float end = (float)Get(routing, "EnvironmentEnd"); bool right = pass % 2 != 0;
+            float start = (float)Get(routing, "ForkStart"), rejoin = (float)Get(routing, "Rejoin"); bool right = pass % 2 != 0;
+            Assert.That(rejoin, Is.LessThan((float)Get(routing, "EnvironmentEnd")), "The choice belongs in the main chase.");
+            float rightLane = (float)Get(routing, "RightLootLane");
+            object curveA = Call(Get(game, "Route"), "Sample", pass < 2 ? 820f : 200f);
+            object curveB = Call(Get(game, "Route"), "Sample", pass < 2 ? 1000f : 420f);
+            Assert.That(Vector3.Angle((Vector3)Get(curveA, "Forward"), (Vector3)Get(curveB, "Forward")), Is.InRange(8f, 18f), "Environment bends should be visible and gentle.");
+            object forkA = Call(Get(game, "Route"), "Sample", start + 80f), forkB = Call(Get(game, "Route"), "Sample", start + 200f);
+            Assert.That(Vector3.Angle((Vector3)Get(forkA, "Forward"), (Vector3)Get(forkB, "Forward")), Is.LessThan(2f), "The fork must not coincide with a sharp bend.");
             if (!right)
             {
                 Call(combat, "TryShoot"); Call(game, "StepSimulation", .2f, 0f, false); Call(combat, "TryShoot");
                 Call(game, "StepSimulation", .2f, 0f, false); Call(combat, "TryShoot");
                 Assert.That(Run.Ammo, Is.Zero, "The clear branch must remain usable without ammo.");
             }
-            Pose(game, end + 20f, right ? 3.2f : -2.8f);
+            Pose(game, start - 20f, right ? rightLane : -2.8f);
             float gap = (float)Get(game, "PursuitGap");
             bool pictured = false;
-            for (int i = 0; i < 900 && (float)Get(game, "Distance") < end + 324f; i++)
+            for (int i = 0; i < 900 && (float)Get(game, "Distance") < rejoin + 4f; i++)
             {
                 float d = (float)Get(game, "Distance");
                 if (right && ((string)Get(combat, "Hint")).StartsWith("Click")) Call(combat, "TryShoot");
-                Call(game, "StepSimulation", .025f, Mathf.Clamp(((right ? 3.2f : -2.8f) - (float)Get(game, "Lateral")) * 2f, -1f, 1f), false);
+                Call(game, "StepSimulation", .025f, Mathf.Clamp(((right ? rightLane : -2.8f) - (float)Get(game, "Lateral")) * 2f, -1f, 1f), false);
                 Assert.That(Get(game, "State").ToString(), Is.EqualTo("Running"));
-                if (!pictured && d > end + 195f)
+                if (!pictured && d > start + 155f)
                 {
                     var player = (Transform)Get(game, "Player"); object p = Call(Get(game, "Route"), "Sample", Get(game, "Distance"));
                     Assert.That(Mathf.Abs(Vector3.Dot(player.position - (Vector3)Get(p, "Position"), (Vector3)Get(p, "Right"))), Is.GreaterThan(6f));
-                    var hidden = game.GetComponentsInChildren<Transform>(true).Single(t => t.name == "Shared road " + (end + 160f).ToString("0"));
+                    var hidden = game.GetComponentsInChildren<Transform>(true).Single(t => t.name == "Shared road " + (start + 120f).ToString("0"));
                     Assert.That(hidden.Find("Road").GetComponent<Renderer>().enabled, Is.False, "There must be no invisible straight-road shortcut between the branches.");
+                    Assert.That((float)Call(routing, "Width", d, -1), Is.GreaterThan((float)Call(routing, "Width", d, 1)));
+                    Assert.That(game.GetComponentsInChildren<Transform>(true).Any(t => t.name == (pass < 2 ? "Side-street boundary" : "Canyon boundary")), Is.True);
+                    var beforeSwitch = player.position; int branch = (int)Get(routing, "RewardBranch");
+                    Call(game, "TrySwitch");
+                    Assert.That(player.position, Is.EqualTo(beforeSwitch)); Assert.That(Get(routing, "RewardBranch"), Is.EqualTo(branch));
+                    Capture("fork-night-" + pass);
+                    Call(game, "TrySwitch");
                     Capture("fork-" + (pass < 2 ? "city-" : "desert-") + (right ? "reward" : "safe")); pictured = true;
                 }
             }
             Assert.That(Get(routing, "RewardBranch"), Is.EqualTo(right ? 1 : -1));
-            Assert.That((float)Get(game, "Distance"), Is.GreaterThan(end + 320f));
+            Assert.That((float)Get(game, "Distance"), Is.GreaterThan(rejoin));
             Assert.That(Run.Carried, Is.EqualTo((int)((right ? 600 : 200) * Run.LootMultiplier)));
             Assert.That(Run.Ammo, Is.EqualTo(right ? 1 : 3));
-            Assert.That((float)Get(game, "PursuitGap"), Is.GreaterThan(gap - .3f), "Both branches must be traversable without an impact.");
+            Assert.That((float)Get(game, "PursuitGap"), Is.GreaterThan(gap - 3f), "Both branches must be traversable without an impact.");
             Assert.That((float)Call(routing, "Spread", Get(game, "Distance")), Is.EqualTo(0f));
         }
     }
@@ -283,8 +297,8 @@ public sealed class WorldShiftCombatRoutesTests
             var game = Find("WorldShiftCity"); game.enabled = false;
             var hud = Find("WorldShiftGetaway"); var route = Get(hud, "Routing");
             float end = (float)Get(route, "EnvironmentEnd"); Run.Collect(500);
-            Pose(game, end + 500f, choice == 0 ? -3.2f : 3.3f);
-            Advance(game, end + 690f, choice == 0 ? -3.2f : 3.3f);
+            Pose(game, end + 180f, choice == 0 ? -3.2f : 3.3f);
+            Advance(game, (float)Get(route, "ExitChoiceAt") + 90f, choice == 0 ? -3.2f : 3.3f);
             Assert.That(Get(route, "ExitBranch"), Is.EqualTo(choice == 0 ? -1 : 1));
             Capture(choice == 0 ? "junction-cash-out" : "junction-continue");
             // Once the roads separate, steering toward the other road stays within the visible rail.

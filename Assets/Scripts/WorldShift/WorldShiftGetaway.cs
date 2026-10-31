@@ -9,7 +9,7 @@ namespace Outlaws.WorldShift
     /// <summary>Shared escape pickups, extraction gate and concise UI for both environments.</summary>
     public sealed class WorldShiftGetaway : MonoBehaviour
     {
-        public const float ExitTail = 760f;
+        public const float ExitTail = 440f;
         public const float ContinueBoundary = 1.8f;
         private sealed class Loot
         {
@@ -39,7 +39,7 @@ namespace Outlaws.WorldShift
         private static readonly Color Green = new Color(.4f, 1f, .68f);
         private static readonly Color Ink = new Color(.025f, .045f, .07f, .96f);
         public bool InRecovery => Distance >= environmentEnd + 20f;
-        public bool InExit => Distance >= environmentEnd + 500f;
+        public bool InExit => Distance >= environmentEnd + 180f;
         public WorldShiftGetawayExtras Extras { get; private set; }
         private bool IsCity => city != null;
         internal float Distance => IsCity ? city.Distance : desert.Distance;
@@ -89,11 +89,11 @@ namespace Outlaws.WorldShift
             }
             Routing = gameObject.AddComponent<WorldShiftForkRoad>();
             Routing.Bind(this, Route, environmentEnd, !IsCity, MakeMaterial);
-            foreach (float offset in new[] { 145f, 245f }) AddLoot(environmentEnd + offset, -2.8f, ShiftWorld.Day, gold, handle, anyWorld: true);
-            foreach (float offset in new[] { 152f, 168f, 186f, 242f, 256f, 270f })
-                AddLoot(environmentEnd + offset, 3.2f, ShiftWorld.Day, gold, handle, anyWorld: true);
+            foreach (float offset in new[] { 105f, 205f }) AddLoot(Routing.ForkStart + offset, -2.8f, ShiftWorld.Day, gold, handle, anyWorld: true);
+            foreach (float offset in new[] { 112f, 128f, 146f, 202f, 216f, 230f })
+                AddLoot(Routing.ForkStart + offset, Routing.RightLootLane, ShiftWorld.Day, gold, handle, anyWorld: true);
             Extras = gameObject.AddComponent<WorldShiftGetawayExtras>();
-            Extras.Bind(this, Route, IsCity ? city.Player : desert.Player, environmentEnd + 320f, MakeMaterial);
+            Extras.Bind(this, Route, IsCity ? city.Player : desert.Player, environmentEnd, MakeMaterial);
             foreach (float at in new[] { Extras.Jump.Start + 8f, Extras.Jump.Start + 22f, Extras.Jump.Takeoff + 8f,
                 Extras.Jump.Takeoff + 24f, Extras.Jump.Takeoff + 42f, Extras.Jump.Landing - 8f })
                 AddLoot(at, WorldShiftBonusJump.Lane, ShiftWorld.Echo, gold, handle, Extras.Jump.HeightAt(at), true);
@@ -209,7 +209,7 @@ namespace Outlaws.WorldShift
         private void BuildExit()
         {
             Material safe = MakeMaterial(Green), risk = MakeMaterial(Gold);
-            foreach (float at in new[] { environmentEnd + 560f, Length })
+            foreach (float at in new[] { environmentEnd + 240f, Length })
                 foreach (int side in new[] { -1, 1 })
                 {
                     RoadPathPoint point = Route.Sample(at);
@@ -217,8 +217,13 @@ namespace Outlaws.WorldShift
                     root.SetParent(transform, false);
                     root.SetPositionAndRotation(Routing.Position(at, side * 2.5f), Quaternion.LookRotation(point.Forward));
                     Material colour = side < 0 ? safe : risk;
-                    foreach (float x in new[] { -2.4f, 2.4f })
+                    foreach (float x in new[] { -2.55f, 2.55f })
+                    {
+                        // The approach is still a shared road: keep its centre clear
+                        // until the two exit branches have actually separated.
+                        if (at < Routing.ExitChoiceAt && (side < 0 ? x > 0f : x < 0f)) continue;
                         Box(root, new Vector3(x, 2.5f, 0f), new Vector3(.12f, 5f, .12f), colour);
+                    }
                     WorldLabel(root, side < 0 ? "Exit" : "Next", new Vector3(0f, 4.5f, 0f), side < 0 ? Green : Gold, 4f);
                 }
         }

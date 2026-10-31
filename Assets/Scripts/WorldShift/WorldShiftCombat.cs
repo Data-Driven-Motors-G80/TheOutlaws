@@ -43,11 +43,12 @@ namespace Outlaws.WorldShift
         public void Bind(WorldShiftCity game) { city = game; Initialize(); }
         public void Bind(DesertShiftTrial game) { desert = game; Initialize(); }
         private void LateUpdate() => Present();
+        public float RefillAt => Escape && desert != null ? 640f : 780f;
         private void Initialize()
         {
             if (city != null && city.TutorialLevel) return;
-            AddAmmoPickup(780f, 0f);
-            if (Escape) AddAmmoPickup((city != null ? WorldShiftLevel.Length : DesertShiftLevel.Length) + 140f, -2.8f);
+            AddAmmoPickup(RefillAt, 0f);
+            if (Escape) AddAmmoPickup(WorldShiftForkRoad.MainForkStart(city != null ? WorldShiftLevel.Length : DesertShiftLevel.Length) + 100f, -2.8f);
         }
         private void AddAmmoPickup(float at, float x)
         {

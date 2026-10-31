@@ -135,7 +135,11 @@ namespace Outlaws.WorldShift
         {
             var result = new System.Collections.Generic.List<ShiftFuelPickup>();
             foreach (var p in FuelPickups)
-                if (!result.Exists(other => other.Distance == p.Distance)) result.Add(new ShiftFuelPickup(ShiftWorld.Day, p.Distance, 0));
+                if (!result.Exists(other => other.Distance == p.Distance))
+                {
+                    float at = WorldShiftForkRoad.InMainFork(Length, p.Distance) ? WorldShiftForkRoad.MainForkStart(Length) - 40f : p.Distance;
+                    result.Add(new ShiftFuelPickup(ShiftWorld.Day, at, 0));
+                }
             return result.ToArray();
         }
 
@@ -152,6 +156,7 @@ namespace Outlaws.WorldShift
             int[] lane = { 1, 2, 2, 1, 2, 4, 1, 2, 4, 1, 1, 2, 4, 1, 2, 4, 1, 4, 2, 1, 4 };
             for (int i = 0; i < at.Length; i++)
             {
+                if (WorldShiftForkRoad.InMainFork(Length, at[i], 35f)) continue;
                 bool barrier = at[i] == 440 || at[i] == 900 || at[i] == 1050 || at[i] == 1520 || at[i] == 2030
                     || at[i] == 2600 || at[i] == 2800 || at[i] == 3000 || at[i] == 3200;
                 result.Add(new ShiftHazard(ShiftWorld.Day, barrier ? ShiftHazardKind.Barrier : ShiftHazardKind.Oncoming,

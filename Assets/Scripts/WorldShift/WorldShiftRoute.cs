@@ -22,6 +22,8 @@ namespace Outlaws.WorldShift
         public WorldShiftForkRoad Forks { get; private set; }
         private float forkEnvironmentEnd = float.NaN;
         public bool IsForkSurface(float distance) => !float.IsNaN(forkEnvironmentEnd) && WorldShiftForkRoad.Owns(forkEnvironmentEnd, distance);
+        public bool IsForkScenery(float d) => !float.IsNaN(forkEnvironmentEnd)
+            && (WorldShiftForkRoad.InMainFork(forkEnvironmentEnd, d, 48f) || d >= forkEnvironmentEnd + 160f);
         public void AttachForks(WorldShiftForkRoad forks) { Forks = forks; SetWorld(ShiftWorld.Day); }
         public RoadPathPoint SampleDriver(float distance, RoadPathPoint ground, float lateral)
             => Forks != null ? Forks.SampleDriver(distance, ground, lateral) : ground;
@@ -42,7 +44,7 @@ namespace Outlaws.WorldShift
             if (!validation) foreach (float boundary in WorldShiftLevel.MergeBounds) cuts.Add(boundary);
             foreach (var jump in relays)
                 foreach (float cut in new[] { jump.Ramp - 20f, jump.Ramp, jump.Ramp + 24f, jump.Takeoff, jump.Landing, jump.End }) cuts.Add(cut);
-            if (!float.IsNaN(forkEnvironmentEnd)) foreach (float offset in new[] { 40f, 320f, 520f }) cuts.Add(forkEnvironmentEnd + offset);
+            if (!float.IsNaN(forkEnvironmentEnd)) foreach (float cut in new[] { WorldShiftForkRoad.MainForkStart(forkEnvironmentEnd), WorldShiftForkRoad.MainForkStart(forkEnvironmentEnd) + 280f, forkEnvironmentEnd + 200f }) cuts.Add(cut);
             Pose entry = new Pose(Vector3.back * 80f, Quaternion.identity);
             float start = -80f;
             foreach (float end in cuts)
@@ -52,7 +54,8 @@ namespace Outlaws.WorldShift
                 segment.name = "Shared road " + start.ToString("0");
                 Transform legacyCar = segment.transform.Find("Car");
                 if (legacyCar != null) legacyCar.gameObject.SetActive(false);
-                float angle = desertProfile ? DesertHeading(end) - DesertHeading(start) : validation ? 0f : Heading(end) - Heading(start);
+                float angle = desertProfile ? ProfileDesertHeading(end) - ProfileDesertHeading(start) : validation ? 0f
+                    : SharedWorldRules ? EscapeHeading(end) - EscapeHeading(start) : Heading(end) - Heading(start);
                 segment.ConfigureCurve(end - start, angle, false,
                     desertProfile ? DesertRelaySlope(start, true) : validation ? 0f : Slope(start, true),
                     desertProfile ? DesertRelaySlope(end, false) : validation ? 0f : Slope(end, false));
@@ -77,6 +80,21 @@ namespace Outlaws.WorldShift
                 start = end;
             }
             SetWorld(ShiftWorld.Day);
+        }
+
+        private float ProfileDesertHeading(float d) => !SharedWorldRules ? DesertHeading(d)
+            : .6f * DesertHeading(d) + 12f * (Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(2260f, 2380f, d))
+                - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(2580f, 2700f, d)));
+        private static float EscapeHeading(float d)
+        {
+            // Streets turn gently between traversal sections. The fork and all
+            // ramp approaches remain straight, with clear views of each choice.
+            return -12f * (Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(820f, 980f, d))
+                - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(1440f, 1600f, d)))
+                + 10f * (Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(1980f, 2080f, d))
+                - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(2160f, 2260f, d)))
+                - 10f * (Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(2560f, 2660f, d))
+                - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(2800f, 2920f, d)));
         }
 
         // Reuse the old desert's 25-degree bend scale, with clear sight lines at
