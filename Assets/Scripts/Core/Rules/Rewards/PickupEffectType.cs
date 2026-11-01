@@ -1,3 +1,4 @@
+// Stable pickup identifiers; retain numeric values for saved data and prefabs.
 public enum PickupEffectType
 {
     None = 0,

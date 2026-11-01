@@ -1,7 +1,7 @@
+// Builds sand geometry beside the current road layout.
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>Visual-only sand banks belonging to each pooled road instance.</summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(RoadSegment))]
 public sealed class DesertRoadsideSand : MonoBehaviour
@@ -17,7 +17,6 @@ public sealed class DesertRoadsideSand : MonoBehaviour
     private readonly List<Vector3> vertices = new List<Vector3>();
     private readonly List<int> triangles = new List<int>();
 
-    // Refresh on streaming/reuse, rather than allocating and rebuilding every frame.
     public bool Refresh(Material material, float floor)
     {
         if (segment == null) segment = GetComponent<RoadSegment>();
@@ -55,7 +54,7 @@ public sealed class DesertRoadsideSand : MonoBehaviour
             RoadPathPoint point = segment.Sample(segment.Length * i / steps);
             Vector3 left = point.Position - point.Right * (point.Width * 0.5f + BankWidth);
             Vector3 right = point.Position + point.Right * (point.Width * 0.5f + BankWidth);
-            // Each bank connects to the backdrop independently. Nothing spans the road.
+
             Add(new Vector3(left.x, floor, left.z));
             Add(point.Position - point.Right * (point.Width * 0.5f + ShoulderWidth) - Vector3.up * SurfaceOffset);
             Add(point.Position - point.Right * point.Width * 0.5f - Vector3.up * SurfaceOffset);
@@ -85,6 +84,7 @@ public sealed class DesertRoadsideSand : MonoBehaviour
         triangles.Add(a); triangles.Add(c); triangles.Add(d);
     }
 
+    // Release meshes created at runtime.
     private void OnDestroy()
     {
         if (mesh == null) return;

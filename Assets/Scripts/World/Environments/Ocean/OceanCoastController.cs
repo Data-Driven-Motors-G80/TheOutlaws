@@ -1,7 +1,7 @@
+// Manages ocean waves, boat wakes and their driving interactions.
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>Road-relative surf lanes and telegraphed coast guard wakes; uses the existing car models.</summary>
 [DefaultExecutionOrder(-175)]
 [DisallowMultipleComponent]
 [RequireComponent(typeof(EnvironmentRoot))]
@@ -60,8 +60,7 @@ public sealed class OceanCoastController : MonoBehaviour
             nextWaveAt = distance + 15f;
             wakeTimer = wakeInterval;
         }
-        // Stop new hazards during scripted reservations, but let visible waves and
-        // wakes finish naturally instead of popping out or abruptly resetting surf.
+
         bool suppressed = environment.Obstacles.SuppressAutoSpawn;
         if (!road.TrySample(distance, out RoadPathPoint point)) return;
         float lateral = Vector3.Dot(car.transform.position - point.Position, point.Right);
@@ -95,7 +94,7 @@ public sealed class OceanCoastController : MonoBehaviour
     private bool SpawnWave(float start)
     {
         if (!road.TrySample(start, out RoadPathPoint point) || !road.TrySample(start + waveLength, out _)) return false;
-        // Alternate outer lanes with a centre lane between them; keep each route reachable.
+
         int[] lanes = { -1, 0, 1, 0 };
         float lateral = lanes[waveIndex++ % lanes.Length] * point.Width / 3f;
         GameObject visual = new GameObject("Surf wave — follow the white crest");
@@ -133,6 +132,7 @@ public sealed class OceanCoastController : MonoBehaviour
         return true;
     }
 
+    // Update wake interactions against current road distance and lateral position.
     private void UpdateWakes(float distance, float lateral)
     {
         for (int i = wakes.Count - 1; i >= 0; i--)
@@ -185,6 +185,7 @@ public sealed class OceanCoastController : MonoBehaviour
         return line;
     }
 
+    // Remove active surface features when the controller stops.
     private void OnDisable() => ClearSurface();
 
     private void ClearSurface()

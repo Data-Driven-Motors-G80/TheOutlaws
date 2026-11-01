@@ -1,4 +1,5 @@
-/// <summary>Tracks one temporary pickup effect without depending on a scene or vehicle.</summary>
+// Tracks the active temporary driving effect and its remaining time.
+
 public sealed class PickupEffectState
 {
     public const float DefaultDurationSeconds = 5f;
@@ -10,7 +11,6 @@ public sealed class PickupEffectState
     public float ForwardSpeedMultiplier => ActiveEffect == PickupEffectType.Boost ? 1.2f : 1f;
     public float LateralAccelerationMultiplier => ActiveEffect == PickupEffectType.SlipperySteering ? 0.3f : 1f;
 
-    /// <summary>A new pickup replaces the current effect, including its remaining time.</summary>
     public void Apply(PickupEffectType effect, float duration = DefaultDurationSeconds)
     {
         if (!IsPickupEffect(effect) || !IsFinite(duration) || duration <= 0f)
@@ -23,7 +23,7 @@ public sealed class PickupEffectState
         RemainingSeconds = duration;
     }
 
-    /// <summary>Advance with scaled game time; zero elapsed time leaves the effect paused.</summary>
+    // Expire an effect when its remaining duration reaches zero.
     public void Tick(float elapsedSeconds)
     {
         if (ActiveEffect == PickupEffectType.None)
@@ -31,7 +31,6 @@ public sealed class PickupEffectState
             return;
         }
 
-        // Invalid clock data must not poison the countdown with NaN or infinity.
         if (!IsFinite(elapsedSeconds))
         {
             Clear();

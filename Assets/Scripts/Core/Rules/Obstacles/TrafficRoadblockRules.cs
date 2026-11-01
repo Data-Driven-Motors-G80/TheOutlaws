@@ -1,21 +1,17 @@
+// Chooses roadblock spacing and patterns from run progress.
 public enum TrafficRoadblockPattern
 {
     TwoLaneGreen,
     TwoLaneYellow,
-    /// <summary>Two single-lane blocks of different colours; the third lane stays open.</summary>
+
     SplitChoice
 }
 
-/// <summary>
-/// Scene-independent pacing for mid/late-game roadblocks. Every roadblock leaves
-/// one lane open: ammo is a shortcut, never a requirement.
-/// </summary>
 public static class TrafficRoadblockRules
 {
     public const float FirstRoadblockDistance = 400f;
     public const float UltraLateDistance = 2000f;
 
-    /// <summary>Roadblocks keep getting closer together the further you go (210 m apart at first, 55 m at the end).</summary>
     public static float GetNextSpacing(float distanceTravelled, double roll)
     {
         roll = ClampRoll(roll);
@@ -25,7 +21,7 @@ public static class TrafficRoadblockRules
         return minimum + (maximum - minimum) * (float)roll;
     }
 
-    /// <summary>The same roadblock mix all run; only how often they appear increases.</summary>
+    // Progress changes the available challenge without changing the supplied roll.
     public static TrafficRoadblockPattern ChoosePattern(float distanceTravelled, double roll)
     {
         roll = ClampRoll(roll);

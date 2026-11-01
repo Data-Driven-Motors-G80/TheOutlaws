@@ -1,3 +1,4 @@
+// Refreshes the proximity display from the current pursuit state.
 using UnityEngine;
 using UnityEngine.UI;
 

@@ -1,3 +1,4 @@
+// Connects firing input and backpack ammo to projectile creation.
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -5,7 +6,7 @@ using UnityEngine.InputSystem;
 public sealed class OutlawShooting : MonoBehaviour
 {
     private const int MaximumAmmoValue = BackpackState.GunShots;
-    // No cooldown: every Space press fires (as long as there is ammo).
+
     private const float FireCooldown = 0f;
 
     private AutoDriveCar driver;
@@ -26,7 +27,6 @@ public sealed class OutlawShooting : MonoBehaviour
         nextFireTime = 0f;
     }
 
-    // Read the final visible pose after AutoDriveCar.Update applies drift and road rotation.
     private void LateUpdate()
     {
         if (Time.timeScale <= 0f || Keyboard.current == null || Time.time < nextFireTime || pickupEffects == null || !pickupEffects.SimulationActive || pickupEffects.RunState.IsGameOver)
@@ -53,6 +53,7 @@ public sealed class OutlawShooting : MonoBehaviour
         return pickupEffects.Backpack.Receive(RandomPickupOutcome.Gun);
     }
 
+    // Spend ammunition only when a shot can be fired.
     private void TryShoot()
     {
         var item = pickupEffects.Backpack.Item;

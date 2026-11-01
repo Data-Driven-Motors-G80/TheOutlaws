@@ -1,15 +1,17 @@
+// Owns pursuit, crash, boost, recovery and run-end rules.
 using System;
 
-/// <summary>Scene-independent pursuit, crash recovery, and voluntary pickup rewards.</summary>
 public sealed class RiskRunState
 {
+    public const float RampBoostMultiplier = 1.5f;
+    public const float RoadRecoverySeconds = 0.8f;
     public const float InitialPursuitGap = 45f;
     public const float TutorialInitialPursuitGap = 18f;
     public const float MaximumPursuitGap = 75f;
     public const float PickupProximityRecovery = MaximumPursuitGap * 0.5f;
-    // Collisions drain the proximity bar but do not slow the car.
+
     public const float CrashSlowDuration = 0f;
-    // 20% of the initial 45 m gap, so each collision costs 9 m.
+
     public const float DefaultCrashProximityDrain = 0.2f;
     public const float CollisionProtectionDuration = 1f;
     public const float RecoveryWaitDuration = 2.6f;
@@ -23,19 +25,54 @@ public sealed class RiskRunState
     private bool shieldAvailable;
     private int shieldUseCount;
 
-    // This run is the sole clock owner; callers read Effects but advance it through Tick.
     public PickupEffectState Effects { get; } = new PickupEffectState();
     public float PursuitGap => (float)pursuitGap;
-    /// <summary>While above zero (the tutorial), hits and closing speed can never end the run.</summary>
+
     public float MinimumPursuitGap { get; set; }
-    /// <summary>
-    /// When the player is faster than the police, the gap only grows back up to this distance
-    /// (the police tail you rather than vanishing). Bonuses like the jammer can still exceed it.
-    /// </summary>
+
     public float RecoveryCap { get; set; } = MaximumPursuitGap;
     public bool IsGameOver { get; private set; }
     public bool HasNitro { get; private set; }
-    public float ForwardSpeedMultiplier => HasNitro ? 1.2f : Effects.ForwardSpeedMultiplier;
+    public float RoadRecoveryRemaining { get; private set; }
+    public bool IsRoadRecovering => RoadRecoveryRemaining > 0f;
+    public int RoadRecoveryCount { get; private set; }
+    public float RoadFallProximityDrain { get; set; } = DefaultCrashProximityDrain;
+
+    // Apply the fall penalty and start the temporary recovery state.
+    public bool RecoverFromRoadFall()
+    {
+        if (IsGameOver || IsRoadRecovering) return false;
+        RoadRecoveryCount++;
+        pursuitGap = Math.Max(MinimumPursuitGap,
+            pursuitGap - InitialPursuitGap * RoadFallProximityDrain);
+        HasNitro = false;
+        RampBoostRemaining = 0f;
+        RoadRecoveryRemaining = RoadRecoverySeconds;
+        collisionProtectionRemaining = RoadRecoverySeconds + CollisionProtectionDuration;
+        recoveryWaitRemaining = RoadRecoverySeconds + RecoveryWaitDuration;
+        if (pursuitGap <= 0d)
+        {
+            IsGameOver = true;
+            Effects.Clear();
+            PendingBonus = 0;
+        }
+        return true;
+    }
+
+    public float RampBoostRemaining { get; private set; }
+    public bool HasRampBoost => RampBoostRemaining > 0f;
+    public float RampBoostStrength { get; private set; } = RampBoostMultiplier;
+    public float ForwardSpeedMultiplier => Math.Max(HasRampBoost ? RampBoostStrength : 1f,
+        HasNitro ? 1.2f : Effects.ForwardSpeedMultiplier);
+
+    // Keep ramp boosts separate from collected nitro.
+    public bool TryActivateRampBoost(float seconds, float multiplier = RampBoostMultiplier)
+    {
+        if (IsGameOver || !IsFinite(seconds) || seconds <= 0f || !IsFinite(multiplier) || multiplier < 1f) return false;
+        RampBoostStrength = HasRampBoost ? Math.Max(RampBoostStrength, multiplier) : multiplier;
+        RampBoostRemaining = Math.Max(RampBoostRemaining, seconds);
+        return true;
+    }
 
     public bool TryActivateNitro()
     {
@@ -53,20 +90,18 @@ public sealed class RiskRunState
     public int BankedPickupScore { get; private set; }
     public int PendingBonus { get; private set; }
     public float LastTickForwardDistance { get; private set; }
-    public float CrashSpeedMultiplier => IsGameOver ? 0f : 1f;
+    public float CrashSpeedMultiplier => IsGameOver || IsRoadRecovering ? 0f : 1f;
 
     public RiskRunState()
     {
         Reset();
     }
 
-    /// <summary>A valid pickup banks its small reward and replaces the unearned survival bonus.</summary>
     public bool TryCollect(PickupEffectType effect, float duration = PickupEffectState.DefaultDurationSeconds)
     {
         return TryCollectInternal(effect, duration, awardScore: true);
     }
 
-    /// <summary>Gameplay pickup entry point while the team decides whether pickup scoring belongs in the final design.</summary>
     public bool TryCollectWithoutReward(PickupEffectType effect, float duration = PickupEffectState.DefaultDurationSeconds)
     {
         return TryCollectInternal(effect, duration, awardScore: false);
@@ -90,7 +125,6 @@ public sealed class RiskRunState
         return true;
     }
 
-    /// <summary>Cancel the current risk, forfeiting only its unearned bonus.</summary>
     public bool TryBailOut()
     {
         if (IsGameOver || Effects.ActiveEffect == PickupEffectType.None)
@@ -101,7 +135,6 @@ public sealed class RiskRunState
         return true;
     }
 
-    /// <summary>Stores one collision shield earned from a pickup.</summary>
     public bool TryGrantShield()
     {
         if (IsGameOver) return false;
@@ -109,7 +142,6 @@ public sealed class RiskRunState
         return true;
     }
 
-    /// <summary>Adds one half of the maximum pursuit gap, capped at the maximum.</summary>
     public bool TryRestorePursuitGap(float amount)
     {
         if (IsGameOver || !IsFinite(amount) || amount <= 0f)
@@ -119,7 +151,6 @@ public sealed class RiskRunState
         return true;
     }
 
-    /// <summary>Consumes the shield only when a new collision would actually start recovery.</summary>
     public bool TryConsumeShield()
     {
         if (IsGameOver || !shieldAvailable || collisionProtectionRemaining > 0d)
@@ -130,7 +161,6 @@ public sealed class RiskRunState
         return true;
     }
 
-    /// <summary>Impact drains part of the proximity bar without slowing the car.</summary>
     public bool TryCrash(float normalizedProximityDrain = DefaultCrashProximityDrain)
     {
         if (IsGameOver || collisionProtectionRemaining > 0d
@@ -138,9 +168,7 @@ public sealed class RiskRunState
             return false;
 
         double clampedDrain = Math.Min(1d, normalizedProximityDrain);
-        // The normalized cost is based on the 45 m starting gap. Subtract it
-        // from the current distance so every hit costs the same number of
-        // metres, including after the player has earned recovery distance.
+
         pursuitGap = Math.Max(
             MinimumPursuitGap,
             pursuitGap - InitialPursuitGap * clampedDrain);
@@ -158,7 +186,6 @@ public sealed class RiskRunState
         return true;
     }
 
-    /// <summary>Ends the run immediately for non-collision failures such as fuel depletion.</summary>
     public bool EndRun()
     {
         if (IsGameOver)
@@ -171,11 +198,6 @@ public sealed class RiskRunState
         return true;
     }
 
-    /// <summary>
-    /// Integrates relative forward speed across every effect and recovery boundary.
-    /// During the post-impact wait, distance may shrink but cannot increase.
-    /// Invalid clock/speed input leaves the whole state unchanged.
-    /// </summary>
     public void Tick(float elapsedSeconds, float baseForwardSpeed = 15f, float policeSpeed = 14f)
     {
         LastTickForwardDistance = 0f;
@@ -188,6 +210,8 @@ public sealed class RiskRunState
         while (remaining > 0d && !IsGameOver)
         {
             double step = remaining;
+            if (HasRampBoost) step = Math.Min(step, RampBoostRemaining);
+            if (IsRoadRecovering) step = Math.Min(step, RoadRecoveryRemaining);
             bool hadEffect = Effects.ActiveEffect != PickupEffectType.None;
             if (hadEffect)
                 step = Math.Min(step, Effects.RemainingSeconds);
@@ -198,11 +222,12 @@ public sealed class RiskRunState
 
             double forwardSpeed = (double)baseForwardSpeed * ForwardSpeedMultiplier
                 * CrashSpeedMultiplier;
-            double relativeSpeed = forwardSpeed - policeSpeed;
+            if (IsRoadRecovering) forwardSpeed = 0d;
+
+            double relativeSpeed = IsRoadRecovering ? 0d : forwardSpeed - policeSpeed;
             if (recoveryWaitRemaining > 0d && relativeSpeed > 0d)
                 relativeSpeed = 0d;
 
-            // Resolve capture before ticking Effects: an expiry at the capture instant earns no bonus.
             if (MinimumPursuitGap <= 0f && relativeSpeed < 0d && pursuitGap / -relativeSpeed <= step)
             {
                 double timeUntilCapture = pursuitGap / -relativeSpeed;
@@ -219,7 +244,7 @@ public sealed class RiskRunState
             double next = pursuitGap + relativeSpeed * step;
             if (relativeSpeed > 0d)
             {
-                // Pulling away only recovers the gap up to the cap (never shrinks a bigger, bonus gap).
+
                 double cap = Math.Min(RecoveryCap, MaximumPursuitGap);
                 next = pursuitGap >= cap ? pursuitGap : Math.Min(cap, next);
             }
@@ -235,13 +260,12 @@ public sealed class RiskRunState
             }
             else if (!hadEffect)
             {
-                // Direct lifecycle clearing must never turn an abandoned effect into a paid bonus.
+
                 PendingBonus = 0;
             }
         }
     }
 
-    // Used when a countdown boundary splits one rendered frame into two ticks.
     public void TickAdditionalFrameTime(float elapsedSeconds, float baseForwardSpeed,
         float policeSpeed, float previousForwardDistance)
     {
@@ -249,14 +273,15 @@ public sealed class RiskRunState
         LastTickForwardDistance += previousForwardDistance;
     }
 
-    /// <summary>Copies everything that must survive a scene change (proximity, shield, nitro, effects).</summary>
+    // Copy state needed to continue the same run after a transition.
     public RiskRunSnapshot Capture()
     {
         return new RiskRunSnapshot(
             (float)pursuitGap, shieldAvailable, shieldUseCount, HasNitro,
             BankedPickupScore, PendingBonus,
             Effects.ActiveEffect, Effects.RemainingSeconds,
-            (float)collisionProtectionRemaining, (float)recoveryWaitRemaining);
+            (float)collisionProtectionRemaining, (float)recoveryWaitRemaining, RampBoostRemaining,
+            RoadRecoveryRemaining, RoadRecoveryCount, RampBoostStrength);
     }
 
     public void Restore(RiskRunSnapshot snapshot)
@@ -266,6 +291,10 @@ public sealed class RiskRunState
         shieldAvailable = snapshot.HasShield;
         shieldUseCount = snapshot.ShieldUseCount;
         HasNitro = snapshot.HasNitro;
+        RampBoostRemaining = Math.Max(0f, snapshot.RampBoostRemaining);
+        RoadRecoveryRemaining = Math.Max(0f, snapshot.RoadRecoveryRemaining);
+        RoadRecoveryCount = snapshot.RoadRecoveryCount;
+        RampBoostStrength = Math.Max(1f, snapshot.RampBoostStrength);
         BankedPickupScore = snapshot.BankedPickupScore;
         PendingBonus = snapshot.PendingBonus;
         collisionProtectionRemaining = snapshot.CollisionProtectionRemaining;
@@ -274,7 +303,6 @@ public sealed class RiskRunState
             Effects.Apply(snapshot.ActiveEffect, snapshot.EffectRemaining);
     }
 
-    /// <summary>Close, nonfatal pursuit for demonstrating the opening nitro pickup.</summary>
     public void BeginTutorialPursuit()
     {
         Reset();
@@ -283,7 +311,6 @@ public sealed class RiskRunState
         RecoveryCap = InitialPursuitGap;
     }
 
-    /// <summary>Starts the real chase from the opening gap without touching pickups or effects.</summary>
     public void ResetPursuit()
     {
         if (IsGameOver) return;
@@ -299,8 +326,12 @@ public sealed class RiskRunState
         pursuitGap = InitialPursuitGap;
         MinimumPursuitGap = 0f;
         RecoveryCap = MaximumPursuitGap;
+        RoadRecoveryRemaining = 0f;
+        RoadRecoveryCount = 0;
+        RampBoostStrength = RampBoostMultiplier;
         IsGameOver = false;
         HasNitro = false;
+        RampBoostRemaining = 0f;
         crashSlowRemaining = 0d;
         collisionProtectionRemaining = 0d;
         recoveryWaitRemaining = 0d;
@@ -317,6 +348,8 @@ public sealed class RiskRunState
         crashSlowRemaining = Math.Max(0d, crashSlowRemaining - elapsedSeconds);
         collisionProtectionRemaining = Math.Max(0d, collisionProtectionRemaining - elapsedSeconds);
         recoveryWaitRemaining = Math.Max(0d, recoveryWaitRemaining - elapsedSeconds);
+        RampBoostRemaining = Math.Max(0f, RampBoostRemaining - (float)elapsedSeconds);
+        RoadRecoveryRemaining = Math.Max(0f, RoadRecoveryRemaining - (float)elapsedSeconds);
     }
 
     private static bool IsPickupEffect(PickupEffectType effect)
@@ -332,13 +365,16 @@ public sealed class RiskRunState
     }
 }
 
-/// <summary>Plain-data copy of a RiskRunState, used to carry a run between scenes.</summary>
 public readonly struct RiskRunSnapshot
 {
     public readonly float PursuitGap;
     public readonly bool HasShield;
     public readonly int ShieldUseCount;
     public readonly bool HasNitro;
+    public readonly float RampBoostRemaining;
+    public readonly float RoadRecoveryRemaining;
+    public readonly int RoadRecoveryCount;
+    public readonly float RampBoostStrength;
     public readonly int BankedPickupScore;
     public readonly int PendingBonus;
     public readonly PickupEffectType ActiveEffect;
@@ -348,12 +384,17 @@ public readonly struct RiskRunSnapshot
 
     public RiskRunSnapshot(float pursuitGap, bool hasShield, int shieldUseCount, bool hasNitro,
         int bankedPickupScore, int pendingBonus, PickupEffectType activeEffect, float effectRemaining,
-        float collisionProtectionRemaining, float recoveryWaitRemaining)
+        float collisionProtectionRemaining, float recoveryWaitRemaining, float rampBoostRemaining = 0f,
+        float roadRecoveryRemaining = 0f, int roadRecoveryCount = 0, float rampBoostStrength = RiskRunState.RampBoostMultiplier)
     {
         PursuitGap = pursuitGap;
         HasShield = hasShield;
         ShieldUseCount = shieldUseCount;
         HasNitro = hasNitro;
+        RampBoostRemaining = rampBoostRemaining;
+        RoadRecoveryRemaining = roadRecoveryRemaining;
+        RoadRecoveryCount = roadRecoveryCount;
+        RampBoostStrength = rampBoostStrength;
         BankedPickupScore = bankedPickupScore;
         PendingBonus = pendingBonus;
         ActiveEffect = activeEffect;

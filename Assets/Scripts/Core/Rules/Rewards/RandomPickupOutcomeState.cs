@@ -1,3 +1,4 @@
+// Selects mystery rewards using the configured table or fallback weights.
 using System;
 
 public enum RandomPickupOutcome
@@ -11,27 +12,34 @@ public enum RandomPickupOutcome
     Gun = 6
 }
 
-/// <summary>City: reverse 10%, gun 30%, other helpful items 20% each. Seeds support reproducible tests.</summary>
 public sealed class RandomPickupOutcomeState
 {
     private readonly Random random;
 
     public float SunnyDayChance { get; set; }
     public RewardTable Table { get; set; }
+    public bool HarderDifficulty { get; set; }
 
     public RandomPickupOutcomeState(int? seed = null)
     {
         random = seed.HasValue ? new Random(seed.Value) : new Random();
     }
 
+    // Prefer the configured reward table; use fallback weights when absent.
     public RandomPickupOutcome Next()
     {
-        if (Table != null) return Table.Roll(random);
+        if (Table != null) return Table.Roll(random, HarderDifficulty);
         if (SunnyDayChance > 0f && random.NextDouble() < SunnyDayChance) return RandomPickupOutcome.SunnyDay;
-        int roll = random.Next(10);
+        if (HarderDifficulty)
+        {
+            int hardRoll = random.Next(9);
+            if (hardRoll < 2) return RandomPickupOutcome.ReverseSteering;
+            if (hardRoll < 5) return RandomPickupOutcome.Gun;
+            return hardRoll < 7 ? RandomPickupOutcome.ProximityRecovery : RandomPickupOutcome.Shield;
+        }
+        int roll = random.Next(8);
         if (roll == 0) return RandomPickupOutcome.ReverseSteering;
         if (roll < 4) return RandomPickupOutcome.Gun;
-        if (roll < 6) return RandomPickupOutcome.Nitro;
-        return roll < 8 ? RandomPickupOutcome.ProximityRecovery : RandomPickupOutcome.Shield;
+        return roll < 6 ? RandomPickupOutcome.ProximityRecovery : RandomPickupOutcome.Shield;
     }
 }

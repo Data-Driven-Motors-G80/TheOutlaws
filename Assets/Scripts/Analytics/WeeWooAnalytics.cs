@@ -1,3 +1,4 @@
+// Queues analytics rows and sends them in batches.
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -8,12 +9,6 @@ using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.SceneManagement;
 
-/// <summary>
-/// Sends gameplay analytics to a Google Apps Script web app that writes rows into a Sheet
-/// (see Docs/ANALYTICS.md). Events are batched; on WebGL a beacon also delivers the
-/// final state when the tab closes, so quitting mid-run or mid-tutorial is still recorded.
-/// Configured via Resources/WeeWooAnalytics.json. No names, emails or device ids are sent.
-/// </summary>
 public sealed class WeeWooAnalytics : MonoBehaviour
 {
     [Serializable]
@@ -40,9 +35,9 @@ public sealed class WeeWooAnalytics : MonoBehaviour
     private static float sessionStartRealtime;
 
     public static string SessionId { get; private set; }
-    /// <summary>Supplies run time, distance and screen for every event row.</summary>
+
     public static Func<Dictionary<string, object>> ContextProvider;
-    /// <summary>Rows to deliver if the tab closes right now (session end, abandoned run, ...).</summary>
+
     public static Func<List<KeyValuePair<string, Dictionary<string, object>>>> ExitRowsProvider;
 
     private Settings settings;
@@ -68,7 +63,6 @@ public sealed class WeeWooAnalytics : MonoBehaviour
         ExitRowsProvider = null;
     }
 
-    /// <summary>Creates the uploader and records the session start (once per page load).</summary>
     public static void EnsureStarted()
     {
         if (instance != null) return;
@@ -78,7 +72,6 @@ public sealed class WeeWooAnalytics : MonoBehaviour
         instance.Configure();
     }
 
-    /// <summary>Build tag for every row; editor play is suffixed "-editor" so it can be filtered out.</summary>
     public static string BuildTag => (instance != null && instance.settings != null && !string.IsNullOrEmpty(instance.settings.buildTag)
         ? instance.settings.buildTag
         : Application.version) + (Application.isEditor ? "-editor" : "");
@@ -129,7 +122,6 @@ public sealed class WeeWooAnalytics : MonoBehaviour
 
     public static float SessionSeconds => Time.realtimeSinceStartup - sessionStartRealtime;
 
-    /// <summary>Logs one event. Arguments alternate key, value: Track("pickup", "kind", "Fuel").</summary>
     public static void Track(string eventName, params object[] keyValues)
     {
         var data = new Dictionary<string, object>();
@@ -159,7 +151,6 @@ public sealed class WeeWooAnalytics : MonoBehaviour
             Debug.Log("[Analytics] " + Json(data));
     }
 
-    /// <summary>Adds a summary row (e.g. one per run) to the named sheet.</summary>
     public static void AddRow(string sheet, Dictionary<string, object> data)
     {
         EnsureStarted();
@@ -183,7 +174,7 @@ public sealed class WeeWooAnalytics : MonoBehaviour
         if (pending.Count >= MaximumBatch) Flush();
     }
 
-    /// <summary>Sends everything queued now (run end, tutorial step, focus loss).</summary>
+    // Move queued rows into a request without blocking gameplay.
     public static void Flush()
     {
         if (instance == null) return;
@@ -210,7 +201,7 @@ public sealed class WeeWooAnalytics : MonoBehaviour
         {
             request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body));
             request.downloadHandler = new DownloadHandlerBuffer();
-            // text/plain keeps this a "simple" request, which Apps Script accepts without CORS preflight.
+
             request.SetRequestHeader("Content-Type", "text/plain;charset=utf-8");
             request.timeout = 20;
             yield return request.SendWebRequest();
@@ -230,7 +221,7 @@ public sealed class WeeWooAnalytics : MonoBehaviour
 
     private void OnApplicationFocus(bool focused)
     {
-        // Tab switches and closes start with a focus loss: get queued data out early.
+
         if (!focused) Flush();
     }
 
@@ -308,6 +299,7 @@ public sealed class WeeWooAnalytics : MonoBehaviour
         }
     }
 
+    // Escape text before inserting it into JSON.
     private static void AppendString(StringBuilder builder, string value)
     {
         builder.Append('"');

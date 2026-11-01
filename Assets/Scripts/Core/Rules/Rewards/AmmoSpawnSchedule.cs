@@ -1,4 +1,5 @@
-/// <summary>Distance-based ammo pacing used by the endless chase.</summary>
+// Sets distance ranges between ammo offers as the run progresses.
+
 public static class AmmoSpawnSchedule
 {
     public static int GetMinimumSpacing(float distanceTravelled)

@@ -1,3 +1,4 @@
+// Schedules obstacle rows and protects reserved encounter gaps.
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Pool;
@@ -44,12 +45,14 @@ public class ObstacleSpawner : MonoBehaviour
     private bool firstFairRow = true;
     private float nextRoadblockAt = TrafficRoadblockRules.FirstRoadblockDistance;
 
-    /// <summary>While true (the tutorial), only scripted rows are placed.</summary>
     private bool scriptedSpawnOnly;
     private Object safeGapOwner;
     private Object pickupGapOwner;
+    private float pickupGapClearance;
     private float pickupDistance;
     private bool spawnDeferred;
+    private float nextRoadblockTime;
+    public OutlawGameManager Pacing { get; set; }
 
     public float PickupApproachSpeed
     {
@@ -62,21 +65,20 @@ public class ObstacleSpawner : MonoBehaviour
         }
     }
 
-    // Only the time and space around collection are reserved, not the whole road.
-    private bool ConflictsWithPickup(float at, float closingSpeed, float halfLength, float target)
+    private bool ConflictsWithPickup(float at, float closingSpeed, float halfLength, float target, float extraClearance = 0f)
     {
-        // The driver already tracks route distance. Avoid projecting its position
-        // through every road segment again for each obstacle and gap candidate.
+
         float carDistance = driver != null ? driver.RoadPositionDistance : 0f;
         if (driver == null && !road.TryGetDistance(car.position, out carDistance)) return true;
         float arrival = Mathf.Max(0f, target - carDistance) / PickupApproachSpeed;
-        float margin = 6f + halfLength;
+        float margin = 6f + halfLength + extraClearance;
         float early = at - closingSpeed * Mathf.Max(0f, arrival - 0.35f);
         float late = at - closingSpeed * (arrival + 0.35f);
         return Mathf.Abs(at - target) <= margin || (late <= target + margin && early >= target - margin);
     }
 
-    public bool TryReservePickupGap(Object owner, Vector3 position)
+    // Reject pickup placements that conflict with existing reservations.
+    public bool TryReservePickupGap(Object owner, Vector3 position, float extraClearance = 0f)
     {
         if (owner == null || SuppressAutoSpawn || (pickupGapOwner != null && pickupGapOwner != owner)) return false;
         if (!road.TryGetDistance(position, out float target)) return false;
@@ -85,11 +87,31 @@ public class ObstacleSpawner : MonoBehaviour
             if (obstacle.GameObject == null || !obstacle.GameObject.activeInHierarchy) continue;
             if (!road.TryGetDistance(obstacle.Transform.position, out float at)) return false;
             float speed = motion != null && motion.isActiveAndEnabled ? motion.ApproachSpeed(obstacle.Transform) : 0f;
-            if (ConflictsWithPickup(at, speed, obstacle.Renderer.bounds.extents.magnitude, target)) return false;
+            if (ConflictsWithPickup(at, speed, obstacle.Renderer.bounds.extents.magnitude, target, extraClearance)) return false;
         }
         pickupGapOwner = owner;
         pickupDistance = target;
+        pickupGapClearance = Mathf.Max(0f, extraClearance);
         return true;
+    }
+
+    // Protect takeoff space; overdue jump offers may clear a small entry window.
+    public bool TryReserveRampGap(Object owner, Vector3 position, float clearance, bool overdue)
+    {
+        if (!overdue) return TryReservePickupGap(owner, position, clearance);
+        if (owner == null || SuppressAutoSpawn || (pickupGapOwner != null && pickupGapOwner != owner)) return false;
+        if (!road.TryGetDistance(position, out float target)) return false;
+        for (int i = activeObstacles.Count - 1; i >= 0; i--)
+        {
+            var obstacle = activeObstacles[i];
+            if (obstacle.GameObject == null || !obstacle.GameObject.activeInHierarchy) continue;
+            if (!road.TryGetDistance(obstacle.Transform.position, out float at)) continue;
+            float speed = motion != null && motion.isActiveAndEnabled ? motion.ApproachSpeed(obstacle.Transform) : 0f;
+            if (!ConflictsWithPickup(at, speed, obstacle.Renderer.bounds.extents.magnitude, target, clearance)) continue;
+            pool.Release(obstacle);
+            activeObstacles.RemoveAt(i);
+        }
+        return TryReservePickupGap(owner, position, clearance);
     }
 
     public void ReleasePickupGap(Object owner)
@@ -102,7 +124,6 @@ public class ObstacleSpawner : MonoBehaviour
         set => scriptedSpawnOnly = value;
     }
 
-    // One owner at a time: a portal waits for an existing pickup row, and vice versa.
     public bool TryReserveSafeGap(Object owner)
     {
         if (owner == null || scriptedSpawnOnly || pickupGapOwner != null || (safeGapOwner != null && safeGapOwner != owner)) return false;
@@ -122,24 +143,21 @@ public class ObstacleSpawner : MonoBehaviour
         {
             if (obstacle.GameObject == null || !obstacle.GameObject.activeInHierarchy) continue;
             if (!road.TryGetDistance(obstacle.Transform.position, out float at)) return false;
-            // Bounds magnitude is conservative even for wide blocks on bends.
+
             float margin = clearance + obstacle.Renderer.bounds.extents.magnitude;
             if (Mathf.Abs(at - target) <= margin) return false;
-            // Approaching rows must already be behind the gap: otherwise they
-            // could enter it later while the player is slowed by a collision.
+
             if (ExtraClosingSpeed > 0f && at > target) return false;
         }
         return true;
     }
 
-    /// <summary>Real-run distance, which excludes the tutorial and carries across scenes.</summary>
     public System.Func<float> RunDistance { get; set; }
 
     private float CurrentRunDistance => RunDistance != null
         ? RunDistance()
         : (driver != null ? driver.RoadDistanceTravelled : 0f);
 
-    /// <summary>Clears scripted rows and restarts pacing from the start of the real run.</summary>
     public void BeginRealRun()
     {
         SuppressAutoSpawn = false;
@@ -149,9 +167,9 @@ public class ObstacleSpawner : MonoBehaviour
         previousOpenLane = 1;
         nextRoadblockAt = CurrentRunDistance + TrafficRoadblockRules.FirstRoadblockDistance;
         distanceUntilSpawn = 60f;
+        nextRoadblockTime = (Pacing != null ? Pacing.ElapsedSeconds : 0f) + 12f;
     }
 
-    /// <summary>Removes blocks near a point (keeps the portal gate's doorway clear).</summary>
     public void ClearNear(Vector3 position, float radius)
     {
         for (int i = activeObstacles.Count - 1; i >= 0; i--)
@@ -169,18 +187,15 @@ public class ObstacleSpawner : MonoBehaviour
         return activeObstacles.Exists(item => item.TrafficLight == obstacle);
     }
 
-    /// <summary>Tutorial: a full-width wall the player must shoot through.</summary>
     public TrafficLightObstacle SpawnTutorialWall(float distanceAhead, TrafficObstacleState state)
     {
         if (!road.TryGetPointAhead(car.position, distanceAhead, out RoadPathPoint point)) return null;
         return SpawnFullWidthBarrier(point, state);
     }
 
-    /// <summary>Tutorial: blocks two lanes, leaving open the lane farthest from the car.</summary>
     public List<TrafficLightObstacle> SpawnTutorialDodgeRow(float distanceAhead) =>
         SpawnTutorialDodgeRow(distanceAhead, out _);
 
-    /// <summary>As above; <paramref name="openLateral"/> is the open lane's offset from the road centre.</summary>
     public List<TrafficLightObstacle> SpawnTutorialDodgeRow(float distanceAhead, out float openLateral)
     {
         var placed = new List<TrafficLightObstacle>();
@@ -191,7 +206,7 @@ public class ObstacleSpawner : MonoBehaviour
             ? Vector3.Dot(car.position - current.Position, current.Right)
             : 0f;
         float side = lateral >= 0f ? -1f : 1f;
-        // A two-lane block on the player's side; the open lane is on the far side.
+
         placed.Add(PlaceObstacle(point, -side * laneWidth * 0.5f, laneWidth * 2f, TrafficObstacleState.Green));
         openLateral = side * laneWidth;
         return placed;
@@ -221,16 +236,24 @@ public class ObstacleSpawner : MonoBehaviour
     }
     protected InfiniteRoad Road => road;
 
+    // Convert encounter timing into distance using the current closing speed.
     private float NextSpacing()
     {
         if (!useFairRows) return NextRange(minSpacing, maxSpacing) * RowSpacingMultiplier;
-        // Allow steering and the length of both vehicles, even as the car speeds up.
+
         float speed = driver != null ? driver.ForwardSpeed : 15f;
         if (driver != null) speed *= driver.EnvironmentSpeedMultiplier;
         if (driver != null && driver.TryGetComponent(out CarPickupEffects effects))
             speed *= effects.RunState.ForwardSpeedMultiplier;
-        // Still leaves about a second between rows to reach the (adjacent) open lane.
-        // Rows can come about 0.85 s apart at most (the open lane is always the same or the next one over).
+
+        if (Pacing != null && Pacing.UsesCoordinatedPacing)
+        {
+            float progress = Mathf.Clamp01(difficultyElapsed / 60f);
+            float seconds = NextRange(Mathf.Lerp(1.05f, 0.75f, progress), Mathf.Lerp(1.25f, 0.95f, progress));
+            float at = driver.RoadPositionDistance + PickupLookAhead.Distance;
+            return ((speed + ExtraClosingSpeed) * seconds + 4f) * RowSpacingMultiplier
+                * Pacing.RoadPressureMultiplier(at);
+        }
         return Mathf.Max(NextRange(32f, 42f) / density, (speed + ExtraClosingSpeed) * 0.85f + 4f) * RowSpacingMultiplier;
     }
 
@@ -277,8 +300,8 @@ public class ObstacleSpawner : MonoBehaviour
         if (distanceUntilSpawn <= 0f)
         {
             bool spawnedSpecialRow = TrySpawn();
-            // After a long frame, do not stack catch-up rows at the same position.
-            distanceUntilSpawn = spawnDeferred ? 2f : spawnedSpecialRow ? 45f : NextSpacing();
+
+            distanceUntilSpawn = spawnDeferred ? 2f : spawnedSpecialRow && (Pacing == null || !Pacing.UsesCoordinatedPacing) ? 45f : NextSpacing();
         }
     }
 
@@ -311,6 +334,8 @@ public class ObstacleSpawner : MonoBehaviour
         return true;
     }
 
+    private float SpeedForPacing() => Pacing != null ? Pacing.ActualDrivingSpeed + ExtraClosingSpeed : 20f;
+
     private bool TrySpawn()
     {
         spawnDeferred = false;
@@ -322,18 +347,36 @@ public class ObstacleSpawner : MonoBehaviour
         if (pickupGapOwner != null && road.TryGetDistance(point.Position, out float candidate))
         {
             float speed = motion != null && motion.isActiveAndEnabled ? motion.NextRowSpeed : 0f;
-            if (ConflictsWithPickup(candidate, speed, 5f, pickupDistance))
+            if (ConflictsWithPickup(candidate, speed, 5f, pickupDistance, pickupGapClearance))
             {
                 spawnDeferred = true;
                 return false;
             }
         }
         float distance = CurrentRunDistance;
-        if (distance >= nextRoadblockAt)
+        bool coordinated = Pacing != null && Pacing.UsesCoordinatedPacing;
+        road.TryGetDistance(point.Position, out float rowAt);
+        if (coordinated && !Pacing.CanPlaceNormalObstacle(rowAt))
+        {
+            spawnDeferred = true;
+            return false;
+        }
+        bool roadblockDue = coordinated
+            ? Pacing.ElapsedSeconds + Mathf.Max(0f, rowAt - driver.RoadPositionDistance) / SpeedForPacing() >= nextRoadblockTime
+            : distance >= nextRoadblockAt;
+        if (roadblockDue && (!coordinated || Pacing.CanScheduleEncounter(this,
+            RunEncounterKind.Roadblock, rowAt - 6f, rowAt + 8f)))
         {
             TrafficRoadblockPattern pattern = TrafficRoadblockRules.ChoosePattern(
                 distance, roadblockRandom.NextDouble());
             SpawnRoadblock(point, pattern);
+            if (coordinated)
+            {
+                Pacing.BeginEncounter(this, RunEncounterKind.Roadblock, rowAt - 6f, rowAt + 8f);
+                nextRoadblockTime = Pacing.ElapsedSeconds
+                    + Mathf.Max(0f, rowAt - driver.RoadPositionDistance) / Mathf.Max(1f, SpeedForPacing())
+                    + NextRange(8f, 11f);
+            }
             PickupPlacement.ClearRow(point, (previousOpenLane - 1) * point.Width / 3f);
             GameEvents.RaiseRoadblockSpawned(pattern);
             nextRoadblockAt = distance + TrafficRoadblockRules.GetNextSpacing(
@@ -361,8 +404,7 @@ public class ObstacleSpawner : MonoBehaviour
 
     private void SpawnRoadblock(RoadPathPoint point, TrafficRoadblockPattern pattern)
     {
-        // Every roadblock leaves one lane open, next to the previous open lane so it
-        // is always reachable without ammo.
+
         float laneWidth = point.Width / 3f;
         switch (pattern)
         {
@@ -385,14 +427,14 @@ public class ObstacleSpawner : MonoBehaviour
                     int openLane = Mathf.Clamp(previousOpenLane + roadblockRandom.Next(3) - 1, 0, 2);
                     if (openLane != 1)
                     {
-                        // Neighbouring lanes are blocked: one big two-lane block of a single colour.
+
                         float side = openLane == 0 ? 1f : -1f;
                         PlaceObstacle(point, side * laneWidth * 0.5f, laneWidth * 2f,
                             TrafficObstacleRules.ChooseInitialState(CurrentRunDistance, colorRandom.NextDouble()));
                         previousOpenLane = openLane;
                         break;
                     }
-                    // Split choice offers one- and two-shot blocks, with no three-shot blocks.
+
                     bool greenFirst = roadblockRandom.Next(2) == 0;
                     int stateIndex = 0;
                     for (int lane = 0; lane < 3; lane++)
@@ -414,17 +456,16 @@ public class ObstacleSpawner : MonoBehaviour
         return PlaceObstacle(point, 0f, Mathf.Max(0.8f, point.Width - 0.1f), state);
     }
 
+    // Choose occupied lanes while keeping the row layout passable.
     private void SpawnFairRow(RoadPathPoint point)
     {
-        // Keep the guaranteed route in the same or an adjacent lane, never force
-        // a two-lane swerve between consecutive rows.
+
         int openLane = random.Next(Mathf.Max(0, previousOpenLane - 1),
             Mathf.Min(2, previousOpenLane + 1) + 1);
         int firstLane = (openLane + 1 + random.Next(2)) % 3;
         if (firstFairRow)
         {
-            // Teach the first dodge explicitly instead of letting a stationary
-            // player coast through a randomly empty centre lane.
+
             openLane = random.Next(2) == 0 ? 0 : 2;
             firstLane = 1;
             firstFairRow = false;
@@ -432,13 +473,14 @@ public class ObstacleSpawner : MonoBehaviour
         previousOpenLane = openLane;
         float laneWidth = point.Width / 3f;
         float gapCenter = (openLane - 1) * laneWidth;
-        // The open gap always fits the car, but is sometimes tight enough that shooting is easier.
+
         float gapHalfWidth = RunDifficultyState.GapHalfWidth(difficultyElapsed, random.NextDouble());
-        bool doubleRow = random.NextDouble() < difficultRowChance;
+        float chance = difficultRowChance;
+        bool doubleRow = random.NextDouble() < chance;
         int secondLane = 3 - openLane - firstLane;
         if (doubleRow && openLane != 1)
         {
-            // Both blocked lanes sit side by side: make them one big block from the gap to the wall.
+
             float minimum = openLane == 0 ? gapCenter + gapHalfWidth : -point.Width * 0.5f;
             float maximum = openLane == 0 ? point.Width * 0.5f : gapCenter - gapHalfWidth;
             PlaceObstacle(point, (minimum + maximum) * 0.5f, maximum - minimum - 0.1f);
@@ -464,7 +506,7 @@ public class ObstacleSpawner : MonoBehaviour
             float otherCenter = (otherLane - 1) * point.Width / 3f;
             if ((otherCenter < gapCenter) == leftOfGap)
             {
-                // Two blocks on the same side share the space without overlapping.
+
                 float split = (preferredCenter + otherCenter) * 0.5f;
                 if (preferredCenter < otherCenter) maximum = Mathf.Min(maximum, split - 0.15f);
                 else minimum = Mathf.Max(minimum, split + 0.15f);
@@ -472,9 +514,9 @@ public class ObstacleSpawner : MonoBehaviour
         }
         float availableWidth = maximum - minimum;
         if (availableWidth < 0.8f) return;
-        // Bigger blocks than before: at least 1.8 m wide where there is room.
+
         float width = SizeRange(Mathf.Min(1.8f, availableWidth), Mathf.Min(5.4f, availableWidth));
-        // Lane indices only guide the route. The blocks can straddle painted lines.
+
         float center = Mathf.Clamp(preferredCenter + SizeRange(-0.6f, 0.6f),
             minimum + width * 0.5f, maximum - width * 0.5f);
         PlaceObstacle(point, center, width);
@@ -487,7 +529,7 @@ public class ObstacleSpawner : MonoBehaviour
         TrafficObstacleState? forcedState = null)
     {
         Obstacle obstacle = pool.Get();
-        // Always start from the prefab scale so pooled blocks do not keep growing.
+
         float width = worldWidth > 0f ? worldWidth : SizeRange(0.8f, 4.8f);
         float widthScale = width / Mathf.Max(0.01f, obstacle.BaseWidth);
         obstacle.Transform.localScale = Vector3.Scale(obstacle.BaseScale,
@@ -542,10 +584,18 @@ public class ObstacleSpawner : MonoBehaviour
         return Mathf.Clamp(pushed, -limit, limit);
     }
 
+    // Initialize the output even if road streaming fails before sampling.
     private bool TryGetPointAhead(out RoadPathPoint point)
     {
-        // Far enough ahead that blocks are visible well before they matter (no surprises).
+        point = default;
+
         float distanceAhead = useFairRows ? PickupLookAhead.Distance : spawnDistance;
+        if (Pacing != null && Pacing.UsesCoordinatedPacing && driver != null)
+        {
+            distanceAhead = Mathf.Max(distanceAhead, SpeedForPacing() * 2.5f);
+            float at = driver.RoadPositionDistance + distanceAhead;
+            return road.EnsureDistanceAvailable(at) && road.TrySample(at, out point);
+        }
         return road.TryGetPointAhead(car.position, distanceAhead, out point);
     }
 

@@ -1,3 +1,4 @@
+// Offers fuel along clear routes, increasing frequency as fuel drops.
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -7,7 +8,7 @@ public class FuelTankSpawner : MonoBehaviour
     [SerializeField] private Transform car;
 
     [Header("Spawning")]
-    // Keep spacing independent of how far ahead the pickup appears.
+
     [SerializeField, Min(1f)] private float spawnSpacing = 125f;
     [SerializeField, Min(0f)] private float spawnDistance = 50f;
 
@@ -15,8 +16,63 @@ public class FuelTankSpawner : MonoBehaviour
     [SerializeField] private GameObject fuelTankPrefab;
     [SerializeField, Min(0f)] private float lifetime = 10f;
 
-
     [SerializeField] private float heightOffset = 0.8f;
+    private OutlawGameManager game;
+    private float nextFuelEncounterAt = -1f;
+    private float fuelScheduleAnchor;
+    private float fuelScheduleBaseGap = 6.5f;
+    private float FuelIntervalMultiplier => Mathf.Lerp(0.7f, 1f,
+        Mathf.Clamp01(game.Fuel.NormalizedFuel / 0.75f));
+    public void ConfigurePacing(OutlawGameManager manager) => game = manager;
+
+    public bool ConflictsWithFuelRoute(float from, float to)
+    {
+        if (road == null) return false;
+        foreach (FuelTank tank in tracked)
+            if (tank != null && !tank.Collected && road.TryGetDistance(tank.transform.position, out float at)
+                && at >= from - 10f && at <= to + 10f) return true;
+        return false;
+    }
+
+    // Shorten future intervals as the tank empties without delaying an existing offer.
+    private void UpdateTimedFuel()
+    {
+        if (game.State != OutlawGameState.Running || game.IsTutorial || driver.IsAirborne
+            || game.PickupEffects.RunState.IsRoadRecovering) return;
+        float now = game.ElapsedSeconds;
+        if (nextFuelEncounterAt < 0f)
+        {
+            fuelScheduleAnchor = now;
+            fuelScheduleBaseGap = 6.5f;
+            nextFuelEncounterAt = now + fuelScheduleBaseGap * FuelIntervalMultiplier;
+        }
+        nextFuelEncounterAt = Mathf.Min(nextFuelEncounterAt,
+            fuelScheduleAnchor + fuelScheduleBaseGap * FuelIntervalMultiplier);
+        float speed = game.ActualDrivingSpeed;
+        bool critical = !game.PickupEffects.HarderDifficultyActive && game.Fuel.CurrentFuel < 25f;
+        float previewDistance = critical ? Mathf.Min(PickupLookAhead.Distance, speed * 2f) : PickupLookAhead.Distance;
+        if (critical) nextFuelEncounterAt = Mathf.Min(nextFuelEncounterAt, now + 2f);
+        if (now + previewDistance / speed < nextFuelEncounterAt) return;
+        int ahead = 0;
+        foreach (FuelTank tank in tracked)
+            if (tank != null && !tank.Collected && !road.IsBehind(tank.transform.position, car.position, 1f)) ahead++;
+        if (ahead >= 2) return;
+        float lead = Mathf.Max(previewDistance, (nextFuelEncounterAt - now) * speed);
+        for (float extra = 0f; extra <= 40f; extra += 10f)
+        {
+            if (!road.TryGetPointAhead(car.position, lead + extra, out RoadPathPoint point)
+                || !road.TryGetDistance(point.Position, out float at)) return;
+            if (!game.IsFuelRouteClear(at)) continue;
+            if (SpawnAhead(lead + extra) != null)
+            {
+                fuelScheduleAnchor = now + (lead + extra) / speed;
+                fuelScheduleBaseGap = Random.Range(6.3f, 6.7f);
+                nextFuelEncounterAt = fuelScheduleAnchor + fuelScheduleBaseGap * FuelIntervalMultiplier;
+            }
+            return;
+        }
+    }
+
     private InfiniteRoad road;
     private AutoDriveCar driver;
     private float previousRoadDistance;
@@ -24,15 +80,14 @@ public class FuelTankSpawner : MonoBehaviour
     private float distanceUntilSpawn;
     private readonly List<FuelTank> tracked = new List<FuelTank>();
 
-    /// <summary>While true (the tutorial), tanks only appear through <see cref="SpawnAhead"/>.</summary>
     public bool Suppressed { get; set; }
 
     public void BeginRealRun()
     {
         Suppressed = false;
         distanceUntilSpawn = spawnSpacing;
+        nextFuelEncounterAt = -1f;
     }
-
 
     private void Awake()
     {
@@ -49,8 +104,6 @@ public class FuelTankSpawner : MonoBehaviour
         previousCarPosition = car.position;
         distanceUntilSpawn = spawnSpacing;
 
-        // Keep the stationary pickup trigger in the player's driving path.
-        // Only the visual model bobs; the car should never pass underneath it.
         heightOffset = Mathf.Min(heightOffset, 0.35f);
     }
 
@@ -68,6 +121,11 @@ public class FuelTankSpawner : MonoBehaviour
             return;
         }
 
+        if (game != null && game.UsesCoordinatedPacing)
+        {
+            UpdateTimedFuel();
+            return;
+        }
         if (distanceUntilSpawn <= 0f)
         {
             if (SpawnAhead(Mathf.Max(spawnDistance, PickupLookAhead.Distance)) != null) distanceUntilSpawn = spawnSpacing;
@@ -79,17 +137,14 @@ public class FuelTankSpawner : MonoBehaviour
         PickupTracking.ReportMissed(tracked, road, car, PickupKind.Fuel, tank => tank.Collected);
     }
 
-    /// <summary>
-    /// Places a tank <paramref name="distanceAhead"/> metres ahead: in the car's current lane,
-    /// or at <paramref name="lateralOverride"/> metres from the road centre.
-    /// </summary>
+    // Place fuel on the road and avoid blocked collection routes.
     public GameObject SpawnAhead(float distanceAhead, float? lateralOverride = null)
     {
         if (road == null || !road.TryGetPointAhead(car.position, distanceAhead, out RoadPathPoint point)) return null;
         road.TryGetPathPoint(car.position, out RoadPathPoint current);
         float lateral = Mathf.Clamp(lateralOverride ?? Vector3.Dot(car.position - current.Position, current.Right),
             -point.Width * 0.5f + 1f, point.Width * 0.5f - 1f);
-        // Never inside or right behind a block: every tank must be collectable.
+
         if (lateralOverride == null) lateral = PickupPlacement.ClearLateral(point, lateral);
         GameObject tank = Instantiate(fuelTankPrefab,
             point.Position + point.Right * lateral + point.Up * heightOffset,

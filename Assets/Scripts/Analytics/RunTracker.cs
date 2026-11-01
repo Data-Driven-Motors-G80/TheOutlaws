@@ -1,8 +1,8 @@
+// Accumulates gameplay events and measurements for the current run.
 using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>Per-frame facts the game manager feeds the tracker during a real run.</summary>
 public struct RunTickContext
 {
     public float DeltaTime;
@@ -14,7 +14,7 @@ public struct RunTickContext
     public bool Snow;
     public bool Ocean;
     public bool Desert;
-    /// <summary>Raw keyboard steering (-1..1), before reversed controls.</summary>
+
     public float RawSteer;
     public bool Reversed;
     public bool Nitro;
@@ -23,10 +23,6 @@ public struct RunTickContext
     public int MaximumAmmo;
 }
 
-/// <summary>
-/// One real run (tutorial excluded). Static so it survives the city/snow scene swap.
-/// Feeds missions, the HUD's mission toasts and the analytics run summary.
-/// </summary>
 public static class RunTracker
 {
     public const float CheckpointSpacing = 250f;
@@ -35,26 +31,24 @@ public static class RunTracker
     public static string RunId { get; private set; }
     public static int RunNumberInSession { get; private set; }
     public static bool TutorialWasOn { get; private set; }
-    /// <summary>Wall-clock time the run started (includes pauses, unlike survival time).</summary>
+
     public static float StartedRealtime { get; private set; }
     public static readonly MissionRunStats Stats = new MissionRunStats();
     public static readonly List<MissionDefinition> ActiveMissions = new List<MissionDefinition>();
     public static readonly List<MissionDefinition> CompletedThisRun = new List<MissionDefinition>();
 
-    /// <summary>Raised when a visible mission is completed mid-run.</summary>
     public static event Action<MissionDefinition> MissionCompleted;
 
-    // Shooting
     public static int ShotsFired, ShotsHit, ShotsMissed, DryFires;
     public static readonly int[] DestroyedByColour = new int[3];
     public static readonly int[] ShotsOnColour = new int[3];
-    // Collisions and dodges (every block that reached the car: hit, dodged or destroyed before)
+
     public static readonly int[] CollisionsByColour = new int[3];
     public static readonly int[] DodgedByColour = new int[3];
     public static int CollisionsWithNitro;
     public static int ShieldedCollisions, PoliceContacts, CollisionsWhileReversed;
     public static float FirstHitDistance = -1f, LastHitElapsed = -1f;
-    // Pickups
+
     public static readonly int[] Spawned = new int[3];
     public static readonly int[] Collected = new int[3];
     public static readonly int[] Missed = new int[3];
@@ -63,7 +57,7 @@ public static class RunTracker
     private static float backpackStoredAt;
     public static readonly Dictionary<string, int> MysteryOutcomes = new Dictionary<string, int>();
     public static int Roadblocks;
-    // Continuous
+
     public static float CitySeconds, SnowSeconds, OceanSeconds, DesertSeconds, SecondsBelowQuarterFuel, SecondsSteering;
     public static float SecondsReversed, SecondsNitro, SecondsShielded, SecondsAmmoFull, SecondsAmmoEmpty;
     public static float MinGap = float.MaxValue, MaxSpeed, SnowReachedAt = -1f;
@@ -72,13 +66,13 @@ public static class RunTracker
     public static float PausedSeconds;
     public static bool LowFuelReported;
     public static float LastDistance, LastElapsed;
-    // Bullet holding: how long each bullet is carried before it is fired, and ammo over time.
+
     public static float AmmoSecondsSum, HoldSecondsSum;
     public static int HeldBulletsFired;
     public static readonly List<int> AmmoTimeline = new List<int>();
     public static readonly List<int> ShotsTimeline = new List<int>();
     public const float TimelineStep = 10f;
-    // Death context
+
     public static bool ReversedNow, NitroNow, ShieldNow;
     public static int AmmoNow;
     public static float FuelNow = 1f;
@@ -87,7 +81,7 @@ public static class RunTracker
     private static readonly Queue<float> ammoPickupTimes = new Queue<float>();
     private static float nextTimelineSample;
     private static int shotsThisStep;
-    // Per-checkpoint deltas (bullet usage over distance)
+
     private static int cpShots, cpAmmo, cpDestroyed, cpDodged, cpHits;
 
     private static float lastSteerSign;
@@ -181,7 +175,6 @@ public static class RunTracker
         lastAmmo = 0;
     }
 
-    /// <summary>Ends the run and banks its lifetime totals.</summary>
     public static void End()
     {
         if (!Active) return;
@@ -233,7 +226,7 @@ public static class RunTracker
         AmmoSecondsSum += c.Ammo * dt;
         if (!ammoSeeded)
         {
-            // The starting bullets count as picked up at the start of the run.
+
             for (int i = 0; i < c.Ammo; i++) ammoPickupTimes.Enqueue(0f);
             ammoSeeded = true;
         }
@@ -269,9 +262,7 @@ public static class RunTracker
         CheckMissions();
     }
 
-    /// <summary>
-    /// Completed missions unlock replacements during this run. All ten reset on restart.
-    /// </summary>
+    // Evaluate goals against the latest run statistics.
     public static void CheckMissions()
     {
         bool unlocked = false;
@@ -295,6 +286,7 @@ public static class RunTracker
     public static float SecondsSinceLastHit => LastHitElapsed < 0f ? -1f : LastElapsed - LastHitElapsed;
     public static int TotalCollisions => CollisionsByColour[0] + CollisionsByColour[1] + CollisionsByColour[2];
 
+    // Connect event counters once per tracking session.
     private static void Subscribe()
     {
         if (subscribed) return;
@@ -344,7 +336,7 @@ public static class RunTracker
         Stats.ShotsFired++;
         shotsThisStep++;
         cpShots++;
-        // First in, first out: how long the oldest bullet was carried before being used.
+
         if (ammoPickupTimes.Count > 0)
         {
             HoldSecondsSum += LastElapsed - ammoPickupTimes.Dequeue();
@@ -359,7 +351,6 @@ public static class RunTracker
         cpDodged++;
     }
 
-    /// <summary>Collisions in the last <paramref name="seconds"/> of the run (death context).</summary>
     public static int HitsInLast(float seconds)
     {
         int count = 0;
@@ -368,7 +359,6 @@ public static class RunTracker
         return count;
     }
 
-    /// <summary>"2:5 / 10|3:1,105 / 5,000 m" - each held mission's progress (or "done").</summary>
     public static string MissionProgress()
     {
         var parts = new List<string>();
@@ -377,7 +367,6 @@ public static class RunTracker
         return string.Join("|", parts);
     }
 
-    /// <summary>Compact "2,3,1,0" series sampled every 10 s.</summary>
     public static string Series(List<int> values) => string.Join(",", values);
 
     private static void OnDryFire()

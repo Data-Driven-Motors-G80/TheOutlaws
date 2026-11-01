@@ -1,7 +1,7 @@
+// Defines mission goals, progress text and completion rules.
 using System;
 using System.Collections.Generic;
 
-/// <summary>The kind of skill a mission tests (used for analytics and balancing).</summary>
 public enum MissionCategory
 {
     Distance,
@@ -12,7 +12,6 @@ public enum MissionCategory
     Fuel
 }
 
-/// <summary>Everything a mission can ask about: this run, plus lifetime totals (saved + this run).</summary>
 public sealed class MissionRunStats
 {
     public float Distance;
@@ -23,12 +22,11 @@ public sealed class MissionRunStats
     public int AmmoPickups;
     public int ShotsFired;
     public bool ReachedSnow;
-    /// <summary>Lowest fuel seen this run, 0..1.</summary>
+
     public float MinFuelFraction = 1f;
-    /// <summary>F cans driven past this run.</summary>
+
     public int FuelMissed;
 
-    // Lifetime totals that persist between runs (saved totals + this run so far).
     public float TotalDistance;
     public int TotalDestroyed;
     public int TotalAmmoPickups;
@@ -39,7 +37,7 @@ public sealed class MissionDefinition
     public readonly int Id;
     public readonly string Title;
     public readonly MissionCategory Category;
-    /// <summary>Progress adds up across runs (e.g. "Destroy 10 blocks (total)").</summary>
+
     public bool Cumulative => Title.Contains("(total)");
     private readonly Func<MissionRunStats, bool> complete;
     private readonly Func<MissionRunStats, bool> failed;
@@ -59,22 +57,18 @@ public sealed class MissionDefinition
     }
 
     public bool IsComplete(MissionRunStats stats) => complete(stats);
-    /// <summary>True when this run can no longer complete the mission.</summary>
+
     public bool IsFailed(MissionRunStats stats) => failed != null && failed(stats) && !complete(stats);
     public string Progress(MissionRunStats stats) => progress(stats);
 }
 
-/// <summary>
-/// Ten missions, three held at a time. After an easy starter, every mission is a challenge
-/// that can be retried each run ("reach X while ..."), never a one-off milestone.
-/// </summary>
 public static class MissionCatalog
 {
     public const int VisibleCount = 3;
 
     public static readonly MissionDefinition[] All =
     {
-        // An easy starter; everything after it is a repeatable challenge ("reach X while ...").
+
         new MissionDefinition(1, "Reach 1,000 m", MissionCategory.Distance,
             s => s.Distance >= 1000f, s => Metres(s.Distance, 1000f)),
         new MissionDefinition(2, "Reach 750 m without getting hit", MissionCategory.Clean,
@@ -114,7 +108,7 @@ public static class MissionCatalog
         return null;
     }
 
-    /// <summary>The three active missions: the first unfinished ones in order.</summary>
+    // Skip completed missions when selecting the visible set.
     public static List<MissionDefinition> Visible(Func<int, bool> isDone, int count = VisibleCount)
     {
         var visible = new List<MissionDefinition>(count);

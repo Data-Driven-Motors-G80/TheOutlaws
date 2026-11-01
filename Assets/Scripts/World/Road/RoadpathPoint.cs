@@ -1,3 +1,4 @@
+// Position, orientation and width at one sampled point on the road.
 using UnityEngine;
 
 public readonly struct RoadPathPoint

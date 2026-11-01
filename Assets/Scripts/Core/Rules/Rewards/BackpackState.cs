@@ -1,6 +1,6 @@
+// Stores one power-up and tracks remaining shots for the gun.
 using System;
 
-/// <summary>One stored tool. Active effects belong to RiskRunState.</summary>
 public sealed class BackpackState
 {
     public const int GunShots = 3;
@@ -8,6 +8,7 @@ public sealed class BackpackState
     public int Shots { get; private set; }
     public event Action<RandomPickupOutcome, RandomPickupOutcome, int> Replaced;
     public event Action<RandomPickupOutcome> Used;
+    // Replacing an item discards any remaining shots from the previous gun.
     public bool Receive(RandomPickupOutcome item)
     {
         if (item == RandomPickupOutcome.None || item == RandomPickupOutcome.ReverseSteering) return false;
@@ -24,6 +25,7 @@ public sealed class BackpackState
         Used?.Invoke(used);
         return used;
     }
+    // Sanitize saved ammo counts before restoring the stored item.
     public void Restore(RandomPickupOutcome item, int shots)
     {
         Item = item; Shots = item == RandomPickupOutcome.Gun ? Math.Max(0, Math.Min(GunShots, shots)) : 0;

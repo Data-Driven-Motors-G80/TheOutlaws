@@ -1,3 +1,4 @@
+// Updates chase pressure and exposes explicit pursuit penalties.
 using UnityEngine;
 
 [DisallowMultipleComponent]
@@ -43,8 +44,7 @@ public sealed class ChaseMeter : MonoBehaviour
     {
         if (pickupEffects != null && pickupEffects.isActiveAndEnabled)
         {
-            // The recovery model owns the pursuit clock. Keep the existing
-            // 0..1 meter as a presentation layer for ChaseCar and the HUD.
+
             Value = pickupEffects.RunState.IsGameOver
                 ? 0f
                 : Mathf.Clamp01(
@@ -70,6 +70,7 @@ public sealed class ChaseMeter : MonoBehaviour
         }
     }
 
+    // Derive the steering-related chase penalty from current movement.
     private float GetSteeringDrain()
     {
         return Mathf.Abs(playerCar.SteerInput) >= steerThreshold ? steerDrainRate : 0f;

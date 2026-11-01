@@ -1,3 +1,4 @@
+// Shared gameplay notifications keep UI, missions and analytics in sync.
 using System;
 using UnityEngine;
 
@@ -8,10 +9,6 @@ public enum PickupKind
     Mystery
 }
 
-/// <summary>
-/// Gameplay notifications shared by the tutorial, missions, HUD feedback and analytics.
-/// Raisers never depend on who is listening.
-/// </summary>
 public static class GameEvents
 {
     public static event Action<RandomPickupOutcome, RandomPickupOutcome, int> BackpackReplaced;
@@ -21,20 +18,20 @@ public static class GameEvents
     public static event Action ShotFired;
     public static event Action DryFire;
     public static event Action ShotMissed;
-    /// <summary>Colour before the hit, and whether the hit destroyed the block.</summary>
+
     public static event Action<TrafficObstacleState, bool> ObstacleShot;
-    /// <summary>Colour the destroyed block started as.</summary>
+
     public static event Action<TrafficObstacleState> ObstacleDestroyed;
-    /// <summary>Colour at impact, and whether a shield absorbed it.</summary>
+
     public static event Action<TrafficObstacleState, bool> ObstacleCollision;
     public static event Action PoliceContact;
-    /// <summary>A block went past the car without being hit or destroyed (colour as it passed).</summary>
+
     public static event Action<TrafficObstacleState> ObstacleDodged;
     public static event Action<PickupKind> PickupSpawned;
     public static event Action<PickupKind> PickupMissed;
-    /// <summary>Kind, plus an outcome name for mystery boxes.</summary>
+
     public static event Action<PickupKind, string> PickupCollected;
-    /// <summary>The car drove through an ammo box while already carrying the maximum.</summary>
+
     public static event Action AmmoPickupWastedFull;
     public static event Action<TrafficRoadblockPattern> RoadblockSpawned;
 
@@ -53,6 +50,7 @@ public static class GameEvents
     public static void RaiseRoadblockSpawned(TrafficRoadblockPattern pattern) => RoadblockSpawned?.Invoke(pattern);
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    // Clear subscriptions between play sessions, including domain-reload-free play.
     private static void ResetStatics()
     {
         BackpackReplaced = null;

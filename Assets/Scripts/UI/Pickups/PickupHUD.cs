@@ -1,3 +1,4 @@
+// Displays temporary pickup-effect status.
 using UnityEngine;
 
 public sealed class PickupHUD : MonoBehaviour
@@ -82,6 +83,7 @@ public sealed class PickupHUD : MonoBehaviour
             popupRemaining = Mathf.Max(0f, popupRemaining - Time.unscaledDeltaTime);
     }
 
+    // Clear display state when the pickup HUD is disabled.
     private void OnDisable()
     {
         popupRemaining = 0f;
@@ -102,7 +104,7 @@ public sealed class PickupHUD : MonoBehaviour
 
     private void OnGUI()
     {
-        // OutlawHUD owns the game-over screen; this HUD only shows pickup feedback.
+
         if (effects == null || effects.RunState.IsGameOver) return;
         if (popupText == null)
         {
@@ -130,8 +132,7 @@ public sealed class PickupHUD : MonoBehaviour
         float width = Screen.width / scale;
         float height = Screen.height / scale;
         bool countingDown = effects.ReverseCountdownRemaining > 0f;
-        // Show the actual final three seconds of the reverse effect.
-        // Read live remaining time so another pickup postpones this warning.
+
         bool returningToNormal = effects.ActiveEffect == PickupEffectType.ReverseSteering
             && effects.RemainingSeconds > 0f && effects.RemainingSeconds <= 3f;
         if (popupRemaining > 0f || countingDown || returningToNormal)

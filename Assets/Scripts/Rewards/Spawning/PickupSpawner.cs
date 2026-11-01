@@ -1,3 +1,4 @@
+// Schedules mystery rows and provides explicit tutorial pickup spawns.
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -5,7 +6,7 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class PickupSpawner : MonoBehaviour
 {
-    // Leave a visible car-sized passage between optional mystery rewards.
+
     private const float MysteryLaneWidthFraction = 0.4f;
     [SerializeField] private InfiniteRoad road;
     [SerializeField] private Transform car;
@@ -23,6 +24,10 @@ public sealed class PickupSpawner : MonoBehaviour
     private bool claimed;
     private Vector3 rowPosition;
     private CarPickupEffects effects;
+    private OutlawGameManager game;
+    public void ConfigurePacing(OutlawGameManager manager) => game = manager;
+    private float NextInterval() => game != null && game.UsesCoordinatedPacing
+        ? UnityEngine.Random.Range(10f, 13f) : rowIntervalSeconds;
     private void Start()
     {
         if (car == null || road == null || pickupPrefab == null) { enabled = false; return; }
@@ -35,14 +40,17 @@ public sealed class PickupSpawner : MonoBehaviour
     private void ClearRow()
     {
         if (obstacles != null) obstacles.ReleasePickupGap(this);
+        if (game != null) game.EndEncounter(this);
         foreach (var item in active) if (item != null) { item.gameObject.SetActive(false); Destroy(item.gameObject); }
         active.Clear();
         foreach (var item in retiring) if (item != null) { item.gameObject.SetActive(false); Destroy(item.gameObject); }
         retiring.Clear();
     }
+    // Disable all sibling boxes after the row is claimed.
     private void RetireRow(bool fade)
     {
         if (obstacles != null) obstacles.ReleasePickupGap(this);
+        if (game != null) game.EndEncounter(this);
         foreach (var item in active)
         {
             if (item == null) continue;
@@ -73,7 +81,7 @@ public sealed class PickupSpawner : MonoBehaviour
             if (road.IsBehind(rowPosition, car.position, 4f))
             {
                 GameEvents.RaisePickupMissed(PickupKind.Mystery);
-                RetireRow(true); NextRowAt = now + rowIntervalSeconds;
+                RetireRow(true); NextRowAt = now + NextInterval();
             }
             return;
         }
@@ -87,12 +95,16 @@ public sealed class PickupSpawner : MonoBehaviour
         for (float offset = 0f; offset <= 32f; offset += 4f)
         {
             if (!road.TryGetPointAhead(car.position, lead + offset, out point)) break;
+            if (game != null && road.TryGetDistance(point.Position, out float at)
+                && !game.CanScheduleEncounter(this, RunEncounterKind.Mystery, at - 4f, at + 4f)) continue;
             if (!obstacles.TryReservePickupGap(this, point.Position)) continue;
             found = true;
             break;
         }
         if (!found) return;
         claimed = false; rowPosition = point.Position;
+        if (game != null && road.TryGetDistance(point.Position, out float rowAt))
+            game.BeginEncounter(this, RunEncounterKind.Mystery, rowAt - 4f, rowAt + 4f);
         float laneWidth = point.Width / 3f;
         for (int lane = 0; lane < 3; lane++)
         {
@@ -103,7 +115,7 @@ public sealed class PickupSpawner : MonoBehaviour
             var trigger = item.gameObject.AddComponent<BoxCollider>();
             trigger.isTrigger = true; trigger.size = new Vector3(laneWidth * MysteryLaneWidthFraction / item.transform.lossyScale.x, 3f / item.transform.lossyScale.y, 2f / item.transform.lossyScale.z);
             item.ClaimRow = () => { if (claimed) return false; claimed = true; return true; };
-            item.CollectedCallback = () => { RetireRow(false); NextRowAt = (RunTime?.Invoke() ?? now) + rowIntervalSeconds; };
+            item.CollectedCallback = () => { RetireRow(false); NextRowAt = (RunTime?.Invoke() ?? now) + NextInterval(); };
             var renderer = item.GetComponentInChildren<Renderer>();
             if (renderer != null)
                 renderer.gameObject.AddComponent<MysteryPickupVisual>().Configure(renderer, laneWidth * MysteryLaneWidthFraction);
@@ -116,6 +128,7 @@ public sealed class PickupSpawner : MonoBehaviour
         return SpawnTutorialMystery(distance, lateral, PickupEffectType.Boost);
     }
 
+    // Use a fixed lesson outcome instead of the regular mystery reward roll.
     public PickupItem SpawnTutorialMystery(float distance, float lateral, PickupEffectType outcome)
     {
         if (pickupPrefab == null || !TryGetPointAhead(distance, out RoadPathPoint point)) return null;

@@ -1,8 +1,9 @@
+// Presents a fuel tank and tracks whether it was collected.
 using UnityEngine;
 
 public class FuelTank : MonoBehaviour
 {
-    [SerializeField, Min(0f)] private float fuelAmount = 35f;
+    [SerializeField, Min(0f)] private float fuelAmount = 40f;
     public float FuelAmount => fuelAmount;
     public bool Collected { get; private set; }
 
@@ -42,6 +43,7 @@ public class FuelTank : MonoBehaviour
         if (box != null) WorldLabel.Attach(box, "F", Color.white);
     }
 
+    // Keep the fuel pickup presentation updated while it remains in the world.
     private void Update()
     {
         if (visual == null)
@@ -49,9 +51,8 @@ public class FuelTank : MonoBehaviour
             return;
         }
 
-        // Animate only the model. The root trigger remains low and stationary.
         float bobOffset = Mathf.Sin(Time.time * bobSpeed) * bobHeight;
-        // No spin: the F printed on the front face has to stay readable.
+
         visual.localPosition = Vector3.up * bobOffset;
     }
 

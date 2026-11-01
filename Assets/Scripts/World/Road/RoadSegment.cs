@@ -1,3 +1,4 @@
+// Defines segment geometry, path sampling and world-position projection.
 using System;
 using UnityEngine;
 
@@ -85,6 +86,7 @@ public sealed class RoadSegment : MonoBehaviour
         return new RoadPathPoint(startPoint.position, startPoint.forward, width);
     }
 
+    // Find the closest distance along this segment to a world position.
     public float ProjectDistance(Vector3 position, out float sqrDistance)
     {
         bool isCurve = curvePoints != null;
@@ -123,6 +125,7 @@ public sealed class RoadSegment : MonoBehaviour
         return Vector3.Dot(worldPosition - endPoint.position, endPoint.forward);
     }
 
+    // Join the segment entrance to the preceding road endpoint.
     public void AlignStartTo(Pose entry)
     {
         if (curvePoints != null)

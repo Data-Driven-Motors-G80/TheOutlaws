@@ -1,3 +1,4 @@
+// Applies a configured pickup once, including shared-row claim checks.
 using UnityEngine;
 
 [DisallowMultipleComponent]
@@ -19,7 +20,7 @@ public sealed class PickupItem : MonoBehaviour
         duration = seconds;
     }
 
-    // A resolved row remains visible briefly, but can no longer grant rewards.
+    // Disable collection immediately when a row is claimed or removed.
     public void Retire()
     {
         if (collected) return;
@@ -41,6 +42,7 @@ public sealed class PickupItem : MonoBehaviour
         if (ClaimRow != null) OnTriggerEnter(other);
     }
 
+    // Claim a shared row before awarding its single collectible reward.
     private void OnTriggerEnter(Collider other)
     {
         if (collected || retiring) return;

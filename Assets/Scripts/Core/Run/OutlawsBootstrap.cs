@@ -1,3 +1,4 @@
+// Resets session state when Unity starts a fresh play session.
 using UnityEngine;
 
 public static class OutlawsBootstrap
@@ -7,8 +8,7 @@ public static class OutlawsBootstrap
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void ResetRunState()
     {
-        // Unity editor settings can preserve global state between Play runs.
-        // Reset it explicitly so every run begins from the same conditions.
+
         Time.timeScale = 1f;
         Random.InitState(RunSeed);
     }

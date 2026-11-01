@@ -1,4 +1,5 @@
-/// <summary>Small scene-independent fuel model used by the local pickup prototype.</summary>
+// Fuel arithmetic shared by gameplay systems; values stay within tank limits.
+
 public sealed class FuelState
 {
     public const float MaximumFuel = 100f;
@@ -17,6 +18,7 @@ public sealed class FuelState
         CurrentFuel = ClampFinite(initialFuel, 0f, MaximumFuel);
     }
 
+    // Drain only for valid elapsed time and a valid consumption rate.
     public void Tick(float elapsedSeconds, float consumptionPerSecond = DefaultConsumptionPerSecond)
     {
         if (!IsFinite(elapsedSeconds) || elapsedSeconds <= 0f
@@ -43,6 +45,7 @@ public sealed class FuelState
         CurrentFuel = MaximumFuel;
     }
 
+    // Reject invalid numbers before they can reach the fuel display.
     private static float ClampFinite(float value, float min, float max)
     {
         if (!IsFinite(value)) return min;

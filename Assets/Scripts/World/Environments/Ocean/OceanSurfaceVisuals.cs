@@ -1,7 +1,7 @@
+// Keeps ocean surface presentation aligned with the player.
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>Ocean presentation only: shader clock, surrounding water and gentle model buoyancy.</summary>
 [DefaultExecutionOrder(-50)]
 [DisallowMultipleComponent]
 [RequireComponent(typeof(EnvironmentRoot))]
@@ -36,7 +36,7 @@ public sealed class OceanSurfaceVisuals : MonoBehaviour
             enabled = false;
             return;
         }
-        // Never bob the player root: it also owns the collider and chase camera.
+
         Transform visible = environment.Player.FiringFrame;
         if (visible != environment.Player.transform) model = visible;
         surfaceProperties = new MaterialPropertyBlock();
@@ -63,7 +63,7 @@ public sealed class OceanSurfaceVisuals : MonoBehaviour
     private void LateUpdate()
     {
         FollowPlayer();
-        // Property blocks avoid changing the saved/shared material or leaking animation into another scene.
+
         surfaceProperties.SetFloat(OceanTimeId, waveTime);
         surfaceProperties.SetFloat(ChannelMaskId, 0f);
         seaRenderer.SetPropertyBlock(surfaceProperties);
@@ -92,6 +92,7 @@ public sealed class OceanSurfaceVisuals : MonoBehaviour
         sea.position = new Vector3(player.x, waterHeight, player.z);
     }
 
+    // Undo presentation offsets before releasing the model.
     private void ReleaseModelOffset()
     {
         if (model != null)

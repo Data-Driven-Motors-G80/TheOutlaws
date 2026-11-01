@@ -1,67 +1,61 @@
+// Shared difficulty curves based on elapsed gameplay time.
 using System;
 
-/// <summary>Smooth, bounded difficulty driven by active gameplay seconds.</summary>
 public readonly struct RunDifficultyState
 {
     public const float StartSpeed = 20f;
     public const float MaximumSpeed = 55f;
     public const float SpeedBlendSeconds = 2.5f;
 
-    /// <summary>Retained for code that still reasons in 25-second steps.</summary>
     public static int PressureSteps(float elapsedSeconds)
     {
         return (int)(Math.Max(0f, elapsedSeconds) / 25f);
     }
 
-    /// <summary>A seeded schedule keeps the same timing across frames and scene changes.</summary>
-    public static float SpeedIncreaseInterval(int seed, int step)
+    public static float SpeedIncreaseInterval(int seed, int step, bool harder = false)
     {
         uint value = unchecked((uint)seed + (uint)(step + 1) * 0x9E3779B9u);
         value = unchecked((value ^ (value >> 16)) * 0x85EBCA6Bu);
         value = unchecked((value ^ (value >> 13)) * 0xC2B2AE35u);
         value ^= value >> 16;
-        return 30f + (value & 0xFFFFFFu) / 16777215f * 15f;
+        float roll = (value & 0xFFFFFFu) / 16777215f;
+        return harder ? 16f + roll * 8f : 30f + roll * 15f;
     }
 
-    /// <summary>Gain 1 m/s every 30–45 seconds, blended over 2.5 seconds, capped at 55.</summary>
-    public static float DrivingSpeed(float elapsedSeconds, int seed = 1)
+    // Recreate speed progression deterministically from the seed and elapsed time.
+    public static float DrivingSpeed(float elapsedSeconds, int seed = 1, bool harder = false)
     {
         if (float.IsNaN(elapsedSeconds) || float.IsInfinity(elapsedSeconds)) return StartSpeed;
         float nextIncrease = 0f;
-        float speed = StartSpeed;
-        for (int step = 0; step < (int)(MaximumSpeed - StartSpeed); step++)
+        float initialSpeed = harder ? 22f : StartSpeed;
+        float gain = harder ? 1.25f : 1f;
+        float speed = initialSpeed;
+        for (int step = 0; step < (int)Math.Ceiling((MaximumSpeed - initialSpeed) / gain); step++)
         {
-            nextIncrease += SpeedIncreaseInterval(seed, step);
+            nextIncrease += SpeedIncreaseInterval(seed, step, harder);
             if (elapsedSeconds < nextIncrease) break;
             float progress = Math.Min(1f, (elapsedSeconds - nextIncrease) / SpeedBlendSeconds);
-            speed = StartSpeed + step + progress;
+            speed = Math.Min(MaximumSpeed, initialSpeed + (step + progress) * gain);
             if (progress < 1f) break;
         }
         return speed;
     }
 
-    /// <summary>Seconds of gentle warm-up at the start of every run.</summary>
     public const float WarmUpSeconds = 30f;
-    /// <summary>Seconds after the warm-up until obstacles reach their densest.</summary>
+
     public const float BuildUpSeconds = 120f;
 
-    /// <summary>
-    /// How tightly obstacle rows are packed: a gentle 0.6 at the start, 1.3 after the
-    /// 30 s warm-up, then building to 2.4 over the next two minutes. Spacing still respects speed.
-    /// </summary>
     public static float ObstacleDensity(float elapsedSeconds)
     {
-        // Never stops growing: after the build-up, +0.5 density per minute (up to 4.5).
+
         return Math.Min(4.5f, Phase(elapsedSeconds, 0.6f, 1.3f, 2.4f) + LateMinutes(elapsedSeconds) * 0.5f);
     }
 
-    /// <summary>Minutes driven after the warm-up and build-up (keeps difficulty rising all run).</summary>
     public static float LateMinutes(float elapsedSeconds)
     {
         return Math.Max(0f, elapsedSeconds - WarmUpSeconds - BuildUpSeconds) / 60f;
     }
 
-    /// <summary>Half-width of the guaranteed open gap: roomy at first, tighter (never closed) later on.</summary>
     public static float GapHalfWidth(float elapsedSeconds, double roll)
     {
         float tightness = Math.Min(1f, Math.Max(0f, elapsedSeconds) / 240f);
@@ -70,7 +64,6 @@ public readonly struct RunDifficultyState
         return narrowest + (widest - narrowest) * (float)Math.Max(0d, Math.Min(1d, roll));
     }
 
-    /// <summary>Chance that a row blocks two lanes instead of one (always leaves a lane open).</summary>
     public static float DoubleRowChance(float elapsedSeconds)
     {
         return Math.Min(0.9f, Phase(elapsedSeconds, 0.1f, 0.3f, 0.65f) + LateMinutes(elapsedSeconds) * 0.1f);
@@ -83,14 +76,11 @@ public readonly struct RunDifficultyState
         return afterWarmUp + (maximum - afterWarmUp) * Math.Min(1f, (t - WarmUpSeconds) / BuildUpSeconds);
     }
 
-    /// <summary>
-    /// Police speed minus player speed. Always negative: a player who stops getting hit always pulls
-    /// away again. You pull away at 1.5 m/s at first, slowing to 0.6 m/s after 150 s, so later on
-    /// hits close together are what gets you caught.
-    /// </summary>
-    public static float PoliceClosingSpeed(float elapsedSeconds)
+    // Select the pursuit curve for the active difficulty profile.
+    public static float PoliceClosingSpeed(float elapsedSeconds, bool harder = false)
     {
-        return -Math.Max(0.6f, 1.5f - Math.Max(0f, elapsedSeconds) * 0.006f);
+        return harder ? -Math.Max(0.2f, 0.85f - Math.Max(0f, elapsedSeconds) * 0.006f)
+            : -Math.Max(0.6f, 1.5f - Math.Max(0f, elapsedSeconds) * 0.006f);
     }
 
     public float Progress { get; }
@@ -107,7 +97,7 @@ public readonly struct RunDifficultyState
         float active = Math.Max(0f, elapsed - Math.Max(0f, opening));
         float t = Math.Min(1f, active / Math.Max(1f, ramp));
         float progress = t * t * (3f - 2f * t);
-        // 18 seconds of pressure, followed by a six-second rest with soft edges.
+
         float phase = active % 24f;
         float relief = phase <= 18f ? 0f : (float)Math.Sin((phase - 18f) / 6f * Math.PI);
         return new RunDifficultyState(progress, relief);

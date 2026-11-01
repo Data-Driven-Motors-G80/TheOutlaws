@@ -1,3 +1,4 @@
+// Central rules for obstacle colours, penalties and damage from shots.
 public enum TrafficObstacleState
 {
     Green,
@@ -5,12 +6,9 @@ public enum TrafficObstacleState
     Red
 }
 
-/// <summary>Scene-independent tuning rules for traffic-light obstacles.</summary>
 public static class TrafficObstacleRules
 {
-    // The internal states still describe shots remaining, while the player-facing
-    // colours are orange for the one-shot state and red for the two-shot state.
-    // Fractions are taken from the 45 m starting gap: orange costs 15 m and red 22.5 m.
+
     public const float GreenProximityDrain = 1f / 3f;
     public const float YellowProximityDrain = 0.5f;
     public const float RedProximityDrain = 0.5f;
@@ -20,7 +18,6 @@ public static class TrafficObstacleRules
     public const float MidGameDistance = 300f;
     public const float LateGameDistance = 700f;
 
-    /// <summary>The same mix all run: 55% green (one shot), 45% yellow (two shots).</summary>
     public static TrafficObstacleState ChooseInitialState(float distanceTravelled, double roll)
     {
         if (double.IsNaN(roll) || double.IsInfinity(roll)) roll = 0d;
@@ -48,6 +45,7 @@ public static class TrafficObstacleRules
             : state == TrafficObstacleState.Yellow ? YellowFuelPenaltyFraction : 0f;
     }
 
+    // Resolve damage through one rule shared by all obstacle visuals.
     public static TrafficObstacleState ApplyShot(
         TrafficObstacleState state,
         out bool destroyed)

@@ -1,11 +1,8 @@
+// Persists player milestones, mission completion and lifetime totals.
 using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// Per-browser progress kept in PlayerPrefs (IndexedDB on WebGL, so incognito starts fresh).
-/// Nothing here identifies a person: the player id is a random anonymous token.
-/// </summary>
 public static class OutlawProfile
 {
     private const string PlayerIdKey = "WeeWoo.PlayerId";
@@ -32,7 +29,7 @@ public static class OutlawProfile
     }
 
     public static bool HasStartedGame => PlayerPrefs.GetInt(StartedKey, 0) == 1;
-    /// <summary>The tutorial is on for a browser's very first game only.</summary>
+
     public static bool TutorialDefault => !HasStartedGame;
     public static int TotalRuns => PlayerPrefs.GetInt(RunsKey, 0);
     public static int SessionCount => PlayerPrefs.GetInt(SessionsKey, 0);
@@ -102,7 +99,6 @@ public static class OutlawProfile
     public static int TotalDestroyed => PlayerPrefs.GetInt(TotalDestroyedKey, 0);
     public static int TotalAmmoPickups => PlayerPrefs.GetInt(TotalAmmoKey, 0);
 
-    /// <summary>Adds a finished run to the lifetime totals used by "(total)" missions.</summary>
     public static void AddRunTotals(float distance, int destroyed, int ammoPickups)
     {
         PlayerPrefs.SetFloat(TotalDistanceKey, TotalDistance + Mathf.Max(0f, distance));
@@ -111,7 +107,6 @@ public static class OutlawProfile
         PlayerPrefs.Save();
     }
 
-    /// <summary>Lifetime totals with no current run (for progress on the title screen).</summary>
     public static MissionRunStats SavedTotals() => new MissionRunStats
     {
         TotalDistance = TotalDistance,
@@ -121,10 +116,8 @@ public static class OutlawProfile
 
     private const string BestKey = "WeeWoo.BestDistance";
 
-    /// <summary>Best real-run distance in metres on this browser.</summary>
     public static int BestDistance => PlayerPrefs.GetInt(BestKey, 0);
 
-    /// <summary>Saves the distance if it beats the best; returns true for a new best.</summary>
     public static bool RecordDistance(float metres)
     {
         int rounded = Mathf.FloorToInt(metres);
@@ -134,12 +127,12 @@ public static class OutlawProfile
         return true;
     }
 
+    // Load saved completion flags lazily before querying missions.
     private static void LoadMissions()
     {
         if (missionsDone != null) return;
         missionsDone = new HashSet<int>();
-        // Mission completion belongs to this run. Ignore legacy saved completions;
-        // best distance, tutorial preference and lifetime statistics remain saved.
+
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]

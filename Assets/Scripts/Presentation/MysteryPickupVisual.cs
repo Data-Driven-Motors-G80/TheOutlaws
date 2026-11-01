@@ -1,6 +1,6 @@
+// Animates mystery-box presentation and retirement fades.
 using UnityEngine;
 
-/// <summary>Only the visual bobs; the generous collection trigger stays steady.</summary>
 public sealed class MysteryPickupVisual : MonoBehaviour
 {
     private Vector3 restingPosition;
@@ -13,6 +13,7 @@ public sealed class MysteryPickupVisual : MonoBehaviour
     private float fadeTime;
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
+    // Retiring visuals fade after their collection colliders stop being active.
     public void BeginFade()
     {
         if (fading) return;
@@ -41,7 +42,7 @@ public sealed class MysteryPickupVisual : MonoBehaviour
         transform.localPosition = restingPosition + Vector3.up * (Mathf.Sin(Time.time * 2f + phase) * .12f);
         if (!fading) return;
         fadeTime += Time.deltaTime;
-        // Let the car pass first, then gently dissolve the box and its question mark.
+
         float opacity = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((fadeTime - 0.25f) / 0.75f));
         Color color = baseColor;
         color.a *= opacity;

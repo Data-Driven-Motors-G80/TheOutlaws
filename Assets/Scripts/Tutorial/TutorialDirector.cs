@@ -1,3 +1,4 @@
+// Runs the guided lessons and advances after each required action.
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -11,7 +12,7 @@ public enum TutorialStep
     Ammo,
     Shoot,
     Done,
-    Nitro, // Appended to preserve existing tutorial analytics indices.
+    Nitro,
     Reverse,
     Shield,
     Recovery,
@@ -26,10 +27,6 @@ public enum TutorialHighlight
     RearView
 }
 
-/// <summary>
-/// Show-don't-tell tutorial: one mechanic per step, and a step only ends once the
-/// player has actually done it. Nothing here counts towards the real run.
-/// </summary>
 [DisallowMultipleComponent]
 public sealed class TutorialDirector : MonoBehaviour
 {
@@ -78,7 +75,7 @@ public sealed class TutorialDirector : MonoBehaviour
     private List<TrafficLightObstacle> dodgeRow = new List<TrafficLightObstacle>();
     private bool dodgeHit;
     private bool stepSucceeded;
-    /// <summary>Shoot step: collect only the missing ammo before retrying the current wall.</summary>
+
     private bool reloading;
 
     public bool Active { get; private set; }
@@ -110,7 +107,6 @@ public sealed class TutorialDirector : MonoBehaviour
         }
     }
 
-    /// <summary>The one instruction shown until the player does it.</summary>
     public string Title
     {
         get
@@ -163,7 +159,7 @@ public sealed class TutorialDirector : MonoBehaviour
         GameEvents.ShotFired += OnShotFired;
         GameEvents.DryFire += OnDryFire;
         if (fuel != null) fuel.DrainMode = FuelDrainMode.Frozen;
-        // Ammo is introduced later; the squares fill up as the player collects A boxes.
+
         shooting.SetAmmo(0);
         WeeWooAnalytics.Track("tutorial_start");
         EnterStep(TutorialStep.Steer);
@@ -178,7 +174,6 @@ public sealed class TutorialDirector : MonoBehaviour
         GameEvents.DryFire -= OnDryFire;
     }
 
-    /// <summary>Row for the analytics "tutorials" sheet if the tab closes mid-tutorial.</summary>
     public Dictionary<string, object> AbandonRow()
     {
         var row = new Dictionary<string, object>(stepRecord)
@@ -220,6 +215,7 @@ public sealed class TutorialDirector : MonoBehaviour
         }
     }
 
+    // Set up the required lesson objects and reset per-step progress.
     private void EnterStep(TutorialStep step)
     {
         Step = step;
@@ -234,7 +230,7 @@ public sealed class TutorialDirector : MonoBehaviour
         switch (step)
         {
             case TutorialStep.Fuel:
-                // Separate the fuel lesson from the preceding collision/dodge feedback.
+
                 fuel.DrainMode = FuelDrainMode.Frozen;
                 fuelLessonStarted = false;
                 waitRemaining = 0.8f;
@@ -287,7 +283,6 @@ public sealed class TutorialDirector : MonoBehaviour
         }
     }
 
-    /// <summary>Moves on silently after a short breather; there are no success pop-ups.</summary>
     private void Succeed(float delay = 0.6f)
     {
         if (stepSucceeded) return;
@@ -302,6 +297,7 @@ public sealed class TutorialDirector : MonoBehaviour
         WeeWooAnalytics.Flush();
     }
 
+    // Repeat the current lesson after a failed attempt.
     private void Retry(string reason)
     {
         stepRetries++;
@@ -372,7 +368,7 @@ public sealed class TutorialDirector : MonoBehaviour
             if (effects.Backpack.Item != RandomPickupOutcome.ProximityRecovery) RespawnLessonBox(PickupEffectType.ProximityRecovery);
             return;
         }
-        // Leave room for the final nitro lesson to visibly open the gap further.
+
         effects.RunState.RecoveryCap = RiskRunState.MaximumPursuitGap;
         Succeed(1.5f);
     }
@@ -385,7 +381,7 @@ public sealed class TutorialDirector : MonoBehaviour
             Succeed(1.5f);
             return;
         }
-        // Shooting or missing the demonstration must not leave the lesson stuck.
+
         if (wall == null || !obstacles.IsActive(wall) || road.IsBehind(wall.transform.position, player.position, 3f))
         {
             obstacles.ClearNear(player.position, SpawnAhead + 20f);
@@ -417,7 +413,7 @@ public sealed class TutorialDirector : MonoBehaviour
         previousReverseLateral = lateral;
         if (effects.ReverseCountdownRemaining > 0f) return;
         reversePracticeSeconds += dt;
-        // Keep this safe practice active until the player has felt both directions.
+
         if (effects.RemainingSeconds < 1f)
             effects.RunState.Effects.Apply(PickupEffectType.ReverseSteering, 2f);
         Keyboard keys = Keyboard.current;
@@ -437,7 +433,7 @@ public sealed class TutorialDirector : MonoBehaviour
     {
         if (player.GetComponent<CarPickupEffects>().RunState.HasNitro)
         {
-            // Allow time to see the gradual retreat, unlike the instant jammer bonus.
+
             Succeed(2.5f);
             return;
         }
@@ -470,7 +466,7 @@ public sealed class TutorialDirector : MonoBehaviour
         {
             fuel.SetFuel(fuel.MaximumFuel);
             fuel.DrainMode = FuelDrainMode.Frozen;
-            // Keep a brief break so fuel and ammo remain separate lessons.
+
             Succeed(0.8f);
             return;
         }
@@ -506,7 +502,6 @@ public sealed class TutorialDirector : MonoBehaviour
             if (box != null && !road.IsBehind(box.transform.position, player.position, 2f))
                 anyAhead = true;
 
-        // The shooting lesson needs three rounds: one for the 1 block, two for the 2 block.
         if (shooting.CurrentAmmo >= 3)
         {
             ClearAmmoBoxes();
@@ -534,7 +529,7 @@ public sealed class TutorialDirector : MonoBehaviour
         int requiredAmmo = (int)shootWallState + 1;
         if (reloading)
         {
-            // Keep earned rounds and refill only enough for this wall.
+
             bool anyAhead = false;
             foreach (GameObject box in ammoBoxes)
                 if (box != null && !road.IsBehind(box.transform.position, player.position, 2f))
@@ -556,8 +551,7 @@ public sealed class TutorialDirector : MonoBehaviour
         {
             waitRemaining -= dt;
             if (waitRemaining > 0f) return;
-            // A player may fire while the next wall is being introduced.
-            // Refill before placing it rather than making them hit it to retry.
+
             if (shooting.CurrentAmmo < requiredAmmo)
             {
                 reloading = true;
@@ -624,6 +618,7 @@ public sealed class TutorialDirector : MonoBehaviour
         Succeed();
     }
 
+    // Hand control back to regular gameplay after the final lesson.
     private void Finish()
     {
         Active = false;

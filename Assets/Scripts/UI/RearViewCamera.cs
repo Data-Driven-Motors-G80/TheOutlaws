@@ -1,10 +1,7 @@
+// Keeps a rear-facing camera aimed at the pursuing police.
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
 
-/// <summary>
-/// A small rear-facing camera, rendered to a texture for the HUD. It sits just above
-/// and ahead of the player and always aims at the chasing police, so they stay in frame.
-/// </summary>
 public sealed class RearViewCamera : MonoBehaviour
 {
     private const int TextureWidth = 512;
@@ -52,13 +49,13 @@ public sealed class RearViewCamera : MonoBehaviour
         return rear;
     }
 
+    // Follow after player and police movement for a stable rear view.
     private void LateUpdate()
     {
         if (player == null) return;
         Vector3 forward = player.forward;
         Vector3 up = player.up;
-        // Above the car's middle, looking back: the rear of the player's car sits at the
-        // bottom of the frame so you can judge how close the police are.
+
         transform.position = player.position + up * 1.9f + forward * 1.8f;
 
         Vector3 target = player.position - forward * 6f;

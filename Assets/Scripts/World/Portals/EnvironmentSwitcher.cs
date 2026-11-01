@@ -1,4 +1,5 @@
-// Switches environments when the car drives through a portal gate.
+// Offers portals and transfers the current run into another environment.
+
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -62,10 +63,7 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
         UpdatePortal();
     }
 
-    /// <summary>
-    /// A gate appears ahead after 60 seconds of active gameplay in each environment.
-    /// Pauses and the tutorial do not count; driving through the gate switches scenes.
-    /// </summary>
+    // Wait for a safe road gap before displaying a due portal.
     private void UpdatePortal()
     {
         if (RunSession.NextPortalAt < 0f)
@@ -74,7 +72,10 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
         if (portal == null)
         {
             if (RunSession.SecondsUntilPortal(game.ElapsedSeconds) > 0f) return;
+            float plannedAt = game.Player.GetComponent<AutoDriveCar>().RoadPositionDistance + PortalLeadMetres;
+            if (!game.CanScheduleEncounter(this, RunEncounterKind.Portal, plannedAt - 10f, plannedAt + 15f)) return;
             if (obstacles != null && !obstacles.TryReserveSafeGap(this)) return;
+            game.BeginEncounter(this, RunEncounterKind.Portal, plannedAt - 10f, plannedAt + 15f);
             if (road == null || player == null ||
                 !road.TryGetPointAhead(player.position, PortalLeadMetres, out RoadPathPoint point))
                 return;
@@ -99,6 +100,7 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
     private void OnDisable()
     {
         if (obstacles != null) obstacles.ReleaseSafeGap(this);
+        if (game != null) game.EndEncounter(this);
     }
 
     private string PickOtherEnvironment()
@@ -110,6 +112,7 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
         return alternatives.Length > 0 ? alternatives[Random.Range(0, alternatives.Length)] : null;
     }
 
+    // Capture the run before loading the selected environment.
     private void StartSwitch(string sceneName)
     {
         if (string.IsNullOrEmpty(sceneName) || switching || SceneTransition.IsRunning)
@@ -124,7 +127,7 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
             canProceed: () => game != null && game.State == OutlawGameState.Running,
             capture: () =>
             {
-                // Start the next environment's minute from the carried run time.
+
                 RunSession.ScheduleNextPortal(game.ElapsedSeconds);
                 RunSession.SetPending(game.CaptureRun());
             },
@@ -132,6 +135,7 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
             {
                 switching = false;
                 if (obstacles != null) obstacles.ReleaseSafeGap(this);
+                if (game != null) game.EndEncounter(this);
             }
         );
     }

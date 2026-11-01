@@ -1,3 +1,4 @@
+// Rebuilds lane markings to follow each road segment.
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -43,6 +44,7 @@ public sealed class RoadMarking : MonoBehaviour
     }
 
     [ContextMenu("Rebuild Markings")]
+    // Regenerate markings from the curved road samples.
     public void Rebuild()
     {
         if (!gameObject.scene.IsValid())

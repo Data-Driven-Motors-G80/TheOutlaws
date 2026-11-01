@@ -1,6 +1,6 @@
+// Adapts placed obstacles to the ocean environment.
 using UnityEngine;
 
-/// <summary>Reuses fair rows, shooting, shield handling and pooling for prototype reef/buoy obstacles.</summary>
 [DisallowMultipleComponent]
 public sealed class OceanObstacleSpawner : ObstacleSpawner
 {

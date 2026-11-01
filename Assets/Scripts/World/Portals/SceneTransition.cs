@@ -1,4 +1,5 @@
-// Displays a sliding transition when switching scenes.
+// Covers scene changes with an animated overlay and reliable cleanup.
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -120,8 +121,7 @@ public sealed class SceneTransition : MonoBehaviour
         Finish();
     }
 
-    // Drive nested enumerators here so exceptions in either loading or sliding
-    // cannot strand the persistent full-screen overlay.
+    // Ensure transition errors still reach the cleanup path.
     private IEnumerator Guarded(IEnumerator routine)
     {
         var stack = new Stack<IEnumerator>();
@@ -178,6 +178,7 @@ public sealed class SceneTransition : MonoBehaviour
         Destroy(gameObject);
     }
 
+    // Release the overlay and transition ownership on every exit path.
     private void OnDisable() { Cleanup(); }
 
     private void Cleanup()

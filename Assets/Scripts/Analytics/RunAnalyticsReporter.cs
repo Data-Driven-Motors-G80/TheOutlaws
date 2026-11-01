@@ -1,9 +1,9 @@
+// Translates run results and mission progress into analytics records.
 using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-/// <summary>Builds the existing analytics payloads without owning gameplay or run state.</summary>
 public sealed class RunAnalyticsReporter : IDisposable
 {
     private readonly OutlawGameManager game;
@@ -37,6 +37,7 @@ public sealed class RunAnalyticsReporter : IDisposable
             WeeWooAnalytics.ExitRowsProvider = null;
     }
 
+    // Record the final result once using the accumulated run measurements.
     public void RecordRunEnd(string reason)
     {
         if (!RunTracker.Active) return;
@@ -61,7 +62,6 @@ public sealed class RunAnalyticsReporter : IDisposable
         };
     }
 
-    /// <summary>Rows the browser beacon delivers if the tab is closed right now.</summary>
     private List<KeyValuePair<string, Dictionary<string, object>>> ExitRows()
     {
         var rows = new List<KeyValuePair<string, Dictionary<string, object>>>();
@@ -180,7 +180,6 @@ public sealed class RunAnalyticsReporter : IDisposable
             ["best_m"] = OutlawProfile.BestDistance,
             ["new_best"] = IsNewBest,
 
-            // Cause of death, with the situation at the moment the run ended.
             ["death_cause"] = DeathCause(reason, sinceHit),
             ["last_hit_colour"] = RunTracker.LastHitColour,
             ["hits_last_10s"] = RunTracker.HitsInLast(10f),
@@ -190,7 +189,6 @@ public sealed class RunAnalyticsReporter : IDisposable
             ["nitro_at_end"] = RunTracker.NitroNow,
             ["shield_at_end"] = RunTracker.ShieldNow,
 
-            // Every block that reached the car was dodged, hit, or destroyed first, by its colour.
             ["dodged_green"] = RunTracker.DodgedByColour[0],
             ["dodged_yellow"] = RunTracker.DodgedByColour[1],
             ["dodged_red"] = RunTracker.DodgedByColour[2],
@@ -199,7 +197,6 @@ public sealed class RunAnalyticsReporter : IDisposable
             ["shots_on_red"] = RunTracker.ShotsOnColour[2],
             ["hits_with_nitro"] = RunTracker.CollisionsWithNitro,
 
-            // Bullet holding: average ammo carried, and how long a bullet is held before use.
             ["avg_ammo_held"] = elapsed > 0f ? RunTracker.Round(RunTracker.AmmoSecondsSum / elapsed) : 0f,
             ["avg_hold_s"] = RunTracker.HeldBulletsFired > 0
                 ? RunTracker.Round(RunTracker.HoldSecondsSum / RunTracker.HeldBulletsFired) : -1f,
@@ -209,7 +206,6 @@ public sealed class RunAnalyticsReporter : IDisposable
         return row;
     }
 
-    /// <summary>A readable cause of death for analysis.</summary>
     private static string DeathCause(string reason, float sinceHit)
     {
         if (reason == "fuel")

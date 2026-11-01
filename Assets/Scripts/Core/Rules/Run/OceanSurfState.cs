@@ -1,6 +1,6 @@
+// Tracks wave riding and crest timing independently of the ocean visuals.
 using System;
 
-/// <summary>Surf momentum without scene dependencies. The environment owns its active-play clock.</summary>
 public sealed class OceanSurfState
 {
     public const float MaximumBoost = 0.35f;
@@ -12,6 +12,7 @@ public sealed class OceanSurfState
     public bool IsOnCrest { get; private set; }
     public float SpeedMultiplier => 1f + Boost;
 
+    // Accumulate surf progress from the current wave and crest contacts.
     public void Tick(float seconds, bool onWave, bool onCrest)
     {
         if (float.IsNaN(seconds) || float.IsInfinity(seconds) || seconds <= 0f) return;

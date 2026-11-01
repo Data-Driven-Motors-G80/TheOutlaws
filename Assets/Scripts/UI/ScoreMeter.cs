@@ -1,3 +1,4 @@
+// Updates the score label from the current run.
 using TMPro;
 using UnityEngine;
 
@@ -49,7 +50,7 @@ public sealed class ScoreMeter : MonoBehaviour
     {
         if (game != null)
         {
-            // The run's distance is the score; the tutorial earns nothing.
+
             Score = game.DistanceTravelled * pointsPerUnit;
             previousCarPosition = car.position;
             if (game.IsTutorial || game.State == OutlawGameState.Ready)
@@ -71,6 +72,7 @@ public sealed class ScoreMeter : MonoBehaviour
         Refresh();
     }
 
+    // Keep score formatting in one place for initial and later updates.
     private void Refresh()
     {
         int wholeScore = Mathf.FloorToInt(Score);

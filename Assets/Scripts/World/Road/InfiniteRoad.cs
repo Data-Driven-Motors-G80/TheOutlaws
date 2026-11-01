@@ -1,3 +1,4 @@
+// Streams road segments and exposes distance-based path sampling.
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Pool;
@@ -56,6 +57,26 @@ public sealed class InfiniteRoad : MonoBehaviour
     private int curveIndex;
     private bool lastWasFeature;
     private bool lastWasCurve;
+    private bool balancedLayout;
+    private int featuresSinceRunout;
+    private float balancedStraightLength = 160f;
+
+    public void SetDrivingPace(float speed)
+    {
+        if (balancedLayout) balancedStraightLength = Mathf.Clamp(speed * 6f, 160f, 400f);
+    }
+
+    public void ConfigureBalancedLayout(bool active)
+    {
+        balancedLayout = active;
+        if (!active) return;
+        hairpinFrequency = 0.12f;
+        hairpinRadius = new Vector2(28f, 36f);
+        hairpinAngle = new Vector2(135f, 175f);
+        hillFrequency = 0.45f;
+        hillPitch = new Vector2(4f, 9f);
+        bendAngle = new Vector2(20f, 30f);
+    }
 
     public float FirstDistance => activeSegments.Count > 0 ? activeSegments.Peek().StartDistance : 0f;
     public float LastDistance => nextDistance;
@@ -106,6 +127,23 @@ public sealed class InfiniteRoad : MonoBehaviour
         return closestSqrDistance < float.MaxValue;
     }
 
+    // Bound streaming work while extending the path for distant spawn checks.
+    public bool EnsureDistanceAvailable(float distance)
+    {
+        if (float.IsNaN(distance) || float.IsInfinity(distance)) return false;
+        EnsureInitialized();
+        if (activeSegments.Count == 0) return false;
+
+        for (int i = 0; i < 64 && nextDistance < distance; i++)
+        {
+            float previous = nextDistance;
+            SpawnSegment();
+            if (nextDistance <= previous) return false;
+        }
+        return distance <= nextDistance;
+    }
+
+    // Find the segment containing this accumulated road distance.
     public bool TrySample(float distance, out RoadPathPoint point)
     {
         EnsureInitialized();
@@ -207,6 +245,7 @@ public sealed class InfiniteRoad : MonoBehaviour
         return true;
     }
 
+    // Choose the next road feature and align it with the current endpoint.
     private void SpawnSegment()
     {
         ObjectPool<RoadSegment> pool = GetPool(SelectPrefab());
@@ -227,7 +266,14 @@ public sealed class InfiniteRoad : MonoBehaviour
         bool hill = false;
         bool pastIntro = nextDistance >= behindBuffer + straightIntroDistance;
 
-        if (pastIntro && !lastWasCurve && pendingHairpinAngle != 0f)
+        bool recoveryStraight = balancedLayout && pastIntro && !lastWasFeature
+            && pendingHairpinAngle == 0f && featuresSinceRunout >= 2;
+        if (recoveryStraight)
+        {
+            length = balancedStraightLength;
+            featuresSinceRunout = 0;
+        }
+        else if (pastIntro && !lastWasCurve && pendingHairpinAngle != 0f)
         {
             angle = pendingHairpinAngle;
             pendingHairpinAngle = 0f;
@@ -261,6 +307,9 @@ public sealed class InfiniteRoad : MonoBehaviour
             }
         }
 
+        if (balancedLayout && lastWasCurve && !curve && pendingHairpinAngle != 0f)
+            length = Mathf.Lerp(55f, 75f, (float)random.NextDouble());
+
         if (hill)
         {
             float altitude = nextEntry.position.y - baseAltitude;
@@ -270,6 +319,7 @@ public sealed class InfiniteRoad : MonoBehaviour
         }
         else if (!curve) endSlope = 0f;
 
+        if (balancedLayout && (curve || hill)) featuresSinceRunout++;
         lastWasCurve = curve;
         lastWasFeature = curve || hill;
         segment.ConfigureCurve(length, angle, sCurve, startSlope, endSlope, hairpin);

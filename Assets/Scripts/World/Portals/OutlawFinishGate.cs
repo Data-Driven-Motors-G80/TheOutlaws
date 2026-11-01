@@ -1,3 +1,4 @@
+// Builds the finish-gate structure at a sampled road position.
 using UnityEngine;
 
 public static class OutlawFinishGate

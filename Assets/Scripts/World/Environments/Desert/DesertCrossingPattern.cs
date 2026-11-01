@@ -1,9 +1,9 @@
+// Shared lane ordering and travel timing for crossing rocks.
 using UnityEngine;
 
-/// <summary>Predetermined crossing phases; no player steering or backpack state is used.</summary>
 public static class DesertCrossingPattern
 {
-    // Left, centre, right, centre (or its mirror). Never jump between both edge lanes.
+
     public static int LaneAt(int index, bool mirrored)
     {
         int phase = index % 4;
@@ -11,6 +11,7 @@ public static class DesertCrossingPattern
         return mirrored ? -lane : lane;
     }
 
+    // Offset rock timing by lane so the crossing remains readable.
     public static float TravelSeconds(float width, float span, float duration, int direction, int lane)
     {
         float lateral = Mathf.Clamp(lane, -1, 1) * width / 3f;

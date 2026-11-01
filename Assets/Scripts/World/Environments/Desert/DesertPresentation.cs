@@ -1,7 +1,7 @@
+// Coordinates roadside desert presentation around the generated road.
 using UnityEngine;
 using System.Collections.Generic;
 
-/// <summary>Road-following sand banks and a backdrop below the entire streamed road.</summary>
 [RequireComponent(typeof(EnvironmentRoot))]
 public sealed class DesertPresentation : MonoBehaviour
 {
@@ -33,8 +33,6 @@ public sealed class DesertPresentation : MonoBehaviour
         environment.Road.GetComponentsInChildren(false, segments);
         if (segments.Count == 0) return;
 
-        // A player-height plane hides downhill road ahead and lower pursuit behind.
-        // Keep the backdrop below ALL loaded road, including the retained rear segments.
         float lowest = float.PositiveInfinity;
         foreach (var segment in segments)
             for (int i = 0; i < segment.PathPointCount; i++)
@@ -48,7 +46,7 @@ public sealed class DesertPresentation : MonoBehaviour
             var banks = segment.GetComponent<DesertRoadsideSand>();
             if (banks == null) banks = segment.gameObject.AddComponent<DesertRoadsideSand>();
             layoutChanged |= banks.Refresh(sandMaterial, height);
-            // Scene-local instances only: keep shared prefabs and their boundary colliders intact.
+
             foreach (string wallName in WallNames)
             {
                 var wall = segment.transform.Find(wallName);
@@ -78,7 +76,7 @@ public sealed class DesertPresentation : MonoBehaviour
                 dune.position = dunePosition;
                 dune.rotation = Quaternion.LookRotation(Vector3.ProjectOnPlane(middle.Forward, Vector3.up), Vector3.up);
                 dune.localScale = new Vector3(24f, side < 0 ? 9f : 6f, Mathf.Min(40f, segment.Length * 1.5f));
-                // A dune beside one arm of a hairpin must not cover its returning arm.
+
                 var renderer = dune.GetComponent<Renderer>();
                 renderer.enabled = !OverlapsRoad(renderer.bounds);
             }
@@ -89,7 +87,7 @@ public sealed class DesertPresentation : MonoBehaviour
     {
         foreach (var segment in segments)
         {
-            // Path vertices are at most one metre apart; include a margin between samples.
+
             float margin = segment.Width * 0.5f + 1f;
             Vector3 min = bounds.min - new Vector3(margin, 0f, margin);
             Vector3 max = bounds.max + new Vector3(margin, 0f, margin);

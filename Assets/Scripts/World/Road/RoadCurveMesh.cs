@@ -1,14 +1,12 @@
+// Builds road and wall meshes from curved segment samples.
 using System.Collections.Generic;
 using UnityEngine;
 
-// Rebuilds the existing template's surface and walls, retaining its materials.
-// Meshes belong to each pooled instance, never to the shared prefab.
 [DisallowMultipleComponent]
 public sealed class RoadCurveMesh : MonoBehaviour
 {
     private readonly Dictionary<MeshFilter, Mesh> meshes = new Dictionary<MeshFilter, Mesh>();
 
-    // Reuse scratch buffers when pooled road sections are rebuilt.
     private readonly List<Vector3> vertices = new List<Vector3>();
     private readonly List<Vector2> uvs = new List<Vector2>();
     private readonly List<int> triangles = new List<int>();
@@ -80,6 +78,7 @@ public sealed class RoadCurveMesh : MonoBehaviour
         triangles.Add(a); triangles.Add(c); triangles.Add(d);
     }
 
+    // Release runtime meshes when their owner is destroyed.
     private void OnDestroy()
     {
         foreach (Mesh mesh in meshes.Values)

@@ -1,4 +1,5 @@
-// Preserves the current run when switching environment scenes.
+// Carries run snapshots and portal timing across environment changes.
+
 using UnityEngine;
 
 public struct RunSnapshot
@@ -16,6 +17,8 @@ public struct RunSnapshot
     public float SpeedIncreaseAmount;
     public float SpeedIncreaseInterval;
     public int Ammo;
+    public int EmptyGunBoxStreak;
+    public float LastJumpOfferDistance;
     public RandomPickupOutcome BackpackItem;
     public float NextMysteryRowAt;
     public float SunnyRemaining;
@@ -30,20 +33,24 @@ public static class RunSession
 
     public static bool HasPending { get; private set; }
 
-    public const float PortalIntervalSeconds = 60f;
+    public const float MinimumPortalIntervalSeconds = 30f;
+    public const float MaximumPortalIntervalSeconds = 45f;
+    private static System.Random portalRandom = new System.Random();
 
-    /// <summary>Active run time when the next gate appears (-1 = not scheduled yet).</summary>
     public static float NextPortalAt = -1f;
 
+    // Choose a fresh 30-45 second target on the active gameplay clock.
     public static void ScheduleNextPortal(float elapsedSeconds)
     {
-        NextPortalAt = elapsedSeconds + PortalIntervalSeconds;
+        float interval = MinimumPortalIntervalSeconds + (MaximumPortalIntervalSeconds - MinimumPortalIntervalSeconds)
+            * (float)portalRandom.NextDouble();
+        NextPortalAt = elapsedSeconds + interval;
     }
 
     public static float SecondsUntilPortal(float elapsedSeconds)
     {
-        float scheduledAt = NextPortalAt < 0f ? PortalIntervalSeconds : NextPortalAt;
-        return System.Math.Max(0f, scheduledAt - elapsedSeconds);
+        if (NextPortalAt < 0f) ScheduleNextPortal(0f);
+        return System.Math.Max(0f, NextPortalAt - elapsedSeconds);
     }
 
     public static void ResetSwitchSchedule()
@@ -56,6 +63,7 @@ public static class RunSession
     {
         pending = default;
         HasPending = false;
+        portalRandom = new System.Random();
         ResetSwitchSchedule();
     }
 
@@ -71,6 +79,7 @@ public static class RunSession
         HasPending = false;
     }
 
+    // Read the pending snapshot; the caller clears it after restoring the run.
     public static bool TryGetPending(out RunSnapshot snapshot)
     {
         snapshot = pending;

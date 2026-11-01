@@ -1,6 +1,6 @@
+// Adds desert-specific shot handling to normal obstacle spawning.
 using UnityEngine;
 
-/// <summary>Shared fair rows, with separately scheduled crossing rocks.</summary>
 public sealed class DesertObstacleSpawner : ObstacleSpawner
 {
     protected override float RowSpacingMultiplier => 1f;

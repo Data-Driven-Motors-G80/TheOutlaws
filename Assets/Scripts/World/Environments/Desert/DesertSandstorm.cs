@@ -1,7 +1,7 @@
+// Blends storm presentation and restores the previous fog settings.
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-/// <summary>Desert-local visibility effect; the rock-field controller owns its duration.</summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(EnvironmentRoot))]
 public sealed class DesertSandstorm : MonoBehaviour
@@ -57,7 +57,7 @@ public sealed class DesertSandstorm : MonoBehaviour
         var car = environment.Player;
         float speed = car.ForwardSpeed * car.EnvironmentSpeedMultiplier;
         if (game.PickupEffects != null) speed *= game.PickupEffects.RunState.ForwardSpeedMultiplier;
-        // Fog is measured from the camera, not the bumper. Keep the car and near road readable.
+
         float cameraOffset = Camera.main != null ? Vector3.Distance(Camera.main.transform.position, car.transform.position) : 30f;
         float visibility = Mathf.Max(minimumVisibility, speed * visibleTravelSeconds);
         RenderSettings.fog = true;
@@ -79,9 +79,10 @@ public sealed class DesertSandstorm : MonoBehaviour
         RestoreFog();
     }
 
+    // Restore the scene fog rather than leaving storm settings behind.
     private void RestoreFog()
     {
-        // Do not overwrite a destination scene's RenderSettings during portal teardown.
+
         if (!saved || SceneManager.GetActiveScene() != gameObject.scene) return;
         RenderSettings.fog = originalFog;
         RenderSettings.fogMode = originalMode;

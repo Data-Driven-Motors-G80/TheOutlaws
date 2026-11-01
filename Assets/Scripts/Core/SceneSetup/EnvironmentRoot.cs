@@ -1,6 +1,6 @@
+// Scene references and environment settings required to start a run.
 using UnityEngine;
 
-/// <summary>The explicit scene references and configuration shared by environment systems.</summary>
 [DisallowMultipleComponent]
 public sealed class EnvironmentRoot : MonoBehaviour
 {
@@ -28,6 +28,7 @@ public sealed class EnvironmentRoot : MonoBehaviour
     public bool IsOcean => ocean;
     public bool IsDesert => desert;
 
+    // Report missing scene references before gameplay starts.
     public bool ValidateSetup()
     {
         bool valid = player != null && road != null && obstacles != null &&

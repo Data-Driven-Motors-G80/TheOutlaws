@@ -1,3 +1,4 @@
+// Updates the pursuit simulation using the current driving pace.
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -16,7 +17,6 @@ public sealed class RiskRunController : MonoBehaviour
     private bool hasShooting;
     private bool restartOwnedByGame;
 
-    // The manager owns the gameplay clock; preserve shot slowdown on top of difficulty.
     public void SetClosingSpeed(float metresPerSecond)
     {
         policeClosingSpeed = Mathf.Clamp(metresPerSecond, -3f, 1f);
@@ -35,7 +35,7 @@ public sealed class RiskRunController : MonoBehaviour
         car = GetComponent<AutoDriveCar>();
         hasShooting = GetComponent<OutlawShooting>() != null;
         effects = GetComponent<CarPickupEffects>();
-        // The Outlaws game manager owns restarts (it returns to the title screen).
+
         restartOwnedByGame = Object.FindFirstObjectByType<OutlawGameManager>() != null;
         ConfigureSpeeds();
     }
@@ -53,7 +53,7 @@ public sealed class RiskRunController : MonoBehaviour
             {
                 restarting = true;
                 Scene activeScene = SceneManager.GetActiveScene();
-                // The editor prototype can be played before it is added to a build profile.
+
 #if UNITY_EDITOR
                 UnityEditor.SceneManagement.EditorSceneManager.LoadSceneInPlayMode(
                     activeScene.path, new LoadSceneParameters(LoadSceneMode.Single));
@@ -64,12 +64,11 @@ public sealed class RiskRunController : MonoBehaviour
             return;
         }
 
-        // In The Outlaws, Space belongs exclusively to shooting. Preserve the
-        // original bail-out control only for the separate pickup playground.
         if (!hasShooting && keyboard.spaceKey.wasPressedThisFrame)
             effects.Clear();
     }
 
+    // Translate the configured closing rate into player and pursuer speeds.
     private void ConfigureSpeeds()
     {
         if (effects == null) return;

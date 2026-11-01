@@ -1,6 +1,6 @@
+// Placement and approach-speed contract for obstacle motion behaviours.
 using UnityEngine;
 
-/// <summary>Optional behaviour used by the shared obstacle spawner.</summary>
 public abstract class ObstacleMotion : MonoBehaviour
 {
     public virtual float ApproachSpeed(Transform obstacle) => 0f;

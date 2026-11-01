@@ -1,11 +1,7 @@
+// Caches runtime colour materials to avoid repeated material creation.
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// Coloured materials for objects created in code (A boxes, bullets, portal gates).
-/// Primitives' default material uses a shader that is stripped from WebGL builds (shows magenta),
-/// so they copy a real URP Lit material from Resources, which is always included in the build.
-/// </summary>
 public static class RuntimeMaterials
 {
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
@@ -13,7 +9,6 @@ public static class RuntimeMaterials
     private static Material template;
     private static readonly Dictionary<Color, Material> cache = new Dictionary<Color, Material>();
 
-    /// <summary>A shared material per colour (bullets are fired constantly, so they reuse it).</summary>
     public static Material Coloured(Color colour)
     {
         if (cache.TryGetValue(colour, out Material cached) && cached != null) return cached;
@@ -26,6 +21,7 @@ public static class RuntimeMaterials
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    // Release cached material references between play sessions.
     private static void ResetStatics()
     {
         template = null;

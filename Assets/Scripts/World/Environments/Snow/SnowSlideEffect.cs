@@ -1,3 +1,4 @@
+// Applies snow sliding presentation and restores it when disabled.
 using UnityEngine;
 
 [DefaultExecutionOrder(-100)]
@@ -73,6 +74,7 @@ public sealed class SnowSlideEffect : MonoBehaviour
         visual.localRotation *= appliedYaw;
     }
 
+    // Restore any temporary presentation state owned by this effect.
     private void Release()
     {
         transform.position -= appliedOffset;

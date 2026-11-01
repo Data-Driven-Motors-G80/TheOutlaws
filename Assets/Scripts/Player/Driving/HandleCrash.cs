@@ -1,3 +1,4 @@
+// Routes physical contacts and fuel depletion into the run rules.
 using UnityEngine;
 using System.Collections.Generic;
 using UnityEngine.SceneManagement;
@@ -64,9 +65,10 @@ public sealed class HandleCrash : MonoBehaviour
         }
     }
 
+    // Resolve shield protection and obstacle penalties at contact.
     private void OnTriggerEnter(Collider other)
     {
-        if (restarting)
+        if (restarting || (pickupEffects != null && pickupEffects.RunState.IsRoadRecovering))
         {
             return;
         }
@@ -178,8 +180,6 @@ public sealed class HandleCrash : MonoBehaviour
                 return;
             }
 
-            // A collision drains proximity. The run stays in the same scene and
-            // is restarted explicitly with R after capture.
             pickupEffects.TryCrash(crashDrainAmount);
             return;
         }

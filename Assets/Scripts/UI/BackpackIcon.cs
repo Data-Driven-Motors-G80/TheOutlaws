@@ -1,9 +1,10 @@
+// Loads and draws the icon associated with each backpack item.
 using UnityEngine;
 
-/// <summary>Original antialiased icon textures, prepared once during HUD setup.</summary>
 public static class BackpackIcon
 {
     private static Texture2D[] icons;
+    // Array positions match the stable RandomPickupOutcome identifiers.
     public static void Preload()
     {
         if (icons != null && icons[0] != null) return;

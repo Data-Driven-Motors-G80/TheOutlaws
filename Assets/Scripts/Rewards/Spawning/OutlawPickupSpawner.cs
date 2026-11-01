@@ -1,3 +1,4 @@
+// Places ammo offers and records uncollected pickups as missed.
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -18,10 +19,8 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
     private System.Random spacingRandom;
     private readonly List<OutlawAmmoPickup> tracked = new List<OutlawAmmoPickup>();
 
-    /// <summary>While true (the tutorial), scheduled ammo does not appear.</summary>
     public bool Suppressed { get; set; }
 
-    /// <summary>Real-run distance, which excludes the tutorial and carries across scenes.</summary>
     public System.Func<float> RunDistance { get; set; }
 
     public void BeginRealRun()
@@ -42,7 +41,7 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
         shooting = playerShooting;
         pickupEffects = effects;
         active.Clear();
-        // Remove the old free starting pickup; all ammo now follows the schedule.
+
         foreach (OutlawAmmoPickup pickup in GetComponentsInChildren<OutlawAmmoPickup>(true))
         {
             pickup.gameObject.SetActive(false);
@@ -50,11 +49,9 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
         }
         carriedDistance = RunSession.TryGetPending(out RunSnapshot carried) ? carried.Distance : 0f;
         spawnIndex = 0;
-        // Independent entropy keeps ammo unpredictable on restart without changing
-        // the seeded obstacle layouts or power-up outcomes.
+
         spacingRandom = new System.Random(System.Guid.NewGuid().GetHashCode());
-        // Reveal the pickup early so its actual road position follows the
-        // distance-based schedule rather than appearing directly on the car.
+
         nextSpawnAt = (driver != null ? driver.RoadDistanceTravelled : 0f)
             + NextSpawnSpacing() - SpawnAheadDistance;
     }
@@ -78,7 +75,6 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
                 continue;
             }
 
-            // Do not let missed pickups behind the car occupy all active slots.
             if (road.IsBehind(pickup.transform.position, player.position, 18f) ||
                 Vector3.Distance(player.position, pickup.transform.position) > 140f)
             {
@@ -87,8 +83,6 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
             }
         }
 
-        // Missed or collected ammo must not trigger an immediate replacement.
-        // Sample one distance-appropriate gap per successful spawn, never every frame.
         if (Suppressed || driver.RoadDistanceTravelled < nextSpawnAt || active.Count >= MaximumActive)
         {
             return;
@@ -100,6 +94,7 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
         }
     }
 
+    // Choose the next distance using the current progress rules.
     private float NextSpawnSpacing()
     {
         float distance = RunDistance != null
@@ -114,16 +109,14 @@ public sealed class OutlawPickupSpawner : MonoBehaviour
     {
         if (!TryGetPointAhead(distanceAhead, out RoadPathPoint point))
         {
-            // The infinite road may still be extending. Leave the schedule
-            // unchanged so Update retries instead of skipping this pickup.
+
             return false;
         }
 
         float lateralLimit = Mathf.Max(0f, point.Width * 0.5f - 1.5f);
         float side = spawnIndex % 2 == 0 ? -0.9f : 0.9f;
         spawnIndex++;
-        // Keep the pickup low enough to overlap the player's reduced collider.
-        // The previous 0.75 offset let the car pass underneath the trigger.
+
         float lateral = PickupPlacement.ClearLateral(point, lateralLimit * side);
         Vector3 position = point.Position + point.Right * lateral + point.Up * 0.32f;
         GameObject pickup = OutlawAmmoPickup.Create(position, point.Up, shooting);

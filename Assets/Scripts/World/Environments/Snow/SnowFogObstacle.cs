@@ -1,3 +1,4 @@
+// Pools drifting fog blocks and updates their visibility effects.
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -62,9 +63,12 @@ public sealed class SnowFogObstacle : MonoBehaviour
     private Texture2D[] cloudTextures;
     private CarPickupEffects pickupEffects;
     private bool blocksHidden;
+    private OutlawGameManager game;
+    private float nextFogEncounterAt = -1f;
 
     private void Awake()
     {
+        game = FindFirstObjectByType<OutlawGameManager>();
         spawner = GetComponent<ObstacleSpawner>();
         if (spawner == null) spawner = FindFirstObjectByType<ObstacleSpawner>();
         road = spawner != null ? spawner.RoadReference : FindFirstObjectByType<InfiniteRoad>();
@@ -73,7 +77,7 @@ public sealed class SnowFogObstacle : MonoBehaviour
             AutoDriveCar driver = FindFirstObjectByType<AutoDriveCar>();
             if (driver != null) car = driver.transform;
         }
-        // Generate once during scene setup, not on the first fog encounter.
+
         GetCloudTextures();
         distanceUntilSpawn = firstFogDistance;
         if (car != null)
@@ -85,6 +89,7 @@ public sealed class SnowFogObstacle : MonoBehaviour
 
     private void OnDisable()
     {
+        if (game != null) game.EndEncounter(this);
         blocksHidden = false;
         foreach (FogBlock block in active)
         {
@@ -120,7 +125,8 @@ public sealed class SnowFogObstacle : MonoBehaviour
 
     private void Update()
     {
-        if (!enableFog || road == null || car == null) return;
+        if (!enableFog || road == null || car == null || Time.timeScale <= 0f) return;
+        if (game != null && (game.State != OutlawGameState.Running || game.IsTutorial)) return;
 
         float travelled = Mathf.Min((car.position - previousCarPosition).magnitude, 10f);
         previousCarPosition = car.position;
@@ -135,9 +141,20 @@ public sealed class SnowFogObstacle : MonoBehaviour
         bool suppressed = spawner != null && spawner.SuppressAutoSpawn;
         if (!suppressed && !sunny)
         {
-            distanceUntilSpawn -= travelled;
-            if (distanceUntilSpawn <= 0f && active.Count < maxActive && TrySpawn())
-                distanceUntilSpawn = Random.Range(minSpacing, Mathf.Max(minSpacing, maxSpacing));
+            if (game != null && game.UsesCoordinatedPacing)
+            {
+                float speed = game.ActualDrivingSpeed;
+                if (nextFogEncounterAt < 0f) nextFogEncounterAt = game.ElapsedSeconds + 10f;
+                if (game.ElapsedSeconds + PickupLookAhead.Distance / speed >= nextFogEncounterAt
+                    && active.Count < maxActive && TrySpawn())
+                    nextFogEncounterAt = game.ElapsedSeconds + PickupLookAhead.Distance / speed + Random.Range(7f, 10f);
+            }
+            else
+            {
+                distanceUntilSpawn -= travelled;
+                if (distanceUntilSpawn <= 0f && active.Count < maxActive && TrySpawn())
+                    distanceUntilSpawn = Random.Range(minSpacing, Mathf.Max(minSpacing, maxSpacing));
+            }
         }
 
         UpdateBlocks();
@@ -149,6 +166,9 @@ public sealed class SnowFogObstacle : MonoBehaviour
         if (!road.TryGetDistance(endPoint.Position, out float endDistance)) return false;
 
         float length = Random.Range(minLength, Mathf.Max(minLength, maxLength));
+        float startDistance = endDistance - length;
+        if (game != null && (!game.CanScheduleEncounter(this, RunEncounterKind.Fog,
+            startDistance, endDistance + 15f) || game.IsSharpRoadSection(startDistance, length))) return false;
         float width = Mathf.Max(0.8f, endPoint.Width - 0.1f);
         int columns = Mathf.Max(2, Mathf.RoundToInt(width / puffSpacing));
         int rows = Mathf.Max(2, Mathf.RoundToInt(length / puffSpacing));
@@ -191,6 +211,7 @@ public sealed class SnowFogObstacle : MonoBehaviour
         block.End = endPoint.Position;
         block.Root.SetActive(true);
         active.Add(block);
+        if (game != null) game.BeginEncounter(this, RunEncounterKind.Fog, startDistance, endDistance + 15f);
         return true;
     }
 
@@ -226,6 +247,7 @@ public sealed class SnowFogObstacle : MonoBehaviour
         }
     }
 
+    // Reuse an available fog block before creating another.
     private FogBlock GetBlock()
     {
         while (spare.Count > 0)
@@ -296,6 +318,7 @@ public sealed class SnowFogObstacle : MonoBehaviour
         return cloudTextures;
     }
 
+    // Generate soft cloud opacity procedurally for the fog particles.
     private static Texture2D MakeCloudTexture(float seed)
     {
         const int size = 128;

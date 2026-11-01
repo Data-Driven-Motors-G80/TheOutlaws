@@ -1,3 +1,4 @@
+// Tracks obstacle damage, warning colours and shot feedback.
 using UnityEngine;
 
 [DisallowMultipleComponent]
@@ -27,11 +28,11 @@ public sealed class TrafficLightObstacle : MonoBehaviour
     public TrafficObstacleState CurrentState { get; private set; }
     public TrafficObstacleState InitialState { get; private set; }
     public bool StartedRed { get; private set; }
-    /// <summary>The car drove into this block (shielded or not).</summary>
+
     public bool WasHit { get; private set; }
 
     public void MarkHit() => WasHit = true;
-    /// <summary>Shots still needed to clear this block.</summary>
+
     public int ShotsRemaining => (int)CurrentState + 1;
     public float ProximityDrain => TrafficObstacleRules.GetProximityDrain(CurrentState);
     public float FuelPenaltyFraction => TrafficObstacleRules.GetFuelPenaltyFraction(CurrentState);
@@ -47,7 +48,6 @@ public sealed class TrafficLightObstacle : MonoBehaviour
         PlaceShotLabel();
     }
 
-    /// <summary>Returns true when this shot destroys the one-shot obstacle.</summary>
     public bool ApplyShot()
     {
         TrafficObstacleState before = CurrentState;
@@ -88,7 +88,7 @@ public sealed class TrafficLightObstacle : MonoBehaviour
 
     private void CreateWarningBands()
     {
-        // Cache only body renderers before adding decorations, so tinting never turns the bands orange.
+
         foreach (Renderer body in renderers)
         {
             if (body == null) continue;
@@ -111,11 +111,10 @@ public sealed class TrafficLightObstacle : MonoBehaviour
         }
     }
 
+    // Keep obstacle appearance and shot labels aligned with its damage state.
     private void ApplyVisualState()
     {
-        // The current project only spawns one- and two-shot obstacles during the
-        // normal run. Show those as orange and red respectively; shooting a red
-        // obstacle once visibly lowers it to the orange state.
+
         Color barrierColour = CurrentState == TrafficObstacleState.Green
             ? BarrierOrange
             : BarrierRed;
@@ -134,7 +133,7 @@ public sealed class TrafficLightObstacle : MonoBehaviour
     private void PlaceShotLabel()
     {
         if (!Application.isPlaying || renderers.Length == 0 || renderers[0] == null) return;
-        // The shot count is printed on the face the player drives towards.
+
         if (shotLabel == null)
         {
             shotLabel = WorldLabel.AttachToFrontFace(renderers[0], transform, ShotText, Color.white);

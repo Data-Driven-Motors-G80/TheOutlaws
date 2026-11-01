@@ -1,12 +1,13 @@
+// Maintains the visible fuel supply and applies gameplay fuel changes.
 using UnityEngine;
 using UnityEngine.UI;
 
 public enum FuelDrainMode
 {
     Normal,
-    /// <summary>No drain (tutorial steps that are not about fuel).</summary>
+
     Frozen,
-    /// <summary>Drops fast but eases towards a floor, so it never actually empties.</summary>
+
     TutorialPlunge
 }
 
@@ -26,6 +27,7 @@ public sealed class FuelMeter : MonoBehaviour
     public float CurrentFuel => remainingFuel;
     public float MaximumFuel => maxFuel;
     public float NormalizedFuel => maxFuel > 0f ? remainingFuel / maxFuel : 0f;
+    public bool HarderDifficultyActive { get; set; }
     public bool IsEmpty => remainingFuel <= 0f;
     public FuelDrainMode DrainMode { get; set; } = FuelDrainMode.Normal;
 
@@ -39,7 +41,6 @@ public sealed class FuelMeter : MonoBehaviour
         }
 
     }
-
 
     private void Start()
     {
@@ -56,7 +57,7 @@ public sealed class FuelMeter : MonoBehaviour
     {
         if (DrainMode == FuelDrainMode.TutorialPlunge)
         {
-            // Exponential approach to the floor: a dramatic drop that can never reach zero.
+
             float floor = maxFuel * TutorialFloorFraction;
             if (remainingFuel > floor)
                 remainingFuel = Mathf.Max(floor, remainingFuel - (remainingFuel - floor) * TutorialPlungeRate * Time.deltaTime);
@@ -70,7 +71,7 @@ public sealed class FuelMeter : MonoBehaviour
             return;
         }
 
-        remainingFuel = Mathf.Max(0, remainingFuel - consumptionPerSecond * Time.deltaTime);
+        remainingFuel = Mathf.Max(0, remainingFuel - (HarderDifficultyActive ? 3.8f : consumptionPerSecond) * Time.deltaTime);
         if (bar != null)
         {
             bar.fillAmount = NormalizedFuel;
@@ -83,6 +84,7 @@ public sealed class FuelMeter : MonoBehaviour
         }
     }
 
+    // Clamp refills and penalties through the same visible fuel path.
     public void ChangeFuel(float amount)
     {
         remainingFuel = Mathf.Clamp(remainingFuel + amount, 0f, maxFuel);

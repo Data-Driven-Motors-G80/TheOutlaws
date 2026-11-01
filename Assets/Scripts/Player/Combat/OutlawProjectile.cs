@@ -1,8 +1,9 @@
+// Moves a fired shot and resolves its first valid hit.
 using UnityEngine;
 
 public sealed class OutlawProjectile : MonoBehaviour
 {
-    // Effectively unlimited range: the shot flies until it hits a block or leaves the visible road.
+
     private const float Speed = 70f;
     private const float MaximumRange = 200f;
     private bool targetsPolice;
@@ -51,12 +52,12 @@ public sealed class OutlawProjectile : MonoBehaviour
         Object.Destroy(projectile, MaximumRange / Speed + 0.5f);
     }
 
+    // Check the travelled segment so fast projectiles do not skip targets.
     private void Update()
     {
         if (consumed) return;
         float distance = Mathf.Min(Speed * Time.deltaTime, MaximumRange - distanceTravelled);
-        // Clamp the sweep to the remaining range and resolve the nearest hit first.
-        // SphereCastAll does not guarantee hit order.
+
         RaycastHit[] hits = Physics.SphereCastAll(transform.position, 0.14f,
             direction, distance, ~0, QueryTriggerInteraction.Collide);
         System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
@@ -66,7 +67,7 @@ public sealed class OutlawProjectile : MonoBehaviour
             if (consumed) return;
             if (HitsWall(hit))
             {
-                // Bullets stop at the roadside walls instead of passing through them.
+
                 transform.position += direction * hit.distance;
                 if (!targetsPolice) GameEvents.RaiseShotMissed();
                 consumed = true;
@@ -84,7 +85,6 @@ public sealed class OutlawProjectile : MonoBehaviour
         }
     }
 
-    /// <summary>A solid, roughly vertical surface that isn't the player's car (walls and barriers).</summary>
     private static bool HitsWall(RaycastHit hit)
     {
         Collider collider = hit.collider;
@@ -96,7 +96,7 @@ public sealed class OutlawProjectile : MonoBehaviour
     private void OnTriggerEnter(Collider other)
     {
         if (consumed) return;
-        // Include trigger callbacks in the range limit, including the bullet's radius.
+
         if ((other.ClosestPoint(launchPosition) - launchPosition).sqrMagnitude > MaximumRange * MaximumRange)
             return;
         if (targetsPolice)

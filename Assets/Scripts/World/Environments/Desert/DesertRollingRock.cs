@@ -1,6 +1,6 @@
+// Moves a crossing rock and resolves shots or a successful pass.
 using UnityEngine;
 
-/// <summary>A one-shot crossing hazard. The controller owns its reserved road gap.</summary>
 public sealed class DesertRollingRock : MonoBehaviour
 {
     private TrafficLightObstacle obstacle;
@@ -33,7 +33,7 @@ public sealed class DesertRollingRock : MonoBehaviour
         sphere.GetComponent<Renderer>().sharedMaterial = RuntimeMaterials.Coloured(new Color(1f, 0.42f, 0f));
         rock.visual = sphere.transform;
         rock.obstacle = root.AddComponent<TrafficLightObstacle>();
-        rock.obstacle.Initialize(TrafficObstacleState.Green); // Existing orange cost; no fuel damage.
+        rock.obstacle.Initialize(TrafficObstacleState.Green);
         rock.Place();
         return rock;
     }
@@ -48,6 +48,7 @@ public sealed class DesertRollingRock : MonoBehaviour
 
     private void Place() => transform.position = point.Position + point.Right * lateral + point.Up * radius;
 
+    // Resolve rock destruction through the shared shot reporting path.
     public bool TakeShot()
     {
         if (Resolved || !gameObject.activeInHierarchy) return false;

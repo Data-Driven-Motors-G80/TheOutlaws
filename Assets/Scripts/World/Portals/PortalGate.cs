@@ -1,4 +1,5 @@
-// A glowing wall across the whole road: driving through it takes you to the other world.
+// Builds a labelled portal aligned with the road.
+
 using UnityEngine;
 
 public sealed class PortalGate : MonoBehaviour
@@ -8,7 +9,7 @@ public sealed class PortalGate : MonoBehaviour
         GameObject gate = GameObject.CreatePrimitive(PrimitiveType.Cube);
         gate.name = "Portal Gate";
         Destroy(gate.GetComponent<Collider>());
-        // Wider than the road and taller than the view, so the screen fills up and there is no way around it.
+
         const float height = 18f;
         gate.transform.SetPositionAndRotation(point.Position + point.Up * (height * 0.5f - 0.5f),
             Quaternion.LookRotation(point.Forward, point.Up));

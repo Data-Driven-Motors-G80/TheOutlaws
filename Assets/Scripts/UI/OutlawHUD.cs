@@ -1,3 +1,4 @@
+// Draws menus, run status, backpack feedback and tutorial prompts.
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -59,6 +60,7 @@ public sealed class OutlawHUD : MonoBehaviour
     private float messageRemaining;
     private bool wasPoliceAlert;
     private bool wasBanner;
+    private int shownRoadRecoveries;
     private int shownReverseActivations;
     private int shownReverseCompletions;
     private int shownPickupCount;
@@ -90,13 +92,13 @@ public sealed class OutlawHUD : MonoBehaviour
             observedEffects.EmptyBackpackUsed += OnEmptyBackpackUsed;
         }
         ocean = manager.GetComponent<OceanCoastController>();
-        // Arriving through an environment switch.
+
         if (RunSession.HasPending)
             ShowMessage(manager.GetComponent<EnvironmentRoot>().IsDesert ? "DESERT! WATCH FOR CROSSING ROCKS"
                 : ocean != null ? "OCEAN COAST! RIDE THE WHITE CRESTS"
                 : UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "Env_Snow"
                 ? "PORTAL! YOU ENTERED THE MOUNTAINS" : "PORTAL! BACK TO THE CITY", ShieldCyan, 3.5f);
-        // Bind saved UI without rebuilding or repositioning it during Play.
+
         if (ammoBar == null) ammoBar = FindImage("AmmoBar");
         if (ammoLabel == null)
             ammoLabel = GameObject.Find("AMMO Label")?.GetComponent<TMP_Text>();
@@ -105,25 +107,21 @@ public sealed class OutlawHUD : MonoBehaviour
         if (ammoBar == null || ammoLabel == null)
             Debug.LogError("The Outlaws HUD is missing saved UI references. Assign them in the Inspector.", this);
 
-        // Ammo is drawn as one blue square per bullet; the bar itself is hidden.
         if (ammoBar != null) ammoBar.enabled = false;
-        // The HUD draws the fuel/ammo column itself so it lines up exactly.
+
         if (ammoLabel != null) ammoLabel.gameObject.SetActive(false);
         Image fuelBar = FindImage("FuelBar");
         if (fuelBar != null) fuelBar.enabled = false;
         GameObject fuelLabel = GameObject.Find("FUEL Label");
         if (fuelLabel != null) fuelLabel.SetActive(false);
 
-        // Hide only the old label; ScoreMeter continues recording the score.
         TMP_Text scoreText = GameObject.Find("Score")?.GetComponent<TMP_Text>();
         if (scoreText != null) scoreText.enabled = false;
 
-        // The rear-view camera replaces the police distance bar.
         GameObject proximity = GameObject.Find("Proximity");
         if (proximity != null) proximity.SetActive(false);
         if (game.Player != null) rearView = RearViewCamera.Create(game.Player, game.PoliceCars);
 
-        // Power-up feedback is shown in one place (under the rear view), not as pop-ups.
         PickupHUD popups = Object.FindFirstObjectByType<PickupHUD>();
         if (popups != null) popups.enabled = false;
     }
@@ -159,8 +157,7 @@ public sealed class OutlawHUD : MonoBehaviour
         messageRemaining = Mathf.Max(0f, messageRemaining - (running ? dt : 0f));
         if (!countersSynced && game.PickupEffects != null)
         {
-            // A run carried over from the other scene restores its counters in Start;
-            // adopt them so they don't read as fresh events.
+
             shownPickupCount = game.PickupEffects.PickupCount;
             shownShieldUses = game.PickupEffects.ShieldUseCount;
             shownReverseActivations = game.PickupEffects.ReverseActivationCount;
@@ -188,7 +185,6 @@ public sealed class OutlawHUD : MonoBehaviour
             ShowMessage("HIT BLOCKED!", ShieldCyan, 1.2f);
         }
 
-        // Events that replace the centred message (most recent wins).
         if (game.PickupEffects != null)
         {
             if (game.PickupEffects.ReverseActivationCount != shownReverseActivations)
@@ -201,6 +197,11 @@ public sealed class OutlawHUD : MonoBehaviour
                 shownReverseCompletions = game.PickupEffects.ReverseCompletionCount;
                 ShowMessage("CONTROLS NORMAL", Good, 1.5f);
             }
+        }
+        if (game.PickupEffects != null && game.PickupEffects.RunState.RoadRecoveryCount != shownRoadRecoveries)
+        {
+            shownRoadRecoveries = game.PickupEffects.RunState.RoadRecoveryCount;
+            ShowMessage("BACK ON TRACK — POLICE CLOSER!", PoliceRed, 2f);
         }
         bool banner = game.RunStartBannerRemaining > 0f && !game.IsTutorial;
         if (banner && !wasBanner) ShowMessage(game.StartedAfterTutorial
@@ -217,7 +218,7 @@ public sealed class OutlawHUD : MonoBehaviour
 
     public void BuildLabeledBars()
     {
-        // This layout builder is used only by the explicit editor setup command.
+
         if (Application.isPlaying) return;
         Image fuelBar = FindImage("FuelBar");
         Image policeBar = FindImage("ProximityFill");
@@ -373,8 +374,6 @@ public sealed class OutlawHUD : MonoBehaviour
         GUI.matrix = previous;
     }
 
-    // ---------- Title ----------
-
     private void DrawStartMenu(float width, float height)
     {
         const float panelWidth = 560f, padding = 44f;
@@ -386,7 +385,6 @@ public sealed class OutlawHUD : MonoBehaviour
         float x = panel.x + padding;
         float y = panel.y + 26f;
 
-        // Title and best distance.
         GUIStyle title = new GUIStyle(titleStyle) { fontSize = 52 };
         GUI.Label(new Rect(panel.x, y, panel.width, 62f),
             $"<color={Hex(PoliceRed)}>WEE</color> <color={Hex(PoliceBlue)}>WOO</color> RUN", title);
@@ -397,7 +395,6 @@ public sealed class OutlawHUD : MonoBehaviour
             : $"<color={Hex(Gold)}>ESCAPE THE COPS</color>", best);
         y += 40f;
 
-        // Tutorial switch.
         DrawRect(new Rect(x, y, inner, 1f), new Color(1f, 1f, 1f, 0.15f));
         y += 16f;
         GUIStyle rowLabel = new GUIStyle(leftStyle) { fontSize = 18, fontStyle = FontStyle.Bold };
@@ -408,18 +405,15 @@ public sealed class OutlawHUD : MonoBehaviour
         DrawRect(new Rect(x, y, inner, 1f), new Color(1f, 1f, 1f, 0.15f));
         y += 18f;
 
-        // Missions.
         y = DrawMissionList(new Rect(x, y, inner, 0f), false);
 
-        // Start.
         if (GUI.Button(new Rect(panel.x + (panel.width - 260f) * 0.5f, panel.y + panelHeight - 86f, 260f, 58f), "START", buttonStyle))
         {
             game.BeginGame();
         }
     }
 
-    // ---------- Running ----------
-
+    // Group the indicators shown during active gameplay.
     private void DrawRunningHUD(float width, float height)
     {
         DrawAmmoSquares();
@@ -433,7 +427,6 @@ public sealed class OutlawHUD : MonoBehaviour
 
         DrawLowFuelWarning(width, height);
 
-        // Mission toasts sit in the top-left corner, under the ammo, away from the road.
         if (missionToastRemaining > 0f && game.State == OutlawGameState.Running)
         {
             GUIStyle line = new GUIStyle(leftStyle) { fontSize = 17 };
@@ -447,14 +440,13 @@ public sealed class OutlawHUD : MonoBehaviour
         }
     }
 
-    /// <summary>One centred message below the mirror and active-effect row; the most recent event replaces the last.</summary>
     private void DrawMessage(float width)
     {
         if (game.State != OutlawGameState.Running && game.State != OutlawGameState.Paused) return;
         string text = messageText;
         Color colour = messageColour;
         CarPickupEffects effects = game.PickupEffects;
-        // The control-swap countdown is live, so it always shows its current number.
+
         if (effects != null && effects.ReverseCountdownRemaining > 0f)
         {
             text = $"CONTROLS FLIP IN {Mathf.CeilToInt(effects.ReverseCountdownRemaining)}";
@@ -489,7 +481,6 @@ public sealed class OutlawHUD : MonoBehaviour
 
     private bool FuelLow => game.Fuel != null && game.Fuel.NormalizedFuel < LowFuelFraction;
 
-    /// <summary>A pulsing edge vignette that communicates danger without covering the road.</summary>
     private void DrawLowFuelWarning(float width, float height)
     {
         if (!FuelLow || game.State != OutlawGameState.Running) return;
@@ -515,7 +506,6 @@ public sealed class OutlawHUD : MonoBehaviour
         GUI.Label(new Rect(304f, 42f, 180f, 30f), "LOW FUEL", warning);
     }
 
-    /// <summary>Top-left fuel gauge and one backpack slot.</summary>
     private void DrawAmmoSquares()
     {
         if (game.Shooting == null || game.Fuel == null) return;
@@ -523,7 +513,6 @@ public sealed class OutlawHUD : MonoBehaviour
 
         GUIStyle label = new GUIStyle(leftStyle) { fontSize = 17, fontStyle = FontStyle.Bold };
 
-        // Fuel.
         GUI.Label(new Rect(x, 18f, columnWidth, 24f), "FUEL", label);
         Rect bar = new Rect(x, 44f, columnWidth, 26f);
         DrawRect(bar, new Color(0f, 0f, 0f, 0.45f));
@@ -537,7 +526,7 @@ public sealed class OutlawHUD : MonoBehaviour
         if (activationFlash > 0f)
             border = Color.Lerp(border, Color.white, activationFlash / .35f);
         else if (emptyFlash > 0f)
-            border = Color.Lerp(border, new Color(.65f,.65f,.65f), emptyFlash / .3f);
+            border = Color.Lerp(border, new Color(.65f, .65f, .65f), emptyFlash / .3f);
         DrawBorder(slot, activationFlash > 0f ? 4f : 2f, border);
         var shownItem = activationFlash > 0f ? flashedItem : pack.Item;
         BackpackIcon.Draw(new Rect(x + 12f, 112f, 64f, 64f), shownItem);
@@ -557,7 +546,7 @@ public sealed class OutlawHUD : MonoBehaviour
         if (rearView == null || rearView.Texture == null) return;
         Rect view = new Rect((width - MirrorWidth) * .5f, 8f, MirrorWidth, MirrorHeight);
         float gap = game.PursuitGap;
-        // The border turns red as the police get closer (no blinking).
+
         float danger = Mathf.InverseLerp(30f, 8f, gap);
         Color border = Color.Lerp(new Color(0.85f, 0.9f, 1f), PoliceRed, danger);
         const float thickness = 5f;
@@ -568,7 +557,6 @@ public sealed class OutlawHUD : MonoBehaviour
             DrawHighlight(new Rect(view.x - 8f, Mathf.Max(0f, view.y - 8f), view.width + 16f, view.height + 16f));
     }
 
-    /// <summary>All power-up state lives in one small stack of tiles under the rear view.</summary>
     private void DrawOceanStatus(float width)
     {
         if (ocean == null || game.IsTutorial) return;
@@ -595,6 +583,7 @@ public sealed class OutlawHUD : MonoBehaviour
             GUI.Label(new Rect(width - 250f, 42f, 226f, 42f), game.DistanceTravelled.ToString("N0") + " m", value);
     }
 
+    // Build the icon list from currently active effects.
     private void RefreshActiveIcons()
     {
         activeIcons.Clear();
@@ -633,6 +622,7 @@ public sealed class OutlawHUD : MonoBehaviour
         }
     }
 
+    // Read the current lesson state without advancing the tutorial here.
     private void DrawTutorial(float width, float height)
     {
         TutorialDirector tutorial = game.Tutorial;
@@ -643,7 +633,6 @@ public sealed class OutlawHUD : MonoBehaviour
         bool reverse = tutorial.Step == TutorialStep.Reverse && tutorial.Title == "TRY BOTH DIRECTIONS";
         bool showKeys = steering || shooting || reverse;
 
-        // One box with one instruction; "TRY AGAIN!" briefly takes its place after a miss.
         float panelHeight = shooting ? 220f : showKeys ? 160f : 80f;
         Rect panel = new Rect((width - 520f) * 0.5f, height - panelHeight - 60f, 520f, panelHeight);
         DrawPanel(panel);
@@ -680,8 +669,6 @@ public sealed class OutlawHUD : MonoBehaviour
         GUI.Label(new Rect(0f, height - 42f, width, 30f), "TUTORIAL   (Esc: pause)", smallStyle);
     }
 
-    // ---------- Pause and results ----------
-
     private void DrawPauseMenu(float width, float height)
     {
         DrawRect(new Rect(0f, 0f, width, height), new Color(0f, 0f, 0f, 0.45f));
@@ -700,7 +687,6 @@ public sealed class OutlawHUD : MonoBehaviour
         GUI.Label(new Rect(panel.x, panel.y + panelHeight - 52f, panel.width, 28f), "Esc / P: resume", smallStyle);
     }
 
-    /// <summary>Game-over card: what ended the run, the distance, best, this run's missions, restart.</summary>
     private void DrawResult(float width, float height)
     {
         int missionRows = Mathf.Max(1, RunTracker.ActiveMissions.Count);
@@ -725,11 +711,6 @@ public sealed class OutlawHUD : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// "MISSIONS n/10" and a list of missions in order (lowest number on top).
-    /// Title: fresh missions. During/after a run: the current unlocked missions,
-    /// ticked when completed, otherwise with live progress.
-    /// </summary>
     private float DrawMissionList(Rect area, bool forRun)
     {
         const float rowHeight = MissionRowHeight;
@@ -778,7 +759,6 @@ public sealed class OutlawHUD : MonoBehaviour
         return y;
     }
 
-    /// <summary>Draws a label, shrinking the font until the text fits its rect.</summary>
     private static void FitLabel(Rect rect, string text, GUIStyle style, int minimumSize)
     {
         var fitted = new GUIStyle(style);
@@ -786,8 +766,6 @@ public sealed class OutlawHUD : MonoBehaviour
             fitted.fontSize--;
         GUI.Label(rect, text, fitted);
     }
-
-    // ---------- Drawing helpers ----------
 
     private bool DrawSwitch(Rect rect, bool on)
     {

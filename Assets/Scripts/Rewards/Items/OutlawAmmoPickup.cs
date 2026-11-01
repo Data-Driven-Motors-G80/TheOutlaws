@@ -1,3 +1,4 @@
+// Builds and collects world-space ammo rewards.
 using UnityEngine;
 
 public sealed class OutlawAmmoPickup : MonoBehaviour
@@ -57,6 +58,7 @@ public sealed class OutlawAmmoPickup : MonoBehaviour
         PickupPlacement.EnsureClear(transform);
     }
 
+    // Award ammo once and report collection through gameplay events.
     private void OnTriggerEnter(Collider other)
     {
         if (collected || shooting == null || other.GetComponentInParent<OutlawShooting>() != shooting) return;
@@ -67,7 +69,6 @@ public sealed class OutlawAmmoPickup : MonoBehaviour
             return;
         }
 
-        // Destroy is deferred; multiple car colliders can enter this frame.
         collected = true;
         GameEvents.RaisePickupCollected(PickupKind.Ammo);
         GetComponent<Collider>().enabled = false;

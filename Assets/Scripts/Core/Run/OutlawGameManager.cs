@@ -1,7 +1,10 @@
+// Coordinates the run lifecycle, difficulty and encounter scheduling.
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
+
+public enum RunEncounterKind { Mystery, Ramp, Roadblock, Fog, Desert, Portal }
 
 [DefaultExecutionOrder(-200)]
 public sealed class OutlawGameManager : MonoBehaviour
@@ -40,8 +43,131 @@ public sealed class OutlawGameManager : MonoBehaviour
     private bool tutorialToggled;
     private string endReason;
 
+    private Object encounterOwner;
+    private RunEncounterKind encounterKind;
+    private float encounterStart, encounterEnd, nextMajorAt;
+    private float lastJumpOfferDistance = -200f;
+    public float LastJumpOfferDistance => lastJumpOfferDistance;
+    public bool JumpRampOverdue => UsesCoordinatedPacing && DistanceTravelled - lastJumpOfferDistance >= 300f;
+    public void RecordJumpRampOffer(float roadDistance)
+    {
+        lastJumpOfferDistance = DistanceTravelled + Mathf.Max(0f, roadDistance - driver.RoadPositionDistance);
+    }
+    private readonly Dictionary<Object, Vector2> encounterRequests = new Dictionary<Object, Vector2>();
+    public bool UsesCoordinatedPacing => environment != null && !environment.IsOcean;
+    public bool IsReliefPhase => UsesCoordinatedPacing && RunDifficultyState.Evaluate(elapsed).Relief > 0.85f;
+    public float ActualDrivingSpeed => Mathf.Max(1f, driver.ForwardSpeed * driver.EnvironmentSpeedMultiplier
+        * pickupEffects.RunState.ForwardSpeedMultiplier);
+
+    public bool IsSharpRoadSection(float distance, float length = 40f)
+    {
+        if (!road.TrySample(distance, out RoadPathPoint first)) return true;
+        Vector3 initial = Vector3.ProjectOnPlane(first.Forward, Vector3.up);
+        Vector3 previous = initial;
+        for (float offset = 5f; offset <= length; offset += 5f)
+        {
+            if (!road.TrySample(distance + offset, out RoadPathPoint point)) return true;
+            Vector3 heading = Vector3.ProjectOnPlane(point.Forward, Vector3.up);
+            if (Vector3.Angle(initial, heading) > 18f || Vector3.Angle(previous, heading) > 4f) return true;
+            previous = heading;
+        }
+        return false;
+    }
+
+    private void RefreshEncounter()
+    {
+        if (encounterOwner is DesertCrossingController desert && desert.CrossingActive) return;
+        if (encounterOwner != null && driver.RoadPositionDistance <= encounterEnd) return;
+        if (encounterOwner != null)
+            nextMajorAt = elapsed + (encounterKind == RunEncounterKind.Mystery ? 0f : 0.5f);
+        encounterOwner = null;
+    }
+
+    // Resolve encounter priority before a spawner commits its placement.
+    public bool CanScheduleEncounter(Object owner, RunEncounterKind kind, float from, float to)
+    {
+        if (!UsesCoordinatedPacing) return true;
+        if (State != OutlawGameState.Running || IsTutorial || pickupEffects.RunState.IsRoadRecovering) return false;
+        RefreshEncounter();
+        bool portalDue = RunSession.NextPortalAt >= 0f && RunSession.NextPortalAt <= elapsed + 3f;
+        if (portalDue && kind != RunEncounterKind.Portal) return false;
+        bool overlap = encounterOwner != null && from <= encounterEnd && to >= encounterStart;
+
+        if (kind == RunEncounterKind.Fog)
+            return !driver.IsAirborne && !(overlap && encounterKind == RunEncounterKind.Ramp);
+        if (JumpRampOverdue && kind != RunEncounterKind.Ramp && kind != RunEncounterKind.Portal) return false;
+        if (kind == RunEncounterKind.Mystery)
+            return !(overlap && encounterKind != RunEncounterKind.Fog);
+        if (kind != RunEncounterKind.Portal && kind != RunEncounterKind.Mystery)
+        {
+            float fuelFloor = kind == RunEncounterKind.Ramp && JumpRampOverdue ? 8f : 10f;
+            if (fuel.CurrentFuel < fuelFloor || (driver.IsAirborne && kind != RunEncounterKind.Roadblock)) return false;
+            if (fuelTanks.ConflictsWithFuelRoute(from, to)) return false;
+        }
+        if (kind != RunEncounterKind.Portal && IsSharpRoadSection(from)) return false;
+        Vector2 request = encounterRequests.TryGetValue(owner, out Vector2 prior)
+            && elapsed - prior.y < 2f ? new Vector2(prior.x, elapsed) : new Vector2(elapsed, elapsed);
+        encounterRequests[owner] = request;
+        if (encounterOwner == owner) return true;
+        if (encounterOwner != null || elapsed < nextMajorAt) return false;
+
+        if (!portalDue && !(kind == RunEncounterKind.Ramp && JumpRampOverdue))
+            foreach (var pair in encounterRequests)
+                if (pair.Key != owner && pair.Key != null && elapsed - pair.Value.y < 1f
+                    && elapsed - pair.Value.x >= 8f && pair.Value.x < request.x) return false;
+        return true;
+    }
+
+    public void BeginEncounter(Object owner, RunEncounterKind kind, float from, float to)
+    {
+        if (!UsesCoordinatedPacing || kind == RunEncounterKind.Fog || kind == RunEncounterKind.Mystery) return;
+        encounterOwner = owner;
+        encounterKind = kind;
+        encounterStart = from;
+        encounterEnd = to;
+        encounterRequests.Remove(owner);
+    }
+
+    public void EndEncounter(Object owner)
+    {
+        if (encounterOwner != owner) return;
+        nextMajorAt = elapsed + (encounterKind == RunEncounterKind.Mystery ? 0f : 0.5f);
+        encounterOwner = null;
+    }
+
+    // Allow normal obstacle pressure through ramp flights.
+    public bool CanPlaceNormalObstacle(float distance)
+    {
+        if (!UsesCoordinatedPacing) return true;
+        RefreshEncounter();
+        return encounterOwner == null || encounterKind == RunEncounterKind.Mystery || encounterKind == RunEncounterKind.Fog || encounterKind == RunEncounterKind.Ramp
+            || distance < encounterStart - ActualDrivingSpeed || distance > encounterEnd;
+    }
+
+    public float RoadPressureMultiplier(float distance)
+    {
+        if (!UsesCoordinatedPacing) return 1f;
+        RefreshEncounter();
+
+        return 1f;
+    }
+
+    public bool ConflictsWithFuel(float from, float to) => fuelTanks.ConflictsWithFuelRoute(from, to);
+
+    public bool IsFuelRouteClear(float distance)
+    {
+        if (!UsesCoordinatedPacing) return true;
+        RefreshEncounter();
+        if (encounterOwner is DesertCrossingController desert)
+            return desert.IsFuelPositionSafe(distance);
+        if (encounterOwner != null && encounterKind == RunEncounterKind.Ramp)
+            return distance < encounterStart - ActualDrivingSpeed || distance > encounterStart + 20f;
+        return encounterOwner == null || encounterKind == RunEncounterKind.Mystery
+            || distance < encounterStart - ActualDrivingSpeed || distance > encounterEnd + ActualDrivingSpeed;
+    }
+
     public OutlawGameState State { get; private set; } = OutlawGameState.Ready;
-    /// <summary>Real-run distance: excludes the tutorial and carries across environment scenes.</summary>
+
     public float DistanceTravelled => carriedDistance + (driver != null ? driver.RoadDistanceTravelled - distanceOrigin : 0f);
     public float ElapsedSeconds => elapsed;
     public bool StartedAfterTutorial { get; private set; }
@@ -58,7 +184,7 @@ public sealed class OutlawGameManager : MonoBehaviour
     public Transform Player => driver != null ? driver.transform : null;
     public float PursuitGap => pickupEffects != null ? pickupEffects.RunState.PursuitGap : 0f;
     public string EndReason => endReason;
-    /// <summary>Seconds left on the "GO!" banner shown when the real run begins.</summary>
+
     public float RunStartBannerRemaining { get; private set; }
     public bool TutorialSelected { get; private set; }
     public bool IsNewBest { get; private set; }
@@ -94,6 +220,16 @@ public sealed class OutlawGameManager : MonoBehaviour
             return;
         }
 
+        road.ConfigureBalancedLayout(!environment.IsOcean);
+        obstacles.Pacing = this;
+        fuelTanks.ConfigurePacing(this);
+        mysterySpawner.ConfigurePacing(this);
+        pickupEffects.EnableGunGuarantee = !environment.IsOcean;
+
+        NitroRampSpawner ramps = GetComponent<NitroRampSpawner>();
+        if (ramps == null) ramps = gameObject.AddComponent<NitroRampSpawner>();
+        ramps.Configure(this, driver, road, obstacles);
+
         pickupEffects.ConfigureRewards(environment.Rewards);
         shooting.Configure(pickupEffects, obstacles);
         ammoSpawner.Configure(road, player.transform, shooting, pickupEffects);
@@ -119,7 +255,6 @@ public sealed class OutlawGameManager : MonoBehaviour
         previousPursuitGap = pickupEffects.RunState.PursuitGap;
         titleShownAt = Time.realtimeSinceStartup;
 
-        // A fresh run (not a continuation from another environment) restarts the switch schedule.
         if (!RunSession.HasPending) RunSession.ResetSwitchSchedule();
 
         Time.timeScale = 0f;
@@ -133,7 +268,7 @@ public sealed class OutlawGameManager : MonoBehaviour
 
     private void Start()
     {
-        // Continuing a run that was carried over from the previous environment scene.
+
         if (!RunSession.TryGetPending(out RunSnapshot carried))
         {
             WeeWooAnalytics.Track("title_shown", "tutorial_default", TutorialSelected,
@@ -145,13 +280,14 @@ public sealed class OutlawGameManager : MonoBehaviour
         speedScheduleSeed = carried.SpeedScheduleSeed;
         carriedDistance = carried.Distance;
         pickupEffects.Backpack.Restore(carried.BackpackItem, carried.Ammo);
+        pickupEffects.RestoreLootPacing(carried.EmptyGunBoxStreak);
+        lastJumpOfferDistance = carried.LastJumpOfferDistance;
         mysterySpawner.RestoreSchedule(carried.NextMysteryRowAt);
         pickupEffects.RestoreTransientEffects(carried.SunnyRemaining, carried.ReverseCountdown, carried.PendingReverse);
         pickupEffects.RestoreRun(carried.Risk, carried.StateFuel);
         previousPursuitGap = pickupEffects.RunState.PursuitGap;
         obstacles.BeginRealRun();
 
-        // No "press Enter" screen and no tutorial: the run is already underway.
         UpdateDifficulty();
         State = OutlawGameState.Running;
         Time.timeScale = 1f;
@@ -159,7 +295,7 @@ public sealed class OutlawGameManager : MonoBehaviour
         WeeWooAnalytics.Track("env_switch", "to", SceneManager.GetActiveScene().name);
     }
 
-    /// <summary>Everything the next environment scene needs to continue this run.</summary>
+    // Capture gameplay and spawn pacing together for environment transfers.
     public RunSnapshot CaptureRun()
     {
         ScoreMeter score = environment.Score;
@@ -178,6 +314,8 @@ public sealed class OutlawGameManager : MonoBehaviour
             SpeedIncreaseAmount = driver.SpeedIncreaseAmount,
             SpeedIncreaseInterval = driver.SpeedIncreaseInterval,
             Ammo = shooting.CurrentAmmo,
+            EmptyGunBoxStreak = pickupEffects.EmptyGunBoxStreak,
+            LastJumpOfferDistance = lastJumpOfferDistance,
             BackpackItem = pickupEffects.Backpack.Item,
             NextMysteryRowAt = mysterySpawner.NextRowAt,
             SunnyRemaining = pickupEffects.SunnyDayRemaining,
@@ -243,7 +381,7 @@ public sealed class OutlawGameManager : MonoBehaviour
 
         if (IsTutorial)
         {
-            // The tutorial never ends the run: the police hold position and fuel cannot empty.
+
             driver.SetTutorialSpeed(TutorialSpeed);
             pursuit.SetClosingSpeed(0f);
             return;
@@ -284,28 +422,34 @@ public sealed class OutlawGameManager : MonoBehaviour
             Desert = environment.IsDesert,
             RawSteer = raw,
             Reversed = pickupEffects.ActiveEffect == PickupEffectType.ReverseSteering,
-            Nitro = pickupEffects.RunState.HasNitro,
+            Nitro = pickupEffects.RunState.HasNitro || pickupEffects.RunState.HasRampBoost,
             ShieldReady = pickupEffects.ShieldReady,
             Ammo = shooting.CurrentAmmo,
             MaximumAmmo = shooting.MaximumAmmo
         };
     }
 
+    // Apply the current environment profile to the shared run systems.
     private void UpdateDifficulty()
     {
-        // Total run time carries across scenes: changing environments never resets pressure.
-        float targetSpeed = RunDifficultyState.DrivingSpeed(elapsed, speedScheduleSeed);
+
+        pickupEffects.ConfigureHarderDifficulty(UsesCoordinatedPacing);
+        fuel.HarderDifficultyActive = UsesCoordinatedPacing;
+        driver.HarderDrivingConditions = UsesCoordinatedPacing;
+        float targetSpeed = RunDifficultyState.DrivingSpeed(elapsed, speedScheduleSeed, UsesCoordinatedPacing);
         if (IsTutorialHandoff)
             driver.SetTutorialSpeed(Mathf.Lerp(TutorialSpeed, targetSpeed,
                 Mathf.SmoothStep(0f, 1f, elapsed / 4f)));
         else
             driver.SetDifficultySpeed(targetSpeed);
+        if (UsesCoordinatedPacing) road.SetDrivingPace(targetSpeed * driver.EnvironmentSpeedMultiplier);
         obstacles.ConfigureDifficulty(
             RunDifficultyState.ObstacleDensity(elapsed),
-            RunDifficultyState.DoubleRowChance(elapsed),
+            UsesCoordinatedPacing ? Mathf.Min(0.95f, Mathf.Max(0.4f, RunDifficultyState.DoubleRowChance(elapsed) + 0.15f))
+                : RunDifficultyState.DoubleRowChance(elapsed),
             elapsed);
-        pursuit.SetClosingSpeed(RunDifficultyState.PoliceClosingSpeed(elapsed));
-        // Pulling away only gets you back to the starting gap: the police keep tailing you.
+        pursuit.SetClosingSpeed(RunDifficultyState.PoliceClosingSpeed(elapsed, UsesCoordinatedPacing));
+
         pickupEffects.RunState.RecoveryCap = RiskRunState.InitialPursuitGap;
     }
 
@@ -362,7 +506,7 @@ public sealed class OutlawGameManager : MonoBehaviour
         tutorial.Begin();
     }
 
-    /// <summary>Starts counting the real run: from the title, or seamlessly after the tutorial.</summary>
+    // Start regular play after optional tutorial setup.
     private void StartRealRun(bool afterTutorial)
     {
         StartedAfterTutorial = afterTutorial;
@@ -424,14 +568,14 @@ public sealed class OutlawGameManager : MonoBehaviour
 #if !UNITY_EDITOR
     private void OnApplicationFocus(bool focused)
     {
-        // Clicking away or switching tabs should never cost a run.
+
         if (!focused) Pause("focus_lost");
     }
 #endif
 
     public void Restart()
     {
-        // Abandoning from the pause menu is a meaningful signal (frustration, wants a retry).
+
         if (RunTracker.Active) RecordRunEnd(State == OutlawGameState.Paused ? "restart_from_pause" : "restart");
         else if (IsTutorial)
         {
@@ -444,7 +588,7 @@ public sealed class OutlawGameManager : MonoBehaviour
         Time.timeScale = 1f;
         RunSession.ClearPending();
         RunSession.ResetSwitchSchedule();
-        // Every new run starts in the city, whatever environment the last one ended in.
+
         string firstScene = SceneUtility.GetScenePathByBuildIndex(0);
         if (string.IsNullOrEmpty(firstScene)) firstScene = SceneManager.GetActiveScene().path;
 #if UNITY_EDITOR

@@ -1,7 +1,7 @@
+// Moves oncoming obstacles along the road toward the player.
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>Moves obstacle rows towards the driver along the road, in any environment.</summary>
 [DefaultExecutionOrder(-100)]
 [DisallowMultipleComponent]
 public sealed class ApproachingObstacleMotion : ObstacleMotion
@@ -63,6 +63,7 @@ public sealed class ApproachingObstacleMotion : ObstacleMotion
             Speed = rowSpeed, Lateral = lateral, HalfHeight = halfHeight });
     }
 
+    // Advance obstacle motion after regular player updates.
     private void LateUpdate()
     {
         float deltaTime = Time.deltaTime;

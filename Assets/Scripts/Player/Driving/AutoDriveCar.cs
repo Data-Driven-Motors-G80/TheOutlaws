@@ -1,3 +1,4 @@
+// Follows the road while simulating steering, drifting, jumps and landings.
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -71,8 +72,20 @@ public sealed class AutoDriveCar : MonoBehaviour
     [SerializeField, Min(1f)] private float fallGravityMultiplier = 1.4f;
     [Tooltip("Upward speed cap at take-off, in m/s. 0 = no cap.")]
     [SerializeField, Min(0f)] private float maxLaunchSpeed = 4f;
-    [Tooltip("Steering strength while airborne (0 = none, 1 = full).")]
-    [SerializeField, Range(0f, 1f)] private float airSteeringControl = 0.15f;
+    [Tooltip("Maximum sideways flight speed, in road lanes per second.")]
+    [SerializeField, Min(0.1f)] private float airLaneSpeed = 1.2f;
+    [Tooltip("Extra air maneuverability, including countersteering to return from beyond the road edge.")]
+    [SerializeField, Range(1f, 3f)] private float airManeuverability = 1.65f;
+    [Tooltip("Sideways acceleration in road lanes per second squared. Independent of saved ground/air grip settings.")]
+    [SerializeField, Min(0.1f)] private float airLaneAcceleration = 2.5f;
+    [Tooltip("Sideways braking when steering is released, in road lanes per second squared.")]
+    [SerializeField, Min(0.1f)] private float airLaneBraking = 3f;
+    [Tooltip("Maximum airborne heading angle relative to the road.")]
+    [SerializeField, Range(5f, 60f)] private float maximumAirYaw = 35f;
+    [SerializeField, Min(1f)] private float airYawRate = 65f;
+    [SerializeField, Min(1f)] private float airYawAcceleration = 180f;
+    [Tooltip("Seconds for tire grip to recover after touchdown.")]
+    [SerializeField, Min(0.05f)] private float landingGripSeconds = 0.65f;
 
     [Header("Body")]
     [SerializeField, Range(0f, 10f)] private float maxBodyPitch = 4f;
@@ -91,6 +104,19 @@ public sealed class AutoDriveCar : MonoBehaviour
     private const float PitchPerAcceleration = 0.35f;
     private const float LandingCompression = 0.02f;
 
+    public NitroRampSpawner Ramps { get; set; }
+
+    // Preserve steering momentum when switching into airborne control.
+    public void LaunchFromRamp(float height, float upwardSpeed, float groundY)
+    {
+        if (!IsAirborne) BeginAirControl();
+        IsAirborne = true;
+        airHeight = Mathf.Max(0.02f, height);
+        verticalVelocity = upwardSpeed;
+        previousGroundY = groundY;
+        hasGroundSample = true;
+    }
+
     private InputAction steerAction;
     private CarPickupEffects pickupEffects;
     private Vector3 visualBasePosition;
@@ -102,6 +128,10 @@ public sealed class AutoDriveCar : MonoBehaviour
     private float driftSpeed;
     private float airHeight;
     private float verticalVelocity;
+    private float airYaw, airAngularVelocity;
+    private float landingGripRemaining;
+    private bool recoveredThisFrame;
+    private bool missedRoadSurface;
     private float previousGroundY;
     private float previousGroundVelocity;
     private float previousLateralSpeed;
@@ -128,12 +158,15 @@ public sealed class AutoDriveCar : MonoBehaviour
 
     public Transform FiringFrame => visual != null ? visual : transform;
     public bool IsOnIce => icyRoad;
+    public bool HarderDrivingConditions { get; set; }
     public bool IsDriveReady { get; private set; }
     public bool IsAirborne { get; private set; }
     public bool IsDrifting => wasDrifting;
     public bool DriftCharged => driftCharge >= turboChargeTime;
     public float SteerInput { get; private set; }
     public float AirHeight => airHeight;
+    public float Gravity => gravity;
+    public float FallGravityMultiplier => fallGravityMultiplier;
     public float LateralG { get; private set; }
     public float Skid { get; private set; }
     public float DriftBoost { get; private set; }
@@ -241,6 +274,8 @@ public sealed class AutoDriveCar : MonoBehaviour
         airHeight = 0f;
         verticalVelocity = 0f;
         IsAirborne = false;
+        airYaw = airAngularVelocity = landingGripRemaining = 0f;
+        missedRoadSurface = false;
         hasGroundSample = false;
         steerWheel = 0f;
         hop = hopVelocity = 0f;
@@ -278,6 +313,7 @@ public sealed class AutoDriveCar : MonoBehaviour
             captured = pickupEffects.RunState.IsGameOver;
             if (captured && forwardDistance <= 0f) return;
 
+            if (pickupEffects.RunState.IsRoadRecovering) return;
             steerInput *= pickupEffects.SteeringMultiplier;
             accelerationMultiplier = pickupEffects.LateralAccelerationMultiplier;
         }
@@ -290,15 +326,26 @@ public sealed class AutoDriveCar : MonoBehaviour
         {
             bool releasedSteering = Mathf.Abs(steerInput) < 0.01f;
             bool countersteering = steerInput * lateralSpeed < 0f;
-            surfaceGrip *= releasedSteering ? iceReleaseGrip : countersteering ? 1f : iceSteeringGrip;
+            float releaseGrip = iceReleaseGrip * (HarderDrivingConditions ? 0.85f : 1f);
+            float steeringGrip = iceSteeringGrip * (HarderDrivingConditions ? 0.9f : 1f);
+            surfaceGrip *= releasedSteering ? releaseGrip : countersteering ? 1f : steeringGrip;
         }
-        if (IsAirborne) surfaceGrip *= airSteeringControl;
         surfaceGrip *= 1f - Skid * skidSteeringLoss;
 
-        lateralSpeed = Mathf.MoveTowards(
-            lateralSpeed,
-            steerInput * currentMaxLateralSpeed,
-            currentLateralAcceleration * accelerationMultiplier * surfaceGrip * deltaTime);
+        if (IsAirborne)
+        {
+            UpdateAirControl(steerInput, forwardDistance, deltaTime);
+        }
+        else
+        {
+            float landingGrip = landingGripRemaining > 0f
+                ? Mathf.Lerp(0.2f, 1f, 1f - landingGripRemaining / landingGripSeconds) : 1f;
+            landingGripRemaining = Mathf.Max(0f, landingGripRemaining - deltaTime);
+            lateralSpeed = Mathf.MoveTowards(
+                lateralSpeed,
+                steerInput * currentMaxLateralSpeed,
+                currentLateralAcceleration * accelerationMultiplier * surfaceGrip * landingGrip * deltaTime);
+        }
 
         if (captured) lateralSpeed = 0f;
 
@@ -319,16 +366,25 @@ public sealed class AutoDriveCar : MonoBehaviour
         }
         else driftSpeed = 0f;
 
-        float desiredOffset = lateralOffset
-            + (lateralSpeed + driftSpeed + holdSide * Skid * skidSlide) * deltaTime;
-        lateralOffset = Mathf.Clamp(desiredOffset, -limit, limit);
+        float sidewaysSpeed = IsAirborne ? lateralSpeed
+            : lateralSpeed + driftSpeed + holdSide * Skid * skidSlide;
+        float desiredOffset = lateralOffset + sidewaysSpeed * deltaTime;
 
-        if (!Mathf.Approximately(desiredOffset, lateralOffset) && lateralSpeed * Mathf.Sign(desiredOffset) > 0f)
+        lateralOffset = IsAirborne ? desiredOffset : Mathf.Clamp(desiredOffset, -limit, limit);
+
+        if (!IsAirborne && !Mathf.Approximately(desiredOffset, lateralOffset) && lateralSpeed * Mathf.Sign(desiredOffset) > 0f)
             lateralSpeed = 0f;
 
         Vector3 groundPosition = next.Position + next.Right * lateralOffset + next.Up * heightOffset;
 
+        if (Ramps != null)
+            Ramps.FollowSurface(RoadPositionDistance, nextDistance, lateralOffset,
+                ref next, ref groundPosition, forwardDistance / Mathf.Max(deltaTime, 0.0001f));
+
+        recoveredThisFrame = false;
         Vector3 airDirection = UpdateVertical(next, groundPosition.y, forwardDistance, deltaTime);
+        if (recoveredThisFrame)
+            groundPosition = next.Position + next.Right * lateralOffset + next.Up * heightOffset;
         UpdateBody(centrifugalAccel, forwardDistance, deltaTime);
 
         transform.position = groundPosition + Vector3.up * airHeight;
@@ -377,6 +433,57 @@ public sealed class AutoDriveCar : MonoBehaviour
         DriftBoosted?.Invoke(turboDuration);
     }
 
+    private void BeginAirControl()
+    {
+
+        lateralSpeed += driftSpeed + holdSide * Skid * skidSlide;
+        driftSpeed = 0f;
+        Skid = 0f;
+        driftCharge = 0f;
+        wasDrifting = false;
+        landingGripRemaining = 0f;
+        missedRoadSurface = false;
+        if (road.TrySample(RoadPositionDistance, out RoadPathPoint point))
+            airYaw = Mathf.Clamp(Vector3.SignedAngle(
+                Vector3.ProjectOnPlane(point.Forward, Vector3.up),
+                Vector3.ProjectOnPlane(FiringFrame.forward, Vector3.up), Vector3.up),
+                -AirYawLimit, AirYawLimit);
+        else airYaw = yawAngle;
+        airAngularVelocity = 0f;
+    }
+
+    private float AirYawLimit => Mathf.Min(70f, maximumAirYaw * airManeuverability);
+
+    // Integrate sideways motion and yaw independently of ground grip.
+    private void UpdateAirControl(float input, float forwardDistance, float deltaTime)
+    {
+        if (deltaTime <= 0f) return;
+        float speed = forwardDistance / deltaTime;
+        float laneWidth = road.TrySample(RoadPositionDistance, out RoadPathPoint airPoint)
+            ? airPoint.Width / 3f : 10f / 3f;
+
+        float roadTurn = SampleYawRate(RoadPositionDistance) * forwardDistance;
+        lateralSpeed = lateralSpeed * Mathf.Cos(roadTurn) - speed * Mathf.Sin(roadTurn);
+        airYaw = Mathf.DeltaAngle(0f, airYaw - roadTurn * Mathf.Rad2Deg);
+        float remaining = deltaTime;
+        while (remaining > 0f)
+        {
+            float step = Mathf.Min(remaining, 1f / 120f);
+            airAngularVelocity = Mathf.MoveTowards(airAngularVelocity,
+                input * airYawRate * airManeuverability, airYawAcceleration * airManeuverability * step);
+            float wantedYaw = airYaw + airAngularVelocity * step;
+            airYaw = Mathf.Clamp(wantedYaw, -AirYawLimit, AirYawLimit);
+            if (wantedYaw != airYaw && airAngularVelocity * wantedYaw > 0f)
+                airAngularVelocity = 0f;
+
+            float targetSidewaysSpeed = input * laneWidth * airLaneSpeed * airManeuverability;
+            float lateralAcceleration = Mathf.Abs(input) < 0.01f ? airLaneBraking : airLaneAcceleration;
+            lateralSpeed = Mathf.MoveTowards(lateralSpeed, targetSidewaysSpeed,
+                laneWidth * lateralAcceleration * airManeuverability * step);
+            remaining = Mathf.Max(0f, remaining - step);
+        }
+    }
+
     private float SampleYawRate(float distance)
     {
         const float half = 2f;
@@ -388,6 +495,7 @@ public sealed class AutoDriveCar : MonoBehaviour
         return Vector3.SignedAngle(a, b, Vector3.up) * Mathf.Deg2Rad / (2f * half);
     }
 
+    // Integrate flight height, then resolve landing or road-fall recovery.
     private Vector3 UpdateVertical(RoadPathPoint point, float groundY, float forwardDistance, float deltaTime)
     {
         Vector3 flat = new Vector3(point.Forward.x, 0f, point.Forward.z);
@@ -414,6 +522,7 @@ public sealed class AutoDriveCar : MonoBehaviour
             airHeight = 0f;
             if (hasGroundSample && horizontalSpeed > 1f && roadAcceleration < -gravity)
             {
+                BeginAirControl();
                 IsAirborne = true;
                 verticalVelocity = maxLaunchSpeed > 0f ? Mathf.Min(groundVelocity, maxLaunchSpeed) : groundVelocity;
                 bounceVelocity += 0.6f;
@@ -423,14 +532,37 @@ public sealed class AutoDriveCar : MonoBehaviour
 
         if (IsAirborne)
         {
-            float step = Mathf.Min(deltaTime, 0.05f);
-            verticalVelocity -= gravity * (verticalVelocity < 0f ? fallGravityMultiplier : 1f) * step;
-            airHeight = previousGroundY + airHeight + verticalVelocity * step - groundY;
-            if (airHeight <= 0f)
+            float worldHeight = previousGroundY + airHeight;
+            float remaining = deltaTime;
+            while (remaining > 0f)
+            {
+                float step = Mathf.Min(remaining, 1f / 120f);
+                float acceleration = gravity * (verticalVelocity < 0f ? fallGravityMultiplier : 1f);
+                worldHeight += verticalVelocity * step - 0.5f * acceleration * step * step;
+                verticalVelocity -= acceleration * step;
+                remaining = Mathf.Max(0f, remaining - step);
+            }
+            airHeight = worldHeight - groundY;
+            bool overRoad = Mathf.Abs(lateralOffset) <= Mathf.Max(0f, point.Width * 0.5f - edgeMargin);
+
+            if (airHeight > 0f) missedRoadSurface = false;
+            else if (!overRoad) missedRoadSurface = true;
+            if ((!overRoad && airHeight <= -3f) || (overRoad && missedRoadSurface && airHeight < -0.5f)
+                || Mathf.Abs(lateralOffset) > point.Width * 2f)
+            {
+                RecoverOntoRoad(point);
+                previousGroundY = groundY;
+                previousGroundVelocity = 0f;
+                return point.Forward;
+            }
+            if (overRoad && airHeight <= 0f)
             {
                 float impact = Mathf.Max(0f, groundVelocity - verticalVelocity);
                 airHeight = 0f;
                 IsAirborne = false;
+                landingGripRemaining = landingGripSeconds;
+                yawAngle = airYaw;
+                yawVelocity = airAngularVelocity;
                 verticalVelocity = groundVelocity;
                 bounceVelocity -= Mathf.Min(impact * LandingCompression, maxSuspensionTravel)
                     * Mathf.Sqrt(suspensionStiffness) / 0.6f;
@@ -442,6 +574,30 @@ public sealed class AutoDriveCar : MonoBehaviour
         previousGroundVelocity = groundVelocity;
         hasGroundSample = true;
         return flatDirection * horizontalSpeed + Vector3.up * verticalVelocity;
+    }
+
+    // Reset motion at a safe road position after missing the landing.
+    private void RecoverOntoRoad(RoadPathPoint point)
+    {
+        pickupEffects?.RunState.RecoverFromRoadFall();
+        Ramps?.PrepareRoadRecovery(point.Position);
+
+        float laneWidth = point.Width / 3f;
+        lateralOffset = Mathf.Clamp(Mathf.Round(lateralOffset / laneWidth), -1f, 1f) * laneWidth;
+        lateralOffset = Mathf.Clamp(lateralOffset,
+            -Mathf.Max(0f, point.Width * 0.5f - edgeMargin), Mathf.Max(0f, point.Width * 0.5f - edgeMargin));
+        lateralSpeed = driftSpeed = airHeight = verticalVelocity = 0f;
+        airYaw = airAngularVelocity = yawAngle = yawVelocity = 0f;
+        pitch = pitchVelocity = roll = rollVelocity = 0f;
+        hop = hopVelocity = bounce = bounceVelocity = 0f;
+        Skid = 0f;
+        IsAirborne = false;
+        landingGripRemaining = landingGripSeconds;
+        previousLateralSpeed = 0f;
+        hasSpeedSample = false;
+        missedRoadSurface = false;
+        recoveredThisFrame = true;
+        transform.rotation = Quaternion.LookRotation(point.Forward, point.Up);
     }
 
     private void UpdateBody(float centrifugalAccel, float forwardDistance, float deltaTime)
@@ -477,8 +633,9 @@ public sealed class AutoDriveCar : MonoBehaviour
 
         float travelAngle = Mathf.Atan2(lateralSpeed, Mathf.Max(horizontalSpeed, 5f)) * Mathf.Rad2Deg;
         float slipLead = SteerInput * SteerSlipAngle * (1f - Skid * skidSteeringLoss);
-        float yawTarget = Mathf.Clamp(travelAngle + slipLead, -maxSteerAngle, maxSteerAngle)
-            + holdSide * Skid * driftBodyAngle;
+        float yawTarget = IsAirborne ? airYaw
+            : Mathf.Clamp(travelAngle + slipLead, -maxSteerAngle, maxSteerAngle)
+                + holdSide * Skid * driftBodyAngle;
 
         hopVelocity -= 22f * step;
         hop += hopVelocity * step;
@@ -489,8 +646,16 @@ public sealed class AutoDriveCar : MonoBehaviour
             hopVelocity = 0f;
         }
 
-        yawVelocity += (YawStiffness * (yawTarget - yawAngle) - YawDamping * yawVelocity) * step;
-        yawAngle += yawVelocity * step;
+        if (IsAirborne)
+        {
+            yawAngle = airYaw;
+            yawVelocity = airAngularVelocity;
+        }
+        else
+        {
+            yawVelocity += (YawStiffness * (yawTarget - yawAngle) - YawDamping * yawVelocity) * step;
+            yawAngle += yawVelocity * step;
+        }
     }
 
     private float SmoothSteering(float raw, float deltaTime)

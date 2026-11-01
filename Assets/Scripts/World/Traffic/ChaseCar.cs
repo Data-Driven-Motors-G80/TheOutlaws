@@ -1,3 +1,4 @@
+// Positions pursuing police behind the player and handles shot reactions.
 using UnityEngine;
 
 [DisallowMultipleComponent]
@@ -87,7 +88,6 @@ public sealed class ChaseCar : MonoBehaviour
             return;
         }
 
-        // Scene placement must not override the configured visible pursuit range.
         startingBumperGap = Mathf.Max(minimumVisualGap, maximumVisualGap);
         displayedBumperGap = GetTargetBumperGap();
         DistanceToPlayer = displayedBumperGap;
@@ -127,8 +127,6 @@ public sealed class ChaseCar : MonoBehaviour
             playerPoint.Forward
         );
 
-        // A collision changes the gameplay gap immediately, but the police
-        // should visibly close that distance instead of teleporting forward.
         displayedBumperGap = Mathf.MoveTowards(
             displayedBumperGap,
             GetTargetBumperGap(),
@@ -178,9 +176,6 @@ public sealed class ChaseCar : MonoBehaviour
 
         transform.position = targetPosition;
 
-        // Turn into sideways movement like the player. Use road-relative lateral
-        // motion, not world displacement: a growing pursuit gap can move the police
-        // backwards temporarily, but must never make them face backwards.
         float lateralVelocity = Time.deltaTime > 0f
             ? (desiredLateralOffset - previousLateralOffset) / Time.deltaTime : 0f;
         previousLateralOffset = desiredLateralOffset;
@@ -207,8 +202,7 @@ public sealed class ChaseCar : MonoBehaviour
 
     private void UpdateVisibility()
     {
-        // The HUD's rear-view camera always shows the police, so they are never hidden
-        // (when no rear view exists, the original hide-while-far behaviour applies).
+
         bool alwaysVisible = RearViewActive;
         float normalizedGap = effects != null && effects.isActiveAndEnabled
             ? effects.RunState.PursuitGap / RiskRunState.MaximumPursuitGap
@@ -218,7 +212,6 @@ public sealed class ChaseCar : MonoBehaviour
                 policeRenderer.forceRenderingOff = !alwaysVisible && normalizedGap > visibleBelowMeterValue;
     }
 
-    /// <summary>Set by the rear-view camera while it exists.</summary>
     public static bool RearViewActive { get; set; }
 
     private void OnDisable()
@@ -228,17 +221,14 @@ public sealed class ChaseCar : MonoBehaviour
             if (policeRenderer != null) policeRenderer.forceRenderingOff = false;
     }
 
+    // Convert pursuit state into a visible gap behind the player.
     private float GetTargetBumperGap()
     {
-        // Include the buffer above the initial gap: rear shots must visibly
-        // increase separation even while the HUD's normalized bar is full.
+
         float pursuitRatio = effects != null
             ? effects.RunState.PursuitGap / RiskRunState.InitialPursuitGap
             : meter.Value;
 
-        // Start the tutorial at the normal visual spacing after two basic hits.
-        // Preserve the normal visual response to jammer, crashes and nitro;
-        // this offset never changes the gameplay pursuit gap.
         if (game != null && game.IsTutorial)
         {
             float twoHitRatio = 1f - 2f * TrafficObstacleRules.GreenProximityDrain;
@@ -250,8 +240,6 @@ public sealed class ChaseCar : MonoBehaviour
             startingBumperGap,
             pursuitRatio));
 
-        // Visual opening only: never change the gameplay pursuit gap. Active run
-        // time survives environment changes and stops while paused.
         if (game == null || game.IsTutorial || game.StartedAfterTutorial) return normalGap;
         float openingBlend = Mathf.SmoothStep(0f, 1f,
             Mathf.InverseLerp(3f, 10f, game.ElapsedSeconds));
@@ -289,6 +277,7 @@ public sealed class ChaseCar : MonoBehaviour
             )) * halfSize.z;
     }
 
+    // Prevent police colliders from pushing one another out of formation.
     private void IgnoreOtherChaseCars()
     {
         Collider[] ownColliders =

@@ -1,3 +1,4 @@
+// Connects pickups, the backpack and temporary effects to the player.
 using UnityEngine;
 
 [DisallowMultipleComponent]
@@ -23,9 +24,10 @@ public sealed class CarPickupEffects : MonoBehaviour
             GameEvents.RaiseBackpackReplaced(old, item, lost);
         };
     }
+    // Activate the stored item before consuming it.
     public bool UseBackpack()
     {
-        if (!simulationActive || runState.IsGameOver || BackpackChangedFrame == Time.frameCount) return false;
+        if (!simulationActive || runState.IsGameOver || runState.IsRoadRecovering || BackpackChangedFrame == Time.frameCount) return false;
         var item = Backpack.Item;
         if (item == RandomPickupOutcome.None) { EmptyBackpackUsed?.Invoke(); return false; }
         if (item != RandomPickupOutcome.Gun && !ActivateOutcome(item)) return false;
@@ -40,12 +42,21 @@ public sealed class CarPickupEffects : MonoBehaviour
         {
             case RandomPickupOutcome.Shield: return runState.TryGrantShield();
             case RandomPickupOutcome.Nitro: return runState.TryActivateNitro();
-            case RandomPickupOutcome.ProximityRecovery: return runState.TryRestorePursuitGap(RiskRunState.PickupProximityRecovery);
-            case RandomPickupOutcome.SunnyDay: sunnyDayRemaining = 15f; return true;
-            case RandomPickupOutcome.ReverseSteering: return TryApplyTemporaryEffect(PickupEffectType.ReverseSteering, reverseControlDuration);
+            case RandomPickupOutcome.ProximityRecovery: return runState.TryRestorePursuitGap(HarderDifficultyActive ? 22.5f : RiskRunState.PickupProximityRecovery);
+            case RandomPickupOutcome.SunnyDay: sunnyDayRemaining = HarderDifficultyActive ? 10f : 15f; return true;
+            case RandomPickupOutcome.ReverseSteering: return TryApplyTemporaryEffect(PickupEffectType.ReverseSteering, EffectiveReverseDuration);
             default: return false;
         }
     }
+    public bool HarderDifficultyActive { get; private set; }
+    private float EffectiveReverseDuration => HarderDifficultyActive ? 10f : reverseControlDuration;
+    public void ConfigureHarderDifficulty(bool active)
+    {
+        HarderDifficultyActive = active;
+        randomOutcome.HarderDifficulty = active;
+        runState.RoadFallProximityDrain = active ? 0.28f : RiskRunState.DefaultCrashProximityDrain;
+    }
+
     private float baseForwardSpeed = 15f;
     private float policeSpeed = 14f;
     private bool simulationActive = true;
@@ -57,14 +68,14 @@ public sealed class CarPickupEffects : MonoBehaviour
     public int ReverseActivationCount { get; private set; }
     public int ReverseCompletionCount { get; private set; }
     public int ReverseExtensionCount { get; private set; }
-    public float ReverseExtensionSeconds => reverseControlDuration;
+    public float ReverseExtensionSeconds => EffectiveReverseDuration;
     [SerializeField, Min(0.1f)] private float reverseControlDuration = 8f;
     [SerializeField, Min(0f)] private float fuelConsumptionPerSecond = FuelState.DefaultConsumptionPerSecond;
 
     public RiskRunState RunState => runState;
-    /// <summary>Any power-up in play (including a pending control swap): no new ? boxes until it ends.</summary>
+
     public bool HasActivePowerUp => ActiveEffect != PickupEffectType.None || reverseCountdownRemaining > 0f
-        || runState.HasNitro || runState.HasShield || sunnyDayRemaining > 0f;
+        || runState.HasNitro || runState.HasRampBoost || runState.HasShield || sunnyDayRemaining > 0f;
     public bool SunnyDayActive => sunnyDayRemaining > 0f;
     public float SunnyDayRemaining => sunnyDayRemaining;
     public FuelState FuelState => fuelState;
@@ -79,8 +90,10 @@ public sealed class CarPickupEffects : MonoBehaviour
     public int ShieldUseCount => runState.ShieldUseCount;
     public RandomPickupOutcome LastOutcome { get; private set; }
     public int PickupCount { get; private set; }
+    public bool EnableGunGuarantee { get; set; }
+    public int EmptyGunBoxStreak { get; private set; }
+    public void RestoreLootPacing(int streak) => EmptyGunBoxStreak = Mathf.Clamp(streak, 0, 3);
 
-    // The pursuit model needs the unmodified speeds; it applies the active effects itself.
     public void ConfigurePursuit(float vehicleBaseSpeed, float pursuerSpeed)
     {
         baseForwardSpeed = vehicleBaseSpeed;
@@ -124,15 +137,20 @@ public sealed class CarPickupEffects : MonoBehaviour
         return accepted;
     }
 
+    // Direct positive pickups enter the backpack; reverse control activates separately.
     private bool TryApplyCore(PickupEffectType effect, float duration)
     {
         if (!isActiveAndEnabled) return false;
 
-        if (runState.IsGameOver) return false;
+        if (runState.IsGameOver || runState.IsRoadRecovering) return false;
+        bool emptyBefore = Backpack.Shots <= 0;
         RandomPickupOutcome outcome;
         switch (effect)
         {
-            case PickupEffectType.RandomFuelOrReverse: outcome = randomOutcome.Next(); break;
+            case PickupEffectType.RandomFuelOrReverse:
+                outcome = EnableGunGuarantee && emptyBefore && EmptyGunBoxStreak >= (HarderDifficultyActive ? 3 : 2)
+                    ? RandomPickupOutcome.Gun : randomOutcome.Next();
+                break;
             case PickupEffectType.Gun: outcome = RandomPickupOutcome.Gun; break;
             case PickupEffectType.Shield: outcome = RandomPickupOutcome.Shield; break;
             case PickupEffectType.ProximityRecovery: outcome = RandomPickupOutcome.ProximityRecovery; break;
@@ -141,13 +159,20 @@ public sealed class CarPickupEffects : MonoBehaviour
             default: return TryApplyTemporaryEffect(effect, duration);
         }
         bool accepted = outcome == RandomPickupOutcome.ReverseSteering ? ActivateOutcome(outcome) : Backpack.Receive(outcome);
-        if (accepted) { LastOutcome = outcome; PickupCount++; }
+        if (accepted)
+        {
+            LastOutcome = outcome;
+            PickupCount++;
+            if (EnableGunGuarantee && effect == PickupEffectType.RandomFuelOrReverse)
+                EmptyGunBoxStreak = outcome == RandomPickupOutcome.Gun || !emptyBefore
+                    ? 0 : Mathf.Min(3, EmptyGunBoxStreak + 1);
+        }
         return accepted;
     }
 
     public bool TryCrash(float proximityDrain = RiskRunState.DefaultCrashProximityDrain)
     {
-        return isActiveAndEnabled && runState.TryCrash(proximityDrain);
+        return isActiveAndEnabled && runState.TryCrash(proximityDrain * (HarderDifficultyActive ? 1.25f : 1f));
     }
 
     public void HitObstacle()
@@ -175,11 +200,6 @@ public sealed class CarPickupEffects : MonoBehaviour
         fuelState.Consume(amount);
     }
 
-    /// <summary>
-    /// Pushes the pursuing police back after a successful rear shot.
-    /// This keeps Team 21's defensive shooting mechanic inside Team 19's
-    /// existing chase-distance model.
-    /// </summary>
     public bool RepelPolice(float distance)
     {
         return isActiveAndEnabled && runState.TryRestorePursuitGap(distance);
@@ -228,26 +248,27 @@ public sealed class CarPickupEffects : MonoBehaviour
         if (ActiveEffect == PickupEffectType.ReverseSteering)
         {
             runState.Effects.Apply(PickupEffectType.ReverseSteering,
-                RemainingSeconds + reverseControlDuration);
+                RemainingSeconds + EffectiveReverseDuration);
             ReverseExtensionCount++;
             return true;
         }
 
         if (reverseCountdownRemaining > 0f)
         {
-            // Keep the original countdown; queue the extra time for activation.
-            pendingReverseDuration += reverseControlDuration;
+
+            pendingReverseDuration += EffectiveReverseDuration;
             ReverseExtensionCount++;
             return true;
         }
 
         runState.TryBailOut();
-        pendingReverseDuration = reverseControlDuration;
-        // A full "3, 2, 1" warning before the controls swap.
+        pendingReverseDuration = EffectiveReverseDuration;
+
         reverseCountdownRemaining = 3f;
         return true;
     }
 
+    // Advance effects and fuel on the same simulation clock.
     private void Update()
     {
         if (!simulationActive || Time.timeScale <= 0f) return;
@@ -268,7 +289,7 @@ public sealed class CarPickupEffects : MonoBehaviour
                 runState.TryCollectWithoutReward(PickupEffectType.ReverseSteering, pendingReverseDuration);
                 ReverseActivationCount++;
             }
-            // Preserve total movement across both parts of this frame.
+
             if (elapsed > 0f)
                 runState.TickAdditionalFrameTime(elapsed, baseForwardSpeed, policeSpeed, countdownDistance);
         }
@@ -276,7 +297,7 @@ public sealed class CarPickupEffects : MonoBehaviour
         if (!runState.IsGameOver && ActiveEffect == PickupEffectType.None
             && (reverseWasActive || ReverseActivationCount != activationsBeforeTick))
             ReverseCompletionCount++;
-        fuelState.Tick(Time.deltaTime, fuelConsumptionPerSecond);
+        fuelState.Tick(Time.deltaTime, HarderDifficultyActive ? 3.8f : fuelConsumptionPerSecond);
     }
 
     private void OnDisable()
@@ -286,6 +307,7 @@ public sealed class CarPickupEffects : MonoBehaviour
         fuelState.Reset();
         LastOutcome = RandomPickupOutcome.None;
         PickupCount = 0;
+        EmptyGunBoxStreak = 0;
         reverseCountdownRemaining = 0f;
         pendingReverseDuration = 0f;
         sunnyDayRemaining = 0f;
