@@ -254,8 +254,8 @@ public sealed class WorldShiftCityTests
         Assert.That(game.GetComponentsInChildren<Transform>(true)
             .Where(t => t.name == "Outline - belongs to other world").All(t => !t.gameObject.activeSelf), Is.True,
             "The joined finale shows real halves, without other-world ghost overlays.");
-        Assert.That((float)Get(game, "Duration"), Is.InRange(112f, 118f));
-        Assert.That(Get(game, "RelaysCompleted"), Is.EqualTo(3));
+        Assert.That((float)Get(game, "Duration"), Is.InRange(108f, 118f));
+        Assert.That(Get(game, "RelaysCompleted"), Is.EqualTo(4));
         CapturePreview(game, "03-won");
 
         // Both halves coexist, regardless of which world the car centre belongs to.
@@ -431,8 +431,7 @@ public sealed class WorldShiftCityTests
     {
         // Read the oncoming car after each wall before returning to that half.
         if (d >= 2800f)
-            return d < 2928f ? 3.2f : d < 2998f ? -3.2f : d < 3068f ? 3.2f
-                : d < 3138f ? -3.2f : d < 3208f ? 3.2f : d < 3278f ? -3.2f : 3.2f;
+            return d < 2928f ? 3.2f : d < 2998f ? -3.2f : d < 3210f ? 3.2f : -3.2f;
         if (d >= 1700f && d < 1880f) return 3.2f;
         if ((d >= 450f && d < 490f) || (d >= 850f && d < 1000f)
             || (d >= 1038f && d < 1150f)) return 3.2f;

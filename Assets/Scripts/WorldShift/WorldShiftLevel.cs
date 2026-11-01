@@ -120,7 +120,10 @@ namespace Outlaws.WorldShift
                 "Day ramp, Night landing. The final rift waits beyond the jump."),
             new ShiftCheckpoint(2800f, ShiftWorld.Day, -3.2f,
                 "THE LAST CROSSING",
-                "Rift crossed. Day left, Night right. Steer between the open halves; Space rests.")
+                "Rift crossed. Day left, Night right. Steer between the open halves; Space rests."),
+            new ShiftCheckpoint(3100f, ShiftWorld.Echo, 3.2f,
+                "THE FINAL LEAP",
+                "Right / Night ramp. Take off, steer left around airborne barriers, land in Day.")
         };
 
         public static readonly ShiftHazard[] Hazards =
@@ -211,14 +214,7 @@ namespace Outlaws.WorldShift
             new ShiftHazard(ShiftWorld.Echo, ShiftHazardKind.HalfBarrier, 2970f, 2976f, 6, halfSide: 1),
             new ShiftHazard(ShiftWorld.Echo, ShiftHazardKind.Oncoming, 3040f, 3045.5f, 4, 14f),
             new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.HalfBarrier, 3040f, 3046f, 3, halfSide: -1),
-            new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.Oncoming, 3110f, 3115.5f, 1, 14f),
-            new ShiftHazard(ShiftWorld.Echo, ShiftHazardKind.HalfBarrier, 3110f, 3116f, 6, halfSide: 1),
-            new ShiftHazard(ShiftWorld.Echo, ShiftHazardKind.Oncoming, 3180f, 3185.5f, 4, 14f),
-            new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.HalfBarrier, 3180f, 3186f, 3, halfSide: -1),
-            new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.Oncoming, 3250f, 3255.5f, 1, 14f),
-            new ShiftHazard(ShiftWorld.Echo, ShiftHazardKind.HalfBarrier, 3250f, 3256f, 6, halfSide: 1),
-            new ShiftHazard(ShiftWorld.Echo, ShiftHazardKind.Oncoming, 3320f, 3325.5f, 4, 14f),
-            new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.HalfBarrier, 3320f, 3326f, 3, halfSide: -1),
+            // Remaining final stretch belongs to the half-world aerial transfer.
         };
 
         // Alternative-world fuel at 820 m offers a lane/world choice on a clear stretch.
@@ -235,8 +231,8 @@ namespace Outlaws.WorldShift
             new ShiftFuelPickup(ShiftWorld.Echo, 2515f, 0),
             new ShiftFuelPickup(ShiftWorld.Day, 2770f, -1),
             new ShiftFuelPickup(ShiftWorld.Day, 2950f, -1),
-            new ShiftFuelPickup(ShiftWorld.Day, 3228f, -1),
-            new ShiftFuelPickup(ShiftWorld.Echo, 3320f, 1),
+            new ShiftFuelPickup(ShiftWorld.Echo, 3120f, 1),
+            new ShiftFuelPickup(ShiftWorld.Day, 3330f, -1),
         };
     }
 }

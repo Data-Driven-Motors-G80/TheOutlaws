@@ -95,6 +95,69 @@ public sealed class WorldShiftRelayTests
         yield return new ExitPlayMode();
     }
 
+    [UnityTest]
+    public IEnumerator FinalLeapUsesSteeringAndRequiresTheDayHalfLanding()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/City_WorldShift.unity");
+        yield return new EnterPlayMode();
+        var game = UnityEngine.Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None)
+            .Single(c => c.GetType().Name == "WorldShiftCity");
+        game.enabled = false;
+        Call(game, "BeginRun");
+        game.GetType().GetField("checkpointIndex", Flags).SetValue(game, 6);
+        Call(game, "RetryCheckpoint");
+        Assert.That(Get(game, "Distance"), Is.EqualTo(3100f));
+        Assert.That(Get(game, "World").ToString(), Is.EqualTo("Echo"));
+        Assert.That(Call(game, "TrySwitch"), Is.False, "Space cannot replace steering in the intersection.");
+        AdvanceFinal(game, 3190f);
+        Capture(game, "relay-final-01-night-ramp");
+        AdvanceFinal(game, 3220f);
+        Assert.That(Get(game, "IsRelayAirborne"), Is.True);
+        float frozenDistance = (float)Get(game, "Distance");
+        Call(game, "TogglePause"); Call(game, "StepSimulation", .5f, -1f, true);
+        Assert.That(Get(game, "Distance"), Is.EqualTo(frozenDistance));
+        Call(game, "TogglePause");
+        AdvanceFinal(game, 3250f);
+        Assert.That(Get(game, "World").ToString(), Is.EqualTo("Day"));
+        Capture(game, "relay-final-02-crossing-midair");
+        AdvanceFinal(game, 3310f);
+        Assert.That(Get(game, "IsRelayAirborne"), Is.False);
+        Assert.That(Get(game, "RelaysCompleted"), Is.EqualTo(4));
+        Assert.That(Get(game, "Hits"), Is.EqualTo(0));
+        Capture(game, "relay-final-03-day-landing");
+        AdvanceFinal(game, 3360f);
+        Assert.That(Get(game, "State").ToString(), Is.EqualTo("Won"));
+
+        Call(game, "RestartRun");
+        game.GetType().GetField("checkpointIndex", Flags).SetValue(game, 6);
+        Call(game, "RetryCheckpoint");
+        for (int i = 0; i < 400 && Get(game, "State").ToString() == "Running"; i++)
+            Call(game, "StepSimulation", .025f, Mathf.Clamp((3.2f - (float)Get(game, "Lateral")) * 2f, -1f, 1f), false);
+        Assert.That(Get(game, "State").ToString(), Is.EqualTo("Retrying"));
+        Assert.That(Get(game, "Message").ToString(), Does.Contain("MISSED RELAY LANDING"));
+        Assert.That(Get(game, "Hits"), Is.EqualTo(1), "The Night aerial barrier must have a real impact.");
+        Call(game, "RetryCheckpoint");
+        Assert.That(Get(game, "Distance"), Is.EqualTo(3100f));
+        Assert.That(Get(game, "Lateral"), Is.EqualTo(3.2f));
+        Assert.That(Get(game, "IsRelayAirborne"), Is.False);
+        for (int i = 0; i < 140 && Get(game, "State").ToString() == "Running"; i++)
+            Call(game, "StepSimulation", .025f, Mathf.Clamp((-3.2f - (float)Get(game, "Lateral")) * 2f, -1f, 1f), false);
+        Assert.That(Get(game, "State").ToString(), Is.EqualTo("Retrying"));
+        Assert.That(Get(game, "Message").ToString(), Does.Contain("NO ROAD"), "Entering the Day gap before taking off must fall.");
+        yield return new ExitPlayMode();
+    }
+
+    private static void AdvanceFinal(object game, float target)
+    {
+        for (int n = 0; n < 500 && (float)Get(game, "Distance") < target; n++)
+        {
+            float lane = (float)Get(game, "Distance") < 3210f ? 3.2f : -3.2f;
+            Call(game, "StepSimulation", .025f, Mathf.Clamp((lane - (float)Get(game, "Lateral")) * 2f, -1f, 1f), false);
+            Assert.That(Get(game, "State").ToString(), Is.EqualTo("Running").Or.EqualTo("Won"), "Failed at " + Get(game, "Distance") + ": " + Get(game, "Message"));
+        }
+        Assert.That((float)Get(game, "Distance"), Is.GreaterThanOrEqualTo(target));
+    }
+
     private static void Advance(object game, float target)
     {
         for (int frame = 0; (float)Get(game, "Distance") < target && frame < 1000; frame++)

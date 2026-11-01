@@ -25,6 +25,7 @@ namespace Outlaws.WorldShift
         private WorldShiftPresentation presentation;
         private AutoDriveCar driver;
         private WorldShiftRelay relay;
+        public WorldShiftFinalLeap FinalLeap { get; private set; }
         public bool IsRelayAirborne => relay != null && relay.IsAirborne;
         public int RelaysCompleted => relay?.Completed ?? 0;
         public bool IsBoosting => Speed > WorldShiftLevel.Speed + .1f;
@@ -95,6 +96,7 @@ namespace Outlaws.WorldShift
             fuelTaken = new bool[Pickups.Length];
             Route.Build(roadTemplate, splitViewValidation || tutorialLevel, RunLength);
             if (!splitViewValidation && !tutorialLevel) relay = new WorldShiftRelay(Route);
+            if (relay != null) { FinalLeap = gameObject.AddComponent<WorldShiftFinalLeap>(); FinalLeap.Build(Route); }
             Player = new GameObject("Player - same position in both worlds").transform;
             Player.SetParent(transform, false);
             var visual = new GameObject("Original driving body").transform;
@@ -238,20 +240,28 @@ namespace Outlaws.WorldShift
                 if (relay != null)
                 {
                     driver.ExternalVerticalControl = WorldShiftRelay.At(previous) != null;
-                    if (relay.BeginStep(previous, previous + speed * dt, World))
-                        Notify("AIRBORNE - PRESS SPACE FOR THE OTHER LANDING", 2.5f);
+                    bool transfer = relay.SectionAt(previous)?.SteerAcross == true;
+                    if ((!transfer || previousLateral >= .85f) && relay.BeginStep(previous, previous + speed * dt, World))
+                        Notify(transfer ? "FINAL LEAP - STEER LEFT TO THE DAY LANDING" : "AIRBORNE - PRESS SPACE FOR THE OTHER LANDING", 2.5f);
                 }
-                driver.StepExternal(dt, IsRelayAirborne ? steer * .4f : steer, speed);
+                driver.StepExternal(dt, IsRelayAirborne ? steer * (relay.Flight.SteerAcross ? .65f : .4f) : steer, speed);
                 float nextLateral = driver.LateralOffset;
                 float next = Mathf.Min(RunLength, driver.RoadPositionDistance);
-                ShiftHazard hit = IsRelayAirborne ? null : FindCollision(World, previous, next, previousLateral, nextLateral, true);
+                ShiftHazard hit = IsRelayAirborne
+                    ? relay.Flight.SteerAcross ? FinalLeap.FindCollision(previous, next, previousLateral, nextLateral, hitHazards) : null
+                    : FindCollision(World, previous, next, previousLateral, nextLateral, true);
                 Duration += dt;
                 fuel.Tick(dt, tutorialLevel ? 0f : WorldShiftLevel.FuelConsumption);
                 pursuit.Tick(dt, speed, speed + (tutorialLevel ? 0f : Mathf.Lerp(.03f, .14f, Progress)));
                 if (relay != null)
                 {
-                    bool safe = relay.FinishStep(next, World, out bool landed);
-                    if (!safe || (!IsRelayAirborne && !Route.HasSurface(next, World)))
+                    ShiftWorld nextWorld = IsJoinedDistance(next) ? WorldShiftLevel.WorldAt(nextLateral) : World;
+                    bool safe = relay.FinishStep(next, nextWorld, out bool landed);
+                    bool deck = Route.HasSurface(next, nextWorld);
+                    // At a half-road lip the entire car must be supported, not just its centre.
+                    if (relay.SectionAt(next)?.SteerAcross == true && Mathf.Abs(nextLateral) < .8f)
+                        deck &= Route.HasSurface(next, ShiftWorld.Day) && Route.HasSurface(next, ShiftWorld.Echo);
+                    if (!safe || (!IsRelayAirborne && !deck))
                     {
                         Distance = next;
                         Lateral = nextLateral;

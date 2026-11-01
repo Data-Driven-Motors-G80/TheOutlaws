@@ -4,7 +4,7 @@ Open `Assets/Scenes/WorldShift_Menu.unity` and press Play, or use **The Outlaws 
 
 The menu has three entries:
 
-- **City:** the existing 3,360 m route, three airborne relays and final Day/Night intersection; roughly 114 seconds without retries.
+- **City:** the 3,360 m route, three Space-operated airborne relays and a final Day/Night intersection ending in a steering leap; roughly 112 seconds without retries. At the final 3,100 m checkpoint, use the right / Night ramp, steer left in the air around two barriers, and land on the left / Day road. Space remains inactive in the intersection.
 - **Desert:** 2,880 m, about 115 seconds without retries. Cruise at 24 m/s, boost at 42 m/s. 58 rocks (including six airborne rocks), 14 freezeable oncoming police cars, alternating world walls, six checkpoints, shared fuel and the existing police/mirror. The final 480 m uses the same full-frame Day/Night compositor as City. No replacement half-road is generated.
 - **Tutorial:** an independent 720 m city course at 18 m/s (about 40 seconds). Steering, switching, returning to Day, half-road obstacles, then steering across a short intersection. No fuel drain. Retries restart the current lesson.
 
@@ -20,7 +20,7 @@ The **Play tutorial before this level** switch sends the player through the tuto
 
 ## Difficulty pass
 
-- City now has 84 authored hazard entries (36 oncoming cars, up from 16). New Day closures interrupt long safe bypasses; both worlds have additional traffic. Launches and landing recovery areas remain clear. The full city has a verified zero-hit route.
+- City has 76 ground hazard entries (32 oncoming cars) and two final aerial barriers. Day closures interrupt long safe bypasses; both worlds have traffic. The last four half-wall groups were replaced by the final leap, keeping launch and landing recovery clear.
 - Full-desert rocks move at 3 m/s laterally. The fields at 1,100-1,356 m and 1,580-1,836 m each contain three four-rock groups at 3.8 m/s. Night walls between groups require returning to Day and freezing a new opening. Walls have clear approach/exit space; these groups have no centre-only guard rails, allowing side routes when the centre is blocked.
 - Desert oncoming cars reuse the City's police prefab and travel at 14 m/s when moving. They occupy single side lanes, leaving space to steer around a frozen vehicle. The original short desert practice retains its slower timing.
 - The fourth sector now has a Day boost ramp at 1,944-2,004 m, a four-second flight, and a Night landing at 2,172 m. Night has no launch deck; Day has no landing deck until 2,228 m. Six airborne rocks move at 5 m/s in Day and freeze in place in Night. Steering stays available in flight. The player and pursuing police share the boost and flight path. Ramp, launch, flight and recovery are clear of unrelated ground hazards. Green boost arrows distinguish this sequence from ordinary pits. A missed landing or entering the missing launch road retries the 1,920 m checkpoint.

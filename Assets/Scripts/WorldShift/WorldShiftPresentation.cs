@@ -412,7 +412,7 @@ namespace Outlaws.WorldShift
                     if (hazard.World == world && hazard.Kind == ShiftHazardKind.Gap && hazard.End > distance)
                         clearRoad = Mathf.Min(clearRoad, Mathf.Max(0f, hazard.Start - distance - 4f));
                 if (!game.SplitViewValidation)
-                    foreach (var jump in WorldShiftRelay.Sections)
+                    foreach (var jump in WorldShiftRelay.CitySections)
                     {
                         float edge = world == jump.Source ? jump.Takeoff : jump.Ramp;
                         float end = world == jump.Source ? jump.End : jump.Landing;
@@ -423,6 +423,7 @@ namespace Outlaws.WorldShift
             if (roadside != null) roadside.UpdateVisibility(distance);
             if (rift != null) rift.Refresh(distance);
             if (relayVisuals != null) relayVisuals.Refresh(distance);
+            if (game.FinalLeap != null) game.FinalLeap.Present(world, distance);
             foreach (var hazard in hazards)
             {
                 if (hazard.Data.Kind != ShiftHazardKind.Oncoming) continue;

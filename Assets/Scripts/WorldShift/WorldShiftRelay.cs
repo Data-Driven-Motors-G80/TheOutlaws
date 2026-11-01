@@ -7,9 +7,10 @@ namespace Outlaws.WorldShift
         public readonly int Number;
         public readonly float Ramp, Takeoff, Landing, End;
         public readonly ShiftWorld Source;
+        public readonly bool SteerAcross;
         public ShiftWorld Destination => Source == ShiftWorld.Day ? ShiftWorld.Echo : ShiftWorld.Day;
-        public ShiftRelay(int number, float ramp, float takeoff, float landing, ShiftWorld source)
-        { Number = number; Ramp = ramp; Takeoff = takeoff; Landing = landing; End = landing + 56f; Source = source; }
+        public ShiftRelay(int number, float ramp, float takeoff, float landing, ShiftWorld source, bool steerAcross = false)
+        { Number = number; Ramp = ramp; Takeoff = takeoff; Landing = landing; End = landing + 56f; Source = source; SteerAcross = steerAcross; }
         public bool Contains(float distance) => distance >= Ramp - 32f && distance < End;
         public bool HasDeck(float distance, ShiftWorld world) => world == Source
             ? distance < Takeoff || distance >= End : distance < Ramp || distance >= Landing;
@@ -32,18 +33,20 @@ namespace Outlaws.WorldShift
             new ShiftRelay(2, 1740f, 1800f, 1896f, ShiftWorld.Echo),
             new ShiftRelay(3, 2300f, 2360f, 2468f, ShiftWorld.Day)
         };
+        public static readonly ShiftRelay FinalLeap = new ShiftRelay(4, 3144f, 3204f, 3304f, ShiftWorld.Echo, true);
+        public static readonly ShiftRelay[] CitySections = { Sections[0], Sections[1], Sections[2], FinalLeap };
         private readonly WorldShiftRoute route;
         private readonly ShiftRelay[] sections;
         private readonly float cruisingSpeed;
         private ShiftRelay flying;
         public int Completed { get; private set; }
         public WorldShiftRelay(WorldShiftRoute sharedRoute, ShiftRelay[] layout = null, float speed = WorldShiftLevel.Speed)
-        { route = sharedRoute; sections = layout ?? Sections; cruisingSpeed = speed; }
+        { route = sharedRoute; sections = layout ?? CitySections; cruisingSpeed = speed; }
         public bool IsAirborne => flying != null;
         public ShiftRelay Flight => flying;
         public static ShiftRelay At(float distance)
         {
-            foreach (var section in Sections) if (section.Contains(distance)) return section;
+            foreach (var section in CitySections) if (section.Contains(distance)) return section;
             return null;
         }
         public ShiftRelay SectionAt(float distance)
@@ -99,6 +102,12 @@ namespace Outlaws.WorldShift
         {
             var section = flying ?? SectionAt(distance);
             if (section == null) return "";
+            if (section.SteerAcross)
+            {
+                if (flying != null) return "STEER LEFT IN THE AIR - LAND ON THE DAY ROAD";
+                if (distance >= section.Landing) return "FINAL LEAP LANDED - DRIVE TO EXTRACTION";
+                return "FINAL LEAP - RIGHT / NIGHT BOOST RAMP, THEN STEER LEFT IN THE AIR";
+            }
             string source = section.Source == ShiftWorld.Day ? "DAY" : "NIGHT";
             string target = section.Destination == ShiftWorld.Day ? "DAY" : "NIGHT";
             if (flying != null) return world == section.Destination

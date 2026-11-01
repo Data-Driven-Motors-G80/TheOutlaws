@@ -4,8 +4,8 @@ The final 20 seconds now use the validated full-frame Day/Night compositor.
 The separate [20-second validation scene](CITY_DUAL_VIEW_VALIDATION.md) remains available.
 
 A finite two-minute escape route: one car, one shared road, two obstacle layouts.
-The route is 3,360 metres, normally at 28 m/s (about 101 km/h). Three relay
-boosts reach 42 m/s (151 km/h); a clean run takes about 114 seconds. Retries add time. Driving uses the original `AutoDriveCar` steering,
+The route is 3,360 metres, normally at 28 m/s (about 101 km/h). Three world-switch relays and one final steering leap
+boost to 42 m/s (151 km/h); a clean run takes about 112 seconds. Retries add time. Driving uses the original `AutoDriveCar` steering,
 skid, suspension and body response through an externally ticked finite route.
 
 ## Play
@@ -41,7 +41,7 @@ deck at touchdown. Ordinary pits never grant this exception. There is no switch 
 
 ## Route
 
-Six sections combine ordinary switching, three relay jumps, missing bridges,
+Seven checkpoint sections combine ordinary switching, three relay jumps, a final steering leap, missing bridges,
 steering around shared blocks, and the final joining of both worlds. Each section begins at a
 clear checkpoint. Ordinary impacts bring the chasing police closer; capture or empty
 fuel retries after 0.7 seconds, and bridge falls take 1.05 seconds.
@@ -54,8 +54,8 @@ wall-attached half-width roadblocks. The opening is sparse; later sections combi
 familiar decisions. The remaining Day divider is 140 m long and
 follows road bends and physically keeps the car on its chosen side; switching to
 Night removes them. Night crossings use zebra stripes and grey geometric
-people. Thirty-six single-lane oncoming cars approach at 12-14 m/s, eighteen in Night
-and eighteen in Day. They arrive in authored groups, rather than random simultaneous
+people. Thirty-two single-lane oncoming cars approach at 12-14 m/s, sixteen in Night
+and sixteen in Day. They arrive in authored groups, rather than random simultaneous
 closures; their render/collision bounds share
 the same deterministic road-progress clock and pause with the run.
 
@@ -168,7 +168,7 @@ rows; normal pit sections and the final rift remain separate, with safe approach
 ### Final world rift
 
 The only joined section begins at **2,800 m / about 94 seconds** and lasts through
-extraction at 3,360 m / about 114 seconds. The middle sectors use ordinary Day/Night switching and relay flight, with no
+extraction at 3,360 m / about 112 seconds. The middle sectors use ordinary Day/Night switching and relay flight, with no
 early world joining.
 
 A jagged amber/cyan geometric gate marks the entrance in both worlds. It has no
@@ -184,21 +184,23 @@ world versions. No replacement half-road/half-city geometry is built. Gameplay,
 fuel and pursuit still update once. The normal camera renders directly before the
 final sector; the extra two world renders are active only during the finale.
 
-The final road is straight, with slope easing to zero by 2,720 m. The camera eases
+The final road is straight, with the new boost ramp rising at 3,144 m. The camera eases
 out lateral follow before the gate and remains on the road centre through the finale.
 This keeps the screen seam aligned with the collision boundary at every depth.
 Earlier bends and slopes remain. Arbitrary curved seams are not implemented.
 
 Two ordinary-world half-width barriers at 480 m and 520 m introduce the shape.
-Seven alternating half-road blocks at 2,900/2,970/3,040/3,110/3,180/3,250/3,320 m
+Three alternating half-road blocks at 2,900/2,970/3,040 m
 require crossing between the visible worlds. The first 100 m after the rift remain
-clear. Six single-lane cars follow the first six walls on the same blocked half,
+clear. Two single-lane cars follow the first two walls on the same blocked half,
 meeting the player about 20 m after the wall. Read the following car before
 crossing back; the opposite half remains available. Each wall reaches from a road edge to the centre; straddling
 the seam still contacts the visible wall. Space is inactive during this section,
 and the split stays visible on the finish screen. Impact penalties are unchanged.
 
-The three city relay jumps precede this final crossing. Next Level now leads to
+The final checkpoint at 3,100 m restarts on the right / Night side. Night has a boost ramp from 3,144 to 3,204 m while Day has no deck. After takeoff, steer left through two moving aerial barriers at 3,240 and 3,272 m. Only Day has a landing at 3,304 m; Night remains missing until extraction. The car must fully clear the seam to be supported on a half-road. Space stays inactive throughout. Green ramp arrows and an amber Day landing frame show the route. Aerial impacts retain the normal pursuit penalty; missed road/landing drops the car and retries this checkpoint. The police share the boost and flight path.
+
+The three earlier city relay jumps still use Space. Next Level now leads to
 the full desert, whose final intersection reuses this compositor. Its left-side
 obstacles keep moving while the right-side Night snapshot remains frozen.
 

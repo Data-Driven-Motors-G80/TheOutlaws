@@ -22,7 +22,7 @@ namespace Outlaws.WorldShift
         public void Build(RoadSegment template, bool straightValidation = false, float validationLength = WorldShiftSplitView.Length, bool desertProfile = false, ShiftRelay[] relayLayout = null)
         {
             validation = straightValidation;
-            relays = relayLayout ?? (validation ? System.Array.Empty<ShiftRelay>() : WorldShiftRelay.Sections);
+            relays = relayLayout ?? (validation ? System.Array.Empty<ShiftRelay>() : WorldShiftRelay.CitySections);
             length = validation ? validationLength : WorldShiftLevel.Length;
             dayRoad = RuntimeMaterials.Coloured(new Color(0.22f, 0.23f, 0.24f));
             echoRoad = RuntimeMaterials.Coloured(new Color(0.085f, 0.105f, 0.14f));
@@ -114,7 +114,7 @@ namespace Outlaws.WorldShift
         }
         private static float Slope(float d, bool afterEdge)
         {
-            foreach (var jump in WorldShiftRelay.Sections)
+            foreach (var jump in WorldShiftRelay.CitySections)
                 if (d >= jump.Ramp - 20f && d <= jump.End)
                     return d < jump.Takeoff || (d == jump.Takeoff && !afterEdge)
                         ? .28f * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(jump.Ramp, jump.Ramp + 24f, d)) : 0f;

@@ -19,7 +19,7 @@ namespace Outlaws.WorldShift
         private Material boost, white, amber, cyan, ghost;
 
         public void Build(WorldShiftCity controller, WorldShiftRoute sharedRoute)
-            => Build(sharedRoute, WorldShiftRelay.Sections);
+            => Build(sharedRoute, WorldShiftRelay.CitySections);
 
         public void Build(WorldShiftRoute sharedRoute, ShiftRelay[] sections)
         {
@@ -38,9 +38,9 @@ namespace Outlaws.WorldShift
                 {
                     RoadPathPoint p = route.Sample(d);
                     if (d < data.Ramp + 25f)
-                        Box(view.Ramp.transform, "Full-road acceleration strip", p.Position + p.Up * .055f,
-                            Quaternion.LookRotation(p.Forward, p.Up), new Vector3(9.3f, .06f, 1.15f), boost);
-                    foreach (float x in new[] { -3.2f, 0f, 3.2f })
+                        Box(view.Ramp.transform, "Acceleration strip", p.Position + p.Up * .055f + p.Right * (data.SteerAcross ? 2.5f : 0f),
+                            Quaternion.LookRotation(p.Forward, p.Up), new Vector3(data.SteerAcross ? 4.4f : 9.3f, .06f, 1.15f), boost);
+                    foreach (float x in data.SteerAcross ? new[] { 2.5f } : new[] { -3.2f, 0f, 3.2f })
                         Line(view.Ramp.transform, "Forward boost chevron", white, .11f,
                             p.Position + p.Right * (x - .65f) + p.Up * .10f - p.Forward * .8f,
                             p.Position + p.Right * x + p.Up * .10f + p.Forward * .4f,
@@ -49,7 +49,7 @@ namespace Outlaws.WorldShift
                 var signPoint = route.Sample(data.Ramp - 22f);
                 string source = data.Source == ShiftWorld.Day ? "DAY" : "NIGHT";
                 string target = data.Destination == ShiftWorld.Day ? "DAY" : "NIGHT";
-                foreach (float side in new[] { -1f, 1f })
+                foreach (float side in data.SteerAcross ? new[] { 1f } : new[] { -1f, 1f })
                 {
                     Vector3 at = signPoint.Position + signPoint.Right * side * 5.75f;
                     Box(view.Root.transform, "Ramp sign support", at + signPoint.Up * 1.2f,
@@ -78,8 +78,8 @@ namespace Outlaws.WorldShift
                 Material targetMaterial = data.Destination == ShiftWorld.Day ? amber : cyan;
                 LandingFrame(view.Landing.transform, data, targetMaterial, false);
                 RoadPathPoint landingPoint = route.Sample(data.Landing + 12f);
-                Label(view.Root.transform, target + " LANDING", landingPoint.Position + landingPoint.Up * 3.3f,
-                    landingPoint, data.Destination == ShiftWorld.Day ? new Color(1f, .75f, .35f) : new Color(.4f, .85f, 1f), 5f);
+                Label(view.Root.transform, target + " LANDING", landingPoint.Position + landingPoint.Up * 3.3f + landingPoint.Right * (data.SteerAcross ? -2.5f : 0f),
+                    landingPoint, data.Destination == ShiftWorld.Day ? new Color(1f, .75f, .35f) : new Color(.4f, .85f, 1f), data.SteerAcross ? 4f : 5f);
             }
             SetWorld(ShiftWorld.Day);
             Refresh(0f);
@@ -109,24 +109,25 @@ namespace Outlaws.WorldShift
 
         private void LandingFrame(Transform parent, ShiftRelay jump, Material material, bool dashed)
         {
+            float left = -4.65f, right = jump.SteerAcross ? -.15f : 4.65f;
             for (float d = jump.Landing; d < jump.Landing + 24f; d += 4f)
-                foreach (float side in new[] { -1f, 1f })
+                foreach (float x in new[] { left, right })
                 {
                     var a = route.Sample(d); var b = route.Sample(d + (dashed ? 2f : 4f));
                     Line(parent, "Landing edge", material, .15f,
-                        a.Position + a.Right * side * 4.65f + a.Up * .12f,
-                        b.Position + b.Right * side * 4.65f + b.Up * .12f);
+                        a.Position + a.Right * x + a.Up * .12f,
+                        b.Position + b.Right * x + b.Up * .12f);
                 }
             var lip = route.Sample(jump.Landing);
             Line(parent, "Landing threshold", material, .17f,
-                lip.Position - lip.Right * 4.65f + lip.Up * .12f,
-                lip.Position + lip.Right * 4.65f + lip.Up * .12f);
-            foreach (float side in new[] { -1f, 1f })
+                lip.Position + lip.Right * left + lip.Up * .12f,
+                lip.Position + lip.Right * right + lip.Up * .12f);
+            foreach (float x in new[] { left, right })
                 Line(parent, "Landing beacon - decorative", material, .18f,
-                    lip.Position + lip.Right * side * 5.2f,
-                    lip.Position + lip.Right * side * 5.2f + lip.Up * 3.5f);
+                    lip.Position + lip.Right * x,
+                    lip.Position + lip.Right * x + lip.Up * 3.5f);
             var target = route.Sample(jump.Landing + 10f);
-            Vector3 tip = target.Position + target.Up * 1.8f;
+            Vector3 tip = target.Position + target.Up * 1.8f + target.Right * (jump.SteerAcross ? -2.5f : 0f);
             Line(parent, "Downward landing target", material, .14f, tip + target.Up * 2.6f, tip);
             Line(parent, "Landing arrowhead", material, .14f,
                 tip - target.Right + target.Up * 1.2f, tip, tip + target.Right + target.Up * 1.2f);
