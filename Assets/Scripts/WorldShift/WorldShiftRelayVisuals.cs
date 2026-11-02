@@ -72,6 +72,7 @@ namespace Outlaws.WorldShift
                 view.Preview = Child(view.Root.transform, "Other-world landing outline - no road here yet");
                 Material targetMaterial = data.Destination == ShiftWorld.Day ? amber : cyan;
                 LandingFrame(view.Landing.transform, data, targetMaterial, false);
+                LandingFrame(view.Preview.transform, data, ghost, true);
             }
             SetWorld(ShiftWorld.Day);
             Refresh(0f);
@@ -82,11 +83,11 @@ namespace Outlaws.WorldShift
             foreach (var view in views)
             {
                 bool launch = world == view.Data.Source;
-                view.Ramp.SetActive(route.SharedWorldRules || launch);
-                view.SourceVoid.SetActive(!route.SharedWorldRules && launch);
-                view.DestinationVoid.SetActive(!route.SharedWorldRules && !launch);
-                view.Landing.SetActive(route.SharedWorldRules || !launch);
-                view.Preview.SetActive(false);
+                view.Ramp.SetActive(launch);
+                view.SourceVoid.SetActive(launch);
+                view.DestinationVoid.SetActive(!launch);
+                view.Landing.SetActive(!launch);
+                view.Preview.SetActive(launch);
             }
         }
 

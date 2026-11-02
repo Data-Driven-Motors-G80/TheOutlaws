@@ -146,10 +146,8 @@ namespace Outlaws.WorldShift
         public int Retries { get; private set; }
         public int Switches { get; private set; }
         public string Message { get; private set; } = "";
-        public string Hint => State == ShiftRunState.Retrying ? Message : Relay != null && Relay.SectionAt(Distance) != null ? IsAirborne
-                ? World == ShiftWorld.Day ? "Tap Space to land in night." : "Stay in night to land."
-                : Relay.Hint(Distance, World)
-            : World == ShiftWorld.Echo ? "Night freezes things. They're still solid." : "Try Space to freeze things.";
+        public string Hint => State == ShiftRunState.Retrying ? Message : Relay != null && Relay.SectionAt(Distance) != null ? Relay.Hint(Distance, World)
+            : World == ShiftWorld.Echo ? "Frozen blocks still block the road." : "Space: Nightshift freezes obstacles in place.";
 
         private void Awake()
         {
@@ -176,7 +174,7 @@ namespace Outlaws.WorldShift
             Route = road.AddComponent<WorldShiftRoute>();
             Route.SharedWorldRules = GetawayMode;
             Route.Build(roadTemplate, true, RunLength, true, fullLevel ? DesertShiftLevel.Relays : null, GetawayMode ? WorldShiftGetaway.ExitTail : 0f);
-            if (fullLevel) Relay = new WorldShiftRelay(Route, DesertShiftLevel.Relays, Speed, GetawayMode);
+            if (fullLevel) Relay = new WorldShiftRelay(Route, DesertShiftLevel.Relays, Speed);
             Player = new GameObject("Shared player - continuous between worlds").transform;
             Player.SetParent(transform, false);
             var visual = new GameObject("Original driving body").transform;
@@ -245,8 +243,9 @@ namespace Outlaws.WorldShift
             if (State != ShiftRunState.Running) return false;
             ShiftWorld next = World == ShiftWorld.Day ? ShiftWorld.Echo : ShiftWorld.Day;
             World = next;
+            Getaway?.OnWorldChanged();
             Switches++;
-            Notify(next == ShiftWorld.Echo ? "NIGHT FREEZES" : "DAY MOVES", 1.3f);
+            Notify(next == ShiftWorld.Echo ? "NIGHTSHIFT" : "DAY MOVES", 1.3f);
             if (!IsAirborne && !Route.HasSurface(Distance, World)) Fail("NO ROAD - USE THE DAY BOOST RAMP");
             else if (!IsAirborne) CheckGates(Distance, Lateral);
             CheckRockContacts(Distance, Lateral, 0f);
@@ -275,7 +274,7 @@ namespace Outlaws.WorldShift
                 Distance = Mathf.Min(RunLength, driver.RoadPositionDistance);
                 if (Relay != null)
                 {
-                    if (!Relay.FinishStep(Distance, World, out bool landed)) { Fail("MISSED LANDING - SWITCH TO NIGHT IN THE AIR"); break; }
+                    if (!Relay.FinishStep(Distance, World, out bool landed)) { Fail("MISSED LANDING - SWITCH TO NIGHTSHIFT IN THE AIR"); break; }
                     if (landed) Notify("LANDED", 1.5f);
                 }
                 if (!IsAirborne && !Route.HasSurface(Distance, World)) { Fail("NO ROAD - USE THE DAY BOOST RAMP"); break; }
@@ -289,7 +288,7 @@ namespace Outlaws.WorldShift
                         pursuit.Tick(dt, speed, BaseSpeed + .04f + (GetawayMode ? WorldShiftFlow.Escape.ExtraPursuitSpeed : 0f));
                     }
                     for (int i = 0; i < FuelCount; i++)
-                        if (!collectedFuel.Contains(i) && Distance + 1.3f >= FuelDistance(i) && before - 1.3f <= FuelDistance(i) && Mathf.Abs(Lateral) < 1.6f)
+                        if ((!GetawayMode || World == ShiftWorld.Day) && !collectedFuel.Contains(i) && Distance + 1.3f >= FuelDistance(i) && before - 1.3f <= FuelDistance(i) && Mathf.Abs(Lateral) < 1.6f)
                         { collectedFuel.Add(i); fuel.Refill(26f); Notify("FUEL +26", 1f); }
                 }
                 CheckRockContacts(before, previousX, dt);

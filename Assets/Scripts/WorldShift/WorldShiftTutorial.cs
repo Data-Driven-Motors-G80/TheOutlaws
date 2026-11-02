@@ -5,6 +5,14 @@ namespace Outlaws.WorldShift
     public static class WorldShiftTutorial
     {
         public const float Length = 576f, FinalLessonStart = 480f, MergeStart = FinalLessonStart;
+        public static readonly string[] LessonMessages =
+        {
+            "Use A / D or arrow keys to steer.",
+            "Press Space to switch between Day and Nightshift.\nNightshift freezes obstacles, but they still block the road.",
+            "Return to Day for cash, fuel and power-ups.\nNightshift has none. Fuel drains. Police keep chasing.",
+            "Click to shoot the block.",
+            "Steer through the gap."
+        };
         public const float FirstFinalObstacle = 510f, LastFinalObstacle = 558f;
         public static readonly ShiftHazard ShootingObstacle = new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.Barrier, 440f, 446f, 7);
         public static readonly ShiftHazard[] Hazards =
@@ -31,8 +39,8 @@ namespace Outlaws.WorldShift
         public static readonly ShiftCheckpoint[] Checkpoints =
         {
             new ShiftCheckpoint(0f, ShiftWorld.Day, 0f, "STEER", "Use A / D or arrow keys to steer."),
-            new ShiftCheckpoint(120f, ShiftWorld.Day, 0f, "SWITCH", "Tap Space to freeze traffic."),
-            new ShiftCheckpoint(240f, ShiftWorld.Echo, 0f, "SWITCH BACK", "Tap Space for day and loot."),
+            new ShiftCheckpoint(120f, ShiftWorld.Day, 0f, "SWITCH", "Press Space to freeze obstacles in Nightshift."),
+            new ShiftCheckpoint(240f, ShiftWorld.Echo, 0f, "SWITCH BACK", "Return to Day to collect supplies."),
             new ShiftCheckpoint(380f, ShiftWorld.Day, 0f, "SHOOT", "Click to shoot the block."),
             new ShiftCheckpoint(FinalLessonStart, ShiftWorld.Day, 2.5f, "YOUR CHOICE", "Steer through the gap.")
         };

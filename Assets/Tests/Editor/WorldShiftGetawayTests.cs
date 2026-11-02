@@ -52,7 +52,7 @@ public sealed class WorldShiftGetawayTests
         Flow("Next", level); yield return null; yield return null;
         var city = Find("WorldShiftCity"); city.enabled = false;
         Assert.That(Get(city, "GetawayMode"), Is.True);
-        Assert.That((float)Get(city, "Speed"), Is.EqualTo(30.8f).Within(.01f));
+        Assert.That((float)Get(city, "Speed"), Is.EqualTo(25.2f).Within(.01f));
         Call(city, "StepSimulation", 3f, 0f, false);
         Assert.That(Run.Carried, Is.EqualTo(300));
         Call(city, "TogglePause"); float d = (float)Get(city, "Distance");
@@ -93,7 +93,8 @@ public sealed class WorldShiftGetawayTests
         for (int i = 0; i < 3400 && Get(game, "State").ToString() == "Running"; i++)
         {
             float d = (float)Get(game, "Distance");
-            string desired = d < 82f ? "Day" : "Echo";
+            string desired = d < 660f ? "Day" : d < 800f ? "Echo" : d < 1708f ? "Day"
+                : d < 1800f ? "Echo" : d < 2360f ? "Day" : d < 2524f ? "Echo" : "Day";
             if (!(bool)Get(game, "IsMerged") && Get(game, "World").ToString() != desired) Call(game, "TrySwitch");
             float target = d > 3380f ? -3.2f : EscapeSafeLane(game, d);
             Call(game, "StepSimulation", .05f, Mathf.Clamp((target - (float)Get(game, "Lateral")) * 2f, -1f, 1f), false);
@@ -123,8 +124,8 @@ public sealed class WorldShiftGetawayTests
         Assert.That(Run.Leg, Is.EqualTo(1));
         Assert.That(Run.Carried, Is.EqualTo(300));
         var desert = Find("DesertShiftTrial"); desert.enabled = false;
-        Assert.That((float)Get(desert, "CurrentSpeed"), Is.EqualTo(26.4f).Within(.01f));
-        Call(desert, "StepSimulation", 3.2f, 0f, false);
+        Assert.That((float)Get(desert, "CurrentSpeed"), Is.EqualTo(21.6f).Within(.01f));
+        Call(desert, "StepSimulation", 3.6f, 0f, false);
         Assert.That(Run.Carried, Is.GreaterThanOrEqualTo(750));
         Capture("desert-loot");
         Pose(desert, (float)Get(desert, "RunLength") - 5f, 3.3f);
@@ -248,15 +249,23 @@ public sealed class WorldShiftGetawayTests
             if (environment == 1) { Flow("FinishGetawayLeg", true); yield return null; yield return null; }
             var game = Find(environment == 0 ? "WorldShiftCity" : "DesertShiftTrial"); game.enabled = false;
             var getaway = Find("WorldShiftGetaway"); var extras = Get(getaway, "Extras");
-            Pose(game, 35f, 3.2f); Call(game, "TrySwitch");
+            var markers = new[] { "shieldPickup", "magnetPickup", "boostPickup" }
+                .Select(name => (Transform)extras.GetType().GetField(name, Flags).GetValue(extras)).ToArray();
+            for (float d = 0f; d < (float)Get(extras, "BoostDistance") + 10f; d += 10f)
+            {
+                Pose(game, d, 0f); Call(extras, "Present", Get(game, "World"));
+                Assert.That(markers.Count(marker => marker.gameObject.activeSelf), Is.LessThanOrEqualTo(1),
+                    "Power-ups must have separate approach windows at " + d);
+            }
+            Pose(game, 142f, 3.2f); Call(game, "TrySwitch");
             Call(game, "StepSimulation", .5f, 0f, false);
             Assert.That(Get(extras, "MagnetActive"), Is.False, "No power-ups can be taken in Night.");
-            Pose(game, 35f, 3.2f); Call(game, "TrySwitch");
+            Pose(game, 142f, 3.2f); Call(game, "TrySwitch");
             Capture(environment == 0 ? "city-power-choices" : "desert-power-choices");
             Call(game, "StepSimulation", .5f, 0f, false);
             Assert.That(Get(extras, "MagnetActive"), Is.True);
             Assert.That(Run.HasShield, Is.False);
-            // Crossing the other choice cannot stack it onto this leg's selected power.
+            // The opening location no longer contains a boost.
             Call(extras, "Collect", 42f, 46f, 0f, 0f);
             Assert.That(Get(extras, "BoostActive"), Is.False);
             Call(game, "TogglePause");
@@ -265,7 +274,7 @@ public sealed class WorldShiftGetawayTests
             Assert.That(Get(game, "Duration"), Is.EqualTo(pausedTime));
             Assert.That(Get(extras, "MagnetActive"), Is.True);
             Call(game, "TogglePause");
-            Pose(game, 60f, 3.2f);
+            Pose(game, 170f, 3.2f);
             int beforeLoot = Run.Carried;
             Call(game, "StepSimulation", .4f, 0f, false);
             Assert.That(Run.Carried, Is.GreaterThan(beforeLoot), "Magnet must collect the opposite lane's Day bag.");
@@ -283,16 +292,16 @@ public sealed class WorldShiftGetawayTests
             if (environment == 1) { Flow("FinishGetawayLeg", true); yield return null; yield return null; }
             game = Find(environment == 0 ? "WorldShiftCity" : "DesertShiftTrial"); game.enabled = false;
             getaway = Find("WorldShiftGetaway"); extras = Get(getaway, "Extras");
-            Pose(game, 35f, 0f);
+            Pose(game, (float)Get(extras, "BoostDistance") - 8f, -2.8f);
             Call(game, "StepSimulation", .5f, 0f, false);
             Assert.That(Get(extras, "BoostActive"), Is.True);
             Assert.That((float)Get(game, environment == 0 ? "Speed" : "CurrentSpeed"),
-                Is.EqualTo(environment == 0 ? 36.96f : 31.68f).Within(.01f));
-            Assert.That(Get(extras, "SteeringMultiplier"), Is.EqualTo(.8f));
+                Is.EqualTo(environment == 0 ? 30.24f : 25.92f).Within(.01f));
+            Assert.That(Get(extras, "SteeringMultiplier"), Is.EqualTo(1f));
             float gap = (float)Get(game, "PursuitGap"), distance = (float)Get(game, "Distance");
             Call(game, "StepSimulation", 1f, 0f, false);
             Assert.That((float)Get(game, "PursuitGap"), Is.GreaterThan(gap + 4f), "Police must not inherit the player's boost.");
-            Assert.That((float)Get(game, "Distance") - distance, Is.GreaterThan(environment == 0 ? 32f : 28f));
+            Assert.That((float)Get(game, "Distance") - distance, Is.GreaterThan(environment == 0 ? 29f : 25f));
             Capture(environment == 0 ? "city-boost" : "desert-boost");
             Call(game, "TogglePause"); Call(game, "StepSimulation", 10f, 0f, false);
             Assert.That(Get(extras, "BoostActive"), Is.True);
@@ -317,7 +326,7 @@ public sealed class WorldShiftGetawayTests
         var prompt = (TMP_Text)hud.GetType().GetField("guidance", Flags).GetValue(hud);
         var driving = (GameObject)hud.GetType().GetField("drivingHud", Flags).GetValue(hud);
         Call(hud, "Refresh");
-        Assert.That(prompt.text, Is.EqualTo("Drive through to collect"));
+        Assert.That(prompt.text, Is.EqualTo("Collect cash. Take the left exit to keep it."));
         Assert.That(driving.GetComponentsInChildren<TMP_Text>(true).Any(t => t.text.Contains("A / D to steer")), Is.False);
         Assert.That(driving.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Chase goal"), Is.False);
         Assert.That(prompt.fontSizeMin, Is.GreaterThanOrEqualTo(24f));
@@ -338,9 +347,14 @@ public sealed class WorldShiftGetawayTests
         Call(Get(hud, "Extras"), "Collect", 42f, 46f, -3.2f, -3.2f);
         Pose(game, 60f, 0f);
         Call(hud, "Refresh");
-        Assert.That(prompt.text, Is.EqualTo("Shield on."), "A shared obstacle cannot be removed by switching worlds.");
+        Assert.That(prompt.text, Is.EqualTo("Collect cash. Take the left exit to keep it."), "A shared obstacle cannot be removed by switching worlds.");
         Assert.That(driving.GetComponentsInChildren<TMP_Text>().Any(t => t.text == "They're close!"), Is.False);
         Capture("hud-clean-road-cue");
+        Pose(game, 220f, 0f); Call(hud, "Refresh");
+        Assert.That(prompt.text, Is.Empty);
+        prompt.ForceMeshUpdate();
+        Assert.That(prompt.isTextOverflowing, Is.False);
+        Capture("hud-freeze-timing");
         Call(game, "TogglePause"); Call(hud, "Refresh");
         Assert.That(driving.activeSelf, Is.False);
         Assert.That(prompt.text, Is.Empty);
@@ -356,8 +370,62 @@ public sealed class WorldShiftGetawayTests
         hud = Find("WorldShiftGetaway");
         Pose(game, 1120f, 0f); Call(hud, "Refresh");
         prompt = (TMP_Text)hud.GetType().GetField("guidance", Flags).GetValue(hud);
-        Assert.That(prompt.text, Is.EqualTo("Space to freeze a gap."));
+        Assert.That(prompt.text, Is.Empty);
         Capture("hud-clean-desert");
+    }
+
+    [UnityTest]
+    public IEnumerator GameplayPromptsStayStableAndCriticalActionsPreemptReminders()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
+        Flow("StartGetaway", false); yield return null; yield return null;
+        var game = Find("WorldShiftCity"); game.enabled = false;
+        var hud = Find("WorldShiftGetaway"); var combat = Get(game, "Combat");
+        var prompt = (TMP_Text)hud.GetType().GetField("guidance", Flags).GetValue(hud);
+        var panel = (RectTransform)prompt.transform.parent;
+        void TimeAt(float time) => game.GetType().GetProperty("Duration", Flags).SetValue(game, time);
+        Pose(game, 400f, 0f); TimeAt(10f); Call(hud, "Refresh");
+        Assert.That(prompt.text, Is.Empty, "Brief shooting opportunities do not flash immediately.");
+        TimeAt(10.2f); Call(hud, "Refresh"); Assert.That(prompt.text, Is.Empty);
+        TimeAt(10.5f); Call(hud, "Refresh");
+        Assert.That(prompt.text, Is.EqualTo("F / click to shoot the block."));
+        float width = panel.sizeDelta.x;
+        for (int i = 0; i < 4; i++)
+        {
+            Pose(game, 400f, i % 2 == 0 ? 3.2f : 0f);
+            TimeAt(10.6f + i * .1f); Call(hud, "Refresh");
+            Assert.That(prompt.text, Is.EqualTo("F / click to shoot the block."), "Small aim changes must not flicker the caption.");
+            Assert.That(panel.sizeDelta.x, Is.EqualTo(width));
+        }
+        Pose(game, 400f, 0f); TimeAt(11f); Call(combat, "TryShoot"); Call(hud, "Refresh");
+        Assert.That(prompt.text, Is.Empty, "A completed shot clears its hint immediately.");
+        Pose(game, 580f, 0f); Call(hud, "Refresh");
+        Assert.That(prompt.text, Is.EqualTo("Drive up the ramp to jump."), "Jump instructions preempt the quiet interval.");
+        Pose(game, 650f, 0f); Call(game, "StepSimulation", .5f, 0f, false); Call(hud, "Refresh");
+        Assert.That(prompt.text, Is.EqualTo("Space to land in Nightshift."));
+        Call(game, "TrySwitch");
+        TimeAt((float)Get(game, "Duration") + 12.1f); Call(hud, "Refresh");
+        Assert.That(prompt.text, Is.EqualTo("Stay in Nightshift until the road rejoins."), "An optional reminder cannot cover a landing instruction.");
+        Assert.That(panel.sizeDelta.x, Is.EqualTo(width));
+        Pose(game, 801f, 0f); Call(game, "StepSimulation", .025f, 0f, false); Call(hud, "Refresh");
+        Assert.That(prompt.text, Is.Empty, "A quiet interval separates action instructions from informational tips.");
+        float now = (float)Get(game, "Duration");
+        for (int i = 0; i < 3; i++)
+        {
+            TimeAt(now + 1.1f + i); Call(hud, "Refresh");
+            Assert.That(prompt.text, Is.EqualTo("Fuel still drains. Return to Day for supplies."), "The Nightshift reminder is one stable message.");
+            Assert.That(panel.sizeDelta.x, Is.EqualTo(width));
+        }
+        Capture("quiet-nightshift-reminder");
+        Call(game, "TogglePause"); Call(hud, "Refresh"); Assert.That(prompt.text, Is.Empty);
+        Call(game, "TogglePause"); Call(hud, "Refresh");
+        Assert.That(prompt.text, Is.EqualTo("Fuel still drains. Return to Day for supplies."));
+        Call(game, "TrySwitch"); Pose(game, 60f, 0f); Call(hud, "Refresh");
+        Assert.That(prompt.text, Is.Empty, "Old objectives and tips are never replayed after a critical action.");
+        Call(Get(hud, "Extras"), "Collect", 148f, 152f, 3.2f, 3.2f); Call(hud, "Refresh");
+        Assert.That(prompt.text, Is.Empty, "Power-up acknowledgements do not compete with road guidance.");
+        Pose(game, 3570f, 0f); Call(hud, "Refresh");
+        Assert.That(prompt.text, Is.Empty, "Exit choices replace the driving prompt completely.");
     }
 
     [UnityTest]
@@ -380,13 +448,13 @@ public sealed class WorldShiftGetawayTests
             .All(r => !r.sharedMaterial.IsKeywordEnabled("_EMISSION")), Is.True);
         Assert.That(UnityEngine.Object.FindObjectsByType<AudioSource>(FindObjectsSortMode.None), Is.Empty);
         Call(hud, "Refresh");
-        Assert.That(prompt.text, Is.EqualTo("Drive through to collect"));
+        Assert.That(prompt.text, Is.EqualTo("Collect cash. Take the left exit to keep it."));
         Pose(game, 18f, 0f); Capture("loot-box-approach");
         Pose(game, 0f, 0f);
-        Call(game, "StepSimulation", 1.2f, 0f, false); Call(hud, "Refresh");
+        Call(game, "StepSimulation", 1.4f, 0f, false); Call(hud, "Refresh");
         Assert.That(Run.Carried, Is.EqualTo(100));
         Assert.That(crate.gameObject.activeSelf, Is.False);
-        Assert.That(prompt.text, Is.Not.EqualTo("Drive through to collect"));
+        Assert.That(prompt.text, Is.EqualTo("Collect cash. Take the left exit to keep it."), "Collecting cash must not flash another message.");
         Assert.That(total.text, Is.EqualTo("$100"));
         Assert.That(total.rectTransform.localScale.x, Is.GreaterThan(1f));
         Capture("loot-total-feedback");
@@ -460,7 +528,7 @@ public sealed class WorldShiftGetawayTests
             Assert.That(Get(game, environment == 0 ? "IsRelayAirborne" : "IsAirborne"), Is.True,
                 "Driving onto the ramp must jump without pressing Space.");
             Assert.That(Get(game, "World").ToString(), Is.EqualTo("Day"));
-            Assert.That(prompt.text, Is.Not.EqualTo("Space to land in night."), "Shared ramps land safely in either world.");
+            Assert.That(prompt.text, Is.EqualTo("Space to land in Nightshift."), "The jump requires an airborne switch to the visible landing.");
             Capture(environment == 0 ? "auto-jump-air" : "auto-jump-desert-air");
             if (environment == 0) { Flow("FinishGetawayLeg", true); yield return null; yield return null; }
         }
@@ -501,8 +569,10 @@ public sealed class WorldShiftGetawayTests
             Call(game, "TogglePause"); fuel.Reset(100f);
             if (mode == 0)
             {
-                Call(Get(hud, "Extras"), "Collect", 42f, 46f, 0f, 0f); Call(hud, "Refresh");
-                Assert.That((float)Get(game, "Speed"), Is.EqualTo(36.96f).Within(.01f), "Removing the speed label must preserve boost behavior.");
+                var extras = Get(hud, "Extras");
+                float boostAt = (float)Get(extras, "BoostDistance");
+                Call(extras, "Collect", boostAt - 2f, boostAt + 2f, -2.8f, -2.8f); Call(hud, "Refresh");
+                Assert.That((float)Get(game, "Speed"), Is.EqualTo(30.24f).Within(.01f), "Removing the speed label must preserve boost behavior.");
             }
         }
     }

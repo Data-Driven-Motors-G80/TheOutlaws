@@ -48,7 +48,7 @@ namespace Outlaws.WorldShift
                 : RewardSeparated(distance) ? RewardBranch != 0 ? RewardBranch : lateral >= .4f ? 1 : -1 : 0;
         public bool ContinueSelected(float lateral) => ExitBranch != 0 ? ExitBranch > 0 : lateral >= WorldShiftGetaway.ContinueBoundary;
         public string Hint(float d)
-            => d >= ForkStart - 70f && d < ChoiceAt ? game.World == ShiftWorld.Day ? desertRoute ? "Open road left. Loot in the canyon." : "Main road left. Loot on the right." : "Left for ammo. Day brings loot." : "";
+            => d >= ForkStart - 70f && d < ChoiceAt ? game.World == ShiftWorld.Day ? desertRoute ? "Open road left: ammo + boost. Loot in the canyon." : "Main road left: ammo + boost. Loot on the right." : "Left for ammo. Day brings loot." : "";
 
         public void Bind(WorldShiftGetaway owner, WorldShiftRoute path, float environmentEnd, bool desert, Func<Color, Material> material)
         {
@@ -68,10 +68,7 @@ namespace Outlaws.WorldShift
                 var root = new GameObject(desert ? "Breakable fork rock" : "Breakable fork barrier").transform;
                 root.SetParent(transform, false);
                 root.SetPositionAndRotation(Position(at, x) + p.Up * .65f, Quaternion.LookRotation(p.Forward, p.Up));
-                var body = GameObject.CreatePrimitive(desert ? PrimitiveType.Sphere : PrimitiveType.Cube);
-                body.transform.SetParent(root, false); body.transform.localScale = new Vector3(1.2f, 1.3f, 1.4f);
-                body.GetComponent<Collider>().enabled = false; body.GetComponent<Renderer>().sharedMaterial = material(new Color(.48f, .43f, .36f));
-                WorldShiftCombat.MarkBreakable(root, new Vector3(0f, 0f, -.73f));
+                WorldShiftObstacleVisual.Build(root, Vector3.zero, new Vector3(1.2f, 1.3f, 1.4f));
                 Blockers.Add(new Blocker { At = at, X = x, Visual = root });
             }
             BuildBoundaries(material);
@@ -89,7 +86,7 @@ namespace Outlaws.WorldShift
             if (side == 0) return central;
             float slope = (Spread(d + .1f) - Spread(d - .1f)) / .2f * side;
             return new RoadPathPoint(central.Position + central.Right * Spread(d) * side,
-                (central.Forward + central.Right * slope).normalized, side < 0 ? Mathf.Max(central.Width, Width(d, -1) * 2f) : central.Width);
+                (central.Forward + central.Right * slope).normalized, Mathf.Max(central.Width, Width(d, side) * 2f));
         }
         public void BeginStep(float from, float to, float lateral)
         {
@@ -161,13 +158,12 @@ namespace Outlaws.WorldShift
             }
         }
         public float Width(float d, int side)
-            => d >= ExitStart ? 5f : Mathf.Lerp(5f, side < 0 ? 5.8f : 3.8f, Spread(d) / 4f);
+            => Mathf.Lerp(WorldShiftLevel.RoadWidth * .5f, WorldShiftLevel.RoadWidth, Spread(d) / 4f);
 
         private void BuildBoundaries(Func<Color, Material> material)
         {
             var surface = material(desertRoute ? new Color(.46f, .32f, .21f) : new Color(.4f, .43f, .46f));
-            // These plain walls communicate the narrow branch and stop visual ambiguity
-            // about its usable road. The open/main branch retains long sight lines.
+            // Boundaries follow the widened carriageway, leaving a steering bypass beside every blocker.
             for (float d = ChoiceAt + 60f; d < Rejoin - 90f; d += 22f)
                 foreach (bool inner in new[] { true, false })
                 {

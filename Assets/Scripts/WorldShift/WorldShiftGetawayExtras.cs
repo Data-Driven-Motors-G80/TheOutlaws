@@ -10,16 +10,20 @@ namespace Outlaws.WorldShift
         private WorldShiftGetaway game;
         private WorldShiftRoute route;
         private Transform shieldPickup, shieldAura, magnetPickup, boostPickup, magnetAura, boostAura;
-        private bool choiceTaken;
+        private bool shieldTaken, magnetTaken, boostTaken;
         private float magnetUntil, boostUntil;
-        public const float PowerDistance = ShieldDistance;
+        public const float MagnetDistance = 150f;
+        public float BoostDistance { get; private set; }
+        private const float PreviewDistance = 80f;
         public const float MagnetLane = 3.2f;
+        public const float BoostLane = -2.8f;
         public const float MagnetDuration = 6f, BoostDuration = 4f;
-        public bool MagnetActive => Active && game.Duration < magnetUntil;
-        public bool BoostActive => Active && game.Duration < boostUntil;
+        public bool MagnetActive => ActiveInDay && game.Duration < magnetUntil;
+        public bool BoostActive => ActiveInDay && game.Duration < boostUntil;
         private bool Active => game != null && WorldShiftFlow.Escape.Status == GetawayRunState.RunStatus.Running;
+        private bool ActiveInDay => Active && game.World == ShiftWorld.Day;
         public float SpeedMultiplier => BoostActive ? 1.2f : 1f;
-        public float SteeringMultiplier => BoostActive ? .8f : 1f;
+        public float SteeringMultiplier => 1f;
         private readonly List<Mesh> meshes = new List<Mesh>();
         private float shieldProtectionUntil, feedbackUntil;
         private string feedback = "";
@@ -28,14 +32,21 @@ namespace Outlaws.WorldShift
         public WorldShiftBonusJump Jump { get; private set; }
         public bool ShieldTaken { get; private set; }
         public string Feedback => game.Duration < feedbackUntil ? feedback : "";
-        public string Hint => !choiceTaken && game.World == ShiftWorld.Day && game.Distance >= 12f && game.Distance < PowerDistance - 2f
-            ? WorldShiftFlow.Escape.HasShield ? "Boost middle. Magnet right." : "Shield left. Boost middle. Magnet right."
+        public string Hint => game.World == ShiftWorld.Day && !shieldTaken && !WorldShiftFlow.Escape.HasShield && Approaching(ShieldDistance)
+            ? "Shield left. Protection for the next obstacle."
+            : game.World == ShiftWorld.Day && !magnetTaken && Approaching(MagnetDistance)
+            ? "Magnet right. Pull in the upcoming loot."
+            : game.World == ShiftWorld.Day && !boostTaken && Approaching(BoostDistance)
+            ? "Boost left. Gain distance on the open branch."
             : game.Distance >= Jump.Start - 56f && game.Distance < Jump.Start
             ? "Drive up the ramp to jump." : Jump.OnRamp ? "Drive up the ramp to jump." : "";
+        private bool Approaching(float at) => game.Distance >= at - PreviewDistance && game.Distance < at - 2f;
 
         public void Bind(WorldShiftGetaway owner, WorldShiftRoute road, Transform player, float environmentEnd, Func<Color, Material> material)
         {
             game = owner; route = road; Jump = new WorldShiftBonusJump(environmentEnd);
+            // One of each per leg: protection early, magnet before loot, boost on the clear fork branch.
+            BoostDistance = road.Forks.ForkStart + 100f;
             Material gold = material(new Color(1f, .76f, .25f));
             Material deck = material(new Color(.10f, .17f, .22f));
             Material cyan = material(new Color(.25f, .85f, 1f));
@@ -65,11 +76,13 @@ namespace Outlaws.WorldShift
                 Line(shieldAura, "Shield ring", points, cyan, .045f, true);
             }
             Material purple = material(new Color(.85f, .45f, 1f));
+            point = route.Sample(MagnetDistance);
             magnetPickup = Root("Loot magnet pickup", point.Position + point.Right * MagnetLane + Vector3.up * 1.5f, point.Forward);
             PowerMarker(magnetPickup, marker, purple);
             Line(magnetPickup, "Magnet", new[] { new Vector3(-.6f, 1f, 0f), new Vector3(-.6f, .1f, 0f),
                 new Vector3(-.35f, -.25f, 0f), new Vector3(.35f, -.25f, 0f), new Vector3(.6f, .1f, 0f), new Vector3(.6f, 1f, 0f) }, purple, .22f, false);
-            boostPickup = Root("Getaway boost pickup", point.Position + Vector3.up * 1.5f, point.Forward);
+            point = route.Sample(BoostDistance);
+            boostPickup = Root("Getaway boost pickup", road.Forks.Position(BoostDistance, BoostLane) + Vector3.up * 1.5f, point.Forward);
             PowerMarker(boostPickup, marker, orange);
             Line(boostPickup, "Boost bolt", new[] { new Vector3(.3f, 1.3f, 0f), new Vector3(-.45f, .4f, 0f),
                 new Vector3(.2f, .4f, 0f), new Vector3(-.3f, -.4f, 0f) }, orange, .22f, false);
@@ -103,34 +116,38 @@ namespace Outlaws.WorldShift
 
         public void Collect(float from, float to, float fromX, float toX)
         {
-            if (!Active || game.World != ShiftWorld.Day || choiceTaken || to < PowerDistance - 1.3f || from > PowerDistance + 1.3f) return;
-            float entry = Mathf.InverseLerp(from, to, PowerDistance - 1.3f);
-            float exit = Mathf.InverseLerp(from, to, PowerDistance + 1.3f);
-            float a = Mathf.Lerp(fromX, toX, entry), b = Mathf.Lerp(fromX, toX, exit);
-            float lane = (a + b) * .5f < -1.6f ? ShieldLane : (a + b) * .5f > 1.6f ? MagnetLane : 0f;
-            if (Mathf.Max(a, b) < lane - 1.35f || Mathf.Min(a, b) > lane + 1.35f) return;
-            if (lane == ShieldLane)
+            if (!Active || game.World != ShiftWorld.Day) return;
+            bool Crosses(float at, float lane)
             {
-                if (!WorldShiftFlow.Escape.CollectShield()) return;
-                ShieldTaken = true;
+                if (to < at - 1.3f || from > at + 1.3f) return false;
+                float entry = Mathf.InverseLerp(from, to, at - 1.3f);
+                float exit = Mathf.InverseLerp(from, to, at + 1.3f);
+                float a = Mathf.Lerp(fromX, toX, entry), b = Mathf.Lerp(fromX, toX, exit);
+                return Mathf.Max(a, b) >= lane - 1.35f && Mathf.Min(a, b) <= lane + 1.35f;
+            }
+            if (!shieldTaken && Crosses(ShieldDistance, ShieldLane) && WorldShiftFlow.Escape.CollectShield())
+            {
+                shieldTaken = ShieldTaken = true;
                 Say("Shield on.");
             }
-            else if (lane == MagnetLane)
+            if (!magnetTaken && Crosses(MagnetDistance, MagnetLane))
             {
+                magnetTaken = true;
                 magnetUntil = game.Duration + MagnetDuration;
                 Say("Magnet on!");
             }
-            else
+            if (!boostTaken && Crosses(BoostDistance, BoostLane))
             {
+                boostTaken = true;
                 boostUntil = game.Duration + BoostDuration;
                 Say("Boost!");
             }
-            choiceTaken = true;
             Refresh();
         }
 
         public bool BlocksImpact(bool collisionProtected)
         {
+            if (!ActiveInDay) return false;
             if (game.Duration < shieldProtectionUntil) return true;
             if (collisionProtected || !WorldShiftFlow.Escape.AbsorbHit()) return false;
             // One obstacle field should not immediately charge another contact for the same hit.
@@ -143,14 +160,16 @@ namespace Outlaws.WorldShift
         public void Present(ShiftWorld displayedWorld)
         {
             if (shieldPickup == null) return;
-            bool visible = Active && !choiceTaken && game.Distance < PowerDistance + 10f && game.Distance > PowerDistance - 180f;
-            shieldPickup.gameObject.SetActive(visible && !WorldShiftFlow.Escape.HasShield && displayedWorld == ShiftWorld.Day);
-            magnetPickup.gameObject.SetActive(visible && displayedWorld == ShiftWorld.Day);
-            boostPickup.gameObject.SetActive(visible && displayedWorld == ShiftWorld.Day);
+            bool Visible(float at) => Active && displayedWorld == ShiftWorld.Day
+                && game.Distance >= at - PreviewDistance && game.Distance <= at + 1.3f;
+            shieldPickup.gameObject.SetActive(Visible(ShieldDistance) && !shieldTaken && !WorldShiftFlow.Escape.HasShield);
+            magnetPickup.gameObject.SetActive(Visible(MagnetDistance) && !magnetTaken);
+            boostPickup.gameObject.SetActive(Visible(BoostDistance) && !boostTaken);
         }
+
         public void Refresh()
         {
-            if (shieldAura != null) shieldAura.gameObject.SetActive(Active && WorldShiftFlow.Escape.HasShield);
+            if (shieldAura != null) shieldAura.gameObject.SetActive(ActiveInDay && WorldShiftFlow.Escape.HasShield);
             if (magnetAura != null)
             {
                 magnetAura.gameObject.SetActive(MagnetActive);

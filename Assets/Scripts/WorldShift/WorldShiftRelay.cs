@@ -35,11 +35,10 @@ namespace Outlaws.WorldShift
         private readonly WorldShiftRoute route;
         private readonly ShiftRelay[] sections;
         private readonly float cruisingSpeed;
-        private readonly bool sharedWorldRules;
         private ShiftRelay flying;
         public int Completed { get; private set; }
-        public WorldShiftRelay(WorldShiftRoute sharedRoute, ShiftRelay[] layout = null, float speed = WorldShiftLevel.Speed, bool sharedWorldRules = false)
-        { route = sharedRoute; sections = layout ?? Sections; cruisingSpeed = speed; this.sharedWorldRules = sharedWorldRules; }
+        public WorldShiftRelay(WorldShiftRoute sharedRoute, ShiftRelay[] layout = null, float speed = WorldShiftLevel.Speed)
+        { route = sharedRoute; sections = layout ?? Sections; cruisingSpeed = speed; }
         public bool IsAirborne => flying != null;
         public ShiftRelay Flight => flying;
         public static ShiftRelay At(float distance)
@@ -56,7 +55,7 @@ namespace Outlaws.WorldShift
         public bool BeginStep(float from, float to, ShiftWorld world)
         {
             foreach (var section in sections)
-                if (from < section.Takeoff && to >= section.Takeoff && (sharedWorldRules || world == section.Source))
+                if (from < section.Takeoff && to >= section.Takeoff && world == section.Source)
                 { flying = section; return true; }
             return false;
         }
@@ -64,7 +63,7 @@ namespace Outlaws.WorldShift
         {
             landed = false;
             if (flying == null || distance < flying.Landing) return true;
-            if (!sharedWorldRules && world != flying.Destination) return false;
+            if (world != flying.Destination) return false;
             flying = null;
             Completed++;
             landed = true;
@@ -100,15 +99,14 @@ namespace Outlaws.WorldShift
         {
             var section = flying ?? SectionAt(distance);
             if (section == null) return "";
-            if (sharedWorldRules) return flying != null ? "" : distance >= section.Landing ? "" : "Drive up the ramp to jump.";
-            string source = section.Source == ShiftWorld.Day ? "DAY" : "NIGHT";
-            string target = section.Destination == ShiftWorld.Day ? "DAY" : "NIGHT";
+            string source = WorldShiftModeGuide.Name(section.Source);
+            string target = WorldShiftModeGuide.Name(section.Destination);
             if (flying != null) return world == section.Destination
-                ? "Stay in " + target.ToLowerInvariant() + " to land."
-                : "Space to land in " + target.ToLowerInvariant() + ".";
-            if (distance >= section.Landing) return "Nice landing!";
+                ? "Stay in " + target + " until the road rejoins."
+                : "Space to land in " + target + ".";
+            if (distance >= section.Landing) return "Stay in " + target + " until the road rejoins.";
             return world == section.Source ? "Drive up the ramp to jump."
-                : "Switch to " + source.ToLowerInvariant() + " for the ramp.";
+                : "Switch to " + source + " for the ramp.";
         }
     }
 }

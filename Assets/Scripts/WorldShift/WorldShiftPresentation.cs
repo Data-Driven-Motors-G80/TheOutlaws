@@ -172,11 +172,6 @@ namespace Outlaws.WorldShift
             chunks.Add(chunk);
             var solid = new GameObject("Solid - collides in this world"); solid.transform.SetParent(root, false);
             var ghost = new GameObject("Outline - belongs to other world"); ghost.transform.SetParent(root, false);
-            Material outline = data.World == ShiftWorld.Day ? warmEdge : coldEdge;
-            Material ghostLine = Reflective(data.World == ShiftWorld.Day
-                ? new Color(.62f, .42f, .18f) : new Color(.20f, .50f, .60f), .24f);
-            Material fire = RuntimeMaterials.Coloured(data.World == ShiftWorld.Day ? new Color(0.95f, 0.24f, 0.07f) : new Color(0.2f, 0.65f, 0.9f));
-            Material body = RuntimeMaterials.Coloured(data.World == ShiftWorld.Day ? new Color(0.14f, 0.18f, 0.24f) : new Color(0.58f, 0.7f, 0.79f));
             float depth = data.End - data.Start;
             if (data.Kind == ShiftHazardKind.Gap)
             {
@@ -184,126 +179,29 @@ namespace Outlaws.WorldShift
                 BuildPitLighting(solid.transform, data);
                 WorldShiftPitVisuals.Build(solid.transform, route, data);
             }
-            else if (data.Kind == ShiftHazardKind.HalfBarrier)
-            {
-                float x = data.HalfSide * WorldShiftLevel.RoadWidth * .25f;
-                Material concrete = RuntimeMaterials.Coloured(new Color(.5f, .52f, .55f));
-                Material stripe = outline;
-
-                // Route-fitted one-metre slices keep even the wall-side end flush on bends.
-                convergence.BuildWall(solid.transform, data, concrete, stripe);
-            }
-            else if (data.Kind == ShiftHazardKind.Divider)
-            {
-                // Each part follows the shared road rather than cutting across a bend.
-                for (float at = data.Start; at < data.End; at += 10f)
-                {
-                    float length = Mathf.Min(10f, data.End - at);
-                    RoadPathPoint section = route.Sample(at + length * .5f);
-                    Renderer median = Box(solid.transform, "Day centre-lane concrete divider", Vector3.zero,
-                        new Vector3(3.05f, 1.05f, length - .12f), RuntimeMaterials.Coloured(new Color(.47f, .48f, .49f)));
-                    median.transform.SetPositionAndRotation(section.Position + section.Up * .525f,
-                        Quaternion.LookRotation(section.Forward, section.Up));
-                    Renderer reflector = Box(solid.transform, "Median yellow reflector", Vector3.zero,
-                        new Vector3(2.8f, .08f, Mathf.Min(1.2f, length)), warmEdge);
-                    reflector.transform.SetPositionAndRotation(section.Position + section.Up * 1.08f,
-                        Quaternion.LookRotation(section.Forward, section.Up));
-                    var outlineSection = new GameObject("Divider preview segment").transform;
-                    outlineSection.SetParent(ghost.transform, false);
-                    outlineSection.SetPositionAndRotation(section.Position, Quaternion.LookRotation(section.Forward, section.Up));
-                }
-            }
-            else if (data.Kind == ShiftHazardKind.Pedestrians)
-            {
-                BuildCrossing(solid.transform, data);
-                WorldShiftRoadSigns.BuildCrossing(solid.transform);
-            }
-            else if (data.Kind == ShiftHazardKind.Oncoming)
-            {
-                int lane = data.LaneMask == 1 ? 0 : data.LaneMask == 2 ? 1 : 2;
-                float x = (lane - 1) * WorldShiftLevel.RoadWidth / 3f;
-                if (policePrefab != null)
-                {
-                    WorldShiftTrafficVisual.Create(policePrefab, solid.transform, x);
-                }
-                else
-                {
-                    Box(solid.transform, "Oncoming police body", new Vector3(x, .55f, 0f), new Vector3(1.95f, 1f, 3.8f), body);
-                    Box(solid.transform, "Oncoming police cabin", new Vector3(x, 1.2f, 0f), new Vector3(1.4f, .5f, 1.6f), body);
-                }
-                Box(solid.transform, "Approaching white headlight bar", new Vector3(x, .65f, -1.8f), new Vector3(1.75f, .15f, .07f),
-                    Reflective(new Color(1f, 1f, .86f), .5f));
-            }
             else
             {
-                for (int lane = 0; lane < 3; lane++)
+                // Fit repeated blocks to the existing lane masks and curved collision footprint.
+                for (float offset = 0f; offset < depth; offset += 8f)
                 {
-                    if ((data.LaneMask & (1 << lane)) == 0) continue;
-                    float x = (lane - 1) * WorldShiftLevel.RoadWidth / 3f;
-                    if (data.Kind == ShiftHazardKind.Fire)
+                    float length = Mathf.Min(8f, depth - offset);
+                    float at = data.Start + offset + length * .5f;
+                    var frame = new GameObject("Obstacle footprint section").transform;
+                    frame.SetParent(solid.transform, false);
+                    var sample = route.Sample(at);
+                    frame.SetPositionAndRotation(sample.Position, Quaternion.LookRotation(sample.Forward, sample.Up));
+                    if (data.Kind == ShiftHazardKind.HalfBarrier)
+                        WorldShiftObstacleVisual.Build(frame, new Vector3(data.HalfSide * 2.5f, .9f, 0f), new Vector3(5f, 1.8f, length));
+                    else if (data.Kind == ShiftHazardKind.Divider)
+                        WorldShiftObstacleVisual.Build(frame, new Vector3(0f, .9f, 0f), new Vector3(3.05f, 1.8f, length));
+                    else for (int lane = 0; lane < 3; lane++)
                     {
-                        Box(solid.transform, "Fire footprint", new Vector3(x, 0.14f, 0f), new Vector3(3.22f, 0.28f, depth), fire);
-                        for (int z = 0; z < 3; z++)
-                            for (int n = 0; n < 3; n++)
-                            {
-                                float height = n == 1 ? 2.0f : 1.45f;
-                                Box(solid.transform, "Prototype flame", new Vector3(x + (n - 1) * 0.98f, height * 0.5f, (z - 1) * depth * 0.32f),
-                                    new Vector3(0.87f, height, 0.65f), n == 1 ? outline : fire);
-                            }
-                    }
-                    else if (data.Kind == ShiftHazardKind.Spikes)
-                    {
-                        Box(solid.transform, "Spike strip base", new Vector3(x, .1f, 0f), new Vector3(3.22f, .2f, depth), RuntimeMaterials.Coloured(new Color(.055f, .06f, .07f)));
-                        Box(solid.transform, "Spike strip warning", new Vector3(x, .22f, -depth * .5f + .2f), new Vector3(3.22f, .04f, .4f), warmEdge);
-                        SpikeStrip(solid.transform, x, depth);
-                    }
-                    else if (data.Kind == ShiftHazardKind.Barrier && obstaclePrefab != null)
-                    {
-                        Box(solid.transform, "Barrier footprint", new Vector3(x, .08f, 0f), new Vector3(3.22f, .16f, depth), body);
-                        foreach (float z in new[] { -depth * .3f, depth * .3f })
-                        {
-                            GameObject barrier = Visual(obstaclePrefab, solid.transform, new Vector3(x, .85f, z), new Vector3(3.05f, 1.7f, 1.5f));
-                            foreach (Renderer r in barrier.GetComponentsInChildren<Renderer>()) r.sharedMaterial = body;
-                            Box(solid.transform, "Barrier reflector", new Vector3(x, 1.4f, z - .8f), new Vector3(2.9f, .2f, .08f), outline);
-                        }
-                    }
-                    else
-                    {
-                        Box(solid.transform, "Police road closure", new Vector3(x, .06f, 0f), new Vector3(3.22f, .12f, depth), body);
-                        foreach (float z in new[] { -depth * 0.25f, depth * 0.25f })
-                        {
-                            if (policePrefab != null)
-                            {
-                                GameObject car = Visual(policePrefab, solid.transform, new Vector3(x, 0f, z), Vector3.one * 1.15f);
-                                foreach (Light light in car.GetComponentsInChildren<Light>()) light.enabled = false;
-                                continue;
-                            }
-                            Box(solid.transform, "Police body", new Vector3(x, 0.55f, z), new Vector3(2.55f, 1f, 3.5f), body);
-                            Box(solid.transform, "Police cabin", new Vector3(x, 1.2f, z), new Vector3(2f, 0.5f, 1.8f), body);
-                            Box(solid.transform, "Police red beacon", new Vector3(x - 0.4f, 1.52f, z), new Vector3(0.65f, 0.15f, 0.35f), RuntimeMaterials.Coloured(new Color(1f, 0.15f, 0.12f)));
-                            Box(solid.transform, "Police blue beacon", new Vector3(x + 0.4f, 1.52f, z), new Vector3(0.65f, 0.15f, 0.35f), coldEdge);
-                        }
+                        if ((data.LaneMask & (1 << lane)) == 0) continue;
+                        float x = (lane - 1) * WorldShiftLevel.RoadWidth / 3f;
+                        WorldShiftObstacleVisual.Build(frame, new Vector3(x, .9f, 0f), new Vector3(3.05f, 1.8f, length));
                     }
                 }
             }
-            if (data.World == ShiftWorld.Echo)
-            {
-                if (data.Kind != ShiftHazardKind.Gap) AddFaintObstacleGlow(solid.transform);
-                BuildNightReflectors(solid.transform, data);
-            }
-            if (data.Kind == ShiftHazardKind.Pedestrians)
-            {
-                foreach (Transform person in solid.GetComponentsInChildren<Transform>())
-                {
-                    if (person.name != "Grey prototype pedestrian") continue;
-                    WorldShiftPedestrian figure = person.gameObject.AddComponent<WorldShiftPedestrian>();
-                    figure.Initialize(game, (data.Start + data.End) * .5f + person.localPosition.z);
-                    pedestrians.Add(new PedestrianView { Hazard = data, Figure = figure, Lateral = person.localPosition.x });
-                }
-            }
-            if (!game.SplitViewValidation && (!game.TutorialLevel || data == game.TutorialShootingObstacle)
-                && (data.Kind == ShiftHazardKind.Barrier || data.Kind == ShiftHazardKind.HalfBarrier))
-                WorldShiftCombat.MarkBreakable(solid.transform, new Vector3(data.Kind == ShiftHazardKind.HalfBarrier ? data.HalfSide * 2.5f : 0f, 1.3f, -depth * .5f - .12f));
             hazards.Add(new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk });
         }
 
@@ -400,7 +298,7 @@ namespace Outlaws.WorldShift
                 foreach (ShiftHazard hazard in game.Hazards)
                     if (hazard.World == world && hazard.Kind == ShiftHazardKind.Gap && hazard.End > distance)
                         clearRoad = Mathf.Min(clearRoad, Mathf.Max(0f, hazard.Start - distance - 4f));
-                if (!game.SplitViewValidation && !route.SharedWorldRules)
+                if (!game.SplitViewValidation && !game.TutorialLevel)
                     foreach (var jump in WorldShiftRelay.Sections)
                     {
                         float edge = world == jump.Source ? jump.Takeoff : jump.Ramp;
@@ -644,7 +542,7 @@ namespace Outlaws.WorldShift
         public void RefreshFuel()
         {
             for (int i = 0; i < fuelModels.Count; i++)
-                fuelModels[i].SetActive((game.GetawayMode || game.Pickups[i].World == world) && !game.IsFuelCollected(i));
+                fuelModels[i].SetActive((game.GetawayMode ? world == ShiftWorld.Day : game.Pickups[i].World == world) && !game.IsFuelCollected(i));
         }
 
         private void SpikeStrip(Transform parent, float x, float depth)

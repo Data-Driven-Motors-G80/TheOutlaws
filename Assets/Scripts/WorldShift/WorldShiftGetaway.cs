@@ -11,6 +11,29 @@ namespace Outlaws.WorldShift
     {
         public const float ExitTail = 440f;
         public const float ContinueBoundary = 1.8f;
+        public const float NightReminderDelay = 12f, NightReminderInterval = 45f;
+        public const string OpeningPrompt = "Collect cash. Take the left exit to keep it.";
+        private const string NightReminderText = "Fuel still drains. Return to Day for supplies.";
+        private const string ShootPrompt = "F / click to shoot the block.";
+        private float lastActionPromptAt = float.NegativeInfinity;
+        private float shootCandidateSince = float.PositiveInfinity;
+        private float shootLastEligibleAt = float.NegativeInfinity;
+        private float shootShownAt = float.PositiveInfinity;
+        private bool shootHintFinished;
+        private float nightEnteredAt = float.PositiveInfinity;
+        public void OnWorldChanged()
+            => nightEnteredAt = World == ShiftWorld.Echo ? Duration : float.PositiveInfinity;
+        private string NightReminder
+        {
+            get
+            {
+                if (World != ShiftWorld.Echo || State != ShiftRunState.Running) return "";
+                float elapsed = Duration - nightEnteredAt - NightReminderDelay;
+                if (elapsed < 0f) return "";
+                float phase = Mathf.Repeat(elapsed, NightReminderInterval);
+                return phase < 6f ? NightReminderText : "";
+            }
+        }
         private sealed class Loot
         {
             public float At, X;
@@ -99,10 +122,11 @@ namespace Outlaws.WorldShift
                 AddLoot(at, WorldShiftBonusJump.Lane, ShiftWorld.Echo, gold, handle, Extras.Jump.HeightAt(at), true);
             AddLoot(Extras.Jump.Start + 16f, -3.2f, ShiftWorld.Day, gold, handle);
             AddLoot(Extras.Jump.Start + 60f, -3.2f, ShiftWorld.Day, gold, handle);
-            // A visible Night trail makes the magnet choice useful immediately.
-            foreach (float at in new[] { 65f, 90f, 115f, 140f })
+            // A spaced loot trail gives the magnet a useful window after its pickup.
+            foreach (float at in new[] { 175f, 200f, 225f, 250f })
                 AddLoot(at, -3.2f, ShiftWorld.Echo, gold, handle);
             BuildExit();
+            OnWorldChanged();
             BuildHud();
             Present(World);
         }
@@ -344,10 +368,12 @@ namespace Outlaws.WorldShift
             choiceRight.text = "Right: Keep going\n" + (IsCity ? "Desert" : "City") + " / " + (1f + Mathf.Min(currentLeg + 1, 40) * .5f).ToString("0.#") + "x loot";
             choiceLeftPanel.color = !Routing.ContinueSelected(Lateral) ? new Color(.08f, .3f, .2f, .98f) : Ink;
             choiceRightPanel.color = Routing.ContinueSelected(Lateral) ? new Color(.35f, .23f, .06f, .98f) : Ink;
-            guidance.text = running && !InExit ? DrivingPrompt() : "";
-            promptPanel.SetActive(guidance.text.Length > 0);
+            string nextPrompt = running && !InExit ? DrivingPrompt() : "";
+            if (guidance.text != nextPrompt) guidance.text = nextPrompt;
+            promptPanel.SetActive(nextPrompt.Length > 0);
+            // A fixed responsive width avoids an autosizing/preferred-width feedback loop.
             float maxPromptWidth = Mathf.Max(300f, ((RectTransform)drivingHud.transform).rect.width * .61f);
-            ((RectTransform)promptPanel.transform).sizeDelta = new Vector2(Mathf.Min(maxPromptWidth, guidance.preferredWidth + 48f), 52f);
+            ((RectTransform)promptPanel.transform).sizeDelta = new Vector2(maxPromptWidth, 60f);
             drivingHud.SetActive(!settled && State != ShiftRunState.Paused);
             pause.SetActive(State == ShiftRunState.Paused);
             pauseNote.text = run.Carried > 0 ? "Leaving now means losing your $" + run.Carried.ToString("N0") + "." : "Take your time. We'll wait.";
@@ -362,32 +388,59 @@ namespace Outlaws.WorldShift
 
         private string DrivingPrompt()
         {
-            // Road instructions take precedence over the goal and pickup acknowledgements.
-            string road = IsCity ? CityHint() : DesertHint();
-            if (road.Length > 0) { openingGoalDismissed = true; return road; }
-            if (Extras.Feedback.Length > 0) { openingGoalDismissed = true; return Extras.Feedback; }
-            if (currentLeg == 0 && WorldShiftFlow.Escape.Carried == 0 && World == ShiftWorld.Day && Distance < 36.3f)
-                return "Drive through to collect";
-            // Driving time pauses with the game; distance prevents replaying this after a teleport/restore.
-            if (!openingGoalDismissed && currentLeg == 0 && Duration < 2.2f && Distance < 80f) return "Grab loot. Exit to keep it.";
-            if (Combat != null && Combat.Hint.Length > 0) return Combat.Hint;
-            string fork = Routing.Hint(Distance);
-            return fork.Length > 0 ? fork : Extras.Hint;
-        }
-
-        private string CityHint()
-        {
-            if (city.IsRelayAirborne || WorldShiftRelay.At(Distance) != null) return city.SectionHint;
+            // One owner and one priority order. Context-critical instructions never queue behind old tips.
+            string jump = IsCity ? CityHint() : DesertHint();
+            if (jump.Length > 0) return ActionPrompt(jump);
+            if (Distance >= Routing.ForkStart - 100f && Distance < Routing.ChoiceAt)
+                return ActionPrompt("Left: ammo + boost. Right: cash in Day.");
+            if (Distance >= Extras.Jump.Start - 100f && Distance < Extras.Jump.Start && !Extras.Jump.Committed)
+                return ActionPrompt("Right ramp: bonus cash in Day. Left: stay on the road.");
+            string shoot = ShootingPrompt();
+            if (shoot.Length > 0) return ActionPrompt(shoot);
+            // Give the player a quiet beat between an action and optional information.
+            if (Duration - lastActionPromptAt < 1f) return "";
+            if (NightReminder.Length > 0) return NightReminder;
+            if (!openingGoalDismissed && currentLeg == 0 && World == ShiftWorld.Day && Duration < 5f && Distance < 150f)
+                return OpeningPrompt;
             return "";
         }
 
-        private string DesertHint()
+        private string ActionPrompt(string text)
         {
-            if (desert.IsAirborne) return World == ShiftWorld.Day ? "Space freezes the rocks." : "";
-            if (desert.Relay?.SectionAt(Distance) != null) return desert.Hint;
-            if (desert.Switches == 0 && Distance >= 100f && Distance < 180f) return "Space freezes the rocks.";
-            return DesertShiftLevel.InRockField(Distance) && World == ShiftWorld.Day ? "Space to freeze a gap." : "";
+            openingGoalDismissed = true;
+            lastActionPromptAt = Duration;
+            return text;
         }
+
+        private string ShootingPrompt()
+        {
+            if (shootHintFinished || Combat == null) return "";
+            if (Combat.ShotsFired > 0) { shootHintFinished = true; return ""; }
+            if (Combat.Ammo <= 0) return "";
+            if (Combat.Hint == "Click to shoot.")
+            {
+                shootLastEligibleAt = Duration;
+                if (float.IsPositiveInfinity(shootCandidateSince)) shootCandidateSince = Duration;
+                if (Duration - shootCandidateSince < .4f) return "";
+                if (float.IsPositiveInfinity(shootShownAt)) shootShownAt = Duration;
+                if (Duration - shootShownAt < 4f) return ShootPrompt;
+                shootHintFinished = true;
+            }
+            else
+            {
+                // Brief aim changes must not make the caption alternate every frame.
+                if (!float.IsPositiveInfinity(shootShownAt) && Duration - shootLastEligibleAt < .35f) return ShootPrompt;
+                if (!float.IsPositiveInfinity(shootShownAt)) shootHintFinished = true;
+                shootCandidateSince = float.PositiveInfinity;
+            }
+            return "";
+        }
+
+        private string CityHint()
+            => city.IsRelayAirborne || WorldShiftRelay.At(Distance) != null ? city.SectionHint : "";
+
+        private string DesertHint()
+            => desert.IsAirborne || desert.Relay?.SectionAt(Distance) != null ? desert.Hint : "";
 
         private void OnDestroy() { foreach (var material in materials) if (material != null) Destroy(material); }
     }

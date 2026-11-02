@@ -77,7 +77,7 @@ public sealed class WorldShiftRelayTests
             Assert.That(Get(game, "Hits"), Is.EqualTo(0));
             if (i == 0) Capture(game, "relay-03-landed");
             Advance(game, landings[i] + 57f);
-            Assert.That((float)Get(game, "Speed"), Is.EqualTo(30.8f).Within(.05f));
+            Assert.That((float)Get(game, "Speed"), Is.EqualTo(25.2f).Within(.05f));
         }
         // Deliberately omit Space on the first jump: no invisible landing or auto-switch.
         game.GetType().GetField("checkpointIndex", Flags).SetValue(game, 1);
@@ -93,7 +93,7 @@ public sealed class WorldShiftRelayTests
         Assert.That(Get(game, "Distance"), Is.EqualTo(560f));
         Assert.That(Get(game, "IsRelayAirborne"), Is.False);
         Assert.That(Get(game, "World").ToString(), Is.EqualTo("Day"));
-        Assert.That(Get(game, "Speed"), Is.EqualTo(30.8f).Within(.01f));
+        Assert.That(Get(game, "Speed"), Is.EqualTo(25.2f).Within(.01f));
         yield return new ExitPlayMode();
     }
 

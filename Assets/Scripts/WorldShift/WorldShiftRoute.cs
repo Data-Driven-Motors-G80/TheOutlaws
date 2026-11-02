@@ -159,9 +159,10 @@ namespace Outlaws.WorldShift
 
         public bool HasSurface(float distance, ShiftWorld world)
         {
-            if (SharedWorldRules) return true;
+            // Shared obstacle rules do not remove the authored jump/world-switch puzzle.
             foreach (var jump in relays)
                 if (!jump.HasDeck(distance, world)) return false;
+            if (SharedWorldRules) return true;
             foreach (var h in validation ? WorldShiftSplitView.Layout : WorldShiftLevel.Hazards)
                 if (h.World == world && h.Kind == ShiftHazardKind.Gap && distance >= h.Start && distance < h.End)
                     return false;

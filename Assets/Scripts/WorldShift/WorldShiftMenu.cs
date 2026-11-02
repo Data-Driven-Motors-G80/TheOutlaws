@@ -35,7 +35,7 @@ namespace Outlaws.WorldShift
             var wordmark = Label(home.transform, "WorldShift", .075f, .78f, .8f, .94f, 60f);
             wordmark.fontStyle = FontStyles.Bold;
             wordmark.color = Cream;
-            Label(home.transform, "Pick your drive.", .079f, .71f, .8f, .78f, 23f).color = new Color(.70f, .77f, .82f);
+            Label(home.transform, "Loot, fuel and powers in Day. None in Nightshift.", .079f, .71f, .8f, .78f, 23f).color = new Color(.70f, .77f, .82f);
 
             var escape = ModeCard(home.transform, "Endless escape", .075f, .49f, false);
             Label(escape, "Endless escape", .065f, .35f, .94f, .48f, 30f).fontStyle = FontStyles.Bold;

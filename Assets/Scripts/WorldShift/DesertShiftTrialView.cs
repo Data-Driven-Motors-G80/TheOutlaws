@@ -159,33 +159,15 @@ namespace Outlaws.WorldShift
 
         private void OriginalObstacle(Transform parent, Vector3 position, Vector3 size, Material material = null)
         {
-            if (material == null) material = Material(new Color(1f, .42f, 0f), .08f);
-            if (obstaclePrefab == null) { Box(parent, "Desert roadblock", position, size, material); return; }
-            GameObject block = Instantiate(obstaclePrefab, parent);
-            block.name = "Original desert obstacle prefab";
-            block.transform.localPosition = position; block.transform.localRotation = Quaternion.identity; block.transform.localScale = size;
-            foreach (Collider collider in block.GetComponentsInChildren<Collider>()) collider.enabled = false;
-            foreach (Renderer surface in block.GetComponentsInChildren<Renderer>()) surface.sharedMaterial = material;
+            WorldShiftObstacleVisual.Build(parent, position, size);
         }
 
         private void BuildRock(DesertTrialRock data)
         {
             var root = new GameObject("Shared rolling rock " + data.Distance).transform;
             root.SetParent(transform, false);
-            var sphere = DesertRollingRock.CreateVisual(root, data.Radius).gameObject;
-            Renderer surface = sphere.GetComponent<Renderer>();
-            surface.sharedMaterial = rockDay;
-            // A simple belt makes real rotation visible on a low-detail sphere.
-            var belt = new GameObject("Rolling orientation marker").AddComponent<LineRenderer>();
-            belt.transform.SetParent(sphere.transform, false);
-            belt.useWorldSpace = false; belt.loop = true; belt.positionCount = 28; belt.widthMultiplier = .035f;
-            belt.sharedMaterial = Material(Gold, .15f);
-            for (int i = 0; i < belt.positionCount; i++)
-            {
-                float angle = i * Mathf.PI * 2f / belt.positionCount;
-                belt.SetPosition(i, new Vector3(0f, Mathf.Sin(angle) * .505f, Mathf.Cos(angle) * .505f));
-            }
-            if (game.FullLevel) WorldShiftCombat.MarkBreakable(root, new Vector3(0f, 0f, -data.Radius - .03f));
+            var sphere = WorldShiftObstacleVisual.Build(root, Vector3.zero, Vector3.one * (data.Radius * 2f)).gameObject;
+            Renderer surface = sphere.transform.Find("Obstacle block").GetComponent<Renderer>();
             var frozen = new GameObject("Frozen pause pictogram");
             frozen.transform.SetParent(root, false);
             foreach (float x in new[] { -.2f, .2f })
@@ -207,8 +189,7 @@ namespace Outlaws.WorldShift
         {
             Transform root = RoadRoot("Freezeable oncoming police " + data.Start, data.Start);
             float x = data.Lane * WorldShiftLevel.RoadWidth / 3f;
-            WorldShiftTrafficVisual.Create(game.PolicePrefab, root, x);
-            Box(root, "Oncoming headlight bar", new Vector3(x, .65f, -1.8f), new Vector3(1.75f, .15f, .07f), Material(new Color(1f, 1f, .85f), .6f));
+            WorldShiftObstacleVisual.Build(root, new Vector3(x, .9f, 0f), new Vector3(2.4f, 1.8f, 3.8f));
             var frozen = new GameObject("Frozen traffic pause pictogram"); frozen.transform.SetParent(root, false);
             foreach (float offset in new[] { -.2f, .2f })
                 Box(frozen.transform, "Pause bar", new Vector3(x + offset, 2.25f, 0f), new Vector3(.18f, .65f, .15f), Material(Cyan, .65f));
@@ -226,14 +207,11 @@ namespace Outlaws.WorldShift
             if (data.HalfSide != 0)
             {
                 OriginalObstacle(solid.transform, new Vector3(data.HalfSide * 2.5f, .7f, 0f), new Vector3(5f, 1.4f, 8f), Material(colour * .55f, .1f));
-                Box(solid.transform, "Reflective half barrier", new Vector3(data.HalfSide * 2.5f, 1.1f, -4.05f), new Vector3(4.9f, .16f, .12f), Material(colour, .35f));
             }
             else for (int lane = -1; lane <= 1; lane++)
             {
                 OriginalObstacle(solid.transform, new Vector3(lane * 3.33f, .7f, 0f), new Vector3(3.3f, 1.4f, 8f), Material(colour * .55f, .1f));
-                Box(solid.transform, "Wall reflective band", new Vector3(lane * 3.33f, 1.1f, -4.05f), new Vector3(3.2f, .16f, .12f), Material(colour, .35f));
             }
-            if (game.FullLevel) WorldShiftCombat.MarkBreakable(solid.transform, new Vector3(data.HalfSide * 2.5f, 1f, -4.15f));
             gates.Add(new GateView { Root = root, Solid = solid });
         }
 
@@ -270,10 +248,8 @@ namespace Outlaws.WorldShift
                 float x = game.RockLateral(data, world);
                 item.Root.SetPositionAndRotation(point.Position + point.Right * x + point.Up * data.Radius,
                     Quaternion.LookRotation(point.Forward, point.Up));
-                // Absolute pose prevents the two camera passes from rotating the
-                // shared visual twice or leaking Day motion into the frozen view.
-                item.Ball.localRotation = Quaternion.AngleAxis(-x / data.Radius * Mathf.Rad2Deg, Vector3.forward);
-                item.Surface.sharedMaterial = day ? rockDay : rockNight;
+                // Moving and frozen hazards keep the same upright X silhouette.
+                item.Ball.localRotation = Quaternion.identity;
                 item.Lock.SetActive(game.FrozenView(world));
             }
             for (int i = 0; i < traffic.Count; i++)
@@ -297,7 +273,7 @@ namespace Outlaws.WorldShift
                 item.Root.SetActive(data.End > game.Distance - 20f && data.Start < game.Distance + 220f);
                 item.Solid.SetActive(active);
             }
-            for (int i = 0; i < fuelViews.Count; i++) fuelViews[i].SetActive(!game.IsFuelTaken(i) && game.FuelDistance(i) > game.Distance - 5f && game.FuelDistance(i) < game.Distance + 200f);
+            for (int i = 0; i < fuelViews.Count; i++) fuelViews[i].SetActive((!game.GetawayMode || day) && !game.IsFuelTaken(i) && game.FuelDistance(i) > game.Distance - 5f && game.FuelDistance(i) < game.Distance + 200f);
         }
 
         public void Refresh()
@@ -319,7 +295,7 @@ namespace Outlaws.WorldShift
             modal.SetActive(menu);
             practiceHud.SetActive(!menu);
             modalText.text = game.State == ShiftRunState.Ready
-                ? "Desert practice\n\nThings move in day and freeze in night.\nGive Space a try."
+                ? "Desert practice\n\nObstacles move in Day and freeze in Nightshift.\nGive Space a try."
                 : game.State == ShiftRunState.Won ? "Nice driving!\n\nFancy another go?"
                 : game.FullLevel ? "Paused\n\nA / D to steer. Space to switch. F / click to shoot." : "Paused\n\nA / D to steer. Space to switch.";
             actionLabel.text = game.State == ShiftRunState.Ready ? "Let's drive" : game.State == ShiftRunState.Won ? "Try again" : "Keep driving";

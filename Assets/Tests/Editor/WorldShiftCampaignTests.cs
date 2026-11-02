@@ -28,6 +28,69 @@ public sealed class WorldShiftCampaignTests
     [UnityTearDown] public IEnumerator Cleanup() { if (Application.isPlaying) yield return new ExitPlayMode(); }
 
     [UnityTest]
+    public IEnumerator TutorialWaitsOnlyForUnfinishedActions()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
+        Flow("StartGetaway", true); yield return null; yield return null;
+        var game = Find("WorldShiftCity"); game.enabled = false;
+        var hud = Find("WorldShiftHud");
+        var prompt = (TMPro.TMP_Text)hud.GetType().GetField("lessonHint", Flags).GetValue(hud);
+        Assert.That(hud.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Mode explanation"), Is.False);
+        Call(hud, "Refresh");
+        string steering = prompt.text;
+        Pose(game, 0f, 1.2f); Call(game, "CompleteTutorialHint");
+        Call(game, "StepSimulation", 3f, 0f, false); Call(hud, "Refresh");
+        Assert.That(prompt.text, Is.EqualTo(steering), "Completing an action must not start rotating subtitles.");
+        Pose(game, 118.5f, 3.2f);
+        float at = (float)Get(game, "Distance");
+        Call(game, "StepSimulation", 1f, 0f, false);
+        Assert.That((float)Get(game, "Distance"), Is.GreaterThan(at), "A completed steering action must not force a reading stop.");
+        game.GetType().GetField("checkpointIndex", Flags).SetValue(game, 1);
+        Call(game, "RetryCheckpoint"); Call(game, "TrySwitch");
+        Pose(game, 238.5f, 0f);
+        Assert.That((float)Get(game, "Speed"), Is.EqualTo(18f), "Switching early keeps the car moving at the next boundary.");
+        Call(game, "StepSimulation", .15f, 0f, false);
+        Assert.That((int)game.GetType().GetField("checkpointIndex", Flags).GetValue(game), Is.EqualTo(2));
+        game.GetType().GetField("checkpointIndex", Flags).SetValue(game, 1);
+        Call(game, "RetryCheckpoint"); Call(hud, "Refresh");
+        string nightLesson = prompt.text;
+        Assert.That(nightLesson, Does.Contain("Nightshift freezes obstacles"));
+        Assert.That(nightLesson, Does.Contain("still block the road"));
+        Capture("tutorial-stable-nightshift");
+        Pose(game, 238.5f, 3.2f);
+        at = (float)Get(game, "Distance");
+        float safeGap = (float)Get(game, "PursuitGap");
+        Call(game, "StepSimulation", 10f, 0f, false); Call(hud, "Refresh");
+        Assert.That(Get(game, "PursuitGap"), Is.EqualTo(safeGap), "Traffic and pursuit must not punish the player while a lesson is waiting.");
+        Assert.That((float)Get(game, "Distance"), Is.EqualTo(at), "An unfinished switch action must still wait safely.");
+        Assert.That(prompt.text, Is.EqualTo(nightLesson));
+        Call(game, "TrySwitch"); Call(hud, "Refresh");
+        Assert.That(prompt.text, Is.EqualTo(nightLesson), "A switch demonstrates the same card rather than replacing its wording.");
+        Call(game, "StepSimulation", .15f, 0f, false); Call(hud, "Refresh");
+        Assert.That(prompt.text, Does.Contain("cash, fuel and power-ups"));
+        Assert.That(prompt.text, Does.Contain("Fuel drains. Police keep chasing"));
+        string suppliesLesson = prompt.text;
+        Call(game, "TrySwitch"); Call(hud, "Refresh");
+        Assert.That(prompt.text, Is.EqualTo(suppliesLesson));
+        Pose(game, 378.5f, 0f);
+        Assert.That((float)Get(game, "Speed"), Is.EqualTo(18f), "Returning to Day early avoids another forced stop.");
+        Canvas.ForceUpdateCanvases(); prompt.ForceMeshUpdate();
+        Assert.That(prompt.isTextOverflowing, Is.False);
+        Assert.That(prompt.textInfo.lineCount, Is.EqualTo(2));
+        Assert.That(prompt.color, Is.EqualTo(new Color(.95f, .97f, 1f)));
+        Capture("tutorial-stable-supplies");
+        Call(game, "TogglePause");
+        float pausedAt = (float)Get(game, "Duration");
+        Call(game, "StepSimulation", 10f, 0f, false);
+        Assert.That(Get(game, "Duration"), Is.EqualTo(pausedAt));
+        Call(game, "TogglePause");
+        Assert.That(Get(game, "TutorialPrompt"), Is.EqualTo(suppliesLesson));
+        game.GetType().GetField("checkpointIndex", Flags).SetValue(game, 3);
+        Call(game, "RetryCheckpoint"); Call(hud, "Refresh");
+        Assert.That(prompt.text, Is.EqualTo("Click to shoot the block."));
+    }
+
+    [UnityTest]
     public IEnumerator MenuTutorialCityDesertAndCollisionSmoke()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
@@ -82,7 +145,7 @@ public sealed class WorldShiftCampaignTests
                         Call(tutorial, "TrySwitch");
                         Assert.That(Get(tutorial, "SectionHint"), Is.Empty, "Completed instructions must not reappear after switching back.");
                         Call(tutorial, "RetryCheckpoint");
-                        Assert.That(Get(tutorial, "SectionHint"), Is.EqualTo("Tap Space to freeze traffic."), "Retrying the lesson restores its instruction.");
+                        Assert.That(Get(tutorial, "SectionHint"), Is.EqualTo("Press Space to freeze obstacles in Nightshift."), "Retrying the lesson restores its instruction.");
                         Call(tutorial, "TrySwitch");
                         Assert.That(Get(tutorial, "SectionHint"), Is.Empty);
                     }
@@ -147,7 +210,7 @@ public sealed class WorldShiftCampaignTests
         Assert.That(Get(desert, "Retries"), Is.EqualTo(1));
         Assert.That((float)Get(desert, "PursuitGap"), Is.GreaterThan(44f), "The frozen centre route must be passable without a forced hit.");
         foreach (object car in traffic) Assert.That(Get(car, "Travel"), Is.EqualTo(0f), "Night freezes cars too.");
-        Call(desert, "StepSimulation", 1.2f, 0f, false);
+        AdvanceDesert(desert, 1174f, 0f);
         Assert.That((float)Get(desert, "PursuitGap"), Is.LessThan(23f), "Staying in Night must collide with the wall between groups.");
         Call(desert, "Restart");
         desert.GetType().GetProperty("Stage").SetValue(desert, 5);

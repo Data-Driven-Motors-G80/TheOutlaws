@@ -34,6 +34,20 @@ namespace Outlaws.WorldShift
         private readonly RiskRunState pursuit = new RiskRunState();
         private readonly System.Collections.Generic.HashSet<ShiftHazard> hitHazards = new System.Collections.Generic.HashSet<ShiftHazard>();
         private bool tutorialHintCompleted;
+        public string TutorialPrompt => !tutorialLevel ? ""
+            : checkpointIndex == 3 && (Combat?.IsDestroyed(TutorialShootingObstacle) ?? false)
+                ? "Block cleared. Keep driving." : WorldShiftTutorial.LessonMessages[checkpointIndex];
+        private bool TutorialWaitingForLesson
+        {
+            get
+            {
+                if (!tutorialLevel) return false;
+                float end = checkpointIndex + 1 < Checkpoints.Length ? Checkpoints[checkpointIndex + 1].Distance : RunLength;
+                if (Distance < end - 2f) return false;
+                bool completed = checkpointIndex == 3 ? Combat?.IsDestroyed(TutorialShootingObstacle) ?? false : tutorialHintCompleted;
+                return !completed;
+            }
+        }
         private int tutorialCheckpointSwitches;
         private float tutorialCheckpointLateral;
         private bool[] fuelTaken;
@@ -77,7 +91,7 @@ namespace Outlaws.WorldShift
         public ShiftHazard TutorialShootingObstacle => tutorialLevel ? tutorialHazards[3] : null;
         public bool TutorialShootingActive => tutorialLevel && Distance >= 380f && Distance < WorldShiftTutorial.FinalLessonStart;
         private bool WaitingForTutorialShot => TutorialShootingActive && !(Combat?.IsDestroyed(TutorialShootingObstacle) ?? false);
-        private float BaseSpeed => tutorialLevel ? WaitingForTutorialShot && Distance >= 410f ? 0f : 18f : JumpSequence ? relay?.SpeedAt(Distance) ?? WorldShiftLevel.Speed
+        private float BaseSpeed => tutorialLevel ? TutorialWaitingForLesson || WaitingForTutorialShot && Distance >= 410f ? 0f : 18f : JumpSequence ? relay?.SpeedAt(Distance) ?? WorldShiftLevel.Speed
             : WorldShiftLevel.Speed * (splitViewValidation ? 1f : WorldShiftLevel.CruiseSpeedMultiplier);
         public float Speed => BaseSpeed * (JumpSequence ? 1f : Getaway?.Extras.SpeedMultiplier ?? 1f);
         public ChaseCar Police { get; private set; }
@@ -114,7 +128,7 @@ namespace Outlaws.WorldShift
             fuelTaken = new bool[Pickups.Length];
             Route.SharedWorldRules = GetawayMode || tutorialLevel;
             Route.Build(roadTemplate, splitViewValidation || tutorialLevel, RunLength, extraLength: GetawayMode ? WorldShiftGetaway.ExitTail : 0f);
-            if (!splitViewValidation && !tutorialLevel) relay = new WorldShiftRelay(Route, sharedWorldRules: GetawayMode);
+            if (!splitViewValidation && !tutorialLevel) relay = new WorldShiftRelay(Route);
             Player = new GameObject("Player - same position in both worlds").transform;
             Player.SetParent(transform, false);
             var visual = new GameObject("Original driving body").transform;
@@ -222,6 +236,7 @@ namespace Outlaws.WorldShift
             }
             ShiftWorld next = World == ShiftWorld.Day ? ShiftWorld.Echo : ShiftWorld.Day;
             ApplyWorld(next);
+            Getaway?.OnWorldChanged();
             Switches++;
             CompleteTutorialHint();
             // A switch always commits. Occupied destinations use the same impact
@@ -263,7 +278,9 @@ namespace Outlaws.WorldShift
                 delta -= dt;
                 simulatedTime += dt;
                 float previous = Distance, previousLateral = Lateral;
-                foreach (var hazard in Hazards) hazard.Advance(dt, Distance, World);
+                // Lesson waits are safe reading time; traffic must not approach a stopped learner.
+                if (!TutorialWaitingForLesson)
+                    foreach (var hazard in Hazards) hazard.Advance(dt, Distance, World);
                 float speed = Speed;
                 Getaway?.BeginStep(previous, previous + speed * dt, driver);
                 if (relay != null)
@@ -415,6 +432,7 @@ namespace Outlaws.WorldShift
 
         private void CollectFuel(float from, float to, float fromLateral, float toLateral)
         {
+            if (GetawayMode && World != ShiftWorld.Day) return;
             for (int i = 0; i < fuelTaken.Length; i++)
             {
                 ShiftFuelPickup pickup = Pickups[i];

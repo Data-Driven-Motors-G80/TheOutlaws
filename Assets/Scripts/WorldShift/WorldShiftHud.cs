@@ -41,16 +41,22 @@ namespace Outlaws.WorldShift
         private int previousHeight;
 
         private TMP_Text lessonHint;
+        private GameObject lessonPrompt;
         private GameObject lessonReady, lessonPause, lessonDone, lessonDriving;
 
         private void BuildLesson()
         {
             canvasRoot = WorldShiftMenu.CreateCanvas(transform, "Learn to play");
             lessonDriving = WorldShiftMenu.Panel(canvasRoot, "One lesson at a time", Vector2.zero, Vector2.one, Color.clear).gameObject;
-            lessonHint = WorldShiftMenu.Label(lessonDriving.transform, "", .16f, .77f, .78f, .85f, 26f);
+            lessonPrompt = WorldShiftMenu.Panel(lessonDriving.transform, "Tutorial prompt",
+                new Vector2(.14f, .74f), new Vector2(.80f, .89f), Ink).gameObject;
+            lessonHint = WorldShiftMenu.Label(lessonPrompt.transform, "", .025f, .08f, .975f, .92f, 28f);
+            lessonHint.name = "Tutorial instruction";
             lessonHint.alignment = TextAlignmentOptions.Center;
-            lessonHint.outlineWidth = .18f;
-            lessonHint.outlineColor = Color.black;
+            lessonHint.color = White;
+            lessonHint.textWrappingMode = TextWrappingModes.NoWrap;
+            lessonHint.fontSizeMin = 24f;
+            lessonHint.fontSizeMax = 28f;
             WorldShiftMenu.Button(lessonDriving.transform, "Pause", new Vector2(.85f, .89f), new Vector2(.97f, .96f), game.TogglePause);
 
             lessonReady = LessonPanel("Let's take a quick spin.", "You'll pick it up as we go.");
@@ -81,7 +87,8 @@ namespace Outlaws.WorldShift
             lessonDone.SetActive(game.State == ShiftRunState.Won);
             bool driving = game.State == ShiftRunState.Running || game.State == ShiftRunState.Retrying;
             lessonDriving.SetActive(driving);
-            lessonHint.text = game.State == ShiftRunState.Retrying ? "Let's try that bit again." : game.SectionHint;
+            lessonHint.text = game.State == ShiftRunState.Retrying ? "Let's try that bit again." : game.TutorialPrompt;
+            lessonPrompt.SetActive(lessonHint.text.Length > 0);
         }
 
         public void Bind(WorldShiftCity controller)
