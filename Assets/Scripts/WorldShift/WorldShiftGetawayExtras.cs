@@ -11,6 +11,7 @@ namespace Outlaws.WorldShift
         private WorldShiftRoute route;
         private Transform shieldPickup, shieldAura, magnetPickup, boostPickup, magnetAura, boostAura;
         private bool shieldTaken, magnetTaken, boostTaken;
+        private bool shieldPassed, magnetPassed, boostPassed;
         private float magnetUntil, boostUntil;
         public const float MagnetDistance = 150f;
         public float BoostDistance { get; private set; }
@@ -81,7 +82,9 @@ namespace Outlaws.WorldShift
 
         public void Collect(float from, float to, float fromX, float toX)
         {
-            if (!Active || game.World != ShiftWorld.Day) return;
+            if (!Active) return;
+            RecordPassed(from);
+            if (game.World != ShiftWorld.Day) return;
             bool Crosses(float at, float lane)
             {
                 if (to < at - 1.3f || from > at + 1.3f) return false;
@@ -93,21 +96,42 @@ namespace Outlaws.WorldShift
             if (!shieldTaken && Crosses(ShieldDistance, ShieldLane) && WorldShiftFlow.Escape.CollectShield())
             {
                 shieldTaken = true;
-
+                WorldShiftAnalytics.PowerUp("shield");
             }
             if (!magnetTaken && Crosses(MagnetDistance, MagnetLane))
             {
                 magnetTaken = true;
                 magnetUntil = game.Duration + MagnetDuration;
-
+                WorldShiftAnalytics.PowerUp("magnet");
             }
             if (!boostTaken && Crosses(BoostDistance, BoostLane))
             {
                 boostTaken = true;
                 boostUntil = game.Duration + BoostDuration;
-
+                WorldShiftAnalytics.PowerUp("boost");
             }
             Refresh();
+        }
+
+        // A power-up the player drove past (in either world) counts as missed; a shield already held is not on offer,
+        // and the boost on the left fork branch is not missed by players who took the right.
+        private void RecordPassed(float from)
+        {
+            if (!shieldPassed && from > ShieldDistance + 1.3f)
+            {
+                shieldPassed = true;
+                if (!shieldTaken && !WorldShiftFlow.Escape.HasShield) WorldShiftAnalytics.Missed("shield");
+            }
+            if (!magnetPassed && from > MagnetDistance + 1.3f)
+            {
+                magnetPassed = true;
+                if (!magnetTaken) WorldShiftAnalytics.Missed("magnet");
+            }
+            if (!boostPassed && from > BoostDistance + 1.3f)
+            {
+                boostPassed = true;
+                if (!boostTaken && !(route.Forks.RewardSeparated(BoostDistance) && route.Forks.RewardBranch > 0)) WorldShiftAnalytics.Missed("boost");
+            }
         }
 
         public bool BlocksImpact(bool collisionProtected)
@@ -117,7 +141,7 @@ namespace Outlaws.WorldShift
             if (collisionProtected || !WorldShiftFlow.Escape.AbsorbHit()) return false;
             // One obstacle field should not immediately charge another contact for the same hit.
             shieldProtectionUntil = game.Duration + RiskRunState.CollisionProtectionDuration;
-
+            WorldShiftAnalytics.ShieldSaved();
             Refresh();
             return true;
         }

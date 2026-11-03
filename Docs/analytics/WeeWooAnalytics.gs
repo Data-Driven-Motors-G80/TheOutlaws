@@ -11,8 +11,38 @@
  * Each sheet gets new columns automatically the first time a field appears.
  */
 
-var SHEETS = ['events', 'runs', 'sessions', 'tutorials'];
+var SHEETS = ['events', 'runs', 'sessions', 'tutorials', 'ws_runs', 'ws_legs', 'ws_tutorials'];
 var DASHBOARD = 'dashboard';
+// Current tutorial lessons in play order: [step name sent by the game, column prefix, label].
+// Older builds' lessons (Shield before the mystery boxes, Reverse, Recovery, PursuitCollision) stay in the raw tabs.
+var TUTORIAL_LESSONS = [
+  ['Intro', 'intro', 'Escape the cops'], ['Steer', 'steer', 'Steer'], ['Dodge', 'dodge', 'Avoid obstacles'],
+  ['Fuel', 'fuel', 'Fuel low'], ['Ammo', 'ammo', 'Grab 3 ammo'], ['Shoot', 'shoot', 'Destroy the 1 wall'],
+  ['ShootTwice', 'shoottwice', 'Destroy the 2 wall'], ['Shield', 'shield', 'Shield box + wall'],
+  ['MysteryDizzy', 'mysterydizzy', 'Dizzy box'], ['Nitro', 'nitro', 'Nitro box (reversed)']
+];
+
+/** "Step:what;Step:what" (fail_log) or "Step:what=result;..." (pass_log) from tutorial rows, counted. */
+function tutorialLogCounts(rows, key) {
+  var c = {};
+  rows.forEach(function (r) {
+    String(r[key] || '').split(';').forEach(function (item) {
+      if (item) c[item] = (c[item] || 0) + 1;
+    });
+  });
+  return Object.keys(c).sort(function (a, b) { return c[b] - c[a]; }).map(function (k) { return [k, c[k]]; });
+}
+
+/** Rows that report a lesson (the current tutorial records <prefix>_attempts). */
+function tutorialLessonRows(rows, prefix) {
+  return rows.filter(function (r) { return r[prefix + '_s'] !== '' && r[prefix + '_s'] !== undefined && r[prefix + '_s'] !== null; });
+}
+
+/** % of a lesson's passes on the first try, from rows that record tries (older builds did not). */
+function tutorialFirstTryPct(rows, prefix) {
+  var tracked = rows.filter(function (r) { return r[prefix + '_attempts'] !== '' && r[prefix + '_attempts'] !== undefined && r[prefix + '_attempts'] !== null; });
+  return tracked.filter(function (r) { return truthy(r[prefix + '_first_try']); }).length / (tracked.length || 1) * 100 * (tracked.length ? 1 : NaN);
+}
 
 function doPost(e) {
   var body;
@@ -42,8 +72,10 @@ function doPost(e) {
     // Only summary uploads refresh reports; frequent event batches remain inexpensive.
     // A report failure must not reject already-saved rows and provoke duplicate uploads.
     var reportError = '';
-    if (bySheet.runs || bySheet.tutorials) {
-      try { updateMetricTabs(book); }
+    // Rebuild only the reports whose summaries changed; uploads queue behind this reply.
+    var legacy = !!(bySheet.runs || bySheet.tutorials), worldShift = !!(bySheet.ws_runs || bySheet.ws_tutorials);
+    if (legacy || worldShift) {
+      try { updateMetricTabs(book, legacy, worldShift); }
       catch (err) { reportError = String(err); console.error(reportError); }
     }
     return reply({ ok: true, written: written, metricTabsError: reportError });
@@ -128,11 +160,15 @@ function refreshDashboard() {
   section('TUTORIAL FUNNEL (% of tutorial starters reaching each step)');
   var starters = unique(filter(events, 'ev', 'tutorial_start'), 'session_id').length;
   row('Tutorials started', starters);
-  ['Steer', 'Dodge', 'Fuel', 'Ammo', 'Shoot'].forEach(function (step) {
+  TUTORIAL_LESSONS.forEach(function (lesson) {
+    var step = lesson[0];
     var done = filter(filter(events, 'ev', 'tutorial_step_complete'), 'step', step);
-    var retries = num(filter(filter(events, 'ev', 'tutorial_retry'), 'step', step), 'attempt').length;
-    row('  completed ' + step, pct(unique(done, 'session_id').length, starters),
-        'median ' + median(num(done, 'seconds')) + ' s, ' + retries + ' retries total, dry fires ' + sum(num(done, 'dry_fires')));
+    var firstDone = dedupe(done, function (r) { return r.session_id; });
+    var retries = filter(filter(events, 'ev', 'tutorial_retry'), 'step', step).length;
+    var firstTry = firstDone.filter(function (r) { return truthy(r.first_try); }).length;
+    row('  completed ' + lesson[2], pct(unique(done, 'session_id').length, starters),
+        'median ' + median(num(firstDone, 'seconds')) + ' s, passed first try ' + pct(firstTry, firstDone.length) +
+        ', median tries ' + median(num(firstDone, 'attempts')) + ', ' + retries + ' retries total, dry fires ' + sum(num(firstDone, 'dry_fires')));
   });
   var completedTut = filter(tutorials, 'status', 'completed');
   row('Tutorial completion rate', pct(completedTut.length, starters));
@@ -140,6 +176,8 @@ function refreshDashboard() {
   var abandoned = tutorials.filter(function (t) { return t.status === 'abandoned' || t.status === 'restarted'; });
   row('Tutorials abandoned / restarted', abandoned.length, 'quit step counts: ' + counts(abandoned, 'quit_step'));
   row('Most common retry reasons', counts(filter(events, 'ev', 'tutorial_retry'), 'reason'));
+  row('Where players failed (lesson:object)', tutorialLogCounts(tutorials, 'fail_log').slice(0, 12).map(function (p) { return p[0] + ' ' + p[1]; }).join(', '));
+  row('How players got past objects', tutorialLogCounts(tutorials, 'pass_log').slice(0, 12).map(function (p) { return p[0] + ' ' + p[1]; }).join(', '));
 
   section('RUNS');
   var distances = num(completedRuns, 'distance_m');
@@ -367,10 +405,26 @@ function metricReports(runRows, tutorialRows) {
       ['Recorded attempts', tutorials.length], ['Completed', filter(tutorials, 'status', 'completed').length],
       ['Restarted', filter(tutorials, 'status', 'restarted').length], ['Abandoned', filter(tutorials, 'status', 'abandoned').length],
       ['Completion rate', pct(filter(tutorials, 'status', 'completed').length, tutorials.length)],
-      ['Median completed duration (seconds)', median(metricNumbers(filter(tutorials, 'status', 'completed'), 'seconds'))]
-    ], [['ts', 'Timestamp (UTC)'], ['session_id', 'Session ID'], ['build', 'Build'], ['status', 'Outcome'], ['seconds', 'Duration (seconds)'], ['retries', 'Retries'], ['quit_step', 'Exit step']].concat(
-      ['steer', 'dodge', 'fuel', 'ammo', 'shoot', 'shield', 'reverse', 'recovery', 'pursuitcollision', 'nitro'].map(function (step) { return [step + '_s', step + ' (seconds)']; })
-    ), tutorials)
+      ['Median completed duration (seconds)', median(metricNumbers(filter(tutorials, 'status', 'completed'), 'seconds'))],
+      ['Median retries per completed tutorial', median(metricNumbers(filter(tutorials, 'status', 'completed'), 'retries'))]
+    ].concat(TUTORIAL_LESSONS.map(function (lesson) {
+      // Per lesson: players who passed it, how many on the first try, and the average number of tries.
+      var rows = tutorialLessonRows(tutorials, lesson[1]);
+      var firstTry = tutorialFirstTryPct(rows, lesson[1]);
+      return [lesson[2] + ': passed / first try / mean tries / mean seconds',
+        rows.length + ' / ' + (isFinite(firstTry) ? Math.round(firstTry * 10) / 10 + '%' : '') + ' / ' + mean(metricNumbers(rows, lesson[1] + '_attempts')) +
+        ' / ' + mean(metricNumbers(rows, lesson[1] + '_s'))];
+    })).concat(
+      tutorialLogCounts(tutorials, 'fail_log').slice(0, 10).map(function (p) { return ['Failed at ' + p[0], p[1]]; })
+    ).concat(
+      tutorialCounts(tutorials.filter(function (t) { return t.status !== 'completed'; }), 'quit_step').map(function (p) { return ['Left during ' + p[0], p[1]]; })
+    ), [['ts', 'Timestamp (UTC)'], ['session_id', 'Session ID'], ['build', 'Build'], ['status', 'Outcome'], ['seconds', 'Duration (seconds)'],
+      ['retries', 'Retries'], ['steps_completed', 'Lessons passed'], ['steps_first_try', 'Lessons passed first try'],
+      ['quit_step', 'Exit step'], ['quit_step_attempt', 'Exit step: try number'], ['quit_step_progress', 'Exit step: got past']].concat(
+      TUTORIAL_LESSONS.reduce(function (cols, lesson) {
+        return cols.concat([[lesson[1] + '_s', lesson[2] + ' (seconds)'], [lesson[1] + '_attempts', lesson[2] + ' (tries)']]);
+      }, [])
+    ).concat([['fail_log', 'Where they failed'], ['pass_log', 'How they got past each object']]), tutorials)
   ];
   reports.forEach(function (r) {
     r.note = r.name === 'Tutorial Summary' ? 'Non-test recorded tutorial attempts, not unique people. Missing lessons remain blank.' : notes;
@@ -380,8 +434,11 @@ function metricReports(runRows, tutorialRows) {
   return reports;
 }
 
-function updateMetricTabs(book) {
-  var reports = metricReports(table(book, 'runs'), table(book, 'tutorials'));
+/** Rewrites the report tabs; with no flags (refreshMetricTabs, setup) both report families are rebuilt. */
+function updateMetricTabs(book, legacy, worldShift) {
+  var all = legacy === undefined && worldShift === undefined;
+  var reports = (all || legacy ? metricReports(table(book, 'runs'), table(book, 'tutorials')) : [])
+    .concat(all || worldShift ? worldShiftReports(book) : []);
   // Avoid replacing someone else's manually created tabs. Check all names before writing.
   reports.forEach(function (r) {
     var sheet = book.getSheetByName(r.name);
@@ -391,7 +448,9 @@ function updateMetricTabs(book) {
   });
   var refreshed = new Date().toISOString();
   reports.forEach(function (r) {
-    var sheet = book.getSheetByName(r.name) || book.insertSheet(r.name);
+    // New WorldShift report tabs start near the front; setupVisualizations fixes the full order.
+    var sheet = book.getSheetByName(r.name) || (r.position !== undefined ? book.insertSheet(r.name, Math.min(r.position, book.getNumSheets()))
+      : book.insertSheet(r.name));
     var output = [[r.name, 'Updated ' + refreshed], [r.note], [], ['Metric', 'Value']].concat(r.summary);
     var detailHeader = 0;
     if (r.fields.length) {
@@ -420,6 +479,135 @@ function updateMetricTabs(book) {
     sheet.setColumnWidth(1, 330);
     sheet.getRange(2, 1).setWrap(true);
   });
+}
+
+// ---------------------------------------------------------------- WorldShift
+
+// Pickup kinds the game reports as <kind>_taken / <kind>_missed / <kind>_missed_night.
+var WS_PICKUPS = ['cash', 'cash_ramp', 'fuel', 'ammo', 'shield', 'magnet', 'boost'];
+// Escape environments in driving order; after Mountain the run laps back to City at a harder tier.
+var WS_ENVS = ['City', 'Desert', 'Ocean', 'Snow', 'Mountain'];
+/** A leg the player drove to the end of. "through" legs had no cash-out choice (1.2+); exit/next legs did. */
+function wsCleared(l) { return l.outcome === 'exit' || l.outcome === 'next' || l.outcome === 'through'; }
+
+/** WS Overview, WS Levels and WS Tutorial tabs from the ws_runs / ws_legs / ws_tutorials uploads. */
+function worldShiftReports(book) {
+  // A tab-close beacon can overlap the normal end-of-run upload; keep the real ending.
+  function latest(rows, key) {
+    var byKey = {}, order = [];
+    metricReal(rows).forEach(function (r) {
+      var k = key(r), previous = byKey[k];
+      if (!previous) order.push(k);
+      if (!previous || (previous.outcome === 'tab_closed' || previous.status === 'tab_closed')) byKey[k] = r;
+    });
+    return order.map(function (k) { return byKey[k]; });
+  }
+  var runs = latest(table(book, 'ws_runs'), function (r) { return r.run_id; });
+  var legs = latest(table(book, 'ws_legs'), function (r) { return r.run_id + '#' + r.leg; });
+  var tutorials = latest(table(book, 'ws_tutorials'), function (r) { return r.session_id + '#' + r.attempt; });
+  var lost = filter(runs, 'outcome', 'lost');
+  var gates = legs.filter(function (l) { return l.outcome === 'exit' || l.outcome === 'next'; });
+  function total(rows, key) { return sum(metricNumbers(rows, key)); }
+  function med(rows, key) { return median(metricNumbers(rows, key)); }
+  var position = 0;
+  function report(name, note, summary, fields, rows) { return { name: name, note: note, summary: summary, fields: fields, rows: rows, position: ++position }; }
+  var note = 'Non-test WorldShift builds. One escape run crosses legs City > Desert > Ocean > Snow > Mountain, then laps at a harder tier. ' +
+    'From 1.2 the cash-out choice is offered only on every other leg; gate stats count only those legs. ' +
+    '"After a switch" means within 1.5 driving seconds of pressing Space. -1 means not applicable.';
+
+  var overview = [
+    ['Escape runs', runs.length], ['Players', unique(runs, 'player_id').length],
+    ['Outcomes', counts(runs, 'outcome')], ['How lost runs ended', counts(lost, 'failure')],
+    ['Median legs cleared', med(runs, 'legs_cleared')],
+    ['Runs that cleared at least one leg', pct(runs.filter(function (r) { return Number(r.legs_cleared) > 0; }).length, runs.length)],
+    ['Cash-out choice: took Next (risk)', pct(filter(gates, 'outcome', 'next').length, gates.length)],
+    ['Where runs ended (environment)', counts(runs, 'end_env')],
+    ['Runs that reached a harder lap (past Mountain)', pct(runs.filter(function (r) { return Number(r.legs_started) > WS_ENVS.length; }).length, runs.length)],
+    ['Median haul banked (banked runs)', med(filter(runs, 'outcome', 'banked'), 'haul')],
+    ['Median haul lost (lost runs)', med(lost, 'haul')],
+    ['Median driving time per run (s)', med(runs, 'drive_s')],
+    ['Median switches per minute', med(runs, 'switches_per_min')],
+    ['Median time in Night (%)', med(runs, 'night_pct')],
+    ['Deaths right after a switch', pct(lost.filter(function (r) { return truthy(r.death_after_switch); }).length, lost.length)],
+    ['Impacts right after a switch', pct(total(runs, 'impacts_after_switch'), total(runs, 'impacts')) + ' of ' + total(runs, 'impacts')],
+    ['Fork choice: right (risky, more loot)', pct(total(runs, 'forks_right'), total(runs, 'forks_right') + total(runs, 'forks_left'))],
+    ['Power-up picks (per leg)', counts(legs.filter(function (l) { return l.powerup; }), 'powerup')],
+    ['Legs with no power-up', pct(legs.filter(function (l) { return !l.powerup; }).length, legs.length)],
+    ['Shield saves', total(runs, 'shield_saves')],
+    ['Shot accuracy', pct(total(runs, 'shot_hits'), total(runs, 'shots')) + ' of ' + total(runs, 'shots') + ' shots'],
+    ['Runs with tutorial first', pct(runs.filter(function (r) { return truthy(r.tutorial_first); }).length, runs.length)],
+    ['Pickups taken (all kinds, on the chosen route)', pct(WS_PICKUPS.reduce(function (n, k) { return n + total(runs, k + '_taken'); }, 0),
+      WS_PICKUPS.reduce(function (n, k) { return n + total(runs, k + '_taken') + total(runs, k + '_missed'); }, 0))],
+    ['Missed pickups that were passed in Night', pct(WS_PICKUPS.reduce(function (n, k) { return n + total(runs, k + '_missed_night'); }, 0),
+      WS_PICKUPS.reduce(function (n, k) { return n + total(runs, k + '_missed'); }, 0))],
+    ['Switches made in the air (jumps)', total(runs, 'air_switches') + ' of ' + total(runs, 'switches')],
+    ['Runs with garage upgrades', pct(runs.filter(function (r) { return Number(r.upgrade_total) > 0; }).length, runs.length)],
+    ['Median total upgrade level at run start (0-9)', med(runs, 'upgrade_total')]
+  ].concat(WS_PICKUPS.map(function (k) {
+    return ['Pickup "' + k + '": taken / missed in Day / missed in Night', total(runs, k + '_taken') + ' / ' +
+      (total(runs, k + '_missed') - total(runs, k + '_missed_night')) + ' / ' + total(runs, k + '_missed_night')];
+  }));
+  var runFields = [['ts', 'Timestamp (UTC)'], ['build', 'Build'], ['player_id', 'Player'], ['run_number_session', 'Run # in session'],
+    ['tutorial_first', 'Tutorial first'], ['outcome', 'Outcome'], ['failure', 'Failure'], ['haul', 'Haul'], ['legs_cleared', 'Legs cleared'],
+    ['end_env', 'Ended in'], ['end_dist_m', 'End distance (m)'], ['drive_s', 'Driving (s)'], ['switches', 'Switches'],
+    ['switches_per_min', 'Switches / min'], ['night_pct', 'Night %'], ['impacts', 'Impacts'], ['impacts_after_switch', 'Impacts after switch'],
+    ['death_after_switch', 'Died after switch'], ['death_s_since_switch', 'Death: s since switch'], ['death_last_impact', 'Death: last impact'],
+    ['forks_left', 'Forks left'], ['forks_right', 'Forks right'], ['powerups', 'Power-ups'], ['shots', 'Shots'], ['shot_hits', 'Shot hits'],
+    ['loot_boxes', 'Loot boxes'], ['pickups_taken_pct', 'Pickups taken %'], ['air_switches', 'Switches in the air'],
+    ['pauses', 'Pauses'], ['upgrade_fuel', 'Fuel tank level'], ['upgrade_armor', 'Armor level'], ['upgrade_lights', 'Headlight level'],
+    ['death_fuel_pct', 'Death: fuel %'], ['death_police_gap_m', 'Death: police gap (m)']];
+
+  var levels = [];
+  WS_ENVS.forEach(function (env) {
+    var here = filter(legs, 'env', env), died = filter(here, 'outcome', 'lost');
+    var cleared = here.filter(wsCleared);
+    levels.push([env.toUpperCase(), '']);
+    levels.push(['  Legs started', here.length]);
+    levels.push(['  Cleared (reached the end)', pct(cleared.length, here.length)]);
+    levels.push(['  Died here', pct(died.length, here.length)]);
+    levels.push(['  Death causes', counts(died, 'failure')]);
+    levels.push(['  Last impact before death', counts(died.filter(function (l) { return l.death_last_impact; }), 'death_last_impact')]);
+    levels.push(['  Median progress at death (%)', med(died, 'progress_pct')]);
+    var bins = {};
+    metricNumbers(died, 'death_dist_m').forEach(function (d) { var b = Math.floor(d / 250) * 250; bins[b] = (bins[b] || 0) + 1; });
+    levels.push(['  Deaths by distance (250 m bins)', Object.keys(bins).sort(function (a, b) { return a - b; })
+      .map(function (b) { return b + 'm: ' + bins[b]; }).join(', ')]);
+    levels.push(['  Deaths right after a switch', pct(died.filter(function (l) { return truthy(l.death_after_switch); }).length, died.length)]);
+    levels.push(['  Median switches per minute', med(here, 'switches_per_min')]);
+    levels.push(['  Median time in Night (%)', med(here, 'night_pct')]);
+    levels.push(['  Fork: took the right branch', pct(filter(here, 'fork', 'right').length, here.filter(function (l) { return l.fork !== 'none'; }).length)]);
+    levels.push(['  Median loot boxes', med(here, 'loot_boxes')]);
+    var chose = cleared.filter(function (l) { return l.outcome !== 'through'; });
+    levels.push(['  Cash-out choice: took Next', pct(filter(chose, 'outcome', 'next').length, chose.length)]);
+  });
+  var legFields = [['ts', 'Timestamp (UTC)'], ['build', 'Build'], ['run_id', 'Run ID'], ['leg', 'Leg'], ['env', 'Environment'],
+    ['outcome', 'Outcome'], ['failure', 'Failure'], ['dist_m', 'Distance (m)'], ['progress_pct', 'Progress %'], ['drive_s', 'Driving (s)'],
+    ['switches', 'Switches'], ['night_pct', 'Night %'], ['impacts', 'Impacts'], ['impacts_after_switch', 'Impacts after switch'],
+    ['death_after_switch', 'Died after switch'], ['death_last_impact', 'Last impact'], ['fork', 'Fork'], ['powerup', 'Power-up'],
+    ['loot_boxes', 'Loot boxes'], ['carried', 'Carried at end'], ['cashout_offered', 'Cash-out offered'], ['tier', 'Lap tier'],
+    ['pickups_taken_pct', 'Pickups taken %'], ['death_fuel_pct', 'Death: fuel %'], ['death_police_gap_m', 'Death: police gap (m)']];
+
+  var tutorialSummary = [['Tutorial attempts', tutorials.length], ['Outcomes', counts(tutorials, 'status')],
+    ['Completed', pct(filter(tutorials, 'status', 'completed').length, tutorials.length)],
+    ['Median completed driving time (s)', med(filter(tutorials, 'status', 'completed'), 'drive_s')],
+    ['Where non-finishers stopped (step)', counts(tutorials.filter(function (t) { return t.status !== 'completed'; }), 'step_title')]];
+  var tutorialFields = [['ts', 'Timestamp (UTC)'], ['build', 'Build'], ['session_id', 'Session'], ['attempt', 'Attempt'],
+    ['status', 'Outcome'], ['step_title', 'Step reached'], ['drive_s', 'Driving (s)'], ['switches', 'Switches'], ['impacts', 'Impacts']];
+  var steps = {};
+  tutorials.forEach(function (t) { Object.keys(t).forEach(function (k) { if (/^s_\d+_/.test(k)) steps[k.substring(2)] = true; }); });
+  Object.keys(steps).sort().forEach(function (step) {
+    var label = step.replace(/^\d+_/, '').replace(/_/g, ' ');
+    var reached = tutorials.filter(function (t) { return Number(t['s_' + step]) > 0; });
+    tutorialSummary.push(['Step "' + label + '": reached / median s / mean retries',
+      pct(reached.length, tutorials.length) + ' / ' + median(metricNumbers(reached, 's_' + step)) + ' / ' + mean(metricNumbers(reached, 'retries_' + step))]);
+    tutorialFields.push(['s_' + step, label + ' (s)'], ['retries_' + step, label + ' retries']);
+  });
+
+  return [
+    report('WS Overview', note, overview, runFields, runs),
+    report('WS Levels', note, levels, legFields, legs),
+    report('WS Tutorial', 'Non-test WorldShift tutorial attempts (not unique people). Seconds are driving time per lesson.', tutorialSummary, tutorialFields, tutorials)
+  ];
 }
 
 // ---------------------------------------------------------------- helpers
@@ -467,6 +655,12 @@ function median(xs) {
 }
 function pct(a, b) { return b ? Math.round(1000 * a / b) / 10 + '%' : ''; }
 function ratio(a, b) { return b ? Math.round(100 * a / b) / 100 : ''; }
+function tutorialCounts(rows, key) {
+  var c = {};
+  rows.forEach(function (r) { var k = r[key] || '(none)'; c[k] = (c[k] || 0) + 1; });
+  return Object.keys(c).sort(function (a, b) { return c[b] - c[a]; }).map(function (k) { return [k, c[k]]; });
+}
+
 function truthy(v) { return v === true || v === 'true' || v === 'TRUE'; }
 function counts(rows, key) {
   var c = {};

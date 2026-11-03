@@ -24,6 +24,7 @@ namespace Outlaws.WorldShift
         private void Awake()
         {
             Time.timeScale = 1f;
+            WorldShiftAnalytics.MenuShown();
             var root = CreateCanvas(transform, "WorldShift menu");
             Panel(root, "Plain background", Vector2.zero, Vector2.one, Ink);
             // Keep every action inside the display's usable area.
@@ -115,6 +116,7 @@ namespace Outlaws.WorldShift
         private void ShowGarage(bool show)
         {
             RefreshGarage(); home.SetActive(!show); garage.SetActive(show);
+            if (show) WorldShiftAnalytics.GarageShown();
             if (EventSystem.current != null)
                 EventSystem.current.SetSelectedGameObject((show ? garage : home)
                     .GetComponentsInChildren<Button>()[show ? 3 : 0].gameObject);

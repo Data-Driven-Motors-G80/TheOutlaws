@@ -19,11 +19,17 @@ namespace Outlaws.WorldShift
         public static bool ConsumeGarageRequest() { bool value = openGarage; openGarage = false; return value; }
         public static void OpenGarage()
         {
+            WorldShiftAnalytics.Abandon("garage");
             Escape.Leave(); getawayAfterTutorial = false; autoStart = null;
             openGarage = true; Time.timeScale = 1f; SceneManager.LoadScene(MenuScene);
         }
         public static bool BuyUpgrade(VehicleUpgrades.Part part)
-            => Escape.Status != GetawayRunState.RunStatus.Running && Garage.Buy(part);
+        {
+            int price = Garage.Price(part);
+            bool bought = Escape.Status != GetawayRunState.RunStatus.Running && Garage.Buy(part);
+            if (bought) WorldShiftAnalytics.UpgradeBought(part, price);
+            return bought;
+        }
 
         public const string MenuScene = "WorldShift_Menu";
         private static ShiftLevel? autoStart;
@@ -43,7 +49,9 @@ namespace Outlaws.WorldShift
 
         public static void StartGetaway(bool tutorialFirst)
         {
+            WorldShiftAnalytics.Abandon("restart");
             Escape.Begin();
+            WorldShiftAnalytics.BeginRun(tutorialFirst);
             afterTutorial = ShiftLevel.City;
             getawayAfterTutorial = tutorialFirst;
             Load(tutorialFirst ? ShiftLevel.Tutorial : ShiftLevel.City);
@@ -52,6 +60,9 @@ namespace Outlaws.WorldShift
         public static void FinishGetawayLeg(bool continueRun)
         {
             if (Escape.Status != GetawayRunState.RunStatus.Running) return;
+            // Ordinary environment endings cannot bank a run.
+            if (!continueRun && !CashOutAvailable) return;
+            WorldShiftAnalytics.Gate(continueRun);
             if (continueRun)
             {
                 Escape.Continue();
@@ -59,11 +70,11 @@ namespace Outlaws.WorldShift
             }
             else
             {
-                if (!CashOutAvailable) return;
                 int deposit = Escape.Bank();
                 PlayerPrefs.SetInt(BankKey, (int)System.Math.Min(int.MaxValue, (long)Banked + deposit));
                 PlayerPrefs.SetInt(BestKey, Mathf.Max(BestHaul, deposit));
                 PlayerPrefs.Save();
+                WorldShiftAnalytics.Banked(deposit);
             }
         }
 
@@ -77,6 +88,7 @@ namespace Outlaws.WorldShift
         }
         public static void Select(ShiftLevel level, bool tutorialFirst)
         {
+            WorldShiftAnalytics.Abandon("menu");
             Escape.Leave();
             getawayAfterTutorial = false;
             TutorialFirst = tutorialFirst;
@@ -93,6 +105,7 @@ namespace Outlaws.WorldShift
         {
             if (completed == ShiftLevel.Tutorial)
             {
+                WorldShiftAnalytics.EndTutorial("skipped");
                 TutorialFirst = false;
                 if (!getawayAfterTutorial) Escape.Leave();
                 getawayAfterTutorial = false;
@@ -102,6 +115,6 @@ namespace Outlaws.WorldShift
             else Menu();
         }
         public static string TutorialDestination => afterTutorial == ShiftLevel.Desert ? "DESERT" : "CITY";
-        public static void Menu() { Escape.Leave(); getawayAfterTutorial = false; autoStart = null; Time.timeScale = 1f; SceneManager.LoadScene(MenuScene); }
+        public static void Menu() { WorldShiftAnalytics.Abandon("menu"); Escape.Leave(); getawayAfterTutorial = false; autoStart = null; Time.timeScale = 1f; SceneManager.LoadScene(MenuScene); }
     }
 }

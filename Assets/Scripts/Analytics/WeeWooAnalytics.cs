@@ -90,7 +90,8 @@ public sealed class WeeWooAnalytics : MonoBehaviour
         TextAsset config = Resources.Load<TextAsset>("WeeWooAnalytics");
         settings = config != null ? JsonUtility.FromJson<Settings>(config.text) : new Settings();
         bool validUrl = Uri.TryCreate(settings.endpointUrl, UriKind.Absolute, out Uri url) && url.Scheme == "https";
-        uploadsEnabled = settings.enabled && validUrl && (!Application.isEditor || settings.sendFromEditor);
+        // Batch-mode test runs and command-line builds never upload to the playtest sheet.
+        uploadsEnabled = settings.enabled && validUrl && !Application.isBatchMode && (!Application.isEditor || settings.sendFromEditor);
         if (settings.enabled && !validUrl)
             Debug.LogWarning("[Analytics] Set endpointUrl in Resources/WeeWooAnalytics.json to the Apps Script web app URL.");
 #if UNITY_WEBGL && !UNITY_EDITOR
@@ -137,6 +138,9 @@ public sealed class WeeWooAnalytics : MonoBehaviour
             data[Convert.ToString(keyValues[i], CultureInfo.InvariantCulture)] = keyValues[i + 1];
         TrackInternal(eventName, data);
     }
+
+    /// <summary>Logs one event from an already-built field dictionary.</summary>
+    public static void Track(string eventName, Dictionary<string, object> fields) => TrackInternal(eventName, fields);
 
     private static void TrackInternal(string eventName, Dictionary<string, object> fields)
     {

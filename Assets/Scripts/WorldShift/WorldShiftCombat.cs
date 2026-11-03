@@ -6,7 +6,7 @@ namespace Outlaws.WorldShift
     /// <summary>Instant lane-assisted shots share the same authoritative destruction state as collisions and rendering.</summary>
     public sealed class WorldShiftCombat : MonoBehaviour
     {
-        private sealed class AmmoPickup { public float At, X; public bool Taken; public Transform Visual; }
+        private sealed class AmmoPickup { public float At, X; public bool Taken, Passed; public Transform Visual; }
         private struct Target { public object Key; public float At, X; }
         private sealed class ShotVisual { public Transform Body; public Vector3[] Path; public float Started; }
         private WorldShiftCity city;
@@ -79,6 +79,7 @@ namespace Outlaws.WorldShift
             LastShotAt = Duration;
             var target = FindTarget();
             if (target.Key != null) destroyed.Add(target.Key);
+            WorldShiftAnalytics.Shot(target.Key != null);
             float end = target.Key != null ? target.At : Distance + OutlawProjectile.MaximumRange;
             float x = target.Key != null ? target.X : Lateral;
             var driver = Player.GetComponent<AutoDriveCar>();
@@ -176,14 +177,21 @@ namespace Outlaws.WorldShift
             if (World != ShiftWorld.Day) { Present(); return; }
             foreach (var pickup in pickups)
             {
+                if (Escape && !pickup.Taken && !pickup.Passed && from - 1.3f > pickup.At)
+                {
+                    pickup.Passed = true;
+                    // The fork's refill sits on the left branch; it is not missed by players on the right.
+                    if (!(Game?.Routing != null && Game.Routing.RewardSeparated(pickup.At) && Game.Routing.RewardBranch > 0)) WorldShiftAnalytics.Missed("ammo");
+                }
                 if (pickup.Taken || to + 1.3f < pickup.At || from - 1.3f > pickup.At) continue;
                 if (Game?.Routing != null && Game.Routing.RewardSeparated(pickup.At) && Game.Routing.RewardBranch >= 0) continue;
                 float x = Mathf.Lerp(a, b, Mathf.InverseLerp(from, to, pickup.At));
                 if (Mathf.Abs(x - pickup.X) > 1.35f) continue;
                 bool accepted = Escape ? WorldShiftFlow.Escape.CollectAmmo() : practiceAmmo < GetawayRunState.MaximumAmmo;
-                if (!accepted) continue;
+                if (!accepted) { if (Escape) WorldShiftAnalytics.AmmoFull(); continue; }
                 if (!Escape) practiceAmmo = GetawayRunState.MaximumAmmo;
                 pickup.Taken = true;
+                WorldShiftAnalytics.Ammo();
             }
             Present();
         }
