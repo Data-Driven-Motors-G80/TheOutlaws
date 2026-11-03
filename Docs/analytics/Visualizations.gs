@@ -32,7 +32,7 @@ var WS_REPORT_TABS = ['WS Overview', 'WS Levels', 'WS Tutorial'];
 var WS_RAW_TABS = ['ws_runs', 'ws_legs', 'ws_tutorials'];
 // Each dashboard: its raw tabs, the tabs its default start date comes from, its default build filter and its metrics.
 var VIS_DASHBOARDS = {};
-VIS_DASHBOARDS[WS_VIS_TAB] = { title: 'Wee Woo Run  ·  WorldShift analytics', raw: WS_RAW_TABS.concat(['events']),
+VIS_DASHBOARDS[WS_VIS_TAB] = { title: 'Wee Woo Run  ·  WorldShift analytics', raw: WS_RAW_TABS,
   dated: ['ws_runs', 'ws_tutorials'], builds: VIS_BUILDS[1], compute: function (d, o, tz) { return wsVizCompute(d, o, tz); } };
 VIS_DASHBOARDS[VIS_TAB] = { title: 'Wee Woo Run  ·  Original endless runner', raw: VIS_RAW_TABS,
   dated: ['runs', 'sessions'], builds: VIS_BUILDS[0], compute: function (d, o, tz) { return vizCompute(d, o, tz); } };
@@ -114,15 +114,17 @@ function onVisualizationsEdit(e) {
   refreshVisualizations(range.getSheet().getName());
 }
 
-/** Timer trigger: redraw only when uploads have added rows since the last redraw. */
+/** Timer trigger: redraw only the dashboards whose raw tabs gained rows since their last redraw. */
 function refreshVisualizationsIfChanged() {
   var book = SpreadsheetApp.getActiveSpreadsheet();
-  if (PropertiesService.getDocumentProperties().getProperty('vizDataKey') === vizDataKey(book)) return;
-  refreshVisualizations();
+  var props = PropertiesService.getDocumentProperties();
+  Object.keys(VIS_DASHBOARDS).forEach(function (name) {
+    if (props.getProperty('vizDataKey:' + name) !== vizDataKey(book, VIS_DASHBOARDS[name].raw)) refreshVisualizations(name);
+  });
 }
 
-function vizDataKey(book) {
-  return VIS_RAW_TABS.concat(WS_RAW_TABS).map(function (name) {
+function vizDataKey(book, tabs) {
+  return tabs.map(function (name) {
     var sheet = book.getSheetByName(name);
     return sheet ? sheet.getLastRow() : 0;
   }).join(',');
@@ -147,19 +149,20 @@ function firstUploadDate(book, tabs) {
 /** Redraws one dashboard by tab name, or both when no name is given. */
 function refreshVisualizations(only) {
   var book = SpreadsheetApp.getActiveSpreadsheet();
-  var lock = LockService.getScriptLock();
+  // A document lock, not the script lock: redraws only read raw tabs and must never make uploads wait.
+  var lock = LockService.getDocumentLock();
   lock.waitLock(25000);
   try {
     var tz = book.getSpreadsheetTimeZone();
-    var key = vizDataKey(book);
     Object.keys(VIS_DASHBOARDS).forEach(function (name) {
       var sheet = book.getSheetByName(name);
       if (!sheet || (typeof only === 'string' && only !== name)) return;
       var dashboard = VIS_DASHBOARDS[name], opts = vizReadOptions(sheet), data = {};
+      var key = vizDataKey(book, dashboard.raw);
       dashboard.raw.forEach(function (tab) { data[tab] = table(book, tab); });
       vizRender(sheet, dashboard.compute(data, opts, tz), opts, tz);
+      PropertiesService.getDocumentProperties().setProperty('vizDataKey:' + name, key);
     });
-    PropertiesService.getDocumentProperties().setProperty('vizDataKey', key);
   } finally {
     lock.releaseLock();
   }

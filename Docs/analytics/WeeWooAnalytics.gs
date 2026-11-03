@@ -72,8 +72,10 @@ function doPost(e) {
     // Only summary uploads refresh reports; frequent event batches remain inexpensive.
     // A report failure must not reject already-saved rows and provoke duplicate uploads.
     var reportError = '';
-    if (bySheet.runs || bySheet.tutorials || bySheet.ws_runs || bySheet.ws_tutorials) {
-      try { updateMetricTabs(book); }
+    // Rebuild only the reports whose summaries changed; uploads queue behind this reply.
+    var legacy = !!(bySheet.runs || bySheet.tutorials), worldShift = !!(bySheet.ws_runs || bySheet.ws_tutorials);
+    if (legacy || worldShift) {
+      try { updateMetricTabs(book, legacy, worldShift); }
       catch (err) { reportError = String(err); console.error(reportError); }
     }
     return reply({ ok: true, written: written, metricTabsError: reportError });
@@ -432,8 +434,11 @@ function metricReports(runRows, tutorialRows) {
   return reports;
 }
 
-function updateMetricTabs(book) {
-  var reports = metricReports(table(book, 'runs'), table(book, 'tutorials')).concat(worldShiftReports(book));
+/** Rewrites the report tabs; with no flags (refreshMetricTabs, setup) both report families are rebuilt. */
+function updateMetricTabs(book, legacy, worldShift) {
+  var all = legacy === undefined && worldShift === undefined;
+  var reports = (all || legacy ? metricReports(table(book, 'runs'), table(book, 'tutorials')) : [])
+    .concat(all || worldShift ? worldShiftReports(book) : []);
   // Avoid replacing someone else's manually created tabs. Check all names before writing.
   reports.forEach(function (r) {
     var sheet = book.getSheetByName(r.name);
