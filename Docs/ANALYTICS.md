@@ -156,3 +156,34 @@ Analyze this build separately from earlier standalone-ammo builds. A mystery row
 New run fields: `gun_rewards`, `backpack_replacements`, `discarded_bullets`, `backpack_uses`, `backpack_at_end`. `backpack_received` events record item, replaced item, discarded bullets and previous holding time; `backpack_used` events record item and holding time (each gun shot is a use). Collection does not imply activation. Existing shots/hits and destruction counts remain valid. Gun bullet holding times reset on replacement; a full gun now means three shots. The no-ammo-pickup mission is now a no-shooting mission.
 
 Ocean Coast run summaries add `ocean_s` for active time spent on the coast; it is excluded from `city_s`. `end_scene` can be `Env_OceanCoast`, and `max_speed` includes the surf multiplier. Existing City/Snow keys remain available. Spreadsheet summaries need to consume `ocean_s` separately if displaying a complete environment time breakdown.
+
+## WorldShift (Day/Night escape, build tag `worldshift-1.0`)
+
+The WorldShift menu, tutorial and escape report through `Assets/Scripts/WorldShift/WorldShiftAnalytics.cs`, using the
+same uploader and endpoint. The old `runs`/`tutorials` tabs are not used by this mode. Build tags must not contain
+`editor`, `test` or `ignore`, or every report filters the rows out.
+
+**Updating the receiver:** `doPost` only accepts listed tabs, so paste the updated `Docs/analytics/WeeWooAnalytics.gs`
+and deploy a new version of the existing web app (Deploy → Manage deployments → Edit → New version). Until then the
+`ws_*` rows below are silently dropped.
+
+| Tab | One row per | Key columns |
+| --- | --- | --- |
+| `ws_runs` | escape run (menu start to bank, loss, restart, menu or tab close) | `outcome` (banked/lost/restart/menu/tab_closed), `failure`, `haul`, `legs_cleared`, `end_env`, `drive_s`, `switches_per_min`, `night_pct`, `impacts_after_switch`, `death_after_switch`, `forks_left/right`, `powerups`, `shots`, `shot_hits` |
+| `ws_legs` | environment visit (City or Desert) within a run | `leg`, `env`, `outcome` (exit/next/lost/...), `dist_m`, `progress_pct`, `fork`, `powerup`, `loot_boxes`, switching and death columns |
+| `ws_tutorials` | tutorial attempt | `status` (completed/skipped/menu/restarted/tab_closed), `step_title`, `s_<n>_<step>` driving seconds and `retries_<n>_<step>` per lesson |
+
+Events (in `events`, with `ws_mode`, `env`, `leg`, `dist`, `world`, `drive_s` context): `ws_menu`, `ws_run_start`,
+`ws_leg_start`, `ws_switch` (`to`, `stayed_s`), `ws_impact` (`kind`, `s_since_switch`), `ws_shield_save`, `ws_powerup`,
+`ws_fork`, `ws_gate` (`choice` exit/next, `carried`), `ws_death` (`reason`, `s_since_switch`, `after_switch`),
+`ws_run_end`, `ws_tutorial_start`, `ws_tutorial_step`, `ws_tutorial_end`.
+
+"After a switch" means within 1.5 driving seconds of pressing Space (`SwitchBlameSeconds`). Seconds are driving time,
+which pauses with the game; `wallclock_s` includes pauses. Report tabs **WS Overview**, **WS Levels** and **WS Tutorial**
+refresh on every `ws_runs`/`ws_tutorials` upload and answer:
+
+- Does switching create decisions? Switches per minute, time in Night, fork and gate choices.
+- Are deaths after switching unfair? Share of deaths and impacts within 1.5 s of a switch, with the last impact kind.
+- Where do players die? Per environment: death causes, progress at death and 250 m distance bins.
+- Do the Day-only rewards pull players out of Night? Night %, loot boxes, power-up picks and right-fork rate.
+- Does the tutorial teach the mechanic? Completion, where non-finishers stop, seconds and retries per lesson.

@@ -150,7 +150,11 @@ namespace Outlaws.WorldShift
             RearView.transform.SetParent(transform, true);
             UpdateCamera(true);
             if (!splitViewValidation) { Combat = gameObject.AddComponent<WorldShiftCombat>(); Combat.Bind(this); }
-            if (tutorialLevel) { TutorialRewards = gameObject.AddComponent<WorldShiftTutorialRewards>(); TutorialRewards.Bind(this); }
+            if (tutorialLevel)
+            {
+                TutorialRewards = gameObject.AddComponent<WorldShiftTutorialRewards>(); TutorialRewards.Bind(this);
+                WorldShiftAnalytics.BeginTutorial(Checkpoints.Length, () => Distance, () => Duration, () => World);
+            }
             if (GetawayMode) { Getaway = gameObject.AddComponent<WorldShiftGetaway>(); Getaway.Bind(this); }
             else gameObject.AddComponent<WorldShiftHud>().Bind(this);
             if (splitViewValidation) gameObject.AddComponent<WorldShiftSplitView>().Initialize(this, view);
@@ -231,6 +235,7 @@ namespace Outlaws.WorldShift
             ApplyWorld(next);
             Getaway?.OnWorldChanged();
             Switches++;
+            WorldShiftAnalytics.Switched(next);
             CompleteTutorialHint();
             // A switch always commits. Occupied destinations use the same impact
             // path as driving into a hazard; missing road still causes a fall.
@@ -330,6 +335,7 @@ namespace Outlaws.WorldShift
                 if (checkpointIndex + 1 < Checkpoints.Length && Distance >= Checkpoints[checkpointIndex + 1].Distance)
                 {
                     checkpointIndex++;
+                    if (tutorialLevel) WorldShiftAnalytics.TutorialStep(checkpointIndex, Checkpoints[checkpointIndex].Title);
                     tutorialHintCompleted = false;
                     tutorialCheckpointSwitches = Switches;
                     tutorialCheckpointLateral = Lateral;
@@ -345,6 +351,7 @@ namespace Outlaws.WorldShift
                 else if (Distance >= RunLength)
                 {
                     State = ShiftRunState.Won;
+                    if (tutorialLevel) WorldShiftAnalytics.EndTutorial("completed");
                     Getaway?.Finish(Lateral);
                 }
             }
@@ -380,6 +387,7 @@ namespace Outlaws.WorldShift
             { presentation.OnHazardImpact(hit, lateral); return; }
             if (!pursuit.TryCrash(CollisionPursuitDrain)) return;
             Hits++;
+            WorldShiftAnalytics.Impact(hit.Kind.ToString());
             presentation.OnHazardImpact(hit, lateral);
             Notify("POLICE CLOSER", 1.3f);
             if (pursuit.IsGameOver) Fail("CAUGHT");
@@ -409,6 +417,7 @@ namespace Outlaws.WorldShift
 
         private void Fail(string reason)
         {
+            WorldShiftAnalytics.Died(reason);
             if (GetawayMode)
             {
                 State = ShiftRunState.Lost;
@@ -434,6 +443,7 @@ namespace Outlaws.WorldShift
                 if (Mathf.Abs(Mathf.Lerp(fromLateral, toLateral, t) - pickup.Lane * WorldShiftLevel.RoadWidth / 3f) > 1.35f) continue;
                 fuelTaken[i] = true;
                 FuelCollected++;
+                WorldShiftAnalytics.Fuel();
                 fuel.Refill(WorldShiftLevel.FuelRefill);
                 presentation.RefreshFuel();
                 Notify("FUEL +26", 1.2f);

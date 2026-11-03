@@ -90,7 +90,7 @@ namespace Outlaws.WorldShift
         }
         public void BeginStep(float from, float to, float lateral)
         {
-            if (RewardBranch == 0 && to >= ChoiceAt && from < Rejoin) RewardBranch = lateral >= .4f ? 1 : -1;
+            if (RewardBranch == 0 && to >= ChoiceAt && from < Rejoin) { RewardBranch = lateral >= .4f ? 1 : -1; WorldShiftAnalytics.Fork(RewardBranch); }
             if (ExitBranch == 0 && to >= ExitChoiceAt) ExitBranch = lateral >= WorldShiftGetaway.ContinueBoundary ? 1 : -1;
         }
         public void Constrain(float distance, AutoDriveCar driver)

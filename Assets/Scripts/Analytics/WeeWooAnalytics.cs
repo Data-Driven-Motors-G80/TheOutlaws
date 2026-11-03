@@ -138,6 +138,9 @@ public sealed class WeeWooAnalytics : MonoBehaviour
         TrackInternal(eventName, data);
     }
 
+    /// <summary>Logs one event from an already-built field dictionary.</summary>
+    public static void Track(string eventName, Dictionary<string, object> fields) => TrackInternal(eventName, fields);
+
     private static void TrackInternal(string eventName, Dictionary<string, object> fields)
     {
         EnsureStarted();

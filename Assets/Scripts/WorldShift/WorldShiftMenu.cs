@@ -20,6 +20,7 @@ namespace Outlaws.WorldShift
         private void Awake()
         {
             Time.timeScale = 1f;
+            WorldShiftAnalytics.MenuShown();
             var root = CreateCanvas(transform, "WorldShift menu");
             Panel(root, "Plain background", Vector2.zero, Vector2.one, Ink);
             // Keep every action inside the display's usable area.

@@ -78,6 +78,7 @@ namespace Outlaws.WorldShift
             LastShotAt = Duration;
             var target = FindTarget();
             if (target.Key != null) destroyed.Add(target.Key);
+            WorldShiftAnalytics.Shot(target.Key != null);
             float end = target.Key != null ? target.At : Distance + OutlawProjectile.MaximumRange;
             float x = target.Key != null ? target.X : Lateral;
             var driver = Player.GetComponent<AutoDriveCar>();
@@ -181,6 +182,7 @@ namespace Outlaws.WorldShift
                 if (!accepted) continue;
                 if (!Escape) practiceAmmo = GetawayRunState.MaximumAmmo;
                 pickup.Taken = true;
+                WorldShiftAnalytics.Ammo();
             }
             Present();
         }

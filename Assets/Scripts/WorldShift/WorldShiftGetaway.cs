@@ -112,6 +112,7 @@ namespace Outlaws.WorldShift
             OnWorldChanged();
             BuildHud();
             Present(World);
+            WorldShiftAnalytics.BeginLeg(IsCity ? "City" : "Desert", currentLeg, Length, () => Distance, () => Duration, () => World);
         }
 
         private Material MakeMaterial(Color color)
@@ -164,7 +165,10 @@ namespace Outlaws.WorldShift
                 if (Mathf.Max(a, b) < item.X - reach || Mathf.Min(a, b) > item.X + reach) continue;
                 item.Taken = true;
                 item.Visual.gameObject.SetActive(false);
-                if (WorldShiftFlow.Escape.Collect(100) > 0) lootFeedbackUntil = Duration + .35f;
+                int value = WorldShiftFlow.Escape.Collect(100);
+                if (value <= 0) continue;
+                lootFeedbackUntil = Duration + .35f;
+                WorldShiftAnalytics.Loot(value);
             }
         }
 
@@ -176,7 +180,12 @@ namespace Outlaws.WorldShift
             else WorldShiftFlow.FinishGetawayLeg(false);
         }
 
-        public void Lose(string reason) => WorldShiftFlow.Escape.Lose(reason);
+        public void Lose(string reason)
+        {
+            int haul = WorldShiftFlow.Escape.Carried;
+            WorldShiftFlow.Escape.Lose(reason);
+            WorldShiftAnalytics.Lost(reason, haul);
+        }
 
         public void Present(ShiftWorld displayedWorld)
         {

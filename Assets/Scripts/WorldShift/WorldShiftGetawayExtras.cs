@@ -107,18 +107,21 @@ namespace Outlaws.WorldShift
             {
                 shieldTaken = ShieldTaken = true;
                 Say("Shield on.");
+                WorldShiftAnalytics.PowerUp("shield");
             }
             if (!magnetTaken && Crosses(MagnetDistance, MagnetLane))
             {
                 magnetTaken = true;
                 magnetUntil = game.Duration + MagnetDuration;
                 Say("Magnet on!");
+                WorldShiftAnalytics.PowerUp("magnet");
             }
             if (!boostTaken && Crosses(BoostDistance, BoostLane))
             {
                 boostTaken = true;
                 boostUntil = game.Duration + BoostDuration;
                 Say("Boost!");
+                WorldShiftAnalytics.PowerUp("boost");
             }
             Refresh();
         }
@@ -131,6 +134,7 @@ namespace Outlaws.WorldShift
             // One obstacle field should not immediately charge another contact for the same hit.
             shieldProtectionUntil = game.Duration + RiskRunState.CollisionProtectionDuration;
             Say("Shield saved you.");
+            WorldShiftAnalytics.ShieldSaved();
             Refresh();
             return true;
         }

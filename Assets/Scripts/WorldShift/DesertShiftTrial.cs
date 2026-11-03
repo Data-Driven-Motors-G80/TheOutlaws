@@ -242,6 +242,7 @@ namespace Outlaws.WorldShift
             World = next;
             Getaway?.OnWorldChanged();
             Switches++;
+            WorldShiftAnalytics.Switched(next);
             Notify(next == ShiftWorld.Echo ? "NIGHTSHIFT" : "DAY MOVES", 1.3f);
             if (!IsAirborne && !Route.HasSurface(Distance, World)) Fail("NO ROAD - USE THE DAY BOOST RAMP");
             else if (!IsAirborne) CheckGates(Distance, Lateral);
@@ -286,7 +287,7 @@ namespace Outlaws.WorldShift
                     }
                     for (int i = 0; i < FuelCount; i++)
                         if ((!GetawayMode || World == ShiftWorld.Day) && !collectedFuel.Contains(i) && Distance + 1.3f >= FuelDistance(i) && before - 1.3f <= FuelDistance(i) && Mathf.Abs(Lateral) < 1.6f)
-                        { collectedFuel.Add(i); fuel.Refill(26f); Notify("FUEL +26", 1f); }
+                        { collectedFuel.Add(i); fuel.Refill(26f); Notify("FUEL +26", 1f); WorldShiftAnalytics.Fuel(); }
                 }
                 CheckRockContacts(before, previousX, dt);
                 StepTraffic(dt, before, previousX);
@@ -397,12 +398,14 @@ namespace Outlaws.WorldShift
             if (!fullLevel) { Fail(reason); return; }
             if (Getaway != null && Getaway.Extras.BlocksImpact(pursuit.CollisionProtectionRemaining > 0f)) return;
             if (!pursuit.TryCrash(.5f)) return;
+            WorldShiftAnalytics.Impact(reason);
             Notify("POLICE CLOSER", 1.3f);
             if (pursuit.IsGameOver) Fail("CAUGHT");
         }
 
         private void Fail(string reason)
         {
+            WorldShiftAnalytics.Died(reason);
             if (GetawayMode)
             {
                 State = ShiftRunState.Lost;
