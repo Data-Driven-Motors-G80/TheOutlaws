@@ -13,6 +13,7 @@ public sealed class WorldShiftGetawayTests
 {
     private const BindingFlags Flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
     private int bank, best;
+    private readonly int[] upgradeLevels = new int[3];
     private static Type FlowType => AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("Outlaws.WorldShift.WorldShiftFlow")).First(t => t != null);
     private static object Get(object o, string name) => o.GetType().GetProperty(name, Flags).GetValue(o);
     private static object Call(object o, string name, params object[] args) => o.GetType().GetMethod(name, Flags).Invoke(o, args);
@@ -27,12 +28,65 @@ public sealed class WorldShiftGetawayTests
     }
 
     [SetUp] public void SaveBank()
-    { bank = PlayerPrefs.GetInt("WorldShift.Getaway.Bank", 0); best = PlayerPrefs.GetInt("WorldShift.Getaway.Best", 0); }
+    {
+        bank = PlayerPrefs.GetInt("WorldShift.Getaway.Bank", 0); best = PlayerPrefs.GetInt("WorldShift.Getaway.Best", 0);
+        for (int i = 0; i < 3; i++)
+        {
+            string key = "WorldShift.Getaway.Upgrade." + (VehicleUpgrades.Part)i;
+            upgradeLevels[i] = PlayerPrefs.GetInt(key, -1);
+            PlayerPrefs.DeleteKey(key);
+        }
+    }
 
     [UnityTearDown] public IEnumerator Cleanup()
     {
         if (Application.isPlaying) yield return new ExitPlayMode();
+        for (int i = 0; i < 3; i++)
+        {
+            string key = "WorldShift.Getaway.Upgrade." + (VehicleUpgrades.Part)i;
+            if (upgradeLevels[i] < 0) PlayerPrefs.DeleteKey(key); else PlayerPrefs.SetInt(key, upgradeLevels[i]);
+        }
         PlayerPrefs.SetInt("WorldShift.Getaway.Bank", bank); PlayerPrefs.SetInt("WorldShift.Getaway.Best", best); PlayerPrefs.Save();
+    }
+
+    [UnityTest]
+    public IEnumerator GarageBenefitsApplyInBothEnvironmentsAndPersistAfterLoss()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
+        yield return new EnterPlayMode();
+        PlayerPrefs.SetInt("WorldShift.Getaway.Bank", 11000);
+        var garage = (VehicleUpgrades)FlowType.GetProperty("Garage").GetValue(null);
+        foreach (VehicleUpgrades.Part part in Enum.GetValues(typeof(VehicleUpgrades.Part)))
+            for (int i = 0; i < 3; i++) Assert.That(garage.Buy(part), Is.True);
+        Assert.That(garage.Banked, Is.EqualTo(500));
+        Flow("StartGetaway", false); yield return null; yield return null;
+        for (int leg = 0; leg < 2; leg++)
+        {
+            var game = Find(leg == 0 ? "WorldShiftCity" : "DesertShiftTrial"); game.enabled = false;
+            var fuel = (FuelState)game.GetType().GetField("fuel", Flags).GetValue(game);
+            Assert.That(fuel.Capacity, Is.EqualTo(130f));
+            Assert.That(fuel.CurrentFuel, Is.GreaterThan(129f));
+            Assert.That((bool)FlowType.GetMethod("BuyUpgrade").Invoke(null,
+                new object[] { VehicleUpgrades.Part.FuelTank }), Is.False);
+            float gap = (float)Get(game, "PursuitGap");
+            if (leg == 0) Call(game, "HitForkObstacle", 100f);
+            else Call(game, "Impact", "test-rock", "ROCK HIT");
+            Assert.That((float)Get(game, "PursuitGap"), Is.EqualTo(gap - 22.5f * .85f).Within(.02f));
+            Call(game, "TrySwitch");
+            var lamp = ((Transform)Get(game, "Player")).GetComponentsInChildren<Light>()
+                .Single(l => l.type == LightType.Spot);
+            Assert.That(lamp.range, Is.EqualTo(119f));
+            Assert.That(lamp.enabled, Is.True);
+            Capture(leg == 0 ? "garage-city-headlights" : "garage-desert-headlights");
+            Call(game, "TrySwitch"); Assert.That(lamp.enabled, Is.False);
+            if (leg == 0) { Flow("FinishGetawayLeg", true); yield return null; yield return null; }
+        }
+        Run.Lose("CAUGHT");
+        Flow("OpenGarage"); yield return null; yield return null;
+        var menu = Find("WorldShiftMenu");
+        Assert.That(menu.GetComponentsInChildren<TMP_Text>().Any(t => t.text == "Garage"), Is.True);
+        Assert.That(garage.Banked, Is.EqualTo(500));
+        Assert.That(garage.Level(VehicleUpgrades.Part.Armor), Is.EqualTo(3));
     }
 
     [UnityTest]
@@ -455,7 +509,7 @@ public sealed class WorldShiftGetawayTests
         Assert.That(Run.Carried, Is.EqualTo(100));
         Assert.That(crate.gameObject.activeSelf, Is.False);
         Assert.That(prompt.text, Is.EqualTo("Collect cash. Take the left exit to keep it."), "Collecting cash must not flash another message.");
-        Assert.That(total.text, Is.EqualTo("$100"));
+        Assert.That(total.text, Is.EqualTo("<size=14>Carrying</size>\n$100"));
         Assert.That(total.rectTransform.localScale.x, Is.GreaterThan(1f));
         Capture("loot-total-feedback");
         Call(game, "TogglePause"); Call(hud, "Refresh");
@@ -551,9 +605,11 @@ public sealed class WorldShiftGetawayTests
             fuel.Reset(100f); Call(hud, "Refresh");
             var fuelText = (TMP_Text)Get(strip, "Fuel");
             Assert.That(fuelText.text, Is.EqualTo("Fuel 100%"));
+            Assert.That(((TMP_Text)Get(strip, "World")).gameObject.activeInHierarchy, Is.False);
+            Assert.That(((GameObject)Get(strip, "MirrorPanel")).activeInHierarchy, Is.False);
             Assert.That(hud.GetComponentsInChildren<TMP_Text>(true).Any(t => t.name == "Speed km/h"), Is.False, "Driving should not add another numeric counter.");
-            Assert.That(fuelText.rectTransform.anchorMin.x, Is.EqualTo(.37f));
-            Assert.That(((RectTransform)hud.GetComponentsInChildren<Transform>(true).Single(t => t.name == "Ammo")).anchorMin.x, Is.EqualTo(.56f));
+            Assert.That(fuelText.rectTransform.anchorMin.x, Is.EqualTo(.34f));
+            Assert.That(((RectTransform)hud.GetComponentsInChildren<Transform>(true).Single(t => t.name == "Ammo")).anchorMin.x, Is.EqualTo(.67f));
             Assert.That(((RectTransform)fuelText.transform.parent).anchorMin.y, Is.GreaterThan(.85f));
             Assert.That(hud.GetComponentsInChildren<RectTransform>(true).Any(r => new[] { "Fuel track", "RouteProgress", "Exit distance", "Progress" }.Contains(r.name)), Is.False);
             fuel.Reset(12.25f); Call(hud, "Refresh");

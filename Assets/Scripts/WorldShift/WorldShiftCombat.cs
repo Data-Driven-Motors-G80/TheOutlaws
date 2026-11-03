@@ -70,7 +70,7 @@ namespace Outlaws.WorldShift
         public bool TryShoot()
         {
             if (city != null && city.TutorialLevel && (!city.TutorialShootingActive
-                || IsDestroyed(city.TutorialShootingObstacle))) return false;
+                || city.TutorialShotComplete)) return false;
             if (!Running || Ammo <= 0 || Duration < nextShot) return false;
             if (Escape) { if (!WorldShiftFlow.Escape.SpendShot()) return false; }
             else practiceAmmo--;
@@ -114,7 +114,7 @@ namespace Outlaws.WorldShift
             {
                 foreach (var h in city.Hazards)
                 {
-                    if (city.TutorialLevel && (!city.TutorialShootingActive || h != city.TutorialShootingObstacle)) continue;
+                    if (city.TutorialLevel && (!city.TutorialShootingActive || !city.IsTutorialShotTarget(h))) continue;
                     if (!IsActive(this, h, h.VisibleIn(World)) || Airborne || h.Kind == ShiftHazardKind.Gap) continue;
                     h.BoundsAt(Distance, out float at, out float end);
                     float x = Lateral;

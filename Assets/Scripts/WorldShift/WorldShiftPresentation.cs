@@ -71,52 +71,10 @@ namespace Outlaws.WorldShift
                 relayVisuals = gameObject.AddComponent<WorldShiftRelayVisuals>();
                 relayVisuals.Build(game, route);
             }
-            BuildCity();
             foreach (ShiftHazard hazard in game.Hazards) BuildHazard(hazard);
             BuildFuel();
             BuildCheckpoints();
             UpdateVisibility(0f);
-        }
-
-        private void BuildCity()
-        {
-            var root = new GameObject("City blocks - shared across worlds");
-            root.transform.SetParent(transform, false);
-            Color[] colours = { new Color(0.36f, 0.53f, 0.57f), new Color(0.58f, 0.43f, 0.37f),
-                new Color(0.61f, 0.57f, 0.43f), new Color(0.43f, 0.46f, 0.54f) };
-            var random = new System.Random(2710);
-            for (float at = -80f; at < game.RunLength + 80f; at += 40f)
-            {
-                RoadPathPoint p = route.Sample(at + 20f);
-                Transform block = new GameObject("City block " + at.ToString("0")).transform;
-                block.SetParent(root.transform, false);
-                block.SetPositionAndRotation(p.Position, Quaternion.LookRotation(p.Forward, p.Up));
-                chunks.Add(new Chunk { Root = block.gameObject, At = at + 20f, CityBlock = true });
-                for (int side = -1; side <= 1; side += 2)
-                {
-                    for (int n = 0; n < 2; n++)
-                    {
-                        float height = 8f + (float)random.NextDouble() * 19f;
-                        Renderer building = Box(block, "Prototype building", new Vector3(side * (13f + n * 7f), height * 0.5f, n == 0 ? -9f : 10f),
-                            new Vector3(8f, height, 14f), warmEdge);
-                        Tint(building, colours[random.Next(colours.Length)], new Color(0.17f + n * 0.04f, 0.25f, 0.35f));
-                        // One geometric strip per facade is enough to establish a city silhouette.
-                        Renderer stripe = Box(block, "Facade stripe", new Vector3(side * (8.95f + n * 7f), height * 0.54f, n == 0 ? -9f : 10f),
-                            new Vector3(0.1f, 0.35f, 11f), warmEdge);
-                        palette.Add(new PaletteItem { Renderer = stripe,
-                            Day = RuntimeMaterials.Coloured(new Color(.92f, .8f, .56f)),
-                            Echo = Reflective(new Color(.3f, .6f, .82f), .32f) });
-                    }
-                    // Plain posts retain useful roadside scale without decorative lamps or light pools.
-                    var lampPoint = route.Sample(at + 20f + (side < 0 ? -10f : 10f));
-                    var post = new GameObject("Street-light post").transform;
-                    post.SetParent(block, false);
-                    post.SetPositionAndRotation(lampPoint.Position + lampPoint.Right * side * 5.8f,
-                        Quaternion.LookRotation(lampPoint.Forward, lampPoint.Up));
-                    Box(post, "Post", Vector3.up * 1.6f, new Vector3(.12f, 3.2f, .12f), RuntimeMaterials.Coloured(new Color(.3f, .33f, .36f)));
-                    Box(post, "Roadside marker", Vector3.up * 3.2f, new Vector3(.45f, .16f, .3f), RuntimeMaterials.Coloured(Color.white));
-                }
-            }
         }
 
         private void BuildHazard(ShiftHazard data)
@@ -156,7 +114,7 @@ namespace Outlaws.WorldShift
                     {
                         if ((data.LaneMask & (1 << lane)) == 0) continue;
                         float x = (lane - 1) * WorldShiftLevel.RoadWidth / 3f;
-                        WorldShiftObstacleVisual.Build(frame, new Vector3(x, .9f, 0f), new Vector3(3.05f, 1.8f, length));
+                        WorldShiftObstacleVisual.Build(frame, new Vector3(x, .9f, 0f), new Vector3(data.LateralMotion ? 1.6f : 3.05f, 1.8f, length));
                     }
                 }
             }
@@ -252,7 +210,7 @@ namespace Outlaws.WorldShift
         {
             if (headlightHazeMaterial != null)
             {
-                float clearRoad = 54f;
+                float clearRoad = 54f * (playerHeadlight != null ? playerHeadlight.range / 74f : 1f);
                 foreach (ShiftHazard hazard in game.Hazards)
                     if (hazard.World == world && hazard.Kind == ShiftHazardKind.Gap && hazard.End > distance)
                         clearRoad = Mathf.Min(clearRoad, Mathf.Max(0f, hazard.Start - distance - 4f));
@@ -272,7 +230,7 @@ namespace Outlaws.WorldShift
                 if (hazard.Data.Kind != ShiftHazardKind.Oncoming) continue;
                 hazard.Data.BoundsAt(distance, out float start, out float end);
                 RoadPathPoint point = route.Sample((start + end) * .5f);
-                hazard.Root.SetPositionAndRotation(point.Position, Quaternion.LookRotation(point.Forward, point.Up));
+                hazard.Root.SetPositionAndRotation(point.Position + point.Right * hazard.Data.LateralOffset, Quaternion.LookRotation(point.Forward, point.Up));
                 hazard.Chunk.At = start;
                 hazard.Chunk.End = end;
             }
@@ -552,10 +510,10 @@ namespace Outlaws.WorldShift
             playerHeadlight = lamp.AddComponent<Light>();
             playerHeadlight.type = LightType.Spot;
             playerHeadlight.color = new Color(.88f, .94f, 1f);
-            playerHeadlight.range = 74f;
+            playerHeadlight.range = game.GetawayMode ? WorldShiftFlow.Garage.HeadlightRange : 74f;
             playerHeadlight.spotAngle = 36f;
             playerHeadlight.innerSpotAngle = 22f;
-            playerHeadlight.intensity = 900f;
+            playerHeadlight.intensity = 900f * Mathf.Pow(playerHeadlight.range / 74f, 2f);
             playerHeadlight.renderMode = LightRenderMode.ForcePixel;
             playerHeadlight.shadows = LightShadows.Soft;
             playerHeadlight.shadowStrength = .85f;
@@ -582,7 +540,7 @@ namespace Outlaws.WorldShift
             for (int row = 0; row <= rows; row++)
             {
                 float t = row / (float)rows;
-                float z = t * 54f;
+                float z = t * 54f * (playerHeadlight.range / 74f);
                 float radius = .12f + z * Mathf.Tan(16f * Mathf.Deg2Rad);
                 for (int column = 0; column <= columns; column++)
                 {

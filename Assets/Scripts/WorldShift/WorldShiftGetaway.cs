@@ -236,7 +236,7 @@ namespace Outlaws.WorldShift
                         if (at < Routing.ExitChoiceAt && (side < 0 ? x > 0f : x < 0f)) continue;
                         Box(root, new Vector3(x, 2.5f, 0f), new Vector3(.12f, 5f, .12f), colour);
                     }
-                    WorldLabel(root, side < 0 ? "Exit" : "Next", new Vector3(0f, 4.5f, 0f), side < 0 ? Green : Gold, 4f);
+                    WorldLabel(root, side < 0 ? "Cash out" : "Continue", new Vector3(0f, 4.5f, 0f), side < 0 ? Green : Gold, 4f);
                 }
         }
 
@@ -313,8 +313,9 @@ namespace Outlaws.WorldShift
             resultValue = Label(result.transform, "", .15f, .49f, .85f, .68f, 64f);
             resultNote = Label(result.transform, "", .15f, .36f, .85f, .48f, 21f);
             resultTitle.alignment = resultValue.alignment = resultNote.alignment = TextAlignmentOptions.Center;
-            WorldShiftMenu.Button(result.transform, "Play again", new Vector2(.20f, .18f), new Vector2(.49f, .29f), () => WorldShiftFlow.StartGetaway(false));
-            WorldShiftMenu.Button(result.transform, "Back to menu", new Vector2(.51f, .18f), new Vector2(.80f, .29f), WorldShiftFlow.Menu);
+            WorldShiftMenu.Button(result.transform, "Play again", new Vector2(.12f, .18f), new Vector2(.36f, .29f), () => WorldShiftFlow.StartGetaway(false));
+            WorldShiftMenu.Button(result.transform, "Garage", new Vector2(.38f, .18f), new Vector2(.62f, .29f), WorldShiftFlow.OpenGarage);
+            WorldShiftMenu.Button(result.transform, "Back to menu", new Vector2(.64f, .18f), new Vector2(.88f, .29f), WorldShiftFlow.Menu);
             Refresh();
         }
 
@@ -347,13 +348,13 @@ namespace Outlaws.WorldShift
             bool settled = run.Status == GetawayRunState.RunStatus.Banked || run.Status == GetawayRunState.RunStatus.Lost;
             statusStrip.SetAmmo(Combat != null ? Combat.Ammo : 0, Combat != null);
             statusStrip.Refresh(World, Fuel, RearView != null ? RearView.Texture : null, Gap);
-            haul.text = "$" + run.Carried.ToString("N0");
+            haul.text = "<size=14>Carrying</size>\n$" + run.Carried.ToString("N0");
             float pickupPulse = Mathf.Clamp01((lootFeedbackUntil - Duration) / .35f);
             haul.color = Color.Lerp(Gold, Color.white, pickupPulse);
             haul.rectTransform.localScale = Vector3.one * (1f + .12f * pickupPulse);
             choices.SetActive(running && InExit);
             choiceLeft.text = "Left: Cash out\n$" + run.Carried.ToString("N0");
-            choiceRight.text = "Right: Keep going\n" + (IsCity ? "Desert" : "City") + " / " + (1f + Mathf.Min(currentLeg + 1, 40) * .5f).ToString("0.#") + "x loot";
+            choiceRight.text = "Right: Continue\n" + (IsCity ? "Desert" : "City") + " / " + (1f + Mathf.Min(currentLeg + 1, 40) * .5f).ToString("0.#") + "x loot";
             choiceLeftPanel.color = !Routing.ContinueSelected(Lateral) ? new Color(.08f, .3f, .2f, .98f) : Ink;
             choiceRightPanel.color = Routing.ContinueSelected(Lateral) ? new Color(.35f, .23f, .06f, .98f) : Ink;
             string nextPrompt = running && !InExit ? messages.DrivingPrompt() : "";

@@ -34,17 +34,29 @@ namespace Outlaws.WorldShift
         private readonly RiskRunState pursuit = new RiskRunState();
         private readonly System.Collections.Generic.HashSet<ShiftHazard> hitHazards = new System.Collections.Generic.HashSet<ShiftHazard>();
         private bool tutorialHintCompleted;
-        public string TutorialPrompt => !tutorialLevel ? ""
-            : checkpointIndex == 3 && !WorldShiftCombat.IsActive(Combat, TutorialShootingObstacle)
-                ? "Block cleared. Keep driving." : WorldShiftTutorial.LessonMessages[checkpointIndex];
+        private bool tutorialTrafficMoved, tutorialFrozen, tutorialReturned, tutorialSawNight;
+        private float tutorialFrozenAt;
+        public string TutorialControlKey => checkpointIndex == 3 && TutorialShotComplete ? "←   →" : checkpointIndex == 1 && tutorialFrozen || checkpointIndex == 2 && tutorialReturned
+            ? "←   →" : WorldShiftTutorial.LessonKeys[checkpointIndex];
+        public int TutorialLessonIndex => checkpointIndex;
+        public bool TutorialLessonComplete => checkpointIndex == 3
+            ? TutorialShotComplete : tutorialHintCompleted;
+        public string TutorialPrompt => tutorialLevel && checkpointIndex == 3 && TutorialShotComplete && Distance < 450f
+            ? "Drive through the gap." : !tutorialLevel || TutorialLessonComplete ? ""
+            : checkpointIndex == 1 ? tutorialFrozen
+                ? Duration - tutorialFrozenAt < 1f ? "Frozen. Still solid." : "Steer past."
+                : World == ShiftWorld.Echo ? "Wake traffic. Then freeze it." : "Freeze traffic."
+            : checkpointIndex == 2 ? tutorialReturned ? "Collect the cash."
+                : !tutorialSawNight && World == ShiftWorld.Day ? "Freeze traffic first." : "Bring supplies back."
+            : WorldShiftTutorial.LessonMessages[checkpointIndex];
         private bool TutorialWaitingForLesson
         {
             get
             {
-                if (!tutorialLevel) return false;
+                if (!tutorialLevel || checkpointIndex == 1 || checkpointIndex == 2) return false;
                 float end = checkpointIndex + 1 < Checkpoints.Length ? Checkpoints[checkpointIndex + 1].Distance : RunLength;
                 if (Distance < end - 2f) return false;
-                bool completed = checkpointIndex == 3 ? Combat?.IsDestroyed(TutorialShootingObstacle) ?? false : tutorialHintCompleted;
+                bool completed = checkpointIndex == 3 ? TutorialShotComplete : tutorialHintCompleted;
                 return !completed;
             }
         }
@@ -78,7 +90,7 @@ namespace Outlaws.WorldShift
         public int Deaths { get; private set; }
         public int Switches { get; private set; }
         public int FuelCollected { get; private set; }
-        public float FuelFraction => fuel.CurrentFuel / FuelState.MaximumFuel;
+        public float FuelFraction => fuel.CurrentFuel / fuel.Capacity;
         public bool IsMerged => IsJoinedDistance(Distance);
         private bool wasMerged;
         private ShiftWorld riftEntryWorld;
@@ -89,8 +101,11 @@ namespace Outlaws.WorldShift
             Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((Distance - MergeStart) / 16f)));
         private bool JumpSequence => relay?.SectionAt(Distance) != null || (Getaway?.Extras.IsJumpSequence(Distance) ?? false);
         public ShiftHazard TutorialShootingObstacle => tutorialLevel ? tutorialHazards[3] : null;
-        public bool TutorialShootingActive => tutorialLevel && Distance >= 380f && Distance < WorldShiftTutorial.FinalLessonStart;
-        private bool WaitingForTutorialShot => TutorialShootingActive && WorldShiftCombat.IsActive(Combat, TutorialShootingObstacle);
+        public bool IsTutorialShotTarget(ShiftHazard hazard) => tutorialLevel && (hazard == tutorialHazards[3] || hazard == tutorialHazards[6] || hazard == tutorialHazards[7]);
+        public bool TutorialShotComplete => tutorialLevel && ((Combat?.IsDestroyed(tutorialHazards[3]) ?? false)
+            || (Combat?.IsDestroyed(tutorialHazards[6]) ?? false) || (Combat?.IsDestroyed(tutorialHazards[7]) ?? false));
+        public bool TutorialShootingActive => tutorialLevel && checkpointIndex == 3 && Distance >= 330f && Distance < WorldShiftTutorial.FinalLessonStart;
+        private bool WaitingForTutorialShot => TutorialShootingActive && !TutorialShotComplete;
         private float BaseSpeed => tutorialLevel ? TutorialWaitingForLesson || WaitingForTutorialShot && Distance >= 410f ? 0f : 18f : JumpSequence ? relay?.SpeedAt(Distance) ?? WorldShiftLevel.Speed
             : WorldShiftLevel.Speed * (splitViewValidation ? 1f : WorldShiftLevel.CruiseSpeedMultiplier);
         public float Speed => BaseSpeed * (JumpSequence ? 1f : Getaway?.Extras.SpeedMultiplier ?? 1f);
@@ -105,7 +120,7 @@ namespace Outlaws.WorldShift
         public float MessageRemaining { get; private set; }
         public string SectionTitle => Checkpoints[checkpointIndex].Title;
         public string SectionHint => TutorialShootingActive ? WaitingForTutorialShot
-            ? "Click to shoot the block."
+            ? "F / click: shoot the block."
             : Duration - Combat.LastShotAt < 1f ? "Nice shot!" : ""
             : tutorialLevel ? tutorialHintCompleted ? "" : Checkpoints[checkpointIndex].Hint
             : relay != null && relay.Hint(Distance, World).Length > 0 ? relay.Hint(Distance, World)
@@ -118,6 +133,7 @@ namespace Outlaws.WorldShift
         private void Awake()
         {
             GetawayMode = !tutorialLevel && !splitViewValidation && WorldShiftFlow.Escape.Status == GetawayRunState.RunStatus.Running;
+            if (GetawayMode) { fuel.SetCapacity(WorldShiftFlow.Garage.FuelCapacity); fuel.RefillToFull(); }
             if (GetawayMode) { escapeHazards = WorldShiftLevel.CreateEscapeHazards(); escapeFuel = WorldShiftLevel.CreateEscapeFuel(); }
             if (tutorialLevel) tutorialHazards = WorldShiftTutorial.CreateHazards();
             if (roadTemplate == null || carPrefab == null || view == null || sun == null)
@@ -146,8 +162,11 @@ namespace Outlaws.WorldShift
             ApplyWorld(ShiftWorld.Day);
             Police = ChaseCar.CreateForFiniteRoute(policePrefab, transform, Player, d => Route.SampleDriver(d, relay != null ? relay.SamplePolice(d) : Route.Sample(d), Lateral));
             UpdatePolice(0f);
-            RearView = RearViewCamera.Create(Player, new[] { Police });
-            RearView.transform.SetParent(transform, true);
+            if (!GetawayMode && !tutorialLevel)
+            {
+                RearView = RearViewCamera.Create(Player, new[] { Police });
+                RearView.transform.SetParent(transform, true);
+            }
             UpdateCamera(true);
             if (!splitViewValidation) { Combat = gameObject.AddComponent<WorldShiftCombat>(); Combat.Bind(this); }
             if (tutorialLevel)
@@ -236,6 +255,16 @@ namespace Outlaws.WorldShift
             Getaway?.OnWorldChanged();
             Switches++;
             WorldShiftAnalytics.Switched(next);
+            if (tutorialLevel && checkpointIndex == 1 && !tutorialHintCompleted)
+            {
+                tutorialFrozen = next == ShiftWorld.Echo && tutorialTrafficMoved;
+                if (tutorialFrozen) tutorialFrozenAt = Duration;
+            }
+            if (tutorialLevel && checkpointIndex == 2)
+            {
+                if (next == ShiftWorld.Echo) tutorialSawNight = true;
+                else if (tutorialSawNight) tutorialReturned = true;
+            }
             CompleteTutorialHint();
             // A switch always commits. Occupied destinations use the same impact
             // path as driving into a hazard; missing road still causes a fall.
@@ -278,7 +307,18 @@ namespace Outlaws.WorldShift
                 float previous = Distance, previousLateral = Lateral;
                 // Lesson waits are safe reading time; traffic must not approach a stopped learner.
                 if (!TutorialWaitingForLesson)
-                    foreach (var hazard in Hazards) hazard.Advance(dt, Distance, World);
+                    foreach (var hazard in Hazards)
+                    {
+                        if (tutorialLevel && hazard.MotionSpeed > 0f &&
+                            hazard != tutorialHazards[checkpointIndex == 2 ? 2 : 1]) continue;
+                        if (tutorialLevel && checkpointIndex == 0) continue;
+                        hazard.Advance(dt, Distance, World);
+                    }
+                if (tutorialLevel)
+                {
+                    if (checkpointIndex == 1 && World == ShiftWorld.Day && tutorialHazards[1].MotionTravel > 0f)
+                        tutorialTrafficMoved = true;
+                }
                 float speed = Speed;
                 Getaway?.BeginStep(previous, previous + speed * dt, driver);
                 if (relay != null)
@@ -332,10 +372,15 @@ namespace Outlaws.WorldShift
                 Getaway?.Collect(previous, next, previousLateral, nextLateral);
                 Combat?.Step(previous, next, previousLateral, nextLateral);
                 TutorialRewards?.Step(previous, next, previousLateral, nextLateral);
+                CompleteTutorialHint();
+                if (tutorialLevel && (checkpointIndex == 1 || checkpointIndex == 2) && !TutorialLessonComplete
+                    && Distance >= Checkpoints[checkpointIndex + 1].Distance - 2f)
+                { Fail("TRY THIS STEP AGAIN"); break; }
                 if (checkpointIndex + 1 < Checkpoints.Length && Distance >= Checkpoints[checkpointIndex + 1].Distance)
                 {
                     checkpointIndex++;
                     if (tutorialLevel) WorldShiftAnalytics.TutorialStep(checkpointIndex, Checkpoints[checkpointIndex].Title);
+                    ResetTutorialDemo();
                     tutorialHintCompleted = false;
                     tutorialCheckpointSwitches = Switches;
                     tutorialCheckpointLateral = Lateral;
@@ -383,9 +428,11 @@ namespace Outlaws.WorldShift
             if (hit == null) return;
             if (hit.Kind == ShiftHazardKind.Gap) { Fail("NO ROAD"); return; }
             hitHazards.Add(hit);
+            if (tutorialLevel && (checkpointIndex == 1 || checkpointIndex == 2))
+            { Fail("TRY THIS STEP AGAIN"); return; }
             if (Getaway != null && Getaway.Extras.BlocksImpact(pursuit.CollisionProtectionRemaining > 0f))
             { presentation.OnHazardImpact(hit, lateral); return; }
-            if (!pursuit.TryCrash(CollisionPursuitDrain)) return;
+            if (!pursuit.TryCrash(CollisionPursuitDrain * (GetawayMode ? WorldShiftFlow.Garage.CollisionMultiplier : 1f))) return;
             Hits++;
             WorldShiftAnalytics.Impact(hit.Kind.ToString());
             presentation.OnHazardImpact(hit, lateral);
@@ -479,6 +526,13 @@ namespace Outlaws.WorldShift
                 float entry = relativeTo > relativeFrom ? Mathf.Clamp01((-halfLength - relativeFrom) / (relativeTo - relativeFrom)) : 0f;
                 float exit = relativeTo > relativeFrom ? Mathf.Clamp01((depth + halfLength - relativeFrom) / (relativeTo - relativeFrom)) : 1f;
                 float a = Mathf.Lerp(fromLateral, toLateral, entry), b = Mathf.Lerp(fromLateral, toLateral, exit);
+                if (hazard.LateralMotion)
+                {
+                    float left = Mathf.Min(hazard.PreviousLateralOffset, hazard.LateralOffset) - .8f - halfWidth;
+                    float right = Mathf.Max(hazard.PreviousLateralOffset, hazard.LateralOffset) + .8f + halfWidth;
+                    if (Mathf.Max(a, b) >= left && Mathf.Min(a, b) <= right) return hazard;
+                    continue;
+                }
                 if (hazard.Kind == ShiftHazardKind.HalfBarrier)
                 {
                     float min = hazard.HalfSide < 0 ? -WorldShiftLevel.RoadWidth * .5f : 0f;
@@ -504,11 +558,19 @@ namespace Outlaws.WorldShift
             switch (checkpointIndex)
             {
                 case 0: tutorialHintCompleted = Mathf.Abs(Lateral - Checkpoints[0].Lateral) >= .8f; break;
-                case 1: tutorialHintCompleted = World == ShiftWorld.Echo; break;
-                case 2: tutorialHintCompleted = World == ShiftWorld.Day; break;
-                case 4: tutorialHintCompleted = Switches > tutorialCheckpointSwitches
-                    || Mathf.Abs(Lateral - tutorialCheckpointLateral) >= .8f || Distance >= WorldShiftTutorial.FirstFinalObstacle + 12f; break;
+                case 1:
+                    tutorialHazards[1].BoundsAt(Distance, out _, out float end);
+                    tutorialHintCompleted = tutorialFrozen && World == ShiftWorld.Echo && Distance > end + 5f;
+                    break;
+                case 2: tutorialHintCompleted = tutorialReturned && TutorialRewards != null && TutorialRewards.Collected > 0; break;
+                case 4: tutorialHintCompleted = Distance >= WorldShiftTutorial.LastFinalObstacle + 12f; break;
             }
+        }
+
+        private void ResetTutorialDemo()
+        {
+            tutorialTrafficMoved = tutorialFrozen = tutorialReturned = false;
+            tutorialSawNight = World == ShiftWorld.Echo;
         }
 
         private void RestoreCheckpoint()
@@ -542,6 +604,7 @@ namespace Outlaws.WorldShift
             wasMerged = IsMerged;
             riftEntryWorld = checkpoint.World;
             ApplyWorld(IsMerged ? WorldShiftLevel.WorldAt(Lateral) : checkpoint.World);
+            ResetTutorialDemo();
             UpdatePolice(0f);
             UpdateCamera(true);
             Notify("CHECKPOINT " + (checkpointIndex + 1), 2f);

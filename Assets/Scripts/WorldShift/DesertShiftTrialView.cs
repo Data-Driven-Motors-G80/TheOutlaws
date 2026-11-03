@@ -22,7 +22,7 @@ namespace Outlaws.WorldShift
         private readonly List<Renderer> sand = new List<Renderer>();
         private DesertShiftTrial game;
         private Camera view;
-        private Light sun;
+        private Light sun, playerHeadlight;
         private ShiftWorld? displayed;
         private Material rockDay, rockNight, sandDay, sandNight;
         private TMP_Text hint, modalText;
@@ -38,11 +38,27 @@ namespace Outlaws.WorldShift
         {
             game = controller; view = camera; sun = directional;
             obstaclePrefab = obstacle;
+            if (game.GetawayMode)
+            {
+                var lamp = new GameObject("Player forward cone headlight");
+                lamp.transform.SetParent(game.Player, false);
+                lamp.transform.localPosition = new Vector3(0f, 1.1f, 1.8f);
+                lamp.transform.localRotation = Quaternion.Euler(2f, 0f, 0f);
+                playerHeadlight = lamp.AddComponent<Light>();
+                playerHeadlight.type = LightType.Spot;
+                playerHeadlight.color = new Color(.88f, .94f, 1f);
+                playerHeadlight.range = WorldShiftFlow.Garage.HeadlightRange;
+                playerHeadlight.spotAngle = 36f; playerHeadlight.innerSpotAngle = 22f;
+                playerHeadlight.intensity = 900f * Mathf.Pow(playerHeadlight.range / 74f, 2f);
+                playerHeadlight.renderMode = LightRenderMode.ForcePixel;
+                playerHeadlight.shadows = LightShadows.Soft;
+                playerHeadlight.enabled = false;
+            }
             rockDay = Material(new Color(1f, .42f, 0f), .08f);
             rockNight = Material(new Color(.35f, .64f, .76f), .25f);
-            sandDay = originalSand != null ? originalSand : Material(new Color(.52f, .32f, .16f));
+            sandDay = Material(new Color(.52f, .32f, .16f));
             sandNight = Material(new Color(.17f, .24f, .31f));
-            game.Route.SetSurfaceMaterials(originalRoad, Material(new Color(.10f, .14f, .19f)));
+            game.Route.SetSurfaceMaterials(Material(new Color(.28f, .26f, .23f)), Material(new Color(.10f, .14f, .19f)));
             BuildOriginalDesertSand();
             if (game.FullLevel)
             {
@@ -108,20 +124,7 @@ namespace Outlaws.WorldShift
                 banks.Refresh(sandDay, floor);
                 sand.Add(segment.transform.Find("Desert roadside sand").GetComponent<Renderer>());
             }
-            for (float at = 30f; at < game.RunLength + 60f; at += 80f)
-            {
-                RoadPathPoint point = game.Route.Sample(at);
-                foreach (float side in new[] { -1f, 1f })
-                {
-                    var dune = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                    dune.name = "Prototype dune " + side; dune.transform.SetParent(transform, false); StripCollider(dune);
-                    Vector3 position = point.Position + point.Right * side * (point.Width * .5f + 25f);
-                    position.y = floor - 1.5f;
-                    dune.transform.SetPositionAndRotation(position, Quaternion.LookRotation(Vector3.ProjectOnPlane(point.Forward, Vector3.up), Vector3.up));
-                    dune.transform.localScale = new Vector3(24f, side < 0f ? 9f : 6f, 40f);
-                    var surface = dune.GetComponent<Renderer>(); surface.sharedMaterial = sandDay; sand.Add(surface);
-                }
-            }
+            // Flat ground preserves road and gap readability without decorative dunes.
         }
 
         private void BuildSandBackdrop(Bounds bounds, float floor)
@@ -225,6 +228,7 @@ namespace Outlaws.WorldShift
             if (game == null) return;
             game.Getaway?.Present(world);
             bool day = world == ShiftWorld.Day;
+            if (playerHeadlight != null) playerHeadlight.enabled = !day;
             if (relayViews != null) { relayViews.SetWorld(world); relayViews.Refresh(game.Distance); }
             if (displayed != world)
             {
