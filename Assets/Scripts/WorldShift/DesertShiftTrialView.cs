@@ -32,6 +32,7 @@ namespace Outlaws.WorldShift
         private readonly List<GameObject> fuelViews = new List<GameObject>();
         private TMP_Text actionLabel;
         private WorldShiftRelayVisuals relayViews;
+        private readonly WorldShiftObstacleVisual.Palette obstaclePalette = new WorldShiftObstacleVisual.Palette();
         private static readonly Color Gold = new Color(1f, .70f, .26f), Cyan = new Color(.32f, .84f, 1f);
 
         public void Build(DesertShiftTrial controller, Camera camera, Light directional, Material originalRoad, Material originalSand, GameObject obstacle)
@@ -162,14 +163,14 @@ namespace Outlaws.WorldShift
 
         private void OriginalObstacle(Transform parent, Vector3 position, Vector3 size, Material material = null)
         {
-            WorldShiftObstacleVisual.Build(parent, position, size);
+            WorldShiftObstacleVisual.Build(parent, position, size, obstaclePalette);
         }
 
         private void BuildRock(DesertTrialRock data)
         {
             var root = new GameObject("Shared rolling rock " + data.Distance).transform;
             root.SetParent(transform, false);
-            var sphere = WorldShiftObstacleVisual.Build(root, Vector3.zero, Vector3.one * (data.Radius * 2f)).gameObject;
+            var sphere = WorldShiftObstacleVisual.Build(root, Vector3.zero, Vector3.one * (data.Radius * 2f), obstaclePalette).gameObject;
             Renderer surface = sphere.transform.Find("Obstacle block").GetComponent<Renderer>();
             var frozen = new GameObject("Frozen pause pictogram");
             frozen.transform.SetParent(root, false);
@@ -189,7 +190,7 @@ namespace Outlaws.WorldShift
                 }
             }
             if (!data.Airborne && data.MergeSide == 0 && (!game.FullLevel || !DesertShiftLevel.InRockField(data.Distance) || data.Guarded))
-                DesertCrossingController.CreateWarning(crossing, game.Route.Sample(data.Distance), data.Direction > 0f ? 1 : -1, true);
+                DesertCrossingController.CreateWarning(crossing, game.Route.Sample(data.Distance), data.Direction > 0f ? 1 : -1, true, showSign: false);
             rocks.Add(new RockView { Root = root, Ball = sphere.transform, Surface = surface, Lock = frozen, Marker = crossing.gameObject });
         }
 
@@ -197,7 +198,7 @@ namespace Outlaws.WorldShift
         {
             Transform root = RoadRoot("Freezeable oncoming police " + data.Start, data.Start);
             float x = data.Lane * WorldShiftLevel.RoadWidth / 3f;
-            WorldShiftObstacleVisual.Build(root, new Vector3(x, .9f, 0f), new Vector3(2.4f, 1.8f, 3.8f));
+            WorldShiftObstacleVisual.Build(root, new Vector3(x, .9f, 0f), new Vector3(2.4f, 1.8f, 3.8f), obstaclePalette);
             var frozen = new GameObject("Frozen traffic pause pictogram"); frozen.transform.SetParent(root, false);
             foreach (float offset in new[] { -.2f, .2f })
                 Box(frozen.transform, "Pause bar", new Vector3(x + offset, 2.25f, 0f), new Vector3(.18f, .65f, .15f), Material(Cyan, .65f));
@@ -212,7 +213,9 @@ namespace Outlaws.WorldShift
             root.transform.SetPositionAndRotation(point.Position, Quaternion.LookRotation(point.Forward, point.Up));
             var solid = new GameObject("Active wall"); solid.transform.SetParent(root.transform, false);
             Color colour = data.World == ShiftWorld.Day ? Gold : Cyan;
-            if (data.HalfSide != 0)
+            if (data.SwitchOnly)
+                WorldShiftObstacleVisual.Build(solid.transform, new Vector3(0f, .9f, 0f), new Vector3(WorldShiftLevel.RoadWidth, 1.8f, 8f), obstaclePalette);
+            else if (data.HalfSide != 0)
             {
                 OriginalObstacle(solid.transform, new Vector3(data.HalfSide * 2.5f, .7f, 0f), new Vector3(5f, 1.4f, 8f), Material(colour * .55f, .1f));
             }
@@ -225,6 +228,7 @@ namespace Outlaws.WorldShift
 
         public void Present(ShiftWorld world)
         {
+            obstaclePalette.SetWorld(world);
             if (game == null) return;
             game.Getaway?.Present(world);
             bool day = world == ShiftWorld.Day;
@@ -279,7 +283,7 @@ namespace Outlaws.WorldShift
             for (int i = 0; i < gates.Count; i++)
             {
                 var data = game.ActiveGates[i]; GateView item = gates[i];
-                bool active = (game.GetawayMode || data.World == world) && WorldShiftCombat.IsActive(game.Combat, data);
+                bool active = data.VisibleIn(world, game.GetawayMode) && WorldShiftCombat.IsActive(game.Combat, data);
                 item.Root.SetActive(data.End > game.Distance - 20f && data.Start < game.Distance + 220f);
                 item.Solid.SetActive(active);
             }
@@ -350,13 +354,6 @@ namespace Outlaws.WorldShift
             text.rectTransform.anchorMin = min; text.rectTransform.anchorMax = max;
             text.rectTransform.offsetMin = text.rectTransform.offsetMax = Vector2.zero;
             return text;
-        }
-        private static void WorldText(Transform parent, string value, Vector3 position, Color colour, float size)
-        {
-            var obj = new GameObject(value); obj.transform.SetParent(parent, false); obj.transform.localPosition = position;
-            var text = obj.AddComponent<TextMeshPro>(); text.font = TMP_Settings.defaultFontAsset; text.fontSize = size;
-            text.text = value; text.color = colour; text.alignment = TextAlignmentOptions.Center;
-            text.rectTransform.sizeDelta = new Vector2(12f, 2f);
         }
         private Material Material(Color colour, float emission = 0f)
         {

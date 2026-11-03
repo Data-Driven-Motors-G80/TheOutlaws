@@ -5,7 +5,7 @@ namespace Outlaws.WorldShift
     /// <summary>Optional right-lane ramp. The ordinary road remains underneath the entire jump.</summary>
     public sealed class WorldShiftBonusJump
     {
-        public const float Lane = 3.2f;
+        public const float Lane = 3.2f, ShortStartOffset = -60f;
         public readonly float Start, Takeoff, Landing, End;
         public bool Committed { get; private set; }
         public bool Completed { get; private set; }
@@ -14,8 +14,9 @@ namespace Outlaws.WorldShift
         public bool Airborne => Committed && Distance >= Takeoff && Distance < Landing;
         public bool Traversing => Committed && Distance >= Start - 1f && Distance < Landing;
 
-        public WorldShiftBonusJump(float environmentEnd)
-        { Start = environmentEnd + 40f; Takeoff = Start + 32f; Landing = Takeoff + 64f; End = Landing + 28f; }
+        public WorldShiftBonusJump(float environmentEnd) : this(environmentEnd, false) { }
+        public WorldShiftBonusJump(float environmentEnd, bool shortTransition)
+        { Start = environmentEnd + (shortTransition ? ShortStartOffset : 40f); Takeoff = Start + 32f; Landing = Takeoff + 64f; End = Landing + 28f; }
 
         public void BeginStep(float from, float to, float lateral)
         {

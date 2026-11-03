@@ -1,3 +1,5 @@
+> Scope: Legacy analytics reference. This reporter belongs to the older World game; current WorldShift controllers do not emit these events. See the [current documentation index](README.md).
+
 # Wee Woo Run analytics
 
 The game sends rows to a Google Apps Script web app, which writes them into four tabs of a Google Sheet and builds a dashboard tab.

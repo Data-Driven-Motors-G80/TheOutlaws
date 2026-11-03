@@ -11,7 +11,7 @@ public static class WorldShiftCitySetup
 {
     public const string ScenePath = "Assets/Scenes/City_WorldShift.unity";
 
-    [MenuItem("The Outlaws/World Shift/Open City Prototype")]
+    [MenuItem("The Outlaws/World Shift/Validation/Open City Practice")]
     public static void Open()
     {
         if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
@@ -19,7 +19,7 @@ public static class WorldShiftCitySetup
         else EditorSceneManager.OpenScene(ScenePath);
     }
 
-    [MenuItem("The Outlaws/World Shift/Create City Prototype")]
+    [MenuItem("The Outlaws/World Shift/Setup/Create Missing City Scene")]
     public static void Create()
     {
         if (Application.isPlaying) throw new InvalidOperationException("Stop Play mode before creating the prototype.");

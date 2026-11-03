@@ -15,13 +15,14 @@ namespace Outlaws.WorldShift
 
         private readonly List<Piece> pieces = new List<Piece>();
         private Material dayRoad, echoRoad;
-        private bool validation;
+        private bool validation, shortTransition;
         private float length;
         private ShiftRelay[] relays;
         public bool SharedWorldRules { get; set; }
+        public ShiftLevel Environment { get; set; } = ShiftLevel.City;
         public WorldShiftForkRoad Forks { get; private set; }
         private float forkEnvironmentEnd = float.NaN;
-        public bool IsForkSurface(float distance) => !float.IsNaN(forkEnvironmentEnd) && WorldShiftForkRoad.Owns(forkEnvironmentEnd, distance);
+        public bool IsForkSurface(float distance) => Forks != null ? Forks.OwnsDistance(distance) : !float.IsNaN(forkEnvironmentEnd) && WorldShiftForkRoad.Owns(forkEnvironmentEnd, distance);
         public bool IsForkScenery(float d) => !float.IsNaN(forkEnvironmentEnd)
             && (WorldShiftForkRoad.InMainFork(forkEnvironmentEnd, d, 48f) || d >= forkEnvironmentEnd + 160f);
         public void AttachForks(WorldShiftForkRoad forks) { Forks = forks; SetWorld(ShiftWorld.Day); }
@@ -31,14 +32,16 @@ namespace Outlaws.WorldShift
         public void Build(RoadSegment template, bool straightValidation = false, float validationLength = WorldShiftSplitView.Length, bool desertProfile = false, ShiftRelay[] relayLayout = null, float extraLength = 0f)
         {
             validation = straightValidation;
+            shortTransition = extraLength > 0f && extraLength < WorldShiftGetaway.ExitTail;
             relays = relayLayout ?? (validation ? System.Array.Empty<ShiftRelay>() : WorldShiftRelay.Sections);
-            length = validation ? validationLength : WorldShiftLevel.Length + extraLength;
-            if (extraLength >= WorldShiftGetaway.ExitTail) forkEnvironmentEnd = length - extraLength;
+            length = validation || SharedWorldRules ? validationLength : WorldShiftLevel.Length + extraLength;
+            if (extraLength > 0f) forkEnvironmentEnd = length - extraLength;
             dayRoad = RuntimeMaterials.Coloured(new Color(0.22f, 0.23f, 0.24f));
             echoRoad = RuntimeMaterials.Coloured(new Color(0.085f, 0.105f, 0.14f));
             Material lines = RuntimeMaterials.Coloured(new Color(0.85f, 0.88f, 0.87f));
             var cuts = new SortedSet<float> { -80f, 0f, length + 80f };
-            for (float d = -40f; d < length + 80f; d += 40f) cuts.Add(d);
+            float pieceLength = SharedWorldRules && extraLength > 0f ? 20f : 40f;
+            for (float d = -pieceLength; d < length + 80f; d += pieceLength) cuts.Add(d);
             foreach (var hazard in validation ? WorldShiftSplitView.Layout : WorldShiftLevel.Hazards)
                 if (hazard.Kind == ShiftHazardKind.Gap) { cuts.Add(hazard.Start); cuts.Add(hazard.End); }
             if (!validation) foreach (float boundary in WorldShiftLevel.MergeBounds) cuts.Add(boundary);
@@ -49,6 +52,7 @@ namespace Outlaws.WorldShift
             float start = -80f;
             foreach (float end in cuts)
             {
+                if (end > length + 80f) break;
                 if (end <= start) continue;
                 RoadSegment segment = Instantiate(template, transform);
                 segment.name = "Shared road " + start.ToString("0");
@@ -57,8 +61,8 @@ namespace Outlaws.WorldShift
                 float angle = desertProfile ? ProfileDesertHeading(end) - ProfileDesertHeading(start) : validation ? 0f
                     : SharedWorldRules ? EscapeHeading(end) - EscapeHeading(start) : Heading(end) - Heading(start);
                 segment.ConfigureCurve(end - start, angle, false,
-                    desertProfile ? DesertRelaySlope(start, true) : validation ? 0f : Slope(start, true),
-                    desertProfile ? DesertRelaySlope(end, false) : validation ? 0f : Slope(end, false));
+                    desertProfile ? DesertRelaySlope(start, true) : validation && relays.Length == 0 ? 0f : Slope(start, true),
+                    desertProfile ? DesertRelaySlope(end, false) : validation && relays.Length == 0 ? 0f : Slope(end, false));
                 segment.AlignStartTo(entry);
                 entry = segment.ExitPose;
                 foreach (Collider collider in segment.GetComponentsInChildren<Collider>()) collider.enabled = false;
@@ -83,18 +87,16 @@ namespace Outlaws.WorldShift
         }
 
         private float ProfileDesertHeading(float d) => !SharedWorldRules ? DesertHeading(d)
-            : .6f * DesertHeading(d) + 12f * (Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(2260f, 2380f, d))
+            : 1.05f * DesertHeading(d) + 26f * (Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(2260f, 2380f, d))
                 - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(2580f, 2700f, d)));
-        private static float EscapeHeading(float d)
+        private float EscapeHeading(float d)
         {
-            // Streets turn gently between traversal sections. The fork and all
+            // Authored bends vary in severity between traversal sections. The fork and all
             // ramp approaches remain straight, with clear views of each choice.
-            return -12f * (Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(820f, 980f, d))
-                - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(1440f, 1600f, d)))
-                + 10f * (Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(1980f, 2080f, d))
-                - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(2160f, 2260f, d)))
-                - 10f * (Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(2560f, 2660f, d))
-                - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(2800f, 2920f, d)));
+            if (relays.Length == 0) return 0f;
+            if (shortTransition) d = Mathf.Min(d, forkEnvironmentEnd - 100f);
+            return WorldShiftEscapeProfile.Heading(Environment, d, WorldShiftEscapeProfile.Fork(forkEnvironmentEnd),
+                relays[0], float.IsNaN(forkEnvironmentEnd) ? length - WorldShiftGetaway.ExitTail : forkEnvironmentEnd);
         }
 
         // Reuse the old desert's 25-degree bend scale, with clear sight lines at
@@ -105,11 +107,12 @@ namespace Outlaws.WorldShift
         // The aerial puzzle and final stretch use a straight approach for readability.
         private float DesertRelaySlope(float d, bool afterEdge)
         {
+            if (shortTransition && d >= forkEnvironmentEnd - 100f) return 0f;
             foreach (var jump in relays)
                 if (d >= jump.Ramp - 20f && d <= jump.End)
                     return d < jump.Takeoff || (d == jump.Takeoff && !afterEdge)
                         ? .28f * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(jump.Ramp, jump.Ramp + 24f, d)) : 0f;
-            return DesertSlope(d);
+            return SharedWorldRules ? WorldShiftEscapeProfile.TerrainSlope(ShiftLevel.Desert, d, DesertShiftLevel.Length, relays) : DesertSlope(d);
         }
         private static float DesertBend(float d, float a, float b, float c, float e)
             => 25f * (Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(a, b, d))
@@ -139,12 +142,14 @@ namespace Outlaws.WorldShift
                         Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(HeadingKeys[i - 1].x, HeadingKeys[i].x, d)));
             return HeadingKeys[HeadingKeys.Length - 1].y;
         }
-        private static float Slope(float d, bool afterEdge)
+        private float Slope(float d, bool afterEdge)
         {
-            foreach (var jump in WorldShiftRelay.Sections)
+            if (shortTransition && d >= forkEnvironmentEnd - 100f) return 0f;
+            foreach (var jump in relays)
                 if (d >= jump.Ramp - 20f && d <= jump.End)
                     return d < jump.Takeoff || (d == jump.Takeoff && !afterEdge)
                         ? .28f * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(jump.Ramp, jump.Ramp + 24f, d)) : 0f;
+            if (SharedWorldRules) return WorldShiftEscapeProfile.TerrainSlope(Environment, d, float.IsNaN(forkEnvironmentEnd) ? length - WorldShiftGetaway.ExitTail : forkEnvironmentEnd, relays);
             return d < 720f ? 0f : .025f * Mathf.Sin((d - 720f) / 190f)
                 * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(2640f, 2720f, d)));
         }

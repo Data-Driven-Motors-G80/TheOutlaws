@@ -45,12 +45,13 @@ namespace Outlaws.WorldShift
         public void Bind(WorldShiftCity game) { city = game; Initialize(); }
         public void Bind(DesertShiftTrial game) { desert = game; Initialize(); }
         private void LateUpdate() => Present();
-        public float RefillAt => Escape && desert != null ? 640f : 780f;
+        public float RefillAt => !Escape ? 780f : desert != null ? 640f : city.Environment == ShiftLevel.City ? 730f
+            : WorldShiftEscapeProfile.Fork(city.EnvironmentLength) - (city.Environment == ShiftLevel.Mountain ? 110f : 80f);
         private void Initialize()
         {
             if (city != null && city.TutorialLevel) return;
             AddAmmoPickup(RefillAt, 0f);
-            if (Escape) AddAmmoPickup(WorldShiftForkRoad.MainForkStart(city != null ? WorldShiftLevel.Length : DesertShiftLevel.Length) + 100f, -2.8f);
+            if (Escape) AddAmmoPickup(WorldShiftForkRoad.MainForkStart(city != null ? city.EnvironmentLength : DesertShiftLevel.Length) + WorldShiftForkRoad.AmmoOffset, -2.8f);
         }
         private void AddAmmoPickup(float at, float x)
         {
@@ -118,9 +119,10 @@ namespace Outlaws.WorldShift
                     if (!IsActive(this, h, h.VisibleIn(World)) || Airborne || h.Kind == ShiftHazardKind.Gap) continue;
                     h.BoundsAt(Distance, out float at, out float end);
                     float x = Lateral;
-                    bool occupied = h.Kind == ShiftHazardKind.HalfBarrier ? h.HalfSide < 0 ? Lateral < .7f : Lateral > -.7f
+                    bool occupied = h.LateralMotion ? Mathf.Abs(Lateral - h.LateralOffset) <= 1.6f : h.Kind == ShiftHazardKind.HalfBarrier ? h.HalfSide < 0 ? Lateral < .7f : Lateral > -.7f
                         : (h.LaneMask & (1 << Mathf.Clamp(Mathf.RoundToInt(Lateral / (WorldShiftLevel.RoadWidth / 3f)) + 1, 0, 2))) != 0;
                     if (!occupied) continue;
+                    if (h.LateralMotion) x = h.LateralOffset;
                     if (h.Kind == ShiftHazardKind.HalfBarrier) x = Mathf.Clamp(Lateral, h.HalfSide < 0 ? -4f : .5f, h.HalfSide < 0 ? -.5f : 4f);
                     Offer(ref best, h, at, x, end: end);
                 }
@@ -142,7 +144,7 @@ namespace Outlaws.WorldShift
                 }
                 if (!Airborne) foreach (var gate in desert.ActiveGates)
                 {
-                    if (!IsActive(this, gate, desert.GetawayMode || gate.World == World)) continue;
+                    if (!IsActive(this, gate, gate.VisibleIn(World, desert.GetawayMode))) continue;
                     if (gate.HalfSide < 0 && Lateral > .7f || gate.HalfSide > 0 && Lateral < -.7f) continue;
                     Offer(ref best, gate, gate.Start, Lateral, end: gate.End);
                 }
@@ -172,6 +174,7 @@ namespace Outlaws.WorldShift
         public void Step(float from, float to, float a, float b)
         {
             if (!Running) return;
+            if (World != ShiftWorld.Day) { Present(); return; }
             foreach (var pickup in pickups)
             {
                 if (Escape && !pickup.Taken && !pickup.Passed && from - 1.3f > pickup.At)
@@ -196,7 +199,7 @@ namespace Outlaws.WorldShift
         {
             foreach (var pickup in pickups)
             {
-                pickup.Visual.gameObject.SetActive(!pickup.Taken && pickup.At > Distance - 8f && pickup.At < Distance + 170f);
+                pickup.Visual.gameObject.SetActive(World == ShiftWorld.Day && !pickup.Taken && pickup.At > Distance - 8f && pickup.At < Distance + 170f);
                 pickup.Visual.position = Position(pickup.At, pickup.X) + Route.Sample(pickup.At).Up * 1.4f;
             }
             if (!Running && (city != null ? city.State : desert.State) != ShiftRunState.Paused) { ClearShots(); return; }

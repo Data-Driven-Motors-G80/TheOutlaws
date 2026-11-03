@@ -1,110 +1,82 @@
-# WorldShift playable flow
+# WorldShift campaign
 
-Open `Assets/Scenes/WorldShift_Menu.unity` and press Play, or use **The Outlaws > World Shift > Open Game Menu**. The menu offers **Endless escape**, which starts directly in City, and an optional **Tutorial**. Finishing or skipping the tutorial leads into Escape. There is no Practice submenu.
+This is the gameplay reference for the current low-fidelity playtest. Open the menu as described in the [README](../README.md). Code ownership is in [Architecture](ARCHITECTURE.md); geometry and tuning are in [Curved roads](CURVED_ROADS.md).
 
-## Goal and Day/Night rules
+## Run flow
 
-Collect loot, then steer left at an exit to keep it or right to risk the haul in the next environment. City and Desert alternate indefinitely. Capture, an unsuccessful run, or empty fuel loses the carried haul. The bank and best banked getaway persist locally; live runs do not. The Garage sells permanent fuel-tank, armor and headlight upgrades using banked cash.
+**City → Desert → Ocean → Snow → Mountain → City**, automatically. The next lap is harder. Environment transitions keep carried cash, ammunition and unused shields; each environment starts with full fuel and normal police separation.
 
-**Day is for earning. Night is for surviving.** Both Escape environments use the same rules:
+A marked cash-out side exit appears every two environments. Stay on the main road to continue, including from the centre lane. Taking the left side exit banks the carried haul and ends the run. Cashing out offers **Upgrade car** and **Start next run**. There is no Garage stop between environments.
 
-- **Day:** traffic and rolling rocks move. Cash boxes and all power-up choices are visible and collectible.
-- **Night:** the same road hazards freeze at their current positions and remain solid. Cash boxes and power-up pickups disappear and cannot be collected, including by the magnet. Returning to Day resumes motion from the frozen position and restores uncollected rewards still ahead.
-- **Both:** fuel and ammo remain available, shooting works, the car keeps moving, and police keep chasing. Night has no additional timer or resource cost. Active powers keep their existing driving-time durations.
-- Roads, ramps and landing decks stay available when switching. Automatic jumps can launch and land in either world; switching is useful for freezing hazards or returning to Day for airborne loot, without a mandatory world change to land.
+Ordinary environment transitions have a 60 m approach (about 2–3 seconds), with the next-environment message starting at that approach. Cash-out legs retain a 440 m finishing section so players can choose the side exit. On ordinary transitions the optional bonus ramp starts before the boundary, leaving at least 24 m of road after landing before the next environment loads. Its approach remains flat and straight.
 
-The header labels the selected state **Day / loot** or **Night / freeze**. Switching never removes an obstacle or changes the selected fork. Fuel drain and pursuit closing pause in the final extension; solid impacts still count there.
+Getting caught, missing a required landing or running out of fuel loses the run's carried cash. Previously saved cash and upgrades remain. Leaving a live run also loses its carried cash. Escape has no checkpoint retry.
 
-## Routes and decisions
+## Day and Nightshift
 
-City has a 3,360 m authored route with three automatic jumps. Its Escape layout uses spaced shared hazards, including moving oncoming traffic, shootable single-lane blocks, and fixed fire/police obstacles with steering bypasses. The former overlapping world-specific closures were replaced with spaced obstacles on one road. Gentle street bends lead into straight fork and ramp approaches. Moving traffic uses a Day-only simulation clock after entering its approach range; collision checks and rendering use the same positions.
-
-Desert has a 2,880 m route with rolling rocks, freezeable oncoming traffic and an airborne rock section. Its Escape walls are shared half-width barriers, with room to steer around them. Finale rocks are present in both worlds. The former centre-only crossing guards are omitted in Escape so freezing a rock does not force a collision. Rocks continue rolling in Day and preserve their exact positions in Night. Broad desert curves follow the open landscape; the canyon choice has a straight approach and opens back out before later hazards.
-
-Each environment has one fork during the main chase:
-
-- **City, 1,120–1,400 m:** a broad main road on the left and a narrower side street on the right. Plain building boundaries mark the side street's usable space.
-- **Desert, 720–1,000 m:** an open road on the left and a narrow canyon on the right. Plain canyon walls communicate its reduced visibility and steering room.
-- The left branch offers ammo and two Day cash boxes. The right offers six Day cash boxes behind two breakable obstacles. The left has more steering room (up to 5.8 m of road width versus 3.8 m on the right) and stays clear without ammo.
-- Both paths are visible before steering commits the choice; no new controls or decision screen are used. The roads rejoin before later hazards and ramps. Switching Day/Night preserves the chosen road and its geometry. All cash stays Day-only.
-- Normal road hazards, traffic, buildings and central pickups are cleared or repositioned around the fork so nothing sits in the gap between roads. Ammo before the fork is at 780 m in City and 640 m in Desert; the left fork offers another refill. Fuel remains available in both worlds.
-
-A shorter 440 m extension follows each environment. An optional right ramp offers six elevated Day cash boxes, while the ground bypass offers two Day boxes. Elevated rewards require the ramp; either world can launch and land safely. A separate final junction offers green **Exit** on the left and amber **Next** on the right. Steering commits the choice as the roads separate; the gate banks the haul once or carries it into the next environment. The previous end-of-environment reward fork has been moved into the chase rather than duplicated.
-
-Continued legs increase loot by 0.5 per leg, capped at x21, and pursuit pressure, capped after six continues. Each environment restores fuel and normal police separation. Cruise speed stays stable between environments. Results show the best banked getaway, total savings and a new-best message when beaten. Snow and Ocean Coast remain separate development scenes outside this loop.
-
-## Controls, shooting and power-ups
-
-**A/D or arrows** steer. **Space** switches Day/Night. **Left-click or F** shoots. **Escape** pauses. Leaving a live run loses the carried haul. Escape has no checkpoint retries.
-
-Start with three rounds. White three-round pickups refill to three before the main fork and again on its safe branch. Ammo carries between Escape environments. Shots clear cracked barriers and rocks in either world, with modest assistance in the current lane. Cars, fire and spikes cannot be destroyed. Shared fork obstacles cannot be removed by switching worlds.
-
-Shots use the original game's small yellow sphere, with the same 0.28 m size, muzzle offset and 70 m/s travel speed. The visible shot follows the road around bends. Hit resolution remains immediate, removing both the obstacle and its collision. Visible bullets pause with driving time and clear on retry or run end. There are no shot sounds.
-
-Near the start of each environment, Day offers one automatic power-up choice; collecting one removes the other choices for that visit. All can be skipped. Night hides all three pickups.
-
-| Lane | Power-up | Effect |
+| Rule | Day | Nightshift |
 | --- | --- | --- |
-| Left | Shield | Absorbs one solid impact, with brief protection against overlapping contacts. An unused shield carries between environments. |
-| Middle | Boost | Adds 20% forward speed and reduces steering input by 20% for four driving seconds. Police retain their normal pace. |
-| Right | Magnet | Pulls Day loot across the selected road branch for six driving seconds. It cannot collect in Night or pull elevated bags from the ground. |
+| Cash, fuel, ammo pickups and power-ups | Available | Hidden and unavailable |
+| Marked full-width Day barrier | Solid; standard X marks | Disappears |
+| Shared moving obstacles | Move | Freeze at their current position and remain solid |
+| Shared static X blocks | Solid | Solid |
+| Shooting with carried ammo | Available | Available |
+| Fuel consumption and pursuit | Continue | Continue |
 
-Powers use dark diamond markers: cyan shield, orange bolt, purple magnet. Fuel uses a green F can. Ammo uses three white capsules. Cash uses a low primitive gold box with a dollar symbol. Fuel and cash occupy separate lanes. Rings and trails only communicate active powers. Power durations pause with the game; boost and magnet reset between environments.
+Normal speed, fuel consumption and road geometry are the same in both modes. Nightshift has no extra timer or fuel penalty. Supplies after encounters give a reason to return to Day. Stay in Nightshift until a Day barrier is behind the car.
 
-## Tutorial and guidance
+Visible X-marked road obstacles are shootable, including traffic and Day-only walls. Ammo offers an alternative to shifting or steering; other shared obstacles always retain a steering bypass. Each environment has three Day-only full-width walls, away from forks and relay approaches. The additional wall is followed by two Day-only cash pickups roughly 50–80 metres later, rewarding a return to Day after clearing the wall. No new wall is placed across an entire fork branch without a way through.
 
-The separate 576 m tutorial runs at 18 m/s (about 32 seconds of driving, plus time spent on the shooting lesson), with no fuel drain. It teaches steering, freezing shared traffic with Space, returning to Day for a small loot trail, shooting a marked block, and steering through an opening. The first moving traffic encounter leaves room to finish the steering lesson. The final steering section follows shooting closely, with obstacles at 510 m and 558 m and the finish just after the last one. Its cash boxes use the same primitive appearance and Day-only collection rule as Escape, without adding a currency HUD.
+## Roads and encounters
 
-At the shooting lesson, forward movement waits safely before the block until the player clicks or presses F. **Click to shoot the block.** becomes **Nice shot!** for one driving second. Earlier lessons keep shooting disabled. Steering and switching instructions clear after their actions and stay dismissed for that lesson; retrying restores them. Tutorial completion offers **Start your escape**.
+- **City:** mostly flat streets and short chicanes. An opening sliding block leads into a switch wall and Day rewards; another mover follows the fork rejoin. Day cash breaks up the next barrier sequence, and alternating two-lane blocks require steering in the final slalom. The 1,440 m main route plus exit extension targets roughly 55–65 seconds at normal speed.
+- **Desert:** stronger canyon bends and dune-like swells, crossing rocks, freezeable traffic and switch walls. Its already dense rock sections keep their obstacle count; Day cash creates return windows between the fields and before the ramp.
+- **Ocean:** tighter sweeping coastal bends, small rises, visible bridge edges, paired crossing blocks with opposite motion, then switch walls and Day supplies. An earlier moving block starts the first sequence; Day cash between crossing blocks rewards returning from Nightshift. The final alternating two-lane blocks require a lane change. The actual road retains safe steering width.
+- **Snow:** firmer long bends and gradual descents. Steering grip is 0.85 in both modes, with gentle coasting on steering release and stronger countersteering to catch the slide. Extra coasting is disabled near forks, ramps and landing recovery. Slow moving blocks, a Day return window after the fork and a widely spaced final slalom reward planning; freezing hazards does not restore grip.
+- **Mountain:** climbs, sharp alternating switchbacks and winding descents, half-width barriers and rock blocks approaching downhill. An extra approaching centre rock closes the gap after the fork, with Day reward windows before and after the next rock group. Early encounters introduce each separately; the descent combines approaching rocks with offset half-walls. Forks and ramp approaches remain clear.
 
-Driving uses one contextual prompt above the road, below the status strip and left of the mirror. At the 1280×720 reference size, prompts use 26 px type with a 24 px minimum. The car and lower road stay free of text. Urgent road instructions, pickup acknowledgements and route guidance share that slot. Ramp approaches say **Drive up the ramp to jump.**; takeoff is automatic. Escape no longer asks players to switch worlds to make a landing deck appear.
+Forks have full-width branches once separated. The left branch spaces out ammo, boost and cash in that order, with at least 20 m between same-lane supply pickups and other rewards; the right offers more Day cash beside blockers. Both rejoin the main road. The branch is preserved when switching modes. Plain overhead banners label each branch: AMMO + BOOST or CASH. They replace the fork instruction in the HUD and remain visible in Nightshift.
 
-The first Escape crate says **Drive through to collect**. Collection removes it and briefly pulses the existing loot total for 0.35 driving seconds, with no additional popup. **Grab loot. Exit to keep it.** is the short opening goal. Exit choices replace the contextual prompt. Pause and results hide driving stats.
+Each environment has a main automatic jump: launch in the source mode and switch in the air to land in the other. After a successful landing, early return switches are safely ignored until both roads rejoin. The prompt explains the restriction, then confirms that switching is safe. This does not prevent a missed landing if the player never switches in the air.
 
-Fuel is always a rounded-up percentage, red below 25%. Three ammo pips replace the numeric speed readout. The pursuit mirror remains at the top right, preserving image proportions and turning its border red for danger. There are no duplicate fuel bars, progress bars, driving clocks or control footers. Roadside instruction text, other-world outlines and the merged-world finale are removed from player-facing routes.
+An optional right-lane bonus ramp in the final extension offers elevated Day cash. It works in either mode; the ordinary ground route remains underneath and cannot collect the aerial cash trail. Fuel consumption and pursuit closing pause in this final recovery extension; solid impacts still count.
 
-## Pace and beta scope
+## Controls and resources
 
-Normal Escape cruise is 30.8 m/s in City and 26.4 m/s in Desert. Boost reaches 36.96 or 31.68 m/s. Authored jumps retain their original speed curves, including the 42 m/s peak; optional ramps retain 28/24 m/s. Night does not change player speed. Solid impacts cost 22.5 m of the initial 45 m police gap, with protection against repeated overlapping contacts.
+**A/D or arrow keys:** steer. **Space:** switch. **F or left-click:** shoot. **Esc:** pause/resume. Pause also displays controls.
 
-WorldShift is silent: no music, switch sounds, shot sounds or pickup sounds. New presentation uses functional primitive shapes and symbols, without decorative assets, particles, bobbing or glowing loot.
+Start with three shots; labeled AMMO pickups refill to three on the main road and the clear fork branch. Shots immediately clear the targeted block and its collision. The small visible projectile follows the road, pauses with driving time and clears on run end.
 
-The shared rules apply to the menu's Escape run and revised tutorial. Standalone checkpoint Practice scenes and rendering validation scenes retain their older authored layouts for development; they are not menu choices. Their existing tests remain useful for the legacy mechanics.
+Day supplies are spaced around useful stretches:
 
-`GetawayRunState` owns loot, ammo, powers and settlement. `WorldShiftGetaway` shares reward collection and UI; `WorldShiftCombat` shares targeting, ammo and destruction. `WorldShiftForkRoad` owns split-road geometry and branch commitment. `WorldShiftRelay` and `WorldShiftRoute` share launch, landing and road availability. `WorldShiftFlow` owns scene routing and bank persistence.
+| Pickup | Effect |
+| --- | --- |
+| FUEL | Restores 26 fuel units |
+| SHIELD | Absorbs one Day impact; an unused shield carries between environments |
+| MAGNET | Collects nearby Day cash on the selected road branch for six driving seconds |
+| BOOST | Adds 20% speed for four driving seconds, with normal steering available |
+| Cash block with $ | Adds to the carried haul at the current loot multiplier |
 
-Verification covers Day-only rewards and powers, exact Night freezing and resuming, solid frozen obstacles, shared fuel/ammo, continued pursuit, Night launches and either-world landings, complete City traversal, tutorial completion and prompt dismissal, shooting, forks, settlement and legacy route checks. Pacing, reward visibility and how often players choose each world still need player testing.
+Active power-up benefits are disabled in Nightshift. Boost and magnet timers still advance with driving time; pausing stops them. An unused shield is stored, not consumed in Nightshift. Ammo pickups are Day-only too. Carried ammo can still be fired in either mode. Mountain ammo is placed before its fuel pickup so their blocks and collection windows remain separate.
 
-## Garage upgrades
+Normal cruise is 25.2 m/s on the shared finite courses and 21.6 m/s in Desert. Main relay jumps retain their authored speed curves, up to 42 m/s. All visible solids use primitive blocks. Day obstacles are red/brown with white X marks; frozen Nightshift obstacles are opaque icy blue with navy X marks. Mode changes do not add flashing, frost particles or new artwork.
 
-Open **Garage** from the main menu or the run results. Starting an escape remains free.
-Each part has three permanent levels costing $500, $1,000 and $2,000 respectively.
-Purchases save locally alongside the existing bank and apply automatically to Escape in City and Desert.
-Tutorial and standalone trials retain their default settings.
+## Difficulty and upgrades
 
-- Fuel tank: 100 → 110 → 120 → 130 capacity. Each environment starts full; fuel pickups still restore 26 units and consumption is unchanged.
-- Armor: 0% → 5% → 10% → 15% reduction in the police-distance penalty from ordinary collisions. Shields still block hits first.
-- Headlights: 74 → 89 → 104 → 119 metre spotlight range in Nightshift. Beam intensity scales with range; City beam haze and reflector response follow it. Day lighting and obstacle solidity are unchanged.
+Carried cash earns an extra 0.5 multiplier per environment, capped at x21. Pursuit pressure increases with continued environments and is capped. Each completed five-environment lap increases moving-obstacle speed by 15%, capped at 45%. Difficulty preserves mode rules and safe steering bypasses.
 
-The Garage shows current and next benefits, level, saved balance, and price. Purchases are disabled at maximum level or when savings are insufficient. Upgrades survive lost runs; they do not change the best-haul record. Local saves are specific to the device/browser and are not cloud accounts.
+The Garage is opened through **Upgrade car** on the main menu or results screen. Upgrades apply on the next run and persist locally after losses. Each has three levels costing $500, $1,000 and $2,000:
 
-## First-time-player guidance
+- Fuel tank: capacity 100 → 110 → 120 → 130.
+- Armor: collision penalty reduction 0% → 5% → 10% → 15%.
+- Headlights: Nightshift range 74 → 89 → 104 → 119 metres.
 
-The Escape HUD shows carried cash, fuel and ammunition; the world-name label and rear-view mirror are hidden. Escape and tutorial scenes no longer create the extra mirror camera. The main driving camera is unchanged.
+Saved cash and upgrades are local to the device/browser, not a cloud account.
 
-The tutorial uses one large key cue (A/D, Space or F) with one short action/consequence card. The card clears when the action succeeds. Unfinished lessons wait safely without a mandatory reading timer. The final steering cue remains until both final obstacles have been passed. The completion screen summarizes collecting, cashing out and upgrades, and explains that capture or empty fuel loses carried cash. Cash-out and Continue signs match the exit-choice UI.
+## Tutorial and interface
 
-### Hands-on switching lessons
+The optional tutorial teaches escaping a Day-only roadblock through Nightshift, steering past stopped but solid traffic, returning to Day for cash and supplies, shooting, and switching midair from a Day ramp to a Nightshift landing. Cash is hidden and uncollectable at night, with no supply outlines. It uses the same shared hazards, real road gaps and post-landing switch protection as gameplay. Early actions count; players never have to toggle back just to replay a demonstration. A lesson waits safely only while its action remains unfinished. Retry cards keep the lesson instruction instead of flashing a generic message. Jump instructions stay stable across takeoff and landing, and the shooting-gap handoff has no blank flash. It has no fuel drain or mandatory reading timer. Key cues use A/D, SPACE and F / CLICK; completed actions clear their cards.
 
-Switching lessons use the normal tutorial speed of 18 m/s, with no lesson-specific slowdown. The first demonstration vehicle starts 82 m ahead of its lesson checkpoint, moves side to side in Day on a 4.2-second cycle, and freezes at its current lateral position in Nightshift. This test is limited to tutorial traffic; normal Escape traffic is unchanged. The 1.6 m-wide obstacle moves within a ±2.8 m range, leaving a steering bypass. Its outline remains visible; sideways motion arrows disappear when frozen. Players must see motion, freeze it, and steer past without contact. A toggle alone is not completion.
+The menu has one vertical stack: **Start run**, **Tutorial**, **Upgrade car**, with saved cash under the upgrade action. Driving shows carried cash, fuel and ammo, plus one contextual prompt. Jump instructions and switch-wall instructions take priority over optional guidance. Pickups give silent visual feedback rather than extra message popups. Nightshift occasionally reminds the player to return to Day for supplies; the reminder is suppressed while recovery pauses fuel consumption.
 
-The return lesson highlights supply locations with non-collectible wire outlines visible only in this tutorial's Nightshift. The second demonstration uses an oncoming obstacle in the left lane moving toward the player at 8 m/s in Day; the center stays open for collecting supplies. Nightshift freezes both movement types. Returning to Day restores pickups and moving traffic; collecting at least one cash box completes the lesson. Missing the action or colliding retries that short section with its motion and pickup state reset. Pause freezes all lesson progress.
-
-Keys use bright bordered keyboard shapes and dark lettering, with separate left/right arrow keys. Prompts sit above the demonstration area and clear on success. Early/repeated switches cannot bypass the required actions. Normal Escape rules are unchanged.
-
-Tutorial prompts begin at 110 m (freeze), 220 m (supplies), 330 m (shoot), and 460 m (final dodge). At 18 m/s, shooting has about 6 seconds of advance notice and the final dodge about 2.8 seconds. Driving speed is unchanged.
-
-The shooting lesson uses three independent lane blocks. One shot destroys only the aligned block; the other two remain solid. A short arrow cue asks the player to drive through the gap.
-
-### Plain prototype presentation
-City buildings, facade decorations, roadside lamp posts, and desert dunes are removed from runtime presentation. Desert road and ground use plain, untextured colors. Lane markings, hazard warnings, pickup labels, day/night visibility, fog and upgrade headlights remain functional cues. Layout, collision, movement, rewards and camera framing are unchanged.
+The playtest is silent and uses primitive shapes, flat panels and functional labels. It does not use the older World's mystery backpack, missions, surf simulation, automatic portals or split-screen finale. Their development scenes remain available separately; see the [scene guide](SCENES.md).

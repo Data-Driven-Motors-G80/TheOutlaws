@@ -1,55 +1,50 @@
-# Gameplay structure
+# WorldShift architecture
 
-The endless chase now uses a one-slot mystery-reward backpack. Space fires the equipped three-shot gun or activates the stored positive item. No starting ammo or independent ammo pickups are supplied. Environment collectibles and world switching are not implemented.
+The playable game uses authored finite routes and one simulation clock per active scene. The older World game remains in the repository but is a separate entry point. See [gameplay rules](WORLD_SHIFT_CAMPAIGN.md) and [scene scopes](SCENES.md).
 
-## Where things live
+## Ownership
 
-| Folder under `Assets/Scripts` | Responsibility |
+| File or system | Responsibility |
 | --- | --- |
-| `Core/Run` | Run lifecycle, scene-to-scene snapshot, startup |
-| `Core/SceneSetup` | Explicit environment references |
-| `Core/Rules` | Shared state, reward selection, difficulty, obstacle and mission rules |
-| `Player` | Driving, fuel, combat, pursuit, pickup effects |
-| `Rewards` | Pickup objects, spawn schedules, placement and tracking |
-| `World` | Road, obstacles, environment behaviours, traffic, portals |
-| `UI` | HUD, meters, pickup feedback, rear-view camera |
-| `Tutorial` | Existing tutorial sequence |
-| `Missions` | Player profile and mission persistence |
-| `Analytics` | Run tracking, report construction, upload |
-| `Presentation` | Runtime materials and world labels |
+| `WorldShiftFlow` | Five-environment order, scene handoff, cash-out cadence, saved bank and Garage access |
+| `GetawayRunState` | Carried cash, ammo, shield and one-time settlement across environments |
+| `VehicleUpgrades` | Permanent local upgrades and prices |
+| `WorldShiftCity` | Finite simulation for City, Ocean, Snow and Mountain; its historical class name is retained |
+| `DesertShiftTrial` | Desert simulation and its separate short development trial |
+| `WorldShiftEscapeProfile` | Environment course data, curves, slopes, fuel, relays, grip and difficulty scaling |
+| `WorldShiftRoute`, `WorldShiftForkRoad` | Shared road sampling, physical branches, steering commitment and cash-out side exits |
+| `WorldShiftRelay`, `WorldShiftBonusJump` | Required cross-mode landings and the optional bonus ramp |
+| `WorldShiftCombat` | Ammo, targeting and authoritative destroyed-obstacle state |
+| `WorldShiftGetaway` | Cash collection, run HUD, pause/results and continuation handoff |
+| `WorldShiftDrivingMessages` | One prompt priority order, pacing and reminders |
+| `WorldShiftGetawayExtras` | Independent shield, magnet and boost pickups and active indicators |
+| `WorldShiftPresentation`, `DesertShiftTrialView` | Environment rendering, hazard visibility and camera presentation |
+| `WorldShiftObstacleVisual`, `WorldShiftPickupVisual`, `WorldShiftBlockVisuals` | Shared primitive visuals and meaningful labels |
+| `WorldShiftMenu`, `WorldShiftHud`, `WorldShiftTutorial` | Menu/Garage, tutorial presentation and authored lessons |
 
-Reward prefabs live in `Assets/Prefabs/Rewards`. Environment reward assets live in `Assets/Settings/Rewards`.
+Most files above live in `Assets/Scripts/WorldShift`. Shared run/resource rules live in `Assets/Scripts/Core/Rules`; `AutoDriveCar` remains in `Player/Driving`.
 
-## Configuring an environment
+## Simulation boundaries
 
-Both saved scenes have an `EnvironmentRoot` on **The Outlaws Game Systems**. Assign the player, road, obstacle spawner, fuel and mystery spawners, police, score, and reward table here. The game manager and portal switcher use these references rather than searching the scene. The game manager preserves the existing rule of using only active police cars.
+The scene controller advances driving, obstacle motion, collision, resources and rewards in small substeps. Day advances moving hazards; Nightshift retains their current positions. Both modes use the same road coordinate. Collision, targeting, steering restrictions and rendering consult the shared obstacle active-state check so a destroyed block cannot retain invisible collisions.
 
-The reward table configures mystery outcomes. City weights are reverse 1, gun 3, nitro 2, jammer 2, shield 2. Snow first rolls 25% Sunny Day, then uses the same weights. Positive rewards replace the stored item without activating it; unused bullets are discarded. Reverse controls keep their warning and apply without replacing the backpack. Activated effects survive later pickups.
+Presentation can temporarily render another mode without changing the player's world, clocks or resources. Prompts read simulation state; rendering must not collect cash, finish a leg or reset a Nightshift visit.
 
-BackpackState owns the item and shots; CarPickupEffects receives and activates rewards. OutlawShooting is the sole Space input reader. A newly collected reward cannot be activated in the same frame. Empty-slot input is ignored. Positive effects are not stacked beyond their existing rules.
+A successful main relay landing retains a brief one-world deck. Returning too early is ignored rather than killing the run. At an ordinary environment boundary, continuation is automatic. At designated cash-out legs, only the explicit side exit settles the haul.
 
-PickupSpawner creates forced three-lane rows, targeting the first encounter after five active seconds and subsequent encounters twenty seconds after resolution. Each row grants exactly one reward and is counted as one encounter. Boxes are placed ahead using current speed and safe approaches; portal transitions may defer rows. Active effects no longer suppress rewards. The old ammo spawner component remains serialized for compatibility but is disabled by the game manager.
+## Shared foundations and legacy scope
 
-Create a table with **Assets > Create > The Outlaws > Reward Table**. Change the weighted entries to enable or disable existing rewards. Runtime timers and effect state belong to the player, never to the shared asset. New effect behaviour belongs in the effect receiver; reward timing and placement belong in the spawner.
+`AutoDriveCar`, `RoadSegment`, `RoadCurveMesh`, `RoadMarking`, `FuelState`, `RiskRunState` and runtime material helpers are still shared foundations. Do not remove them because they originated in the older game.
 
-## Optional obstacle behaviour
+The legacy `Env_*` scenes use `OutlawGameManager`, `EnvironmentRoot`, `RunSession`, mystery rewards and their own portal/progression systems. Ocean surf and Snow slide controllers remain there; they are not attached to the current finite profiles. Their architecture is preserved in [Legacy/World architecture](Legacy/WORLD_ARCHITECTURE.md).
 
-`ObstacleSpawner` owns row placement, pooling, spacing, difficulty, and tutorial placement. Assign an optional `ObstacleMotion` component to change movement. Snow uses `ApproachingObstacleMotion` with its original 20–30 m/s speed and 1.7 spacing multipliers; City has no motion component. Fog remains a separate optional component and now depends on the shared spawner.
+The existing analytics documentation covers the legacy reporter. The WorldShift controllers currently do not invoke that reporter; its presence is not evidence that current Escape emits the old events.
 
-The small `SnowObstacleSpawner` wrapper intentionally remains to preserve the scene's existing script GUID and execution order. Its former movement implementation now lives entirely in the reusable motion component. Tutorial placements still bypass automatic movement.
+## Changes and verification
 
-## Run lifecycle and reporting
+- Course/road tuning: edit `WorldShiftEscapeProfile` or the Desert authored data, then use the closest course checks.
+- Prompt/copy changes: use `WorldShiftDrivingMessages` or tutorial copy, then inspect the diff; a full gameplay suite is unnecessary by default.
+- Shared collision/mode changes: check combat/routes, environment flow and relay coverage.
+- Scene setup: `Assets/Editor/WorldShiftCampaignSetup.cs` creates missing scenes without replacing existing assets. Current tools are grouped separately from Legacy and Validation menus.
 
-`OutlawGameManager` controls run flow and difficulty. `RunAnalyticsReporter` builds the existing context, run, session, and tutorial-exit payloads and manages analytics callbacks. Reporting fields and event names are unchanged. `RunSession` still carries the same snapshot between environment scenes.
-
-Fuel keeps its existing schedule. Mystery rows carry their schedule through scenes, along with the backpack, remaining shots, and transient effects. Full-road rows bypass lateral pickup relocation; regular fuel placement is unchanged.
-
-## Unity references and checks
-
-Moved scripts and prefabs retain their `.meta` GUIDs. Existing `MoneyHeist.Pickups` and road assembly names are retained. Small `.asmref` files keep the player effects, mystery collectible, and pickup HUD in their original assembly despite their new folders. This avoids changing serialized type identities or test dependencies.
-
-Run **The Outlaws > Validate Environment Setup** to check both scenes for missing scripts, required references, reward settings, and snow movement configuration. Run Edit Mode tests for shared gameplay rules and seeded reward-selection parity. Playtest tutorial handoff, pickup effects, pause/restart, and City–Snow–City portal transitions after changing scene wiring.
-
-## Ocean Coast
-
-`Env_OceanCoast` is the third build scene and portal destination. Its `EnvironmentRoot` enables `ocean` and has an `OceanCoastController` for surf lanes and coast guard wakes. `OceanObstacleSpawner` retains shared fair rows, pooling, collision and shooting rules, with REEF/BUOY labels. The driving environment multiplier feeds pursuit before the effects tick, so integrated travel and police separation agree. It does not change difficulty speed or consume collectible nitro. See [OCEAN_COAST.md](OCEAN_COAST.md) for controls, tuning and prototype limits.
+Relevant tests: `WorldShiftEnvironmentFlowTests`, `WorldShiftCombatRoutesTests`, `WorldShiftGetawayTests`, `WorldShiftCampaignTests`, `WorldShiftRelayTests` and `WorldShiftSceneSetupTests`. Retain focused checks; archived documents are historical records, not current passing-test guarantees.

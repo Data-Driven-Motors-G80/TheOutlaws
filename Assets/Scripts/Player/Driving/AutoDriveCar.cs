@@ -146,6 +146,9 @@ public sealed class AutoDriveCar : MonoBehaviour
         : Mathf.Min(forwardSpeed, maximumForwardSpeed);
     public float EnvironmentSpeedMultiplier { get; set; } = 1f;
     public float EnvironmentSteeringGrip { get; set; } = 1f;
+    // Finite Snow courses opt in; legacy ice and other environments keep their own handling.
+    public float EnvironmentReleaseGrip { get; set; } = 1f;
+    public float EnvironmentCountersteerGrip { get; set; } = 1f;
     public float RoadDistanceTravelled { get; private set; }
     public float RoadPositionDistance { get; private set; }
     public float LateralOffset => lateralOffset;
@@ -351,7 +354,10 @@ public sealed class AutoDriveCar : MonoBehaviour
         SteerInput = steerInput;
         UpdateSkid(steerInput, currentMaxLateralSpeed, deltaTime);
 
-        float surfaceGrip = EnvironmentSteeringGrip;
+        bool releasing = Mathf.Abs(rawSteering) < .01f;
+        bool reversing = steerInput * lateralSpeed < 0f;
+        float surfaceGrip = EnvironmentSteeringGrip * (releasing ? EnvironmentReleaseGrip
+            : reversing ? EnvironmentCountersteerGrip : 1f);
         if (icyRoad)
         {
             bool releasedSteering = Mathf.Abs(steerInput) < 0.01f;

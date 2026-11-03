@@ -8,7 +8,7 @@ public static class WorldShiftDualViewSetup
 {
     public const string ScenePath = "Assets/Scenes/City_DualWorldValidation.unity";
 
-    [MenuItem("The Outlaws/World Shift/Open Short Dual-World Validation")]
+    [MenuItem("The Outlaws/World Shift/Validation/Open Dual-World Rendering Test")]
     public static void Open()
     {
         if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;

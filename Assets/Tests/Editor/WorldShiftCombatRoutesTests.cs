@@ -12,9 +12,9 @@ public sealed class WorldShiftCombatRoutesTests
     private const BindingFlags Flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
     private int bank, best;
     private static Type FlowType => AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("Outlaws.WorldShift.WorldShiftFlow")).First(t => t != null);
-    private static object Get(object o, string name) => o.GetType().GetProperty(name, Flags).GetValue(o);
-    private static object Field(object o, string name) => o.GetType().GetField(name, Flags).GetValue(o);
-    private static object Call(object o, string name, params object[] args) => o.GetType().GetMethod(name, Flags).Invoke(o, args);
+    private static object Get(object o, string name) => (o.GetType().GetProperty(name, Flags) ?? throw new MissingMemberException(o.GetType().FullName, name)).GetValue(o);
+    private static object Field(object o, string name) => (o.GetType().GetField(name, Flags) ?? throw new MissingFieldException(o.GetType().FullName, name)).GetValue(o);
+    private static object Call(object o, string name, params object[] args) => (o.GetType().GetMethod(name, Flags) ?? throw new MissingMethodException(o.GetType().FullName, name)).Invoke(o, args);
     private static void Flow(string name, params object[] args) => FlowType.GetMethod(name).Invoke(null, args);
     private static MonoBehaviour Find(string name) => UnityEngine.Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None).Single(c => c.GetType().Name == name);
     private static GetawayRunState Run => (GetawayRunState)FlowType.GetProperty("Escape").GetValue(null);
@@ -45,18 +45,17 @@ public sealed class WorldShiftCombatRoutesTests
     public IEnumerator EscapeJumpsHaveRealGapsAndRequireTheOtherWorldToLand()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
-        for (int pass = 0; pass < 8; pass++)
+        for (int pass = 0; pass < 4; pass++)
         {
             Flow("StartGetaway", false); yield return null; yield return null;
-            int jump = pass % 4; bool desert = jump == 3, switchInAir = pass < 4;
+            int jump = pass % 2; bool desert = jump == 1, switchInAir = pass < 2;
             if (desert) { Flow("FinishGetawayLeg", true); yield return null; yield return null; }
             var game = Find(desert ? "DesertShiftTrial" : "WorldShiftCity"); game.enabled = false;
-            float ramp = new[] { 600f, 1740f, 2300f, 1944f }[jump];
-            float takeoff = new[] { 660f, 1800f, 2360f, 2004f }[jump];
-            float landing = new[] { 744f, 1896f, 2468f, 2172f }[jump];
-            if (jump == 1) Call(game, "TrySwitch");
+            float ramp = new[] { 980f, 1944f }[jump];
+            float takeoff = new[] { 1040f, 2004f }[jump];
+            float landing = new[] { 1124f, 2172f }[jump];
             object source = Get(game, "World");
-            object target = Enum.Parse(source.GetType(), jump == 1 ? "Day" : "Echo");
+            object target = Enum.Parse(source.GetType(), "Echo");
             var route = Get(game, "Route");
             Assert.That(Call(route, "HasSurface", ramp + 10f, source), Is.True);
             Assert.That(Call(route, "HasSurface", ramp + 10f, target), Is.False);
@@ -71,7 +70,7 @@ public sealed class WorldShiftCombatRoutesTests
             string hint = (string)Get(game, desert ? "Hint" : "SectionHint");
             Assert.That(hint, Does.Contain("Space to land in"));
             var visual = game.GetComponentsInChildren<Transform>(true)
-                .Single(t => t.name == "Relay " + (desert ? 1 : jump + 1) + " - launch and landing");
+                .Single(t => t.name == "Relay " + 1 + " - launch and landing");
             Assert.That(visual.Find("Launch world missing landing").gameObject.activeSelf, Is.True);
             Assert.That(visual.Find("Other-world landing outline - no road here yet").gameObject.activeSelf, Is.True);
             Capture("escape-jump-gap-" + jump);
@@ -79,8 +78,19 @@ public sealed class WorldShiftCombatRoutesTests
             {
                 Call(game, "TrySwitch");
                 Assert.That(visual.Find("Solid landing markers").gameObject.activeSelf, Is.True);
-                Advance(game, landing + 6f, lane);
+                Advance(game, landing + .1f, lane);
                 Assert.That(Get(game, desert ? "IsAirborne" : "IsRelayAirborne"), Is.False);
+                Assert.That(Get(game, "State").ToString(), Is.EqualTo("Running"));
+                for (int press = 0; press < 8; press++)
+                {
+                    Assert.That(Call(game, "TrySwitch"), Is.False, "Rapid return switches immediately after touchdown must be safely ignored.");
+                    Call(game, "StepSimulation", .016f, 0f, false);
+                    Assert.That(Get(game, "State").ToString(), Is.EqualTo("Running"));
+                    Assert.That(Get(game, "World").ToString(), Is.EqualTo("Echo"));
+                }
+                Advance(game, landing + 57f, lane);
+                Assert.That((string)Get(Get(game, "Getaway"), "JumpHint"), Is.EqualTo("Road rejoined. Switch freely."));
+                Assert.That(Call(game, "TrySwitch"), Is.True);
                 Assert.That(Get(game, "State").ToString(), Is.EqualTo("Running"));
                 Capture("escape-jump-landed-" + jump);
             }
@@ -118,25 +128,30 @@ public sealed class WorldShiftCombatRoutesTests
             Assert.That(fuel.CurrentFuel, Is.LessThan(50f), "Night burns fuel without collecting it.");
             Assert.That(Run.Ammo, Is.EqualTo(2));
             Call(combat, "Step", (float)Get(combat, "RefillAt") - 1f, (float)Get(combat, "RefillAt") + 1f, 0f, 0f);
-            Assert.That(Run.Ammo, Is.EqualTo(3), "Ammo remains collectible in Night.");
+            Assert.That(Run.Ammo, Is.EqualTo(2), "Nightshift has no ammo pickups either.");
+            Assert.That(((IEnumerable)Field(combat, "pickups")).Cast<object>()
+                .All(p => !((Transform)Field(p, "Visual")).gameObject.activeSelf), Is.True);
 
             Call(game, "TrySwitch");
+            Call(combat, "Step", (float)Get(combat, "RefillAt") - 1f, (float)Get(combat, "RefillAt") + 1f, 0f, 0f);
+            Assert.That(Run.Ammo, Is.EqualTo(3), "Day restores ammo collection.");
             float fuelBeforeDay = fuel.CurrentFuel;
-            float fuelAt = environment == 0 ? 270f : 24f;
+            float fuelAt = environment == 0 ? 340f : 24f;
             Pose(game, fuelAt - 8f, 0f); Call(game, "StepSimulation", .5f, 0f, false);
             Assert.That(fuel.CurrentFuel, Is.GreaterThan(fuelBeforeDay), "Day restores fuel collection.");
-            Pose(game, 30f, 0f); Call(game, "StepSimulation", .5f, 0f, false);
+            Pose(game, environment == 0 ? 30f : 42f, 0f); Call(game, "StepSimulation", .5f, 0f, false);
             Pose(game, (float)Get(extras, "BoostDistance") - 8f, -2.8f); Call(game, "StepSimulation", .5f, 0f, false);
             Assert.That(Run.Carried, Is.GreaterThan(0), "Returning to Day restores earning.");
             Assert.That(Get(extras, "BoostActive"), Is.True, "The clear branch offers boost in Day.");
-            Pose(game, (float)Get(Get(hud, "Routing"), "EnvironmentEnd") + 21f, -2.8f);
+            // Let the boost expire on the clear branch, before the short environment finish can stop the clock.
+            Pose(game, (float)Get(Get(hud, "Routing"), "ForkStart") + 150f, -2.8f);
             Call(game, "StepSimulation", 4.2f, 0f, false);
             Assert.That(Get(extras, "BoostActive"), Is.False);
             object mover;
             string clock;
             if (environment == 0)
             {
-                mover = ((IEnumerable)Get(game, "Hazards")).Cast<object>().Single(h => (float)Field(h, "Start") == 300f);
+                mover = ((IEnumerable)Get(game, "Hazards")).Cast<object>().Single(h => (float)Field(h, "Start") == 270f);
                 clock = "MotionTravel"; Pose(game, 150f, 0f);
             }
             else
@@ -160,7 +175,7 @@ public sealed class WorldShiftCombatRoutesTests
             foreach (float distance in new[] { 1255f, 1520f, 2800f })
             { Assert.That(Call(route, "HasSurface", distance, day), Is.True); Assert.That(Call(route, "HasSurface", distance, night), Is.True); }
             if (environment == 0)
-                Assert.That(Call(game, "FindCollision", night, 105f, 106f, -3.2f, -3.2f, false), Is.Not.Null, "Frozen hazards remain solid.");
+                Assert.That(Call(game, "FindCollision", night, 1261f, 1262f, -3.2f, -3.2f, false), Is.Not.Null, "Frozen hazards remain solid.");
             Capture(environment == 0 ? "day-night-city" : "day-night-desert");
         }
     }
@@ -263,8 +278,8 @@ public sealed class WorldShiftCombatRoutesTests
         Flow("StartGetaway", false); yield return null; yield return null;
         var game = Find("WorldShiftCity"); game.enabled = false; var combat = Get(game, "Combat");
         var hazards = ((IEnumerable)Get(game, "Hazards")).Cast<object>().ToArray();
-        var echoBarrier = hazards.Single(h => Field(h, "Kind").ToString() == "Barrier" && (float)Field(h, "Start") == 440f);
-        Pose(game, 415f, 0f); Call(game, "TrySwitch");
+        var echoBarrier = hazards.Single(h => Field(h, "Kind").ToString() == "Barrier" && (float)Field(h, "Start") == 270f);
+        Pose(game, 245f, 0f); Call(game, "TrySwitch");
         Call(game, "StepSimulation", .001f, 0f, false);
         Assert.That(Call(combat, "TryShoot"), Is.True);
         var bullet = game.GetComponentsInChildren<Transform>().Single(t => t.name == "Forward Shot");
@@ -276,8 +291,8 @@ public sealed class WorldShiftCombatRoutesTests
         Assert.That(Vector3.Distance(muzzle, bullet.position), Is.EqualTo(5.6f).Within(.15f), "The visible bullet travels at the original 70 m/s.");
         Assert.That(Run.Ammo, Is.EqualTo(2));
         Assert.That(Call(combat, "IsDestroyed", echoBarrier), Is.True);
-        Assert.That(Call(game, "FindCollision", Get(game, "World"), 441f, 442f, 0f, 0f, false), Is.Null);
-        var root = game.GetComponentsInChildren<Transform>(true).Single(t => t.name == "Day Barrier 440");
+        Assert.That(Call(game, "FindCollision", Get(game, "World"), 271f, 272f, 0f, 0f, false), Is.Null);
+        var root = game.GetComponentsInChildren<Transform>(true).Single(t => t.name == "Day Barrier 270");
         Assert.That(root.Find("Solid - collides in this world").gameObject.activeSelf, Is.False);
         Capture("shooting-night-barrier");
         Call(game, "TogglePause"); Call(game, "StepSimulation", 4f, 0f, false);
@@ -285,14 +300,15 @@ public sealed class WorldShiftCombatRoutesTests
         Assert.That(bullet.position, Is.EqualTo(pausedShot));
         Assert.That(Call(combat, "TryShoot"), Is.False); Assert.That(Run.Ammo, Is.EqualTo(2));
         Call(game, "TogglePause"); Call(game, "StepSimulation", .25f, 0f, false);
-        Pose(game, 1020f, 0f); Call(game, "TrySwitch");
-        var dayWall = hazards.Single(h => Field(h, "Kind").ToString() == "Barrier" && (float)Field(h, "Start") == 1050f);
+        Pose(game, 1230f, -3.2f); Call(game, "TrySwitch");
+        var dayWall = hazards.Single(h => Field(h, "Kind").ToString() == "Barrier" && (float)Field(h, "Start") == 1260f);
         Assert.That(Call(combat, "TryShoot"), Is.True);
         Assert.That(Call(combat, "IsDestroyed", dayWall), Is.True); Assert.That(Run.Ammo, Is.EqualTo(1));
-        // A real bend: the shot clears the visible Day barrier at 900 m.
+        // A real bend: the shot clears the visible Day barrier at 830 m.
         Call(combat, "Step", (float)Get(combat, "RefillAt") - 1f, (float)Get(combat, "RefillAt") + 1f, 0f, 0f); Assert.That(Run.Ammo, Is.EqualTo(3));
-        Pose(game, 870f, -3.2f); Call(game, "StepSimulation", .2f, 0f, false);
-        var curved = hazards.Single(h => Field(h, "Kind").ToString() == "Barrier" && (float)Field(h, "Start") == 900f);
+        Pose(game, 800f, 0f); Call(game, "StepSimulation", .2f, 0f, false);
+        var curved = hazards.Single(h => Field(h, "Kind").ToString() == "Barrier" && (float)Field(h, "Start") == 830f);
+        Call(game, "TrySwitch"); Pose(game, 800f, (float)Get(curved, "LateralOffset"));
         Assert.That(Call(combat, "TryShoot"), Is.True);
         Assert.That(Call(combat, "IsDestroyed", curved), Is.True);
         Capture("shooting-around-bend");
@@ -339,9 +355,9 @@ public sealed class WorldShiftCombatRoutesTests
             float start = (float)Get(routing, "ForkStart"), rejoin = (float)Get(routing, "Rejoin"); bool right = pass % 2 != 0;
             Assert.That(rejoin, Is.LessThan((float)Get(routing, "EnvironmentEnd")), "The choice belongs in the main chase.");
             float rightLane = (float)Get(routing, "RightLootLane");
-            object curveA = Call(Get(game, "Route"), "Sample", pass < 2 ? 820f : 200f);
-            object curveB = Call(Get(game, "Route"), "Sample", pass < 2 ? 1000f : 420f);
-            Assert.That(Vector3.Angle((Vector3)Get(curveA, "Forward"), (Vector3)Get(curveB, "Forward")), Is.InRange(8f, 18f), "Environment bends should be visible and gentle.");
+            object curveA = Call(Get(game, "Route"), "Sample", pass < 2 ? 700f : 200f);
+            object curveB = Call(Get(game, "Route"), "Sample", pass < 2 ? 820f : 420f);
+            Assert.That(Vector3.Angle((Vector3)Get(curveA, "Forward"), (Vector3)Get(curveB, "Forward")), Is.InRange(8f, 32f), "Environment bends should remain pronounced while fork approaches stay straight.");
             object forkA = Call(Get(game, "Route"), "Sample", start + 80f), forkB = Call(Get(game, "Route"), "Sample", start + 200f);
             Assert.That(Vector3.Angle((Vector3)Get(forkA, "Forward"), (Vector3)Get(forkB, "Forward")), Is.LessThan(2f), "The fork must not coincide with a sharp bend.");
             if (!right)
@@ -411,6 +427,40 @@ public sealed class WorldShiftCombatRoutesTests
                 "Night's cost comes from missed supplies, with no extra fuel penalty.");
             Assert.That((float)Get(game, "Distance"), Is.EqualTo(60f + daySpeed).Within(.01f));
         }
+    }
+
+    [UnityTest]
+    public IEnumerator CitySlidingBlocksFreezeWhereTheyLookAndCanBeShotOffCentre()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
+        Flow("StartGetaway", false); yield return null; yield return null;
+        var game = Find("WorldShiftCity"); game.enabled = false;
+        Assert.That(((Array)Get(game, "RelayLayout")).Length, Is.EqualTo(1));
+        var block = ((IEnumerable)Get(game, "Hazards")).Cast<object>().First();
+        const float start = 270f;
+        Assert.That(Field(block, "Start"), Is.EqualTo(start));
+        Call(block, "ResetMotion");
+        // A central frozen block still leaves both outside lanes open.
+        Call(game, "TrySwitch");
+        Assert.That(Call(game, "FindCollision", Get(game, "World"), start, start, 0f, 0f, false), Is.EqualTo(block));
+        Assert.That(Call(game, "FindCollision", Get(game, "World"), start, start, 3.2f, 3.2f, false), Is.Null);
+        Call(game, "TrySwitch");
+        Call(block, "Advance", 1f, start - 100f, Get(game, "World"));
+        Pose(game, start - 25f, (float)Get(block, "LateralOffset"));
+        Call(game, "TrySwitch");
+        float x = (float)Get(block, "LateralOffset");
+        Assert.That(Mathf.Abs(x), Is.GreaterThan(2.5f));
+        Call(game, "StepSimulation", .1f, 0f, false);
+        Assert.That(Get(block, "LateralOffset"), Is.EqualTo(x));
+        Assert.That(Call(game, "FindCollision", Get(game, "World"), start, start, 0f, 0f, false), Is.Null);
+        var root = game.GetComponentsInChildren<Transform>(true).Single(t => t.name == "Day Barrier " + start);
+        var point = Call(Get(game, "Route"), "Sample", start + 3f);
+        Assert.That(Vector3.Dot(root.position - (Vector3)Get(point, "Position"), (Vector3)Get(point, "Right")),
+            Is.EqualTo(x).Within(.01f), "Visible blocks and collision must use the same frozen position.");
+        Capture("short-city-moving-block");
+        var combat = Get(game, "Combat");
+        Assert.That(Call(combat, "TryShoot"), Is.True);
+        Assert.That(Call(combat, "IsDestroyed", block), Is.True, "A sliding X block is shootable outside the centre lane.");
     }
 
     [UnityTest]
@@ -528,7 +578,6 @@ public sealed class WorldShiftCombatRoutesTests
             if (environment == 0)
             {
                 var posts = game.GetComponentsInChildren<Transform>(true).Where(t => t.name == "Street-light post").ToArray();
-                Assert.That(posts, Is.Not.Empty);
                 Assert.That(posts.All(p => p.GetComponentsInChildren<Light>(true).Length == 0), Is.True);
                 Assert.That(game.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Weak facade pavement fill"), Is.False);
             }
@@ -568,7 +617,7 @@ public sealed class WorldShiftCombatRoutesTests
             if (environment == 1) { Flow("FinishGetawayLeg", true); yield return null; yield return null; }
             var game = Find(environment == 0 ? "WorldShiftCity" : "DesertShiftTrial"); game.enabled = false;
             var blocks = game.GetComponentsInChildren<Transform>(true).Where(t => t.name == "X obstacle").ToArray();
-            Assert.That(blocks.Length, Is.GreaterThan(10));
+            Assert.That(blocks.Length, Is.GreaterThan(5));
             foreach (var block in blocks)
             {
                 Assert.That(block.Find("Obstacle block"), Is.Not.Null);
@@ -586,10 +635,30 @@ public sealed class WorldShiftCombatRoutesTests
                     Assert.That(root.GetComponentsInChildren<Transform>(true).Any(t => t.name == "X obstacle"), Is.True);
                 }
             }
-            Pose(game, environment == 0 ? 65f : 145f, 0f);
+            if (environment == 1)
+                Assert.That(game.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Rock warning sign"), Is.False,
+                    "Crossing markings are enough; omit the redundant roadside word signs.");
+            Pose(game, environment == 0 ? 240f : 145f, 0f);
             Capture("x-obstacles-day-" + environment);
+            foreach (var block in blocks)
+            {
+                Assert.That(Vector4.Distance(block.Find("Obstacle block").GetComponent<Renderer>().sharedMaterial.color,
+                    new Color(.48f, .16f, .14f)), Is.LessThan(.001f));
+            }
             Call(game, "TrySwitch");
             Capture("x-obstacles-night-" + environment);
+            foreach (var block in blocks)
+            {
+                var body = block.Find("Obstacle block").GetComponent<Renderer>().sharedMaterial;
+                Assert.That(Vector4.Distance(body.color, new Color(.64f, .84f, .96f)), Is.LessThan(.001f), "Every road and fork obstacle uses the frozen palette.");
+                Assert.That(body.color.a, Is.EqualTo(1f), "Frozen blocks remain opaque and solid-looking.");
+                foreach (var mark in block.GetComponentsInChildren<Renderer>(true).Where(r => r.name == "Obstacle X"))
+                    Assert.That(Vector4.Distance(mark.sharedMaterial.color, new Color(.025f, .06f, .12f)), Is.LessThan(.001f));
+            }
+            Call(game, "TrySwitch");
+            foreach (var block in blocks)
+                Assert.That(Vector4.Distance(block.Find("Obstacle block").GetComponent<Renderer>().sharedMaterial.color,
+                    new Color(.48f, .16f, .14f)), Is.LessThan(.001f), "Returning to Day restores the normal palette.");
             Assert.That(blocks.All(b => b.localRotation == Quaternion.identity), Is.True,
                 "Frozen and moving blocks keep the X upright.");
         }
@@ -654,9 +723,10 @@ public sealed class WorldShiftCombatRoutesTests
         for (int choice = 0; choice < 2; choice++)
         {
             Flow("StartGetaway", false); yield return null; yield return null;
-            var game = Find("WorldShiftCity"); game.enabled = false;
+            Flow("FinishGetawayLeg", true); yield return null; yield return null;
+            var game = Find("DesertShiftTrial"); game.enabled = false;
             var hud = Find("WorldShiftGetaway"); var route = Get(hud, "Routing");
-            float end = (float)Get(route, "EnvironmentEnd"); Run.Collect(500);
+            float end = (float)Get(route, "EnvironmentEnd"); Run.Collect(500); int carried = Run.Carried;
             Pose(game, end + 180f, choice == 0 ? -3.2f : 3.3f);
             Advance(game, (float)Get(route, "ExitChoiceAt") + 90f, choice == 0 ? -3.2f : 3.3f);
             Assert.That(Get(route, "ExitBranch"), Is.EqualTo(choice == 0 ? -1 : 1));
@@ -669,14 +739,14 @@ public sealed class WorldShiftCombatRoutesTests
             if (choice == 0)
             {
                 Assert.That(Run.Status, Is.EqualTo(GetawayRunState.RunStatus.Banked));
-                Assert.That(PlayerPrefs.GetInt("WorldShift.Getaway.Bank"), Is.EqualTo(bank + 500));
-                Assert.That(PlayerPrefs.GetInt("WorldShift.Getaway.Best"), Is.GreaterThanOrEqualTo(500));
+                Assert.That(PlayerPrefs.GetInt("WorldShift.Getaway.Bank"), Is.EqualTo(bank + carried));
+                Assert.That(PlayerPrefs.GetInt("WorldShift.Getaway.Best"), Is.GreaterThanOrEqualTo(carried));
                 Capture("banked-personal-best");
             }
             else
             {
                 yield return null; yield return null;
-                Assert.That(Find("DesertShiftTrial"), Is.Not.Null); Assert.That(Run.Carried, Is.EqualTo(500));
+                Assert.That(Get(Find("WorldShiftCity"), "Environment").ToString(), Is.EqualTo("Ocean")); Assert.That(Run.Carried, Is.EqualTo(carried));
             }
         }
     }

@@ -8,7 +8,7 @@ using UnityEngine.SceneManagement;
 /// <summary>Read-only checks of saved environment wiring, including moved scripts and prefabs.</summary>
 public static class EnvironmentValidation
 {
-    [MenuItem("The Outlaws/Validate Environment Setup")]
+    [MenuItem("The Outlaws/Legacy World/Validate Environment Setup")]
     public static void Validate()
     {
         if (Application.isPlaying) throw new InvalidOperationException("Validate outside Play mode.");

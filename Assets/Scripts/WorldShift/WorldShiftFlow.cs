@@ -3,10 +3,17 @@ using UnityEngine.SceneManagement;
 
 namespace Outlaws.WorldShift
 {
-    public enum ShiftLevel { City, Desert, Tutorial }
+    public enum ShiftLevel { City, Desert, Tutorial, Ocean, Snow, Mountain }
 
     public static class WorldShiftFlow
     {
+        private static readonly ShiftLevel[] environmentOrder = { ShiftLevel.City, ShiftLevel.Desert, ShiftLevel.Ocean, ShiftLevel.Snow, ShiftLevel.Mountain };
+        public static ShiftLevel LevelForLeg(int leg) => environmentOrder[Mathf.Max(0, leg) % environmentOrder.Length];
+        public static ShiftLevel NextEnvironment => LevelForLeg(Escape.Leg + 1);
+        public static string EnvironmentName(ShiftLevel level) => level.ToString();
+        public static bool CashOutAvailable => Escape.Leg % 2 == 1;
+        public static int DifficultyTier => Mathf.Min(Escape.Leg / environmentOrder.Length, 3);
+        public static float ObstacleMotionMultiplier => 1f + .15f * DifficultyTier;
         public static VehicleUpgrades Garage { get; } = new VehicleUpgrades();
         private static bool openGarage;
         public static bool ConsumeGarageRequest() { bool value = openGarage; openGarage = false; return value; }
@@ -57,10 +64,11 @@ namespace Outlaws.WorldShift
             if (continueRun)
             {
                 Escape.Continue();
-                Load(Escape.Leg % 2 == 0 ? ShiftLevel.City : ShiftLevel.Desert);
+                Load(LevelForLeg(Escape.Leg));
             }
             else
             {
+                if (!CashOutAvailable) return;
                 int deposit = Escape.Bank();
                 PlayerPrefs.SetInt(BankKey, (int)System.Math.Min(int.MaxValue, (long)Banked + deposit));
                 PlayerPrefs.SetInt(BestKey, Mathf.Max(BestHaul, deposit));
@@ -70,7 +78,8 @@ namespace Outlaws.WorldShift
         }
 
         public static string SceneFor(ShiftLevel level) => level == ShiftLevel.City ? "City_WorldShift"
-            : level == ShiftLevel.Desert ? "Desert_WorldShift" : "WorldShift_Tutorial";
+            : level == ShiftLevel.Desert ? "Desert_WorldShift" : level == ShiftLevel.Ocean ? "Ocean_WorldShift"
+            : level == ShiftLevel.Snow ? "Snow_WorldShift" : level == ShiftLevel.Mountain ? "Mountain_WorldShift" : "WorldShift_Tutorial";
         public static bool ConsumeAutoStart(ShiftLevel level)
         {
             if (autoStart != level) return false;

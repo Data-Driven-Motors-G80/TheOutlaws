@@ -32,6 +32,14 @@ namespace Outlaws.WorldShift
             new ShiftRelay(2, 1740f, 1800f, 1896f, ShiftWorld.Echo),
             new ShiftRelay(3, 2300f, 2360f, 2468f, ShiftWorld.Day)
         };
+        public static readonly ShiftRelay[] EscapeSections =
+        {
+            new ShiftRelay(1, 980f, 1040f, 1124f, ShiftWorld.Day)
+        };
+        private ShiftRelay landedSection;
+        // A successful landing has a short one-world deck. Ignore a premature return switch there.
+        public bool HoldingLanding(float distance, ShiftWorld world) => landedSection != null && !IsAirborne
+            && world == landedSection.Destination && distance >= landedSection.Landing && distance < landedSection.End;
         private readonly WorldShiftRoute route;
         private readonly ShiftRelay[] sections;
         private readonly float cruisingSpeed;
@@ -64,6 +72,7 @@ namespace Outlaws.WorldShift
             landed = false;
             if (flying == null || distance < flying.Landing) return true;
             if (world != flying.Destination) return false;
+            landedSection = flying;
             flying = null;
             Completed++;
             landed = true;
@@ -72,6 +81,7 @@ namespace Outlaws.WorldShift
         public void Reset(float checkpoint)
         {
             flying = null;
+            landedSection = null;
             Completed = 0;
             foreach (var section in sections) if (section.Landing < checkpoint) Completed++;
         }
@@ -98,13 +108,14 @@ namespace Outlaws.WorldShift
         public string Hint(float distance, ShiftWorld world)
         {
             var section = flying ?? SectionAt(distance);
-            if (section == null) return "";
+            if (section == null) return landedSection != null && distance >= landedSection.End && distance < landedSection.End + 48f
+                ? "Road rejoined. Switch freely." : "";
             string source = WorldShiftModeGuide.Name(section.Source);
             string target = WorldShiftModeGuide.Name(section.Destination);
             if (flying != null) return world == section.Destination
-                ? "Stay in " + target + " until the road rejoins."
+                ? "Stay in " + target + ". " + source + " has no road yet."
                 : "Space to land in " + target + ".";
-            if (distance >= section.Landing) return "Stay in " + target + " until the road rejoins.";
+            if (distance >= section.Landing) return "Stay in " + target + ". " + source + " has no road yet.";
             return world == section.Source ? "Drive up the ramp to jump."
                 : "Switch to " + source + " for the ramp.";
         }
