@@ -20,12 +20,14 @@ public sealed class WorldShiftAnalyticsTests
     private static object Call(object o, string name, params object[] args) => o.GetType().GetMethod(name, Flags).Invoke(o, args);
     private static void Flow(string name, params object[] args) => FlowType.GetMethod(name).Invoke(null, args);
     private static MonoBehaviour Find(string name) => UnityEngine.Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None).Single(c => c.GetType().Name == name);
+    private static MonoBehaviour Game => UnityEngine.Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None)
+        .Single(c => c.GetType().Name == "WorldShiftCity" || c.GetType().Name == "DesertShiftTrial");
     private static GetawayRunState Run => (GetawayRunState)FlowType.GetProperty("Escape").GetValue(null);
     private static void Pose(MonoBehaviour game, float d, float x)
     {
         game.GetType().GetProperty("Distance", Flags).SetValue(game, d);
         Call(game.GetType().GetField("driver", Flags).GetValue(game), "RestoreExternalPose", d, x);
-        game.GetType().GetProperty("Lateral", Flags).SetValue(game, x);
+        if (game.GetType().Name == "WorldShiftCity") game.GetType().GetProperty("Lateral", Flags).SetValue(game, x);
     }
     private IEnumerable<Dictionary<string, object>> Sheet(string sheet) => rows.Where(r => r.Sheet == sheet).Select(r => r.Data);
     private IEnumerable<Dictionary<string, object>> Events(string name) => rows.Where(r => r.Event == name).Select(r => r.Data);
@@ -107,29 +109,40 @@ public sealed class WorldShiftAnalyticsTests
     }
 
     [UnityTest]
-    public IEnumerator BankingAtTheExitWritesOneRunAndLeg()
+    public IEnumerator BankingAtTheDesertExitWritesTheRunAndBothLegs()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
         yield return new EnterPlayMode();
         Capture();
         Flow("StartGetaway", false); yield return null; yield return null;
-        var city = Find("WorldShiftCity"); city.enabled = false;
-        Call(city, "StepSimulation", 3f, 0f, false);
-        Pose(city, (float)Get(city, "RunLength") - 90f, -3.2f); yield return null;
-        Call(city, "StepSimulation", 4f, 0f, false); yield return null;
-        Assert.That(Run.Status, Is.EqualTo(GetawayRunState.RunStatus.Banked));
+        // City never offers a cash-out; finishing it carries straight on.
         Flow("FinishGetawayLeg", false);
+        Assert.That(Events("ws_gate"), Is.Empty, "Ordinary environment endings are not a gate.");
+        Flow("FinishGetawayLeg", true); yield return null; yield return null;
+        var desert = Game; desert.enabled = false;
+        Assert.That(desert.GetType().Name, Is.EqualTo("DesertShiftTrial"));
+        // The opening cash trail sits at 50/75/100 m.
+        for (int i = 0; i < 400 && (float)Get(desert, "Distance") < 110f; i++) Call(desert, "StepSimulation", .05f, 0f, false);
+        var forks = Get(Get(desert, "Getaway"), "Routing");
+        Pose(desert, (float)Get(forks, "ExitChoiceAt") - 10f, -3.2f);
+        for (int i = 0; i < 200 && Get(desert, "State").ToString() == "Running"; i++) Call(desert, "StepSimulation", .05f, 0f, false);
+        Assert.That(Run.Status, Is.EqualTo(GetawayRunState.RunStatus.Banked));
 
-        Assert.That(Events("ws_gate").Single()["choice"], Is.EqualTo("exit"));
-        var leg = Sheet("ws_legs").Single();
-        Assert.That(leg["outcome"], Is.EqualTo("exit"));
-        Assert.That((int)leg["loot_boxes"], Is.EqualTo(3));
-        Assert.That(leg["cash_taken"], Is.EqualTo(3));
-        Assert.That(Events("ws_pickup").Count(e => e["kind"].Equals("cash") && (bool)e["taken"]), Is.EqualTo(3));
+        Assert.That(Events("ws_gate").Select(e => e["choice"]), Is.EqualTo(new[] { "through", "exit" }));
+        var legs = Sheet("ws_legs").ToList();
+        Assert.That(legs.Select(l => l["env"]), Is.EqualTo(new[] { "City", "Desert" }));
+        Assert.That(legs.Select(l => l["outcome"]), Is.EqualTo(new[] { "through", "exit" }));
+        Assert.That(legs.Select(l => l["cashout_offered"]), Is.EqualTo(new[] { false, true }));
+        var leg = legs[1];
+        Assert.That((int)leg["cash_taken"], Is.GreaterThanOrEqualTo(3));
+        Assert.That(leg["loot_boxes"], Is.EqualTo(leg["cash_taken"]));
+        Assert.That(Events("ws_pickup").Count(e => e["kind"].Equals("cash") && (bool)e["taken"]), Is.EqualTo(leg["cash_taken"]));
         var run = Sheet("ws_runs").Single();
         Assert.That(run["outcome"], Is.EqualTo("banked"));
         Assert.That(run["banked"], Is.EqualTo(Run.SettledHaul));
-        Assert.That(run["legs_cleared"], Is.EqualTo(1));
+        Assert.That(run["legs_started"], Is.EqualTo(2));
+        Assert.That(run["legs_cleared"], Is.EqualTo(2));
+        Assert.That(run["end_env"], Is.EqualTo("Desert"));
         Assert.That(run["death_reason"], Is.Empty);
         Assert.That((float)run["end_dist_m"], Is.GreaterThan(3000f));
         Assert.That(run["upgrade_total"], Is.EqualTo((int)run["upgrade_fuel"] + (int)run["upgrade_armor"] + (int)run["upgrade_lights"]));
@@ -175,30 +188,37 @@ public sealed class WorldShiftAnalyticsTests
     }
 
     [UnityTest]
-    public IEnumerator ContinuingToDesertThenLeavingRecordsBothLegs()
+    public IEnumerator ContinuingIntoOceanThenLeavingRecordsEachEnvironment()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
         yield return new EnterPlayMode();
         Capture();
         Flow("StartGetaway", false); yield return null; yield return null;
-        var city = Find("WorldShiftCity"); city.enabled = false;
-        Pose(city, (float)Get(city, "RunLength") - 90f, 3.2f); yield return null;
-        Call(city, "StepSimulation", 4f, 0f, false);
-        for (int i = 0; i < 5; i++) yield return null;
-        var desert = Find("DesertShiftTrial"); desert.enabled = false;
-        Call(desert, "StepSimulation", 2f, 0f, false);
+        // Drive off the end of City, then stay on the main road past Desert's cash-out.
+        for (int leg = 0; leg < 2; leg++)
+        {
+            var game = Game; game.enabled = false;
+            Pose(game, (float)Get(game, "RunLength") - 5f, 0f);
+            Call(game, "StepSimulation", .4f, 0f, false);
+            for (int i = 0; i < 5; i++) yield return null;
+        }
+        var ocean = Game; ocean.enabled = false;
+        Call(ocean, "StepSimulation", 2f, 0f, false);
         Flow("Menu"); yield return null;
 
-        Assert.That(Events("ws_gate").Single()["choice"], Is.EqualTo("next"));
+        Assert.That(Events("ws_gate").Select(e => e["choice"]), Is.EqualTo(new[] { "through", "next" }));
         var legs = Sheet("ws_legs").ToList();
-        Assert.That(legs.Select(l => l["env"]), Is.EqualTo(new[] { "City", "Desert" }));
-        Assert.That(legs.Select(l => l["outcome"]), Is.EqualTo(new[] { "next", "menu" }));
-        Assert.That(legs[1]["leg"], Is.EqualTo(1));
+        Assert.That(legs.Select(l => l["env"]), Is.EqualTo(new[] { "City", "Desert", "Ocean" }));
+        Assert.That(legs.Select(l => l["outcome"]), Is.EqualTo(new[] { "through", "next", "menu" }));
+        Assert.That(legs.Select(l => l["leg"]), Is.EqualTo(new[] { 0, 1, 2 }));
+        Assert.That(legs.Select(l => l["cashout_offered"]), Is.EqualTo(new[] { false, true, false }));
+        Assert.That(legs.Select(l => l["tier"]), Is.EqualTo(new[] { 0, 0, 0 }));
+        Assert.That(Events("ws_leg_start").Select(e => e["cashout_offered"]), Is.EqualTo(new[] { false, true, false }));
         var run = Sheet("ws_runs").Single();
         Assert.That(run["outcome"], Is.EqualTo("menu"));
-        Assert.That(run["legs_started"], Is.EqualTo(2));
-        Assert.That(run["legs_cleared"], Is.EqualTo(1));
-        Assert.That(run["end_env"], Is.EqualTo("Desert"));
+        Assert.That(run["legs_started"], Is.EqualTo(3));
+        Assert.That(run["legs_cleared"], Is.EqualTo(2));
+        Assert.That(run["end_env"], Is.EqualTo("Ocean"));
         Assert.That(run["lost"], Is.EqualTo(run["haul"]));
     }
 }

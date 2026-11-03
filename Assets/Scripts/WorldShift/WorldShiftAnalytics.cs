@@ -85,9 +85,9 @@ namespace Outlaws.WorldShift
         private static float runStartRealtime;
         private static readonly List<string> powerUps = new List<string>();
         private static Tally run = new Tally(), current = new Tally();
-        private static bool legOpen;
+        private static bool legOpen, legCashOut;
         private static float legLength, worldSince, lastSwitch, lastImpact, endDistance = -1f;
-        private static int fork;
+        private static int fork, legTier;
         private static string legPowerUp = "", lastImpactKind = "";
         private static Death death;
 
@@ -145,18 +145,23 @@ namespace Outlaws.WorldShift
             Attach("escape", env, getDistance, getDuration, getWorld);
             fuel = getFuel; gap = getGap;
             leg = legIndex; legLength = length; legsStarted++;
+            // Cash-out is offered only on some legs, and later laps of the five environments get harder.
+            legCashOut = WorldShiftFlow.CashOutAvailable; legTier = WorldShiftFlow.DifficultyTier;
             current = new Tally();
             legOpen = true; fork = 0; legPowerUp = ""; lastImpactKind = "";
             worldSince = 0f; lastSwitch = lastImpact = float.NegativeInfinity;
-            Event("ws_leg_start", "carried", WorldShiftFlow.Escape.Carried, "loot_multiplier", WorldShiftFlow.Escape.LootMultiplier);
+            Event("ws_leg_start", "carried", WorldShiftFlow.Escape.Carried, "loot_multiplier", WorldShiftFlow.Escape.LootMultiplier,
+                "cashout_offered", legCashOut, "tier", legTier);
         }
 
         public static void Gate(bool continueRun)
         {
             if (!legOpen) return;
-            Event("ws_gate", "choice", continueRun ? "next" : "exit", "carried", WorldShiftFlow.Escape.Carried);
+            // "through": the leg ended without a cash-out choice, so it is not a gate decision.
+            string choice = !legCashOut ? "through" : continueRun ? "next" : "exit";
+            Event("ws_gate", "choice", choice, "carried", WorldShiftFlow.Escape.Carried);
             legsCleared++;
-            if (continueRun) EndLeg("next");
+            if (continueRun) EndLeg(choice);
         }
 
         public static void Banked(int haul) { if (runId != null) EndRun("banked", "", haul); }
@@ -317,7 +322,7 @@ namespace Outlaws.WorldShift
                 ["dist_m"] = Round(distance()), ["length_m"] = Round(legLength),
                 ["progress_pct"] = legLength > 0f ? Mathf.Round(100f * Mathf.Clamp01(distance() / legLength)) : -1f,
                 ["drive_s"] = Round(tally.DriveSeconds), ["fork"] = fork > 0 ? "right" : fork < 0 ? "left" : "none",
-                ["powerup"] = legPowerUp, ["carried"] = WorldShiftFlow.Escape.Carried, ["loot_multiplier"] = WorldShiftFlow.Escape.LootMultiplier
+                ["powerup"] = legPowerUp, ["cashout_offered"] = legCashOut, ["tier"] = legTier, ["carried"] = WorldShiftFlow.Escape.Carried, ["loot_multiplier"] = WorldShiftFlow.Escape.LootMultiplier
             };
             tally.Write(row);
             WriteDeath(row, outcome == "lost");

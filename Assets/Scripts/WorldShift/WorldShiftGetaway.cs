@@ -136,7 +136,7 @@ namespace Outlaws.WorldShift
             OnWorldChanged();
             BuildHud();
             Present(World);
-            WorldShiftAnalytics.BeginLeg(IsCity ? "City" : "Desert", currentLeg, Length, () => Distance, () => Duration, () => World, () => Fuel, () => Gap);
+            WorldShiftAnalytics.BeginLeg(Environment.ToString(), currentLeg, Length, () => Distance, () => Duration, () => World, () => Fuel, () => Gap);
         }
 
         private Material MakeMaterial(Color color)

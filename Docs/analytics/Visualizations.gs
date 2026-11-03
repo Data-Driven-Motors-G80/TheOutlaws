@@ -623,7 +623,7 @@ function vizCompute(data, opts, tz) {
 
 // ---------------------------------------------------------------- WorldShift metrics (pure: no Sheets calls)
 
-/** Charts for the WorldShift escape: one run crosses legs (City, Desert, ...) and ends banked, lost or abandoned. */
+/** Charts for the WorldShift escape: one run crosses legs (City > Desert > Ocean > Snow > Mountain > ...) and ends banked, lost or abandoned. */
 function wsVizCompute(data, opts, tz) {
   function keep(r) {
     var t = vizTime(r.ts);
@@ -657,7 +657,7 @@ function wsVizCompute(data, opts, tz) {
   var deadLegs = filter(legs, 'outcome', 'lost');
   var gates = legs.filter(function (l) { return l.outcome === 'exit' || l.outcome === 'next'; });
   var forked = legs.filter(function (l) { return l.fork === 'left' || l.fork === 'right'; });
-  var envs = ['City', 'Desert'];
+  var envs = WS_ENVS;
   var players = {};
   runs.forEach(function (r) { if (r.player_id) players[r.player_id] = true; });
 
@@ -673,7 +673,7 @@ function wsVizCompute(data, opts, tz) {
     ['Switches per minute', String(median0(vizNums(runs, 'switches_per_min')))],
     ['Time in Night', median0(vizNums(runs, 'night_pct')) + '%'],
     ['Took the risky fork', vizPct(filter(forked, 'fork', 'right').length, forked.length) + '%'],
-    ['Took Next at the gate', vizPct(filter(gates, 'outcome', 'next').length, gates.length) + '%'],
+    ['Took Next at a cash-out', vizPct(filter(gates, 'outcome', 'next').length, gates.length) + '%'],
     ['Tutorials completed', filter(tutorials, 'status', 'completed').length + ' of ' + tutorials.length]
   ];
 
@@ -682,11 +682,13 @@ function wsVizCompute(data, opts, tz) {
   var progress = { title: 'Progress & outcomes', subtitle: 'how far escapes get', charts: [
     chart('How escape runs ended', 'pie', ['Ending', 'Runs'], vizCount(runs, 'outcome', outcomeLabels),
       { colors: ['#C2553A', '#4C947B', '#8A8F98', '#D8A35A', '#7B6BA8'] }),
-    chart('Legs cleared per run', 'column', ['Legs cleared', 'Runs'], vizBins(vizNums(runs, 'legs_cleared'), [0, 1, 2, 3, 4], vizCountLabel),
+    chart('Legs cleared per run', 'column', ['Legs cleared', 'Runs'], vizBins(vizNums(runs, 'legs_cleared'), [0, 1, 2, 3, 4, 5, 6, 10], vizCountLabel),
       { yTitle: 'Runs' }),
-    chart('City vs Desert: what happened on each visit', 'stacked', ['Environment', 'Reached the gate', 'Died', 'Left / restarted'],
+    chart('Where runs ended', 'column', ['Environment', 'Runs'],
+      envs.map(function (env) { return [env, filter(runs, 'end_env', env).length]; }), { yTitle: 'Runs' }),
+    chart('Each environment: what happened on each visit', 'stacked', ['Environment', 'Drove through', 'Died', 'Left / restarted'],
       envs.map(function (env) {
-        var here = filter(legs, 'env', env), cleared = here.filter(function (l) { return l.outcome === 'exit' || l.outcome === 'next'; });
+        var here = filter(legs, 'env', env), cleared = here.filter(wsCleared);
         var died = filter(here, 'outcome', 'lost').length;
         return [env, cleared.length, died, here.length - cleared.length - died];
       }), { colors: ['#4C947B', '#C2553A', '#C9D1D9'], yTitle: 'Visits' }),
@@ -772,13 +774,13 @@ function wsVizCompute(data, opts, tz) {
   ]};
 
   var shots = vizSum(runs, 'shots'), hits = vizSum(runs, 'shot_hits');
-  var choices = { title: 'Choices & rewards', subtitle: 'forks, Exit vs Next, power-ups', charts: [
+  var choices = { title: 'Choices & rewards', subtitle: 'forks, cash out vs keep going, power-ups', charts: [
     chart('Fork choice by environment', 'stacked', ['Environment', 'Left (safe)', 'Right (risky loot)'],
       envs.map(function (env) { var here = filter(forked, 'env', env); return [env, filter(here, 'fork', 'left').length, filter(here, 'fork', 'right').length]; }),
       { colors: ['#4C947B', '#D8A35A'], yTitle: 'Visits' }),
     chart('Loot boxes per visit, by fork taken', 'column', ['Fork', 'Mean loot boxes'],
       ['left', 'right'].map(function (f) { return [f === 'left' ? 'Left (safe)' : 'Right (risky)', vizMean(filter(forked, 'fork', f), 'loot_boxes')]; })),
-    chart('Gate choice by leg', 'stacked', ['Leg', 'Exit (cash out)', 'Next (keep going)'],
+    chart('Cash-out choice by leg', 'stacked', ['Leg', 'Exit (cash out)', 'Next (keep going)'],
       unique(gates, 'leg').sort(function (a, b) { return a - b; }).map(function (leg) {
         var here = filter(gates, 'leg', leg);
         return ['Leg ' + (Number(leg) + 1), filter(here, 'outcome', 'exit').length, filter(here, 'outcome', 'next').length];

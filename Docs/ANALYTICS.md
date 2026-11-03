@@ -1,4 +1,4 @@
-> Scope: Legacy analytics reference. This reporter belongs to the older World game; current WorldShift controllers do not emit these events. See the [current documentation index](README.md).
+> Scope: Most of this page is the legacy reference for the older World game's events. Current WorldShift analytics are in the WorldShift section at the end. See the [current documentation index](README.md).
 
 # Wee Woo Run analytics
 
@@ -159,7 +159,7 @@ New run fields: `gun_rewards`, `backpack_replacements`, `discarded_bullets`, `ba
 
 Ocean Coast run summaries add `ocean_s` for active time spent on the coast; it is excluded from `city_s`. `end_scene` can be `Env_OceanCoast`, and `max_speed` includes the surf multiplier. Existing City/Snow keys remain available. Spreadsheet summaries need to consume `ocean_s` separately if displaying a complete environment time breakdown.
 
-## WorldShift (Day/Night escape, build tags `worldshift-1.0`, `worldshift-1.1` with the garage)
+## WorldShift (Day/Night escape, build tags `worldshift-1.0`, `worldshift-1.1` with the garage, `worldshift-1.2` with five environments)
 
 The WorldShift menu, tutorial and escape report through `Assets/Scripts/WorldShift/WorldShiftAnalytics.cs`, using the
 same uploader and endpoint. The old `runs`/`tutorials` tabs are not used by this mode. Build tags must not contain
@@ -179,14 +179,14 @@ dashboards redraw on filter edits and every 5 minutes when new rows arrive.
 | Tab | One row per | Key columns |
 | --- | --- | --- |
 | `ws_runs` | escape run (menu start to bank, loss, restart, menu or tab close) | `outcome` (banked/lost/restart/menu/tab_closed), `failure`, `haul`, `legs_cleared`, `end_env`, `drive_s`, `switches_per_min`, `night_pct`, `impacts_after_switch`, `death_after_switch`, `forks_left/right`, `powerups`, `shots`, `shot_hits` |
-| `ws_legs` | environment visit (City or Desert) within a run | `leg`, `env`, `outcome` (exit/next/lost/...), `dist_m`, `progress_pct`, `fork`, `powerup`, `loot_boxes`, switching and death columns |
+| `ws_legs` | environment visit (City, Desert, Ocean, Snow or Mountain) within a run | `leg`, `env`, `outcome` (exit/next/through/lost/...), `cashout_offered`, `tier`, `dist_m`, `progress_pct`, `fork`, `powerup`, `loot_boxes`, switching and death columns |
 | `ws_tutorials` | tutorial attempt | `status` (completed/skipped/menu/restarted/tab_closed), `step_title`, `s_<n>_<step>` driving seconds and `retries_<n>_<step>` per lesson |
 
 Events (in `events`, with `ws_mode`, `env`, `leg`, `dist`, `world`, `drive_s`, and during escapes `fuel_pct` and
 `police_gap_m` context): `ws_menu`, `ws_garage`, `ws_upgrade` (`part`, `level`, `price`, `banked_total`), `ws_run_start`
-(`upgrade_total`), `ws_leg_start`, `ws_switch` (`to`, `stayed_s`, `airborne`, `carried`), `ws_impact` (`kind`,
+(`upgrade_total`), `ws_leg_start` (`cashout_offered`, `tier`), `ws_switch` (`to`, `stayed_s`, `airborne`, `carried`), `ws_impact` (`kind`,
 `s_since_switch`), `ws_shield_save`, `ws_pickup` (`kind`, `taken`), `ws_shot` (`hit`, `ammo_left`), `ws_pause`, `ws_fork`,
-`ws_gate` (`choice` exit/next, `carried`), `ws_death` (`reason`, `s_since_switch`, `after_switch`), `ws_run_end`,
+`ws_gate` (`choice` exit/next/through, `carried`), `ws_death` (`reason`, `s_since_switch`, `after_switch`), `ws_run_end`,
 `ws_tutorial_start`, `ws_tutorial_step`, `ws_tutorial_end`.
 
 **Pickups:** every cash box (`cash`, elevated `cash_ramp`), fuel can, ammo refill and power-up (`shield`, `magnet`,
@@ -198,6 +198,10 @@ already held is not on offer.
 **Garage (1.1):** run rows record the upgrade levels at the start of the run (`upgrade_fuel`, `upgrade_armor`,
 `upgrade_lights`, `upgrade_total`); each purchase is a `ws_upgrade` event. Deaths add `death_fuel_pct` and
 `death_police_gap_m`; rows also count `air_switches` (switches during jumps) and `pauses`.
+
+**Five environments (1.2):** legs run City, Desert, Ocean, Snow, Mountain, then lap back to City with `tier` 1-3
+(faster obstacles and police). The cash-out exit is offered only on odd legs (`cashout_offered`); a leg finished with no
+choice ends as `through`, and the reports count only exit/next legs as cash-out decisions.
 
 "After a switch" means within 1.5 driving seconds of pressing Space (`SwitchBlameSeconds`). Seconds are driving time,
 which pauses with the game; `wallclock_s` includes pauses. Report tabs **WS Overview**, **WS Levels** and **WS Tutorial**

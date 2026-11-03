@@ -60,6 +60,8 @@ namespace Outlaws.WorldShift
         public static void FinishGetawayLeg(bool continueRun)
         {
             if (Escape.Status != GetawayRunState.RunStatus.Running) return;
+            // Ordinary environment endings cannot bank a run.
+            if (!continueRun && !CashOutAvailable) return;
             WorldShiftAnalytics.Gate(continueRun);
             if (continueRun)
             {
@@ -68,7 +70,6 @@ namespace Outlaws.WorldShift
             }
             else
             {
-                if (!CashOutAvailable) return;
                 int deposit = Escape.Bank();
                 PlayerPrefs.SetInt(BankKey, (int)System.Math.Min(int.MaxValue, (long)Banked + deposit));
                 PlayerPrefs.SetInt(BestKey, Mathf.Max(BestHaul, deposit));

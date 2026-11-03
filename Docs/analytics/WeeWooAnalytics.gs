@@ -485,6 +485,10 @@ function updateMetricTabs(book, legacy, worldShift) {
 
 // Pickup kinds the game reports as <kind>_taken / <kind>_missed / <kind>_missed_night.
 var WS_PICKUPS = ['cash', 'cash_ramp', 'fuel', 'ammo', 'shield', 'magnet', 'boost'];
+// Escape environments in driving order; after Mountain the run laps back to City at a harder tier.
+var WS_ENVS = ['City', 'Desert', 'Ocean', 'Snow', 'Mountain'];
+/** A leg the player drove to the end of. "through" legs had no cash-out choice (1.2+); exit/next legs did. */
+function wsCleared(l) { return l.outcome === 'exit' || l.outcome === 'next' || l.outcome === 'through'; }
 
 /** WS Overview, WS Levels and WS Tutorial tabs from the ws_runs / ws_legs / ws_tutorials uploads. */
 function worldShiftReports(book) {
@@ -507,7 +511,8 @@ function worldShiftReports(book) {
   function med(rows, key) { return median(metricNumbers(rows, key)); }
   var position = 0;
   function report(name, note, summary, fields, rows) { return { name: name, note: note, summary: summary, fields: fields, rows: rows, position: ++position }; }
-  var note = 'Non-test WorldShift builds. One escape run can cross several legs (City, Desert, City...). ' +
+  var note = 'Non-test WorldShift builds. One escape run crosses legs City > Desert > Ocean > Snow > Mountain, then laps at a harder tier. ' +
+    'From 1.2 the cash-out choice is offered only on every other leg; gate stats count only those legs. ' +
     '"After a switch" means within 1.5 driving seconds of pressing Space. -1 means not applicable.';
 
   var overview = [
@@ -515,7 +520,9 @@ function worldShiftReports(book) {
     ['Outcomes', counts(runs, 'outcome')], ['How lost runs ended', counts(lost, 'failure')],
     ['Median legs cleared', med(runs, 'legs_cleared')],
     ['Runs that cleared at least one leg', pct(runs.filter(function (r) { return Number(r.legs_cleared) > 0; }).length, runs.length)],
-    ['Gate choice: took Next (risk)', pct(filter(gates, 'outcome', 'next').length, gates.length)],
+    ['Cash-out choice: took Next (risk)', pct(filter(gates, 'outcome', 'next').length, gates.length)],
+    ['Where runs ended (environment)', counts(runs, 'end_env')],
+    ['Runs that reached a harder lap (past Mountain)', pct(runs.filter(function (r) { return Number(r.legs_started) > WS_ENVS.length; }).length, runs.length)],
     ['Median haul banked (banked runs)', med(filter(runs, 'outcome', 'banked'), 'haul')],
     ['Median haul lost (lost runs)', med(lost, 'haul')],
     ['Median driving time per run (s)', med(runs, 'drive_s')],
@@ -551,12 +558,12 @@ function worldShiftReports(book) {
     ['death_fuel_pct', 'Death: fuel %'], ['death_police_gap_m', 'Death: police gap (m)']];
 
   var levels = [];
-  ['City', 'Desert'].forEach(function (env) {
+  WS_ENVS.forEach(function (env) {
     var here = filter(legs, 'env', env), died = filter(here, 'outcome', 'lost');
-    var cleared = here.filter(function (l) { return l.outcome === 'exit' || l.outcome === 'next'; });
+    var cleared = here.filter(wsCleared);
     levels.push([env.toUpperCase(), '']);
     levels.push(['  Legs started', here.length]);
-    levels.push(['  Cleared (reached the gate)', pct(cleared.length, here.length)]);
+    levels.push(['  Cleared (reached the end)', pct(cleared.length, here.length)]);
     levels.push(['  Died here', pct(died.length, here.length)]);
     levels.push(['  Death causes', counts(died, 'failure')]);
     levels.push(['  Last impact before death', counts(died.filter(function (l) { return l.death_last_impact; }), 'death_last_impact')]);
@@ -570,13 +577,15 @@ function worldShiftReports(book) {
     levels.push(['  Median time in Night (%)', med(here, 'night_pct')]);
     levels.push(['  Fork: took the right branch', pct(filter(here, 'fork', 'right').length, here.filter(function (l) { return l.fork !== 'none'; }).length)]);
     levels.push(['  Median loot boxes', med(here, 'loot_boxes')]);
-    levels.push(['  Gate: took Next', pct(filter(cleared, 'outcome', 'next').length, cleared.length)]);
+    var chose = cleared.filter(function (l) { return l.outcome !== 'through'; });
+    levels.push(['  Cash-out choice: took Next', pct(filter(chose, 'outcome', 'next').length, chose.length)]);
   });
   var legFields = [['ts', 'Timestamp (UTC)'], ['build', 'Build'], ['run_id', 'Run ID'], ['leg', 'Leg'], ['env', 'Environment'],
     ['outcome', 'Outcome'], ['failure', 'Failure'], ['dist_m', 'Distance (m)'], ['progress_pct', 'Progress %'], ['drive_s', 'Driving (s)'],
     ['switches', 'Switches'], ['night_pct', 'Night %'], ['impacts', 'Impacts'], ['impacts_after_switch', 'Impacts after switch'],
     ['death_after_switch', 'Died after switch'], ['death_last_impact', 'Last impact'], ['fork', 'Fork'], ['powerup', 'Power-up'],
-    ['loot_boxes', 'Loot boxes'], ['carried', 'Carried at end']];
+    ['loot_boxes', 'Loot boxes'], ['carried', 'Carried at end'], ['cashout_offered', 'Cash-out offered'], ['tier', 'Lap tier'],
+    ['pickups_taken_pct', 'Pickups taken %'], ['death_fuel_pct', 'Death: fuel %'], ['death_police_gap_m', 'Death: police gap (m)']];
 
   var tutorialSummary = [['Tutorial attempts', tutorials.length], ['Outcomes', counts(tutorials, 'status')],
     ['Completed', pct(filter(tutorials, 'status', 'completed').length, tutorials.length)],
