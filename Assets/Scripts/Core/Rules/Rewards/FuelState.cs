@@ -4,6 +4,13 @@ public sealed class FuelState
     public const float MaximumFuel = 100f;
     public const float DefaultConsumptionPerSecond = 4f;
 
+    public float Capacity { get; private set; } = MaximumFuel;
+    public void SetCapacity(float capacity)
+    {
+        Capacity = IsFinite(capacity) && capacity > 0f ? capacity : MaximumFuel;
+        CurrentFuel = ClampFinite(CurrentFuel, 0f, Capacity);
+    }
+
     public float CurrentFuel { get; private set; }
     public bool IsEmpty => CurrentFuel <= 0f;
 
@@ -14,7 +21,7 @@ public sealed class FuelState
 
     public void Reset(float initialFuel = MaximumFuel)
     {
-        CurrentFuel = ClampFinite(initialFuel, 0f, MaximumFuel);
+        CurrentFuel = ClampFinite(initialFuel, 0f, Capacity);
     }
 
     public void Tick(float elapsedSeconds, float consumptionPerSecond = DefaultConsumptionPerSecond)
@@ -23,24 +30,24 @@ public sealed class FuelState
             || !IsFinite(consumptionPerSecond) || consumptionPerSecond < 0f)
             return;
 
-        CurrentFuel = ClampFinite(CurrentFuel - elapsedSeconds * consumptionPerSecond, 0f, MaximumFuel);
+        CurrentFuel = ClampFinite(CurrentFuel - elapsedSeconds * consumptionPerSecond, 0f, Capacity);
     }
 
     public void Refill(float amount)
     {
         if (!IsFinite(amount) || amount <= 0f) return;
-        CurrentFuel = ClampFinite(CurrentFuel + amount, 0f, MaximumFuel);
+        CurrentFuel = ClampFinite(CurrentFuel + amount, 0f, Capacity);
     }
 
     public void Consume(float amount)
     {
         if (!IsFinite(amount) || amount <= 0f) return;
-        CurrentFuel = ClampFinite(CurrentFuel - amount, 0f, MaximumFuel);
+        CurrentFuel = ClampFinite(CurrentFuel - amount, 0f, Capacity);
     }
 
     public void RefillToFull()
     {
-        CurrentFuel = MaximumFuel;
+        CurrentFuel = Capacity;
     }
 
     private static float ClampFinite(float value, float min, float max)

@@ -31,15 +31,19 @@ namespace Outlaws.WorldShift
         public readonly int HalfSide;
         public readonly bool SharedAcrossWorlds;
         public float MotionTravel { get; private set; }
+        public readonly bool LateralMotion;
+        public float LateralOffset => LateralMotion ? -2.8f * (float)System.Math.Sin(MotionTravel) : 0f;
+        public float PreviousLateralOffset { get; private set; }
         public bool VisibleIn(ShiftWorld world) => SharedAcrossWorlds || World == world;
         public void Advance(float delta, float playerDistance, ShiftWorld world)
         {
+            PreviousLateralOffset = LateralOffset;
             if (SharedAcrossWorlds && world == ShiftWorld.Day && playerDistance >= Start - 150f && playerDistance <= End + 20f)
                 MotionTravel += MotionSpeed * delta;
         }
-        public void ResetMotion() => MotionTravel = 0f;
+        public void ResetMotion() { MotionTravel = 0f; PreviousLateralOffset = LateralOffset; }
 
-        public ShiftHazard(ShiftWorld world, ShiftHazardKind kind, float start, float end, int laneMask, float motionSpeed = 0f, int halfSide = 0, bool sharedAcrossWorlds = false)
+        public ShiftHazard(ShiftWorld world, ShiftHazardKind kind, float start, float end, int laneMask, float motionSpeed = 0f, int halfSide = 0, bool sharedAcrossWorlds = false, bool lateralMotion = false)
         {
             World = world;
             Kind = kind;
@@ -49,6 +53,7 @@ namespace Outlaws.WorldShift
             MotionSpeed = motionSpeed;
             HalfSide = halfSide;
             SharedAcrossWorlds = sharedAcrossWorlds;
+            LateralMotion = lateralMotion;
         }
 
         // Both collision and rendering sample the same deterministic road coordinates.
@@ -56,7 +61,7 @@ namespace Outlaws.WorldShift
         public void BoundsAt(float playerDistance, out float start, out float end)
         {
             float travel = System.Math.Max(0f, playerDistance - (Start - 150f));
-            start = Start - (SharedAcrossWorlds ? MotionTravel : travel * MotionSpeed / WorldShiftLevel.Speed);
+            start = LateralMotion ? Start : Start - (SharedAcrossWorlds ? MotionTravel : travel * MotionSpeed / WorldShiftLevel.Speed);
             end = start + End - Start;
         }
     }

@@ -7,6 +7,17 @@ namespace Outlaws.WorldShift
 
     public static class WorldShiftFlow
     {
+        public static VehicleUpgrades Garage { get; } = new VehicleUpgrades();
+        private static bool openGarage;
+        public static bool ConsumeGarageRequest() { bool value = openGarage; openGarage = false; return value; }
+        public static void OpenGarage()
+        {
+            Escape.Leave(); getawayAfterTutorial = false; autoStart = null;
+            openGarage = true; Time.timeScale = 1f; SceneManager.LoadScene(MenuScene);
+        }
+        public static bool BuyUpgrade(VehicleUpgrades.Part part)
+            => Escape.Status != GetawayRunState.RunStatus.Running && Garage.Buy(part);
+
         public const string MenuScene = "WorldShift_Menu";
         private static ShiftLevel? autoStart;
         private static ShiftLevel afterTutorial = ShiftLevel.City;
@@ -21,7 +32,7 @@ namespace Outlaws.WorldShift
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetSession()
-        { autoStart = null; afterTutorial = ShiftLevel.City; TutorialFirst = true; getawayAfterTutorial = false; Escape = new GetawayRunState(); }
+        { openGarage = false; autoStart = null; afterTutorial = ShiftLevel.City; TutorialFirst = true; getawayAfterTutorial = false; Escape = new GetawayRunState(); }
 
         public static void StartGetaway(bool tutorialFirst)
         {

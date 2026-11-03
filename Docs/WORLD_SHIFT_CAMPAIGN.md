@@ -4,7 +4,7 @@ Open `Assets/Scenes/WorldShift_Menu.unity` and press Play, or use **The Outlaws 
 
 ## Goal and Day/Night rules
 
-Collect loot, then steer left at an exit to keep it or right to risk the haul in the next environment. City and Desert alternate indefinitely. Capture, an unsuccessful run, or empty fuel loses the carried haul. The bank and best banked getaway persist locally; live runs do not. There is no shop or permanent upgrade system.
+Collect loot, then steer left at an exit to keep it or right to risk the haul in the next environment. City and Desert alternate indefinitely. Capture, an unsuccessful run, or empty fuel loses the carried haul. The bank and best banked getaway persist locally; live runs do not. The Garage sells permanent fuel-tank, armor and headlight upgrades using banked cash.
 
 **Day is for earning. Night is for surviving.** Both Escape environments use the same rules:
 
@@ -74,3 +74,37 @@ The shared rules apply to the menu's Escape run and revised tutorial. Standalone
 `GetawayRunState` owns loot, ammo, powers and settlement. `WorldShiftGetaway` shares reward collection and UI; `WorldShiftCombat` shares targeting, ammo and destruction. `WorldShiftForkRoad` owns split-road geometry and branch commitment. `WorldShiftRelay` and `WorldShiftRoute` share launch, landing and road availability. `WorldShiftFlow` owns scene routing and bank persistence.
 
 Verification covers Day-only rewards and powers, exact Night freezing and resuming, solid frozen obstacles, shared fuel/ammo, continued pursuit, Night launches and either-world landings, complete City traversal, tutorial completion and prompt dismissal, shooting, forks, settlement and legacy route checks. Pacing, reward visibility and how often players choose each world still need player testing.
+
+## Garage upgrades
+
+Open **Garage** from the main menu or the run results. Starting an escape remains free.
+Each part has three permanent levels costing $500, $1,000 and $2,000 respectively.
+Purchases save locally alongside the existing bank and apply automatically to Escape in City and Desert.
+Tutorial and standalone trials retain their default settings.
+
+- Fuel tank: 100 → 110 → 120 → 130 capacity. Each environment starts full; fuel pickups still restore 26 units and consumption is unchanged.
+- Armor: 0% → 5% → 10% → 15% reduction in the police-distance penalty from ordinary collisions. Shields still block hits first.
+- Headlights: 74 → 89 → 104 → 119 metre spotlight range in Nightshift. Beam intensity scales with range; City beam haze and reflector response follow it. Day lighting and obstacle solidity are unchanged.
+
+The Garage shows current and next benefits, level, saved balance, and price. Purchases are disabled at maximum level or when savings are insufficient. Upgrades survive lost runs; they do not change the best-haul record. Local saves are specific to the device/browser and are not cloud accounts.
+
+## First-time-player guidance
+
+The Escape HUD shows carried cash, fuel and ammunition; the world-name label and rear-view mirror are hidden. Escape and tutorial scenes no longer create the extra mirror camera. The main driving camera is unchanged.
+
+The tutorial uses one large key cue (A/D, Space or F) with one short action/consequence card. The card clears when the action succeeds. Unfinished lessons wait safely without a mandatory reading timer. The final steering cue remains until both final obstacles have been passed. The completion screen summarizes collecting, cashing out and upgrades, and explains that capture or empty fuel loses carried cash. Cash-out and Continue signs match the exit-choice UI.
+
+### Hands-on switching lessons
+
+Switching lessons use the normal tutorial speed of 18 m/s, with no lesson-specific slowdown. The first demonstration vehicle starts 82 m ahead of its lesson checkpoint, moves side to side in Day on a 4.2-second cycle, and freezes at its current lateral position in Nightshift. This test is limited to tutorial traffic; normal Escape traffic is unchanged. The 1.6 m-wide obstacle moves within a ±2.8 m range, leaving a steering bypass. Its outline remains visible; sideways motion arrows disappear when frozen. Players must see motion, freeze it, and steer past without contact. A toggle alone is not completion.
+
+The return lesson highlights supply locations with non-collectible wire outlines visible only in this tutorial's Nightshift. The second demonstration uses an oncoming obstacle in the left lane moving toward the player at 8 m/s in Day; the center stays open for collecting supplies. Nightshift freezes both movement types. Returning to Day restores pickups and moving traffic; collecting at least one cash box completes the lesson. Missing the action or colliding retries that short section with its motion and pickup state reset. Pause freezes all lesson progress.
+
+Keys use bright bordered keyboard shapes and dark lettering, with separate left/right arrow keys. Prompts sit above the demonstration area and clear on success. Early/repeated switches cannot bypass the required actions. Normal Escape rules are unchanged.
+
+Tutorial prompts begin at 110 m (freeze), 220 m (supplies), 330 m (shoot), and 460 m (final dodge). At 18 m/s, shooting has about 6 seconds of advance notice and the final dodge about 2.8 seconds. Driving speed is unchanged.
+
+The shooting lesson uses three independent lane blocks. One shot destroys only the aligned block; the other two remain solid. A short arrow cue asks the player to drive through the gap.
+
+### Plain prototype presentation
+City buildings, facade decorations, roadside lamp posts, and desert dunes are removed from runtime presentation. Desert road and ground use plain, untextured colors. Lane markings, hazard warnings, pickup labels, day/night visibility, fog and upgrade headlights remain functional cues. Layout, collision, movement, rewards and camera framing are unchanged.

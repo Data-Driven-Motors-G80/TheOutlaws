@@ -18,19 +18,23 @@ namespace Outlaws.WorldShift
         private RawImage mirror;
         private GameObject ammoRoot;
         private Image[] rounds;
+        private TMP_Text switchHint;
 
         public static WorldShiftStatusStrip Create(Transform parent, bool showLoot = false)
         {
             var strip = new WorldShiftStatusStrip();
-            var row = WorldShiftMenu.Panel(parent, "Driving status", new Vector2(.02f, .88f), new Vector2(.98f, .98f), Ink);
+            var row = WorldShiftMenu.Panel(parent, "Driving status", new Vector2(.20f, .88f), new Vector2(.80f, .98f), Ink);
             strip.World = Label(row, "World", .02f, .13f, 22f);
-            strip.Loot = Label(row, "Loot total", .15f, .35f, 30f);
+            strip.World.rectTransform.anchorMin = new Vector2(.02f, .38f);
+            strip.switchHint = WorldShiftMenu.Label(row, "SPACE: switch", .02f, .07f, .13f, .37f, 14f);
+            strip.switchHint.alignment = TextAlignmentOptions.Center;
+            strip.Loot = Label(row, "Loot total", .02f, .30f, 24f);
             strip.Loot.gameObject.SetActive(showLoot);
             strip.Loot.color = Gold;
-            strip.Fuel = Label(row, "Fuel percentage", .37f, .54f, 22f);
-            var ammo = WorldShiftMenu.Panel(row, "Ammo", new Vector2(.56f, .1f), new Vector2(.75f, .9f), Color.clear);
+            strip.Fuel = Label(row, "Fuel percentage", .34f, .62f, 22f);
+            var ammo = WorldShiftMenu.Panel(row, "Ammo", new Vector2(.67f, .1f), new Vector2(.98f, .9f), Color.clear);
             strip.ammoRoot = ammo.gameObject;
-            var key = WorldShiftMenu.Label(ammo, "F", .02f, .1f, .23f, .9f, 18f);
+            var key = WorldShiftMenu.Label(ammo, "Ammo\n<size=12>F / click</size>", .02f, .1f, .29f, .9f, 18f);
             key.alignment = TextAlignmentOptions.Center;
             strip.rounds = new Image[3];
             for (int i = 0; i < 3; i++)
@@ -45,6 +49,11 @@ namespace Outlaws.WorldShift
             strip.mirror.rectTransform.anchorMin = new Vector2(.02f, .05f);
             strip.mirror.rectTransform.anchorMax = new Vector2(.98f, .95f);
             strip.mirror.rectTransform.offsetMin = strip.mirror.rectTransform.offsetMax = Vector2.zero;
+            var caption = WorldShiftMenu.Panel(frame, "Police label", new Vector2(.02f, .69f), new Vector2(.35f, .95f), Ink);
+            WorldShiftMenu.Label(caption, "Police", .03f, 0f, .97f, 1f, 14f).alignment = TextAlignmentOptions.Center;
+            strip.World.gameObject.SetActive(false);
+            strip.switchHint.gameObject.SetActive(false);
+            strip.MirrorPanel.SetActive(false);
             return strip;
         }
 
@@ -67,12 +76,13 @@ namespace Outlaws.WorldShift
         public void Refresh(ShiftWorld world, float fuelFraction, Texture rearView, float pursuitGap,
             bool showFuel = true, bool joined = false)
         {
+            switchHint.gameObject.SetActive(false);
             World.text = joined ? "Day + Nightshift" : WorldShiftModeGuide.Name(world);
             World.color = world == ShiftWorld.Day ? Gold : new Color(.3f, .85f, 1f);
             Fuel.gameObject.SetActive(showFuel);
             Fuel.text = "Fuel " + Mathf.Clamp(Mathf.CeilToInt(fuelFraction * 100f), 0, 100) + "%";
             Fuel.color = fuelFraction < .25f ? Danger : Color.white;
-            MirrorPanel.SetActive(rearView != null);
+            MirrorPanel.SetActive(false);
             mirrorBorder.color = pursuitGap < 23f ? Danger : Ink;
             mirror.texture = rearView;
             // Crop the centre instead of stretching the police car to fit the mirror.

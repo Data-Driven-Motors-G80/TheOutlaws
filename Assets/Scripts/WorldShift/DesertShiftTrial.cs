@@ -101,7 +101,7 @@ namespace Outlaws.WorldShift
         private readonly System.Collections.Generic.HashSet<int> collectedFuel = new System.Collections.Generic.HashSet<int>();
         private float checkpointFuel = 100f, checkpointGap = 45f;
         private ShiftWorld entryWorld;
-        public float FuelFraction => fuel.CurrentFuel / 100f;
+        public float FuelFraction => fuel.CurrentFuel / fuel.Capacity;
         public float PursuitGap => pursuit.PursuitGap;
         public ChaseCar Police { get; private set; }
         public RearViewCamera RearView { get; private set; }
@@ -153,6 +153,7 @@ namespace Outlaws.WorldShift
         private void Awake()
         {
             GetawayMode = fullLevel && WorldShiftFlow.Escape.Status == GetawayRunState.RunStatus.Running;
+            if (GetawayMode) { fuel.SetCapacity(WorldShiftFlow.Garage.FuelCapacity); fuel.RefillToFull(); }
             if (roadTemplate == null || carPrefab == null || view == null || sun == null)
             { Debug.LogError("DesertShiftTrial: scene references missing."); enabled = false; return; }
             ActiveGates = fullLevel ? DesertShiftLevel.CreateGates() : Gates;
@@ -190,8 +191,11 @@ namespace Outlaws.WorldShift
             {
                 Police = ChaseCar.CreateForFiniteRoute(policePrefab, transform, Player, d => Route.SampleDriver(d, Relay.SamplePolice(d), Lateral));
                 Police.StepFinite(0f, 0f, 0f, 6f);
-                RearView = RearViewCamera.Create(Player, new[] { Police });
-                RearView.transform.SetParent(transform, true);
+                if (!GetawayMode)
+                {
+                    RearView = RearViewCamera.Create(Player, new[] { Police });
+                    RearView.transform.SetParent(transform, true);
+                }
             }
             if (fullLevel) { Combat = gameObject.AddComponent<WorldShiftCombat>(); Combat.Bind(this); }
             if (GetawayMode) { Getaway = gameObject.AddComponent<WorldShiftGetaway>(); Getaway.Bind(this); }
@@ -396,7 +400,7 @@ namespace Outlaws.WorldShift
             if (State != ShiftRunState.Running || !contacts.Add(id)) return;
             if (!fullLevel) { Fail(reason); return; }
             if (Getaway != null && Getaway.Extras.BlocksImpact(pursuit.CollisionProtectionRemaining > 0f)) return;
-            if (!pursuit.TryCrash(.5f)) return;
+            if (!pursuit.TryCrash(.5f * (GetawayMode ? WorldShiftFlow.Garage.CollisionMultiplier : 1f))) return;
             Notify("POLICE CLOSER", 1.3f);
             if (pursuit.IsGameOver) Fail("CAUGHT");
         }
