@@ -15,17 +15,26 @@ namespace Outlaws.WorldShift
         // Impacts and deaths this soon after a switch are treated as caused by the switch.
         public const float SwitchBlameSeconds = 1.5f;
 
+        // Every pickup on the player's route is either taken or passed; a pass in Night could not have been taken.
+        public static readonly string[] PickupKinds = { "cash", "cash_ramp", "fuel", "ammo", "shield", "magnet", "boost" };
+        private const int TakenSlot = 0, MissedSlot = 1, NightSlot = 2;
+
         private sealed class Tally
         {
-            public int Switches, Impacts, ImpactsAfterSwitch, ShieldSaves, Shots, ShotHits, LootBoxes, LootValue, Fuel, Ammo;
+            public int Switches, AirSwitches, Impacts, ImpactsAfterSwitch, ShieldSaves, Shots, ShotHits, LootBoxes, LootValue, Fuel, Ammo;
+            public int Pauses, AmmoFullTouches;
             public float DaySeconds, NightSeconds, DriveSeconds;
+            public readonly int[,] Pickups = new int[PickupKinds.Length, 3];
             public Tally Copy() { var copy = new Tally(); copy.Add(this); return copy; }
             public void Add(Tally other)
             {
-                Switches += other.Switches; Impacts += other.Impacts; ImpactsAfterSwitch += other.ImpactsAfterSwitch;
+                Switches += other.Switches; AirSwitches += other.AirSwitches; Impacts += other.Impacts; ImpactsAfterSwitch += other.ImpactsAfterSwitch;
                 ShieldSaves += other.ShieldSaves; Shots += other.Shots; ShotHits += other.ShotHits;
                 LootBoxes += other.LootBoxes; LootValue += other.LootValue; Fuel += other.Fuel; Ammo += other.Ammo;
+                Pauses += other.Pauses; AmmoFullTouches += other.AmmoFullTouches;
                 DaySeconds += other.DaySeconds; NightSeconds += other.NightSeconds; DriveSeconds += other.DriveSeconds;
+                for (int k = 0; k < PickupKinds.Length; k++)
+                    for (int j = 0; j < 3; j++) Pickups[k, j] += other.Pickups[k, j];
             }
             public void Write(Dictionary<string, object> row)
             {
@@ -43,23 +52,36 @@ namespace Outlaws.WorldShift
                 row["loot_value"] = LootValue;
                 row["fuel_pickups"] = Fuel;
                 row["ammo_pickups"] = Ammo;
+                row["air_switches"] = AirSwitches;
+                row["pauses"] = Pauses;
+                row["ammo_full_touches"] = AmmoFullTouches;
+                int taken = 0, offered = 0;
+                for (int k = 0; k < PickupKinds.Length; k++)
+                {
+                    row[PickupKinds[k] + "_taken"] = Pickups[k, TakenSlot];
+                    row[PickupKinds[k] + "_missed"] = Pickups[k, MissedSlot];
+                    row[PickupKinds[k] + "_missed_night"] = Pickups[k, NightSlot];
+                    taken += Pickups[k, TakenSlot]; offered += Pickups[k, TakenSlot] + Pickups[k, MissedSlot];
+                }
+                row["pickups_taken_pct"] = offered > 0 ? Mathf.Round(100f * taken / offered) : -1f;
             }
         }
 
         private sealed class Death
         {
             public string Reason = "", World = "", LastImpact = "";
-            public float Distance, SinceSwitch = -1f, SinceImpact = -1f;
+            public float Distance, SinceSwitch = -1f, SinceImpact = -1f, FuelPct = -1f, Gap = -1f;
         }
 
         // Where the player is right now; supplied by whichever scene is driving.
-        private static Func<float> distance, duration;
+        private static Func<float> distance, duration, fuel, gap;
         private static Func<ShiftWorld> world;
         private static string mode = "", environment = "";
 
         private static string runId;
         private static int runNumber, leg, legsStarted, legsCleared, forksLeft, forksRight;
         private static bool tutorialFirst;
+        private static int upgradeFuel, upgradeArmor, upgradeLights;
         private static float runStartRealtime;
         private static readonly List<string> powerUps = new List<string>();
         private static Tally run = new Tally(), current = new Tally();
@@ -81,11 +103,19 @@ namespace Outlaws.WorldShift
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
         {
-            distance = duration = null; world = null; mode = environment = "";
+            distance = duration = fuel = gap = null; world = null; mode = environment = "";
             runId = null; runNumber = tutorialAttempt = 0; legOpen = tutorialOpen = false; Sink = null;
         }
 
         public static void MenuShown() => Event("ws_menu", "banked_total", WorldShiftFlow.Banked, "best_haul", WorldShiftFlow.BestHaul);
+        public static void GarageShown() => Event("ws_garage", "banked_total", WorldShiftFlow.Banked, "upgrade_total", UpgradeTotal);
+
+        public static void UpgradeBought(VehicleUpgrades.Part part, int price)
+            => Event("ws_upgrade", "part", part.ToString(), "level", WorldShiftFlow.Garage.Level(part), "price", price,
+                "banked_total", WorldShiftFlow.Banked, "upgrade_total", UpgradeTotal);
+
+        private static int UpgradeTotal => WorldShiftFlow.Garage.Level(VehicleUpgrades.Part.FuelTank)
+            + WorldShiftFlow.Garage.Level(VehicleUpgrades.Part.Armor) + WorldShiftFlow.Garage.Level(VehicleUpgrades.Part.Headlights);
 
         // ----- Escape runs -----
 
@@ -101,13 +131,19 @@ namespace Outlaws.WorldShift
             death = null;
             legOpen = false;
             endDistance = -1f;
-            Event("ws_run_start", "tutorial_first", withTutorial, "banked_total", WorldShiftFlow.Banked);
+            // Upgrades are bought between runs, so the levels at the start describe the whole run.
+            upgradeFuel = WorldShiftFlow.Garage.Level(VehicleUpgrades.Part.FuelTank);
+            upgradeArmor = WorldShiftFlow.Garage.Level(VehicleUpgrades.Part.Armor);
+            upgradeLights = WorldShiftFlow.Garage.Level(VehicleUpgrades.Part.Headlights);
+            Event("ws_run_start", "tutorial_first", withTutorial, "banked_total", WorldShiftFlow.Banked, "upgrade_total", UpgradeTotal);
         }
 
-        public static void BeginLeg(string env, int legIndex, float length, Func<float> getDistance, Func<float> getDuration, Func<ShiftWorld> getWorld)
+        public static void BeginLeg(string env, int legIndex, float length, Func<float> getDistance, Func<float> getDuration, Func<ShiftWorld> getWorld,
+            Func<float> getFuel = null, Func<float> getGap = null)
         {
             if (runId == null) return;
             Attach("escape", env, getDistance, getDuration, getWorld);
+            fuel = getFuel; gap = getGap;
             leg = legIndex; legLength = length; legsStarted++;
             current = new Tally();
             legOpen = true; fork = 0; legPowerUp = ""; lastImpactKind = "";
@@ -135,15 +171,16 @@ namespace Outlaws.WorldShift
 
         // ----- Moments reported by gameplay -----
 
-        public static void Switched(ShiftWorld to)
+        public static void Switched(ShiftWorld to, bool airborne = false)
         {
             if (!Tracking) return;
+            if (airborne) current.AirSwitches++;
             float now = Now;
             float stayed = now - worldSince;
             if (to == ShiftWorld.Day) current.NightSeconds += stayed; else current.DaySeconds += stayed;
             worldSince = lastSwitch = now;
             current.Switches++;
-            Event("ws_switch", "to", Name(to), "stayed_s", Round(stayed));
+            Event("ws_switch", "to", Name(to), "stayed_s", Round(stayed), "airborne", airborne, "carried", WorldShiftFlow.Escape.Carried);
         }
 
         public static void Impact(string kind)
@@ -157,16 +194,42 @@ namespace Outlaws.WorldShift
         }
 
         public static void ShieldSaved() { if (Tracking) { current.ShieldSaves++; Event("ws_shield_save"); } }
-        public static void Shot(bool hit) { if (Tracking) { current.Shots++; if (hit) current.ShotHits++; } }
-        public static void Loot(int value) { if (Tracking) { current.LootBoxes++; current.LootValue += value; } }
-        public static void Fuel() { if (Tracking) current.Fuel++; }
-        public static void Ammo() { if (Tracking) current.Ammo++; }
+        public static void Shot(bool hit)
+        {
+            if (!Tracking) return;
+            current.Shots++; if (hit) current.ShotHits++;
+            Event("ws_shot", "hit", hit, "ammo_left", WorldShiftFlow.Escape.Ammo);
+        }
+        public static void Loot(int value, bool ramp = false)
+        {
+            if (!Tracking) return;
+            current.LootBoxes++; current.LootValue += value;
+            Pickup(ramp ? "cash_ramp" : "cash", true);
+        }
+        public static void Fuel() { if (Tracking) { current.Fuel++; Pickup("fuel", true); } }
+        public static void Ammo() { if (Tracking) { current.Ammo++; Pickup("ammo", true); } }
+        public static void AmmoFull() { if (Tracking) current.AmmoFullTouches++; }
+        public static void Paused() { if (Tracking) { current.Pauses++; Event("ws_pause"); } }
 
         public static void PowerUp(string kind)
         {
             if (!Tracking) return;
             legPowerUp = kind; powerUps.Add(kind);
-            Event("ws_powerup", "kind", kind);
+            Pickup(kind, true);
+        }
+
+        /// <summary>A pickup on the player's route was passed without being taken.</summary>
+        public static void Missed(string kind) => Pickup(kind, false);
+
+        private static void Pickup(string kind, bool taken)
+        {
+            if (!Tracking || mode != "escape") return;
+            int k = Array.IndexOf(PickupKinds, kind);
+            if (k < 0) return;
+            bool night = world() != ShiftWorld.Day;
+            current.Pickups[k, taken ? TakenSlot : MissedSlot]++;
+            if (!taken && night) current.Pickups[k, NightSlot]++;
+            Event("ws_pickup", "kind", kind, "taken", taken);
         }
 
         public static void Fork(int branch)
@@ -183,7 +246,8 @@ namespace Outlaws.WorldShift
             death = new Death
             {
                 Reason = reason, World = Name(world()), Distance = Round(distance()),
-                SinceSwitch = Since(lastSwitch), SinceImpact = Since(lastImpact), LastImpact = lastImpactKind
+                SinceSwitch = Since(lastSwitch), SinceImpact = Since(lastImpact), LastImpact = lastImpactKind,
+                FuelPct = fuel != null ? Mathf.Round(100f * fuel()) : -1f, Gap = gap != null ? Round(gap()) : -1f
             };
             if (tutorialOpen && tutorialStep < stepRetries.Length) stepRetries[tutorialStep]++;
             Event("ws_death", "reason", reason, "s_since_switch", death.SinceSwitch, "s_since_impact", death.SinceImpact,
@@ -271,6 +335,8 @@ namespace Outlaws.WorldShift
                 ["end_env"] = environment, ["end_leg"] = leg, ["end_dist_m"] = distance != null ? Round(distance()) : endDistance,
                 ["drive_s"] = Round(tally.DriveSeconds), ["wallclock_s"] = Round(Time.realtimeSinceStartup - runStartRealtime),
                 ["forks_left"] = forksLeft, ["forks_right"] = forksRight, ["powerups"] = string.Join("|", powerUps),
+                ["upgrade_fuel"] = upgradeFuel, ["upgrade_armor"] = upgradeArmor, ["upgrade_lights"] = upgradeLights,
+                ["upgrade_total"] = upgradeFuel + upgradeArmor + upgradeLights,
                 ["banked_total"] = WorldShiftFlow.Banked, ["best_haul"] = WorldShiftFlow.BestHaul
             };
             tally.Write(row);
@@ -308,6 +374,8 @@ namespace Outlaws.WorldShift
             row["death_after_switch"] = d != null && d.SinceSwitch >= 0f && d.SinceSwitch <= SwitchBlameSeconds;
             row["death_s_since_impact"] = d?.SinceImpact ?? -1f;
             row["death_last_impact"] = d?.LastImpact ?? "";
+            row["death_fuel_pct"] = d?.FuelPct ?? -1f;
+            row["death_police_gap_m"] = d?.Gap ?? -1f;
         }
 
         // ----- Plumbing -----
@@ -330,7 +398,7 @@ namespace Outlaws.WorldShift
 
         private static void Attach(string newMode, string env, Func<float> getDistance, Func<float> getDuration, Func<ShiftWorld> getWorld)
         {
-            mode = newMode; environment = env; distance = getDistance; duration = getDuration; world = getWorld;
+            mode = newMode; environment = env; distance = getDistance; duration = getDuration; world = getWorld; fuel = gap = null;
             WeeWooAnalytics.EnsureStarted();
             WeeWooAnalytics.ContextProvider = Context;
             WeeWooAnalytics.ExitRowsProvider = ExitRows;
@@ -338,7 +406,7 @@ namespace Outlaws.WorldShift
 
         private static void Detach()
         {
-            mode = ""; distance = duration = null; world = null;
+            mode = ""; distance = duration = fuel = gap = null; world = null;
             if (WeeWooAnalytics.ContextProvider == (Func<Dictionary<string, object>>)Context) WeeWooAnalytics.ContextProvider = null;
         }
 
@@ -352,6 +420,8 @@ namespace Outlaws.WorldShift
             data["dist"] = Round(distance());
             data["world"] = Name(world());
             data["drive_s"] = Round(Now);
+            if (fuel != null) data["fuel_pct"] = Mathf.Round(100f * fuel());
+            if (gap != null) data["police_gap_m"] = Round(gap());
             return data;
         }
 

@@ -483,6 +483,9 @@ function updateMetricTabs(book, legacy, worldShift) {
 
 // ---------------------------------------------------------------- WorldShift
 
+// Pickup kinds the game reports as <kind>_taken / <kind>_missed / <kind>_missed_night.
+var WS_PICKUPS = ['cash', 'cash_ramp', 'fuel', 'ammo', 'shield', 'magnet', 'boost'];
+
 /** WS Overview, WS Levels and WS Tutorial tabs from the ws_runs / ws_legs / ws_tutorials uploads. */
 function worldShiftReports(book) {
   // A tab-close beacon can overlap the normal end-of-run upload; keep the real ending.
@@ -525,15 +528,27 @@ function worldShiftReports(book) {
     ['Legs with no power-up', pct(legs.filter(function (l) { return !l.powerup; }).length, legs.length)],
     ['Shield saves', total(runs, 'shield_saves')],
     ['Shot accuracy', pct(total(runs, 'shot_hits'), total(runs, 'shots')) + ' of ' + total(runs, 'shots') + ' shots'],
-    ['Runs with tutorial first', pct(runs.filter(function (r) { return truthy(r.tutorial_first); }).length, runs.length)]
-  ];
+    ['Runs with tutorial first', pct(runs.filter(function (r) { return truthy(r.tutorial_first); }).length, runs.length)],
+    ['Pickups taken (all kinds, on the chosen route)', pct(WS_PICKUPS.reduce(function (n, k) { return n + total(runs, k + '_taken'); }, 0),
+      WS_PICKUPS.reduce(function (n, k) { return n + total(runs, k + '_taken') + total(runs, k + '_missed'); }, 0))],
+    ['Missed pickups that were passed in Night', pct(WS_PICKUPS.reduce(function (n, k) { return n + total(runs, k + '_missed_night'); }, 0),
+      WS_PICKUPS.reduce(function (n, k) { return n + total(runs, k + '_missed'); }, 0))],
+    ['Switches made in the air (jumps)', total(runs, 'air_switches') + ' of ' + total(runs, 'switches')],
+    ['Runs with garage upgrades', pct(runs.filter(function (r) { return Number(r.upgrade_total) > 0; }).length, runs.length)],
+    ['Median total upgrade level at run start (0-9)', med(runs, 'upgrade_total')]
+  ].concat(WS_PICKUPS.map(function (k) {
+    return ['Pickup "' + k + '": taken / missed in Day / missed in Night', total(runs, k + '_taken') + ' / ' +
+      (total(runs, k + '_missed') - total(runs, k + '_missed_night')) + ' / ' + total(runs, k + '_missed_night')];
+  }));
   var runFields = [['ts', 'Timestamp (UTC)'], ['build', 'Build'], ['player_id', 'Player'], ['run_number_session', 'Run # in session'],
     ['tutorial_first', 'Tutorial first'], ['outcome', 'Outcome'], ['failure', 'Failure'], ['haul', 'Haul'], ['legs_cleared', 'Legs cleared'],
     ['end_env', 'Ended in'], ['end_dist_m', 'End distance (m)'], ['drive_s', 'Driving (s)'], ['switches', 'Switches'],
     ['switches_per_min', 'Switches / min'], ['night_pct', 'Night %'], ['impacts', 'Impacts'], ['impacts_after_switch', 'Impacts after switch'],
     ['death_after_switch', 'Died after switch'], ['death_s_since_switch', 'Death: s since switch'], ['death_last_impact', 'Death: last impact'],
     ['forks_left', 'Forks left'], ['forks_right', 'Forks right'], ['powerups', 'Power-ups'], ['shots', 'Shots'], ['shot_hits', 'Shot hits'],
-    ['loot_boxes', 'Loot boxes']];
+    ['loot_boxes', 'Loot boxes'], ['pickups_taken_pct', 'Pickups taken %'], ['air_switches', 'Switches in the air'],
+    ['pauses', 'Pauses'], ['upgrade_fuel', 'Fuel tank level'], ['upgrade_armor', 'Armor level'], ['upgrade_lights', 'Headlight level'],
+    ['death_fuel_pct', 'Death: fuel %'], ['death_police_gap_m', 'Death: police gap (m)']];
 
   var levels = [];
   ['City', 'Desert'].forEach(function (env) {

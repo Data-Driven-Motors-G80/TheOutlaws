@@ -12,11 +12,17 @@ namespace Outlaws.WorldShift
         public static bool ConsumeGarageRequest() { bool value = openGarage; openGarage = false; return value; }
         public static void OpenGarage()
         {
+            WorldShiftAnalytics.Abandon("garage");
             Escape.Leave(); getawayAfterTutorial = false; autoStart = null;
             openGarage = true; Time.timeScale = 1f; SceneManager.LoadScene(MenuScene);
         }
         public static bool BuyUpgrade(VehicleUpgrades.Part part)
-            => Escape.Status != GetawayRunState.RunStatus.Running && Garage.Buy(part);
+        {
+            int price = Garage.Price(part);
+            bool bought = Escape.Status != GetawayRunState.RunStatus.Running && Garage.Buy(part);
+            if (bought) WorldShiftAnalytics.UpgradeBought(part, price);
+            return bought;
+        }
 
         public const string MenuScene = "WorldShift_Menu";
         private static ShiftLevel? autoStart;

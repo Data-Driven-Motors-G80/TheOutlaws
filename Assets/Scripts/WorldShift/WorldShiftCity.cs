@@ -62,7 +62,7 @@ namespace Outlaws.WorldShift
         }
         private int tutorialCheckpointSwitches;
         private float tutorialCheckpointLateral;
-        private bool[] fuelTaken;
+        private bool[] fuelTaken, fuelPassed;
         private float retryRemaining, hintRemaining, fallVelocity;
         private float checkpointFuel = FuelState.MaximumFuel;
         private float checkpointGap = RiskRunState.InitialPursuitGap;
@@ -142,6 +142,7 @@ namespace Outlaws.WorldShift
             roadObject.transform.SetParent(transform, false);
             Route = roadObject.AddComponent<WorldShiftRoute>();
             fuelTaken = new bool[Pickups.Length];
+            fuelPassed = new bool[Pickups.Length];
             Route.SharedWorldRules = GetawayMode || tutorialLevel;
             Route.Build(roadTemplate, splitViewValidation || tutorialLevel, RunLength, extraLength: GetawayMode ? WorldShiftGetaway.ExitTail : 0f);
             if (!splitViewValidation && !tutorialLevel) relay = new WorldShiftRelay(Route);
@@ -232,6 +233,7 @@ namespace Outlaws.WorldShift
 
         public void TogglePause()
         {
+            if (State == ShiftRunState.Running) WorldShiftAnalytics.Paused();
             if (State == ShiftRunState.Running) State = ShiftRunState.Paused;
             else if (State == ShiftRunState.Paused) State = ShiftRunState.Running;
         }
@@ -254,7 +256,7 @@ namespace Outlaws.WorldShift
             ApplyWorld(next);
             Getaway?.OnWorldChanged();
             Switches++;
-            WorldShiftAnalytics.Switched(next);
+            WorldShiftAnalytics.Switched(next, IsRelayAirborne || (Getaway?.Extras.Jump.Traversing ?? false));
             if (tutorialLevel && checkpointIndex == 1 && !tutorialHintCompleted)
             {
                 tutorialFrozen = next == ShiftWorld.Echo && tutorialTrafficMoved;
@@ -481,6 +483,9 @@ namespace Outlaws.WorldShift
 
         private void CollectFuel(float from, float to, float fromLateral, float toLateral)
         {
+            if (GetawayMode)
+                for (int i = 0; i < fuelPassed.Length; i++)
+                    if (!fuelTaken[i] && !fuelPassed[i] && from > Pickups[i].Distance + 1.3f) { fuelPassed[i] = true; WorldShiftAnalytics.Missed("fuel"); }
             if (GetawayMode && World != ShiftWorld.Day) return;
             for (int i = 0; i < fuelTaken.Length; i++)
             {

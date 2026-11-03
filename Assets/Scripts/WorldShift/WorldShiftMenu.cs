@@ -124,6 +124,7 @@ namespace Outlaws.WorldShift
         private void ShowGarage(bool show)
         {
             RefreshGarage(); home.SetActive(!show); garage.SetActive(show);
+            if (show) WorldShiftAnalytics.GarageShown();
             if (EventSystem.current != null)
                 EventSystem.current.SetSelectedGameObject((show ? garage : home)
                     .GetComponentsInChildren<Button>()[show ? 3 : 0].gameObject);

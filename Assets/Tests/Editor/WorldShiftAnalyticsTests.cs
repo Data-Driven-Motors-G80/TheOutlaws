@@ -39,13 +39,21 @@ public sealed class WorldShiftAnalyticsTests
         AnalyticsType.GetField("Sink", Flags).SetValue(null, sink);
     }
 
+    private static readonly string[] UpgradeKeys = { "WorldShift.Getaway.Upgrade.FuelTank", "WorldShift.Getaway.Upgrade.Armor", "WorldShift.Getaway.Upgrade.Headlights" };
+    private readonly int[] upgrades = new int[3];
+
     [SetUp] public void SaveBank()
-    { bank = PlayerPrefs.GetInt("WorldShift.Getaway.Bank", 0); best = PlayerPrefs.GetInt("WorldShift.Getaway.Best", 0); }
+    {
+        bank = PlayerPrefs.GetInt("WorldShift.Getaway.Bank", 0); best = PlayerPrefs.GetInt("WorldShift.Getaway.Best", 0);
+        for (int i = 0; i < 3; i++) upgrades[i] = PlayerPrefs.GetInt(UpgradeKeys[i], 0);
+    }
 
     [UnityTearDown] public IEnumerator Cleanup()
     {
         if (Application.isPlaying) yield return new ExitPlayMode();
-        PlayerPrefs.SetInt("WorldShift.Getaway.Bank", bank); PlayerPrefs.SetInt("WorldShift.Getaway.Best", best); PlayerPrefs.Save();
+        PlayerPrefs.SetInt("WorldShift.Getaway.Bank", bank); PlayerPrefs.SetInt("WorldShift.Getaway.Best", best);
+        for (int i = 0; i < 3; i++) PlayerPrefs.SetInt(UpgradeKeys[i], upgrades[i]);
+        PlayerPrefs.Save();
     }
 
     [UnityTest]
@@ -116,12 +124,54 @@ public sealed class WorldShiftAnalyticsTests
         var leg = Sheet("ws_legs").Single();
         Assert.That(leg["outcome"], Is.EqualTo("exit"));
         Assert.That((int)leg["loot_boxes"], Is.EqualTo(3));
+        Assert.That(leg["cash_taken"], Is.EqualTo(3));
+        Assert.That(Events("ws_pickup").Count(e => e["kind"].Equals("cash") && (bool)e["taken"]), Is.EqualTo(3));
         var run = Sheet("ws_runs").Single();
         Assert.That(run["outcome"], Is.EqualTo("banked"));
         Assert.That(run["banked"], Is.EqualTo(Run.SettledHaul));
         Assert.That(run["legs_cleared"], Is.EqualTo(1));
         Assert.That(run["death_reason"], Is.Empty);
         Assert.That((float)run["end_dist_m"], Is.GreaterThan(3000f));
+        Assert.That(run["upgrade_total"], Is.EqualTo((int)run["upgrade_fuel"] + (int)run["upgrade_armor"] + (int)run["upgrade_lights"]));
+
+        // Garage purchases between runs are logged with the new level.
+        PlayerPrefs.SetInt("WorldShift.Getaway.Bank", 5000);
+        PlayerPrefs.SetInt(UpgradeKeys[1], 0);
+        object armor = Enum.Parse(typeof(VehicleUpgrades.Part), "Armor");
+        Assert.That(FlowType.GetMethod("BuyUpgrade").Invoke(null, new[] { armor }), Is.True);
+        var upgrade = Events("ws_upgrade").Single();
+        Assert.That(upgrade["part"], Is.EqualTo("Armor"));
+        Assert.That(upgrade["level"], Is.EqualTo(1));
+        Assert.That(upgrade["price"], Is.EqualTo(500));
+        Assert.That(upgrade["banked_total"], Is.EqualTo(4500));
+    }
+
+    [UnityTest]
+    public IEnumerator PickupsPassedInNightAreMissedAndDayPickupsAreTaken()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
+        yield return new EnterPlayMode();
+        Capture();
+        Flow("StartGetaway", false); yield return null; yield return null;
+        var city = Find("WorldShiftCity"); city.enabled = false;
+        // The opening cash trail (35/55/75 m) and the shield (44 m) pass by in Night.
+        Call(city, "TrySwitch");
+        Call(city, "StepSimulation", 3.5f, 0f, false);
+        Assert.That(Run.Carried, Is.Zero);
+        Call(city, "TrySwitch");
+        Call(city, "TogglePause"); Call(city, "TogglePause");
+        Flow("Menu"); yield return null;
+
+        var leg = Sheet("ws_legs").Single();
+        Assert.That(leg["cash_taken"], Is.EqualTo(0));
+        Assert.That((int)leg["cash_missed"], Is.GreaterThanOrEqualTo(3));
+        Assert.That(leg["cash_missed_night"], Is.EqualTo(leg["cash_missed"]), "Every cash box was passed in Night.");
+        Assert.That(leg["shield_missed"], Is.EqualTo(1));
+        Assert.That(leg["shield_missed_night"], Is.EqualTo(1));
+        Assert.That(leg["pickups_taken_pct"], Is.EqualTo(0f));
+        Assert.That(leg["pauses"], Is.EqualTo(1));
+        Assert.That(Events("ws_pickup").All(e => (bool)e["taken"] == false), Is.True);
+        Assert.That(Events("ws_switch").First()["airborne"], Is.False);
     }
 
     [UnityTest]

@@ -20,7 +20,7 @@ namespace Outlaws.WorldShift
         private sealed class Loot
         {
             public float At, X;
-            public bool Taken, Bonus;
+            public bool Taken, Bonus, Passed;
             public Transform Visual;
         }
         private WorldShiftCity city;
@@ -112,7 +112,7 @@ namespace Outlaws.WorldShift
             OnWorldChanged();
             BuildHud();
             Present(World);
-            WorldShiftAnalytics.BeginLeg(IsCity ? "City" : "Desert", currentLeg, Length, () => Distance, () => Duration, () => World);
+            WorldShiftAnalytics.BeginLeg(IsCity ? "City" : "Desert", currentLeg, Length, () => Distance, () => Duration, () => World, () => Fuel, () => Gap);
         }
 
         private Material MakeMaterial(Color color)
@@ -151,6 +151,7 @@ namespace Outlaws.WorldShift
         {
             if (State != ShiftRunState.Running) return;
             Extras.Collect(from, to, fromX, toX);
+            RecordPassedLoot(from);
             Routing.CollectContacts(from, to, fromX, toX);
             foreach (var item in loot)
             {
@@ -168,7 +169,19 @@ namespace Outlaws.WorldShift
                 int value = WorldShiftFlow.Escape.Collect(100);
                 if (value <= 0) continue;
                 lootFeedbackUntil = Duration + .35f;
-                WorldShiftAnalytics.Loot(value);
+                WorldShiftAnalytics.Loot(value, item.Bonus);
+            }
+        }
+
+        // Cash left behind on the chosen road counts as missed; the other fork branch never does.
+        private void RecordPassedLoot(float from)
+        {
+            foreach (var item in loot)
+            {
+                if (item.Taken || item.Passed || from <= item.At + 1.3f) continue;
+                item.Passed = true;
+                if (Routing.RewardSeparated(item.At) && Routing.RewardBranch != 0 && Mathf.Sign(item.X) != Routing.RewardBranch) continue;
+                WorldShiftAnalytics.Missed(item.Bonus ? "cash_ramp" : "cash");
             }
         }
 

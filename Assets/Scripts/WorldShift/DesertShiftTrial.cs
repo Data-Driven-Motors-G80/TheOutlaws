@@ -99,6 +99,7 @@ namespace Outlaws.WorldShift
         private readonly FuelState fuel = new FuelState();
         private readonly System.Collections.Generic.HashSet<string> contacts = new System.Collections.Generic.HashSet<string>();
         private readonly System.Collections.Generic.HashSet<int> collectedFuel = new System.Collections.Generic.HashSet<int>();
+        private readonly System.Collections.Generic.HashSet<int> passedFuel = new System.Collections.Generic.HashSet<int>();
         private float checkpointFuel = 100f, checkpointGap = 45f;
         private ShiftWorld entryWorld;
         public float FuelFraction => fuel.CurrentFuel / fuel.Capacity;
@@ -225,6 +226,7 @@ namespace Outlaws.WorldShift
         public void Begin() { if (State == ShiftRunState.Ready) State = ShiftRunState.Running; }
         public void TogglePause()
         {
+            if (State == ShiftRunState.Running) WorldShiftAnalytics.Paused();
             if (State == ShiftRunState.Running) State = ShiftRunState.Paused;
             else if (State == ShiftRunState.Paused) State = ShiftRunState.Running;
         }
@@ -246,7 +248,7 @@ namespace Outlaws.WorldShift
             World = next;
             Getaway?.OnWorldChanged();
             Switches++;
-            WorldShiftAnalytics.Switched(next);
+            WorldShiftAnalytics.Switched(next, IsAirborne || (Getaway?.Extras.Jump.Traversing ?? false));
             Notify(next == ShiftWorld.Echo ? "NIGHTSHIFT" : "DAY MOVES", 1.3f);
             if (!IsAirborne && !Route.HasSurface(Distance, World)) Fail("NO ROAD - USE THE DAY BOOST RAMP");
             else if (!IsAirborne) CheckGates(Distance, Lateral);
@@ -292,6 +294,9 @@ namespace Outlaws.WorldShift
                     for (int i = 0; i < FuelCount; i++)
                         if ((!GetawayMode || World == ShiftWorld.Day) && !collectedFuel.Contains(i) && Distance + 1.3f >= FuelDistance(i) && before - 1.3f <= FuelDistance(i) && Mathf.Abs(Lateral) < 1.6f)
                         { collectedFuel.Add(i); fuel.Refill(26f); Notify("FUEL +26", 1f); WorldShiftAnalytics.Fuel(); }
+                    if (GetawayMode)
+                        for (int i = 0; i < FuelCount; i++)
+                            if (!collectedFuel.Contains(i) && before - 1.3f > FuelDistance(i) && passedFuel.Add(i)) WorldShiftAnalytics.Missed("fuel");
                 }
                 CheckRockContacts(before, previousX, dt);
                 StepTraffic(dt, before, previousX);

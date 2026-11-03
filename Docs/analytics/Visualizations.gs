@@ -667,7 +667,8 @@ function wsVizCompute(data, opts, tz) {
     ['Runs cashed out', vizPct(banked.length, runs.length) + '%'],
     ['Median legs cleared', String(median0(vizNums(runs, 'legs_cleared')))],
     ['Median driving time', median0(vizNums(runs, 'drive_s')) + ' s'],
-    ['Best haul banked', '$' + vizMax(vizNums(banked, 'haul'))],
+    ['Pickups taken', vizPct(WS_PICKUPS.reduce(function (n, k) { return n + vizSum(runs, k + '_taken'); }, 0),
+      WS_PICKUPS.reduce(function (n, k) { return n + vizSum(runs, k + '_taken') + vizSum(runs, k + '_missed'); }, 0)) + '%'],
     ['Deaths right after a switch', vizPct(lost.filter(after).length, lost.length) + '%'],
     ['Switches per minute', String(median0(vizNums(runs, 'switches_per_min')))],
     ['Time in Night', median0(vizNums(runs, 'night_pct')) + '%'],
@@ -728,7 +729,46 @@ function wsVizCompute(data, opts, tz) {
       vizBins(vizNums(runs, 'night_pct'), [0, 10, 25, 40, 60, 80], function (lo, hi) { return hi === null ? lo + '%+' : lo + '–' + hi + '%'; }),
       { yTitle: 'Runs' }),
     chart('Switching vs driving time', 'scatter', ['Switches per minute', 'Driving time (s)'],
-      runs.map(function (r) { return [Number(r.switches_per_min) || 0, Number(r.drive_s) || 0]; }), { trend: true })
+      runs.map(function (r) { return [Number(r.switches_per_min) || 0, Number(r.drive_s) || 0]; }), { trend: true }),
+    chart('Where switches happen', 'pie', ['Switch', 'Switches'], vizSum(runs, 'switches') ? [['In the air (jumps)', vizSum(runs, 'air_switches')],
+      ['On the road', vizSum(runs, 'switches') - vizSum(runs, 'air_switches')]] : [], { colors: ['#3E9BBF', '#C9D1D9'] })
+  ]};
+
+  var pickupLabels = { cash: 'Cash', cash_ramp: 'Cash on ramps', fuel: 'Fuel', ammo: 'Ammo', shield: 'Shield', magnet: 'Magnet', boost: 'Boost' };
+  var pickups = { title: 'Pickups', subtitle: 'every pickup on the chosen road: taken, or missed in Day / in Night', charts: [
+    chart('Pickups taken vs missed', 'stacked', ['Pickup', 'Taken', 'Missed in Day', 'Missed in Night'],
+      WS_PICKUPS.map(function (k) {
+        var night = vizSum(runs, k + '_missed_night');
+        return [pickupLabels[k], vizSum(runs, k + '_taken'), vizSum(runs, k + '_missed') - night, night];
+      }), { colors: ['#4C947B', '#D8A35A', '#24476A'], yTitle: 'Pickups' }),
+    chart('Collection rate by pickup (%)', 'bar', ['Pickup', '% taken'],
+      WS_PICKUPS.map(function (k) {
+        return [pickupLabels[k], vizPct(vizSum(runs, k + '_taken'), vizSum(runs, k + '_taken') + vizSum(runs, k + '_missed'))];
+      }), { yTitle: '% taken' }),
+    chart('Pickups taken per run vs driving time', 'scatter', ['% of pickups taken', 'Driving time (s)'],
+      runs.filter(function (r) { return Number(r.pickups_taken_pct) >= 0 && r.pickups_taken_pct !== ''; })
+        .map(function (r) { return [Number(r.pickups_taken_pct), Number(r.drive_s) || 0]; }), { trend: true }),
+    chart('Fuel left at death (out-of-fuel vs caught)', 'column', ['Fuel at death', 'Deaths'],
+      vizBins(vizNums(lost, 'death_fuel_pct'), [0, 10, 25, 50, 75], function (lo, hi) { return hi === null ? lo + '%+' : lo + '–' + hi + '%'; }),
+      { yTitle: 'Deaths' })
+  ]};
+
+  var parts = [['upgrade_fuel', 'Fuel tank'], ['upgrade_armor', 'Armor'], ['upgrade_lights', 'Headlights']];
+  var upgradeGroups = {};
+  runs.forEach(function (r) {
+    var n = Number(r.upgrade_total);
+    if (r.upgrade_total === '' || r.upgrade_total === undefined || isNaN(n)) return;
+    (upgradeGroups[n] = upgradeGroups[n] || []).push(r);
+  });
+  var garage = { title: 'Garage', subtitle: 'upgrades bought with banked cash', charts: [
+    chart('Upgrade level at the start of each run', 'stacked', ['Part', 'Level 0', 'Level 1', 'Level 2', 'Level 3'],
+      parts.map(function (p) {
+        return [p[1]].concat([0, 1, 2, 3].map(function (lv) { return runs.filter(function (r) { return Number(r[p[0]]) === lv && r[p[0]] !== ''; }).length; }));
+      }), { colors: ['#C9D1D9', '#9CC3E6', '#3E9BBF', '#24476A'], yTitle: 'Runs' }),
+    chart('Mean driving time by total upgrade level', 'column', ['Total upgrade level (0–9)', 'Mean driving time (s)'],
+      Object.keys(upgradeGroups).sort(function (a, b) { return a - b; }).map(function (n) {
+        return ['Level ' + n + ' (' + upgradeGroups[n].length + ')', vizMean(upgradeGroups[n], 'drive_s')];
+      }))
   ]};
 
   var shots = vizSum(runs, 'shots'), hits = vizSum(runs, 'shot_hits');
@@ -786,6 +826,6 @@ function wsVizCompute(data, opts, tz) {
   return {
     kpis: kpis,
     counts: { runs: runs.length, deaths: lost.length, label: runs.length + ' escape runs (' + lost.length + ' lost) and ' + tutorials.length + ' tutorial attempts' },
-    sections: [progress, deaths, switching, choices, tutorial, engagement]
+    sections: [progress, deaths, switching, pickups, choices, tutorial, garage, engagement]
   };
 }

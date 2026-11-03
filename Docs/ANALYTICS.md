@@ -157,7 +157,7 @@ New run fields: `gun_rewards`, `backpack_replacements`, `discarded_bullets`, `ba
 
 Ocean Coast run summaries add `ocean_s` for active time spent on the coast; it is excluded from `city_s`. `end_scene` can be `Env_OceanCoast`, and `max_speed` includes the surf multiplier. Existing City/Snow keys remain available. Spreadsheet summaries need to consume `ocean_s` separately if displaying a complete environment time breakdown.
 
-## WorldShift (Day/Night escape, build tag `worldshift-1.0`)
+## WorldShift (Day/Night escape, build tags `worldshift-1.0`, `worldshift-1.1` with the garage)
 
 The WorldShift menu, tutorial and escape report through `Assets/Scripts/WorldShift/WorldShiftAnalytics.cs`, using the
 same uploader and endpoint. The old `runs`/`tutorials` tabs are not used by this mode. Build tags must not contain
@@ -180,10 +180,22 @@ dashboards redraw on filter edits and every 5 minutes when new rows arrive.
 | `ws_legs` | environment visit (City or Desert) within a run | `leg`, `env`, `outcome` (exit/next/lost/...), `dist_m`, `progress_pct`, `fork`, `powerup`, `loot_boxes`, switching and death columns |
 | `ws_tutorials` | tutorial attempt | `status` (completed/skipped/menu/restarted/tab_closed), `step_title`, `s_<n>_<step>` driving seconds and `retries_<n>_<step>` per lesson |
 
-Events (in `events`, with `ws_mode`, `env`, `leg`, `dist`, `world`, `drive_s` context): `ws_menu`, `ws_run_start`,
-`ws_leg_start`, `ws_switch` (`to`, `stayed_s`), `ws_impact` (`kind`, `s_since_switch`), `ws_shield_save`, `ws_powerup`,
-`ws_fork`, `ws_gate` (`choice` exit/next, `carried`), `ws_death` (`reason`, `s_since_switch`, `after_switch`),
-`ws_run_end`, `ws_tutorial_start`, `ws_tutorial_step`, `ws_tutorial_end`.
+Events (in `events`, with `ws_mode`, `env`, `leg`, `dist`, `world`, `drive_s`, and during escapes `fuel_pct` and
+`police_gap_m` context): `ws_menu`, `ws_garage`, `ws_upgrade` (`part`, `level`, `price`, `banked_total`), `ws_run_start`
+(`upgrade_total`), `ws_leg_start`, `ws_switch` (`to`, `stayed_s`, `airborne`, `carried`), `ws_impact` (`kind`,
+`s_since_switch`), `ws_shield_save`, `ws_pickup` (`kind`, `taken`), `ws_shot` (`hit`, `ammo_left`), `ws_pause`, `ws_fork`,
+`ws_gate` (`choice` exit/next, `carried`), `ws_death` (`reason`, `s_since_switch`, `after_switch`), `ws_run_end`,
+`ws_tutorial_start`, `ws_tutorial_step`, `ws_tutorial_end`.
+
+**Pickups:** every cash box (`cash`, elevated `cash_ramp`), fuel can, ammo refill and power-up (`shield`, `magnet`,
+`boost`) on the road the player actually drove is reported once: taken, or missed when the car passes it. Run and leg
+rows count `<kind>_taken`, `<kind>_missed` and `<kind>_missed_night` (passed while in Night, where it is hidden), plus
+`pickups_taken_pct` and `ammo_full_touches`. Pickups on the fork branch not taken are never counted as missed. A shield
+already held is not on offer.
+
+**Garage (1.1):** run rows record the upgrade levels at the start of the run (`upgrade_fuel`, `upgrade_armor`,
+`upgrade_lights`, `upgrade_total`); each purchase is a `ws_upgrade` event. Deaths add `death_fuel_pct` and
+`death_police_gap_m`; rows also count `air_switches` (switches during jumps) and `pauses`.
 
 "After a switch" means within 1.5 driving seconds of pressing Space (`SwitchBlameSeconds`). Seconds are driving time,
 which pauses with the game; `wallclock_s` includes pauses. Report tabs **WS Overview**, **WS Levels** and **WS Tutorial**
