@@ -30,6 +30,53 @@ public sealed class ChaseCar : MonoBehaviour
     private OutlawGameManager game;
     private float heightOffset;
     private CarPickupEffects effects;
+    private System.Func<float, RoadPathPoint> finiteRoute;
+    private bool finitePoseReady;
+
+    public bool IsFiniteRoute => finiteRoute != null;
+
+    /// <summary>Reuse this follower with a plain police block on a manually ticked finite road.</summary>
+    public static ChaseCar CreateForFiniteRoute(GameObject prefab, Transform parent, Transform targetPlayer,
+        System.Func<float, RoadPathPoint> sample)
+    {
+        if (sample == null) throw new System.ArgumentNullException(nameof(sample));
+        GameObject instance = new GameObject("Chasing police block");
+        instance.transform.SetParent(parent, false);
+        Outlaws.WorldShift.WorldShiftBlockVisuals.Vehicle(instance.transform, true);
+        ChaseCar chase = instance.GetComponent<ChaseCar>();
+        if (chase == null) chase = instance.AddComponent<ChaseCar>();
+        chase.finiteRoute = sample;
+        chase.player = targetPlayer;
+        chase.playerDriver = targetPlayer != null ? targetPlayer.GetComponent<AutoDriveCar>() : null;
+        // Start/Update belong to the original InfiniteRoad lifecycle. The finite
+        // controller supplies the simulation time and pursuit gap explicitly.
+        chase.enabled = false;
+        foreach (Collider collider in instance.GetComponentsInChildren<Collider>()) collider.enabled = false;
+        chase.policeRenderers = instance.GetComponentsInChildren<Renderer>(true);
+        return chase;
+    }
+
+    public void StepFinite(float delta, float playerDistance, float lateral, float bumperGap)
+    {
+        if (finiteRoute == null || player == null) return;
+        delta = Mathf.Max(0f, delta);
+        bumperGap = Mathf.Max(0f, bumperGap);
+        // A zero-time step is used when restoring a checkpoint, so stale visual
+        // separation and steering do not leak into the restarted section.
+        bool snap = !finitePoseReady || delta <= 0f;
+        displayedBumperGap = snap ? bumperGap
+            : Mathf.MoveTowards(displayedBumperGap, bumperGap, visualGapChangeSpeed * delta);
+        RoadPathPoint target = finiteRoute(playerDistance - (displayedBumperGap + 3.3f));
+        float limit = Mathf.Max(0f, target.Width * .5f - edgeMargin);
+        float desired = Mathf.Clamp(lateral, -limit, limit);
+        float offset = snap ? desired : Mathf.Lerp(previousLateralOffset, desired, 1f - Mathf.Exp(-turnSharpness * delta));
+        float lateralVelocity = delta > 0f && !snap ? (offset - previousLateralOffset) / delta : 0f;
+        transform.position = target.Position + target.Right * offset + target.Up * .08f;
+        TurnAlong(target, lateralVelocity, delta, snap);
+        previousLateralOffset = offset;
+        DistanceToPlayer = displayedBumperGap;
+        finitePoseReady = true;
+    }
 
     public void HitByShot()
     {
@@ -63,6 +110,7 @@ public sealed class ChaseCar : MonoBehaviour
 
     private void Start()
     {
+        if (IsFiniteRoute) return;
         if (!HasValidSetup())
         {
             enabled = false;
@@ -109,6 +157,7 @@ public sealed class ChaseCar : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (IsFiniteRoute) return;
         UpdateVisibility();
         if (!road.TryGetPathPoint(
                 player.position,
@@ -184,6 +233,13 @@ public sealed class ChaseCar : MonoBehaviour
         float lateralVelocity = Time.deltaTime > 0f
             ? (desiredLateralOffset - previousLateralOffset) / Time.deltaTime : 0f;
         previousLateralOffset = desiredLateralOffset;
+        TurnAlong(target, lateralVelocity, Time.deltaTime);
+
+        DistanceToPlayer = displayedBumperGap;
+    }
+
+    private void TurnAlong(RoadPathPoint target, float lateralVelocity, float deltaTime, bool snap = false)
+    {
         float forwardSpeed = playerDriver != null ? playerDriver.BaseForwardSpeed : 15f;
         float steerAngle = Mathf.Clamp(
             Mathf.Atan2(lateralVelocity, Mathf.Max(1f, forwardSpeed)) * Mathf.Rad2Deg,
@@ -193,16 +249,14 @@ public sealed class ChaseCar : MonoBehaviour
 
         float blend =
             1f - Mathf.Exp(
-                -turnSharpness * Time.deltaTime
+                -turnSharpness * deltaTime
             );
 
-        transform.rotation = Quaternion.Slerp(
+        transform.rotation = snap ? targetRotation : Quaternion.Slerp(
             transform.rotation,
             targetRotation,
             blend
         );
-
-        DistanceToPlayer = displayedBumperGap;
     }
 
     private void UpdateVisibility()

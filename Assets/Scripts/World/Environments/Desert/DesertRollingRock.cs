@@ -23,19 +23,25 @@ public sealed class DesertRollingRock : MonoBehaviour
         rock.hitbox = root.AddComponent<SphereCollider>();
         rock.hitbox.radius = radius;
         rock.hitbox.isTrigger = true;
+        rock.visual = CreateVisual(root.transform, radius);
+        rock.obstacle = root.AddComponent<TrafficLightObstacle>();
+        rock.obstacle.Initialize(TrafficObstacleState.Green); // Existing orange cost; no fuel damage.
+        rock.Place();
+        return rock;
+    }
+
+    // Both desert prototypes use the same geometry; gameplay ownership stays separate.
+    public static Transform CreateVisual(Transform parent, float radius)
+    {
         var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         sphere.name = "Rolling prototype visual";
-        sphere.transform.SetParent(root.transform, false);
+        sphere.transform.SetParent(parent, false);
         sphere.transform.localScale = Vector3.one * radius * 2f;
         var redundant = sphere.GetComponent<Collider>();
         redundant.enabled = false;
         Destroy(redundant);
         sphere.GetComponent<Renderer>().sharedMaterial = RuntimeMaterials.Coloured(new Color(1f, 0.42f, 0f));
-        rock.visual = sphere.transform;
-        rock.obstacle = root.AddComponent<TrafficLightObstacle>();
-        rock.obstacle.Initialize(TrafficObstacleState.Green); // Existing orange cost; no fuel damage.
-        rock.Place();
-        return rock;
+        return sphere.transform;
     }
 
     public void Advance(float lateralDelta)

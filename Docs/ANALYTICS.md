@@ -1,7 +1,6 @@
 # Wee Woo Run analytics
 
-Replaces the Google Forms setup (`GOOGLE_FORMS_ANALYTICS.md`, now superseded). The game sends rows to a
-Google Apps Script web app, which writes them into four tabs of a Google Sheet and builds a dashboard tab.
+The game sends rows to a Google Apps Script web app, which writes them into four tabs of a Google Sheet and builds a dashboard tab.
 
 ## One-time setup (about 3 minutes)
 
