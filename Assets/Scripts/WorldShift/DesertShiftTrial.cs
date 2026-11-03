@@ -37,8 +37,10 @@ namespace Outlaws.WorldShift
         public readonly float Start;
         public readonly ShiftWorld World;
         public readonly int HalfSide;
+        public readonly bool SwitchOnly;
+        public bool VisibleIn(ShiftWorld world, bool shared) => !SwitchOnly && shared || world == World;
         public float End => Start + 8f;
-        public DesertTrialGate(float start, ShiftWorld world, int halfSide = 0) { Start = start; World = world; HalfSide = halfSide; }
+        public DesertTrialGate(float start, ShiftWorld world, int halfSide = 0, bool switchOnly = false) { Start = start; World = world; HalfSide = halfSide; SwitchOnly = switchOnly; }
     }
 
     /// <summary>Shared simulation for the short timing trial and full desert level.</summary>
@@ -57,7 +59,7 @@ namespace Outlaws.WorldShift
         public bool GetawayMode { get; private set; }
         public WorldShiftGetaway Getaway { get; private set; }
         public bool SplitViewValidation => false;
-        public float RunLength => fullLevel ? DesertShiftLevel.Length + (GetawayMode ? WorldShiftGetaway.ExitTail : 0f) : Length;
+        public float RunLength => fullLevel ? DesertShiftLevel.Length + (GetawayMode ? WorldShiftGetaway.TailLength : 0f) : Length;
         public float MergeStart => fullLevel ? DesertShiftLevel.MergeStart : float.PositiveInfinity;
         public bool IsMerged => false;
         public float JoinedViewSplit => Mathf.Lerp(entryWorld == ShiftWorld.Day ? 1f : 0f, .5f,
@@ -163,9 +165,18 @@ namespace Outlaws.WorldShift
                     var gate = ActiveGates[i];
                     ActiveGates[i] = new DesertTrialGate(gate.Start, gate.World, gate.HalfSide == 0 ? i % 2 == 0 ? -1 : 1 : gate.HalfSide);
                 }
+            if (GetawayMode)
+            {
+                var gates = new System.Collections.Generic.List<DesertTrialGate>(ActiveGates);
+                foreach (float at in WorldShiftEscapeProfile.SwitchWalls(ShiftLevel.Desert))
+                    gates.Add(new DesertTrialGate(at, ShiftWorld.Day, switchOnly: true));
+                ActiveGates = gates.ToArray();
+            }
             if (fullLevel) { Rocks = DesertShiftLevel.CreateRocks(); Traffic = DesertShiftLevel.CreateTraffic(); }
             if (GetawayMode)
             {
+                Rocks = System.Array.ConvertAll(Rocks, rock => new DesertTrialRock(rock.Distance, rock.Phase, rock.Direction,
+                    rock.MotionSpeed * WorldShiftFlow.ObstacleMotionMultiplier, rock.Guarded, rock.MergeSide, rock.Airborne, rock.Radius));
                 Rocks = System.Array.FindAll(Rocks, r => !WorldShiftForkRoad.InMainFork(DesertShiftLevel.Length, r.Distance, 25f));
                 Traffic = System.Array.FindAll(Traffic, t => !WorldShiftForkRoad.InMainFork(DesertShiftLevel.Length, t.Start, 35f));
                 ActiveGates = System.Array.FindAll(ActiveGates, g => !WorldShiftForkRoad.InMainFork(DesertShiftLevel.Length, g.Start, 25f));
@@ -174,8 +185,9 @@ namespace Outlaws.WorldShift
             var road = new GameObject("Shared desert test road");
             road.transform.SetParent(transform, false);
             Route = road.AddComponent<WorldShiftRoute>();
+            Route.Environment = ShiftLevel.Desert;
             Route.SharedWorldRules = GetawayMode;
-            Route.Build(roadTemplate, true, RunLength, true, fullLevel ? DesertShiftLevel.Relays : null, GetawayMode ? WorldShiftGetaway.ExitTail : 0f);
+            Route.Build(roadTemplate, true, RunLength, true, fullLevel ? DesertShiftLevel.Relays : null, GetawayMode ? WorldShiftGetaway.TailLength : 0f);
             if (fullLevel) Relay = new WorldShiftRelay(Route, DesertShiftLevel.Relays, Speed);
             Player = new GameObject("Shared player - continuous between worlds").transform;
             Player.SetParent(transform, false);
@@ -242,6 +254,7 @@ namespace Outlaws.WorldShift
         public bool TrySwitch()
         {
             if (State != ShiftRunState.Running) return false;
+            if (GetawayMode && (Relay?.HoldingLanding(Distance, World) ?? false)) return false;
             ShiftWorld next = World == ShiftWorld.Day ? ShiftWorld.Echo : ShiftWorld.Day;
             World = next;
             Getaway?.OnWorldChanged();
@@ -337,7 +350,7 @@ namespace Outlaws.WorldShift
             if (IsAirborne) return;
             foreach (var gate in ActiveGates)
             {
-                bool visible = GetawayMode || gate.World == World;
+                bool visible = gate.VisibleIn(World, GetawayMode);
                 if (!WorldShiftCombat.IsActive(Combat, gate)) continue;
                 if (!visible || Distance + 1.5f < gate.Start || before - 1.5f > gate.End) continue;
                 float min = gate.HalfSide > 0 ? 0f : -5f, max = gate.HalfSide < 0 ? 0f : 5f;

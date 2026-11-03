@@ -25,28 +25,15 @@ namespace Outlaws.WorldShift
         public float SpeedMultiplier => BoostActive ? 1.2f : 1f;
         public float SteeringMultiplier => 1f;
         private readonly List<Mesh> meshes = new List<Mesh>();
-        private float shieldProtectionUntil, feedbackUntil;
-        private string feedback = "";
+        private float shieldProtectionUntil;
         public const float ShieldDistance = 44f;
         public const float ShieldLane = -3.2f;
         public WorldShiftBonusJump Jump { get; private set; }
-        public bool ShieldTaken { get; private set; }
-        public string Feedback => game.Duration < feedbackUntil ? feedback : "";
-        public string Hint => game.World == ShiftWorld.Day && !shieldTaken && !WorldShiftFlow.Escape.HasShield && Approaching(ShieldDistance)
-            ? "Shield left. Protection for the next obstacle."
-            : game.World == ShiftWorld.Day && !magnetTaken && Approaching(MagnetDistance)
-            ? "Magnet right. Pull in the upcoming loot."
-            : game.World == ShiftWorld.Day && !boostTaken && Approaching(BoostDistance)
-            ? "Boost left. Gain distance on the open branch."
-            : game.Distance >= Jump.Start - 56f && game.Distance < Jump.Start
-            ? "Drive up the ramp to jump." : Jump.OnRamp ? "Drive up the ramp to jump." : "";
-        private bool Approaching(float at) => game.Distance >= at - PreviewDistance && game.Distance < at - 2f;
-
         public void Bind(WorldShiftGetaway owner, WorldShiftRoute road, Transform player, float environmentEnd, Func<Color, Material> material)
         {
-            game = owner; route = road; Jump = new WorldShiftBonusJump(environmentEnd);
+            game = owner; route = road; Jump = new WorldShiftBonusJump(environmentEnd, !game.CashOutAvailable);
             // One of each per leg: protection early, magnet before loot, boost on the clear fork branch.
-            BoostDistance = road.Forks.ForkStart + 100f;
+            BoostDistance = road.Forks.ForkStart + WorldShiftForkRoad.BoostOffset;
             Material gold = material(new Color(1f, .76f, .25f));
             Material deck = material(new Color(.10f, .17f, .22f));
             Material cyan = material(new Color(.25f, .85f, 1f));
@@ -105,20 +92,20 @@ namespace Outlaws.WorldShift
             }
             if (!shieldTaken && Crosses(ShieldDistance, ShieldLane) && WorldShiftFlow.Escape.CollectShield())
             {
-                shieldTaken = ShieldTaken = true;
-                Say("Shield on.");
+                shieldTaken = true;
+
             }
             if (!magnetTaken && Crosses(MagnetDistance, MagnetLane))
             {
                 magnetTaken = true;
                 magnetUntil = game.Duration + MagnetDuration;
-                Say("Magnet on!");
+
             }
             if (!boostTaken && Crosses(BoostDistance, BoostLane))
             {
                 boostTaken = true;
                 boostUntil = game.Duration + BoostDuration;
-                Say("Boost!");
+
             }
             Refresh();
         }
@@ -130,7 +117,7 @@ namespace Outlaws.WorldShift
             if (collisionProtected || !WorldShiftFlow.Escape.AbsorbHit()) return false;
             // One obstacle field should not immediately charge another contact for the same hit.
             shieldProtectionUntil = game.Duration + RiskRunState.CollisionProtectionDuration;
-            Say("Shield saved you.");
+
             Refresh();
             return true;
         }
@@ -160,7 +147,6 @@ namespace Outlaws.WorldShift
             }
         }
 
-        private void Say(string text) { feedback = text; feedbackUntil = game.Duration + 2f; }
 
         private void BuildRamp(Material deck, Material gold)
         {

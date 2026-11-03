@@ -1,3 +1,5 @@
+> Scope: Legacy World game reference for `Env_OceanCoast`. Current `Ocean_WorldShift` uses the finite Day/Nightshift course; the surf mechanics below are not active there. See the [current documentation index](README.md).
+
 # Ocean Coast prototype
 
 Open `Assets/Scenes/Env_OceanCoast.unity` and press Play, then Enter to start. Turn off the standard driving tutorial with T if you want to try the coastal mechanics immediately. In the Editor or a development build, F9 cycles City → Snow → Ocean Coast → City during a real run. Normal timed portals can also lead to the coast.

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Outlaws.WorldShift
@@ -5,15 +6,46 @@ namespace Outlaws.WorldShift
     /// <summary>One readable silhouette for every solid road hazard, fitted to its existing footprint.</summary>
     public static class WorldShiftObstacleVisual
     {
-        public static Transform Build(Transform parent, Vector3 centre, Vector3 size)
+        /// <summary>Caches obstacle renderers once; palettes change only when the displayed mode changes.</summary>
+        public sealed class Palette
+        {
+            private readonly List<Renderer> bodies = new List<Renderer>();
+            private readonly List<Renderer> marks = new List<Renderer>();
+            private ShiftWorld? displayed;
+
+            public void Add(Transform root)
+            {
+                foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
+                    (renderer.name == "Obstacle block" ? bodies : marks).Add(renderer);
+                displayed = null;
+            }
+
+            public void SetWorld(ShiftWorld world)
+            {
+                if (displayed == world) return;
+                displayed = world;
+                bool night = world == ShiftWorld.Echo;
+                var body = RuntimeMaterials.Coloured(night ? new Color(.64f, .84f, .96f) : new Color(.48f, .16f, .14f));
+                var ink = RuntimeMaterials.Coloured(night ? new Color(.025f, .06f, .12f) : new Color(.96f, .96f, .94f));
+                // A small constant fill keeps the ice legible under Nightshift lighting; no flash or particles.
+                body.EnableKeyword("_EMISSION");
+                body.SetColor("_EmissionColor", night ? new Color(.64f, .84f, .96f) * .35f : Color.black);
+                ink.EnableKeyword("_EMISSION");
+                ink.SetColor("_EmissionColor", night ? Color.black : new Color(.96f, .96f, .94f) * .45f);
+                foreach (var renderer in bodies) renderer.sharedMaterial = body;
+                foreach (var renderer in marks) renderer.sharedMaterial = ink;
+            }
+        }
+
+        public static Transform Build(Transform parent, Vector3 centre, Vector3 size, Palette palette)
         {
             var root = new GameObject("X obstacle").transform;
             root.SetParent(parent, false);
             root.localPosition = centre;
             var body = RuntimeMaterials.Coloured(new Color(.48f, .16f, .14f));
-            var ink = RuntimeMaterials.Coloured(new Color(.99f, .92f, .74f));
+            var ink = RuntimeMaterials.Coloured(new Color(.96f, .96f, .94f));
             ink.EnableKeyword("_EMISSION");
-            ink.SetColor("_EmissionColor", new Color(.99f, .92f, .74f) * .45f);
+            ink.SetColor("_EmissionColor", new Color(.96f, .96f, .94f) * .45f);
             Cube(root, "Obstacle block", Vector3.zero, size, body);
             float halfX = Mathf.Min(size.x * .32f, 1.05f), halfY = size.y * .32f;
             foreach (float face in new[] { -1f, 1f })
@@ -23,6 +55,7 @@ namespace Outlaws.WorldShift
             float top = Mathf.Min(size.x, size.z) * .3f;
             Cross(root, new Vector3(0f, size.y * .5f + .035f, 0f),
                 new Vector3(top, 0f, top), new Vector3(top, 0f, -top), ink);
+            palette.Add(root);
             return root;
         }
 

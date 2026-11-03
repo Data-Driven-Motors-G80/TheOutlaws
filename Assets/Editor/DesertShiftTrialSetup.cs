@@ -7,7 +7,7 @@ using UnityEngine.Rendering.Universal;
 public static class DesertShiftTrialSetup
 {
     public const string ScenePath = "Assets/Scenes/Desert_WorldShiftTrial.unity";
-    [MenuItem("The Outlaws/World Shift/Open Desert Rock Freeze Trial")]
+    [MenuItem("The Outlaws/World Shift/Validation/Open Desert Freeze Trial")]
     public static void Open()
     {
         if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;

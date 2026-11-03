@@ -7,7 +7,7 @@ using UnityEngine;
 // Explicit editor command: never changes an open scene automatically.
 public static class OutlawsSceneSetup
 {
-    [MenuItem("The Outlaws/Apply Gameplay Layout to Current Scene")]
+    [MenuItem("The Outlaws/Legacy World/Apply Gameplay Layout to Current Scene")]
     public static void Apply()
     {
         var scene = EditorSceneManager.GetActiveScene();

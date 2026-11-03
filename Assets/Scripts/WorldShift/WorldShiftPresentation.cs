@@ -17,7 +17,6 @@ namespace Outlaws.WorldShift
             public Transform Root;
             public Chunk Chunk;
         }
-        private sealed class NightReflector { public Renderer Surface; public Color Colour; }
         private sealed class PedestrianView
         {
             public ShiftHazard Hazard;
@@ -29,9 +28,8 @@ namespace Outlaws.WorldShift
         private readonly List<HazardView> hazards = new List<HazardView>();
         private readonly List<GameObject> nightLamps = new List<GameObject>();
         private readonly List<GameObject> fuelModels = new List<GameObject>();
-        private readonly List<Mesh> spikeMeshes = new List<Mesh>();
+        private readonly List<Mesh> generatedMeshes = new List<Mesh>();
         private WorldShiftCity game;
-        private GameObject obstaclePrefab, policePrefab, streetlightPrefab, fuelPrefab;
         private WorldShiftRoute route;
         private Camera view;
         private Light sun;
@@ -41,32 +39,22 @@ namespace Outlaws.WorldShift
         private WorldShiftRoadside roadside;
         private WorldShiftConvergence convergence;
         private WorldShiftRelayVisuals relayVisuals;
+        private readonly WorldShiftObstacleVisual.Palette obstaclePalette = new WorldShiftObstacleVisual.Palette();
         private readonly List<Material> ownedMaterials = new List<Material>();
-        private readonly List<NightReflector> nightReflectors = new List<NightReflector>();
         private readonly List<PedestrianView> pedestrians = new List<PedestrianView>();
-        private readonly Dictionary<Color, Material> reflectorMaterials = new Dictionary<Color, Material>();
         private readonly Dictionary<(Color, float), Material> glowMaterials = new Dictionary<(Color, float), Material>();
-        private readonly Dictionary<Material, Material> obstacleGlowMaterials = new Dictionary<Material, Material>();
-        private MaterialPropertyBlock reflectorProperties;
-        private static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
-        private Material warmEdge, coldEdge;
         private ShiftWorld world;
 
-        public void Build(WorldShiftCity controller, WorldShiftRoute sharedRoute, Transform player, Camera camera, Light directional,
-            GameObject obstacle, GameObject police, GameObject streetlight, GameObject fuel)
+        public void Build(WorldShiftCity controller, WorldShiftRoute sharedRoute, Transform player, Camera camera, Light directional)
         {
             game = controller;
-            reflectorProperties = new MaterialPropertyBlock();
-            obstaclePrefab = obstacle; policePrefab = police; streetlightPrefab = streetlight; fuelPrefab = fuel;
             route = sharedRoute; view = camera; sun = directional;
-            warmEdge = RuntimeMaterials.Coloured(new Color(1f, 0.72f, 0.3f));
-            coldEdge = RuntimeMaterials.Coloured(new Color(0.2f, 0.85f, 1f));
             BuildHeadlight(player);
             roadside = gameObject.AddComponent<WorldShiftRoadside>();
-            roadside.Build(route);
+            roadside.Build(route, game.Environment);
             convergence = gameObject.AddComponent<WorldShiftConvergence>();
             convergence.BuildWallsOnly(route);
-            if (!game.SplitViewValidation && !game.TutorialLevel)
+            if (!game.SplitViewValidation)
             {
                 relayVisuals = gameObject.AddComponent<WorldShiftRelayVisuals>();
                 relayVisuals.Build(game, route);
@@ -74,7 +62,28 @@ namespace Outlaws.WorldShift
             foreach (ShiftHazard hazard in game.Hazards) BuildHazard(hazard);
             BuildFuel();
             BuildCheckpoints();
+            BuildCoastalBridge();
             UpdateVisibility(0f);
+        }
+
+        private void BuildCoastalBridge()
+        {
+            if (!game.GetawayMode || game.Environment != ShiftLevel.Ocean) return;
+            var day = RuntimeMaterials.Coloured(new Color(.65f, .75f, .78f));
+            var night = RuntimeMaterials.Coloured(new Color(.32f, .43f, .5f));
+            for (float at = 820f; at < 1000f; at += 8f)
+            {
+                var point = route.Sample(at);
+                var root = new GameObject("Coastal bridge edges").transform;
+                root.SetParent(transform, false);
+                root.SetPositionAndRotation(point.Position, Quaternion.LookRotation(point.Forward, point.Up));
+                foreach (float side in new[] { -1f, 1f })
+                {
+                    var rail = Box(root, "Bridge edge", new Vector3(side * 5.3f, .45f, 0f), new Vector3(.12f, .7f, 7.8f), day);
+                    palette.Add(new PaletteItem { Renderer = rail, Day = day, Echo = night });
+                }
+                chunks.Add(new Chunk { Root = root.gameObject, At = at, End = at + 8f });
+            }
         }
 
         private void BuildHazard(ShiftHazard data)
@@ -106,15 +115,17 @@ namespace Outlaws.WorldShift
                     frame.SetParent(solid.transform, false);
                     var sample = route.Sample(at);
                     frame.SetPositionAndRotation(sample.Position, Quaternion.LookRotation(sample.Forward, sample.Up));
-                    if (data.Kind == ShiftHazardKind.HalfBarrier)
-                        WorldShiftObstacleVisual.Build(frame, new Vector3(data.HalfSide * 2.5f, .9f, 0f), new Vector3(5f, 1.8f, length));
+                    if (data.Kind == ShiftHazardKind.SwitchWall)
+                        WorldShiftObstacleVisual.Build(frame, new Vector3(0f, .9f, 0f), new Vector3(WorldShiftLevel.RoadWidth, 1.8f, length), obstaclePalette);
+                    else if (data.Kind == ShiftHazardKind.HalfBarrier)
+                        WorldShiftObstacleVisual.Build(frame, new Vector3(data.HalfSide * 2.5f, .9f, 0f), new Vector3(5f, 1.8f, length), obstaclePalette);
                     else if (data.Kind == ShiftHazardKind.Divider)
-                        WorldShiftObstacleVisual.Build(frame, new Vector3(0f, .9f, 0f), new Vector3(3.05f, 1.8f, length));
+                        WorldShiftObstacleVisual.Build(frame, new Vector3(0f, .9f, 0f), new Vector3(3.05f, 1.8f, length), obstaclePalette);
                     else for (int lane = 0; lane < 3; lane++)
                     {
                         if ((data.LaneMask & (1 << lane)) == 0) continue;
                         float x = (lane - 1) * WorldShiftLevel.RoadWidth / 3f;
-                        WorldShiftObstacleVisual.Build(frame, new Vector3(x, .9f, 0f), new Vector3(data.LateralMotion ? 1.6f : 3.05f, 1.8f, length));
+                        WorldShiftObstacleVisual.Build(frame, new Vector3(x, .9f, 0f), new Vector3(data.LateralMotion ? 1.6f : 3.05f, 1.8f, length), obstaclePalette);
                     }
                 }
             }
@@ -175,6 +186,7 @@ namespace Outlaws.WorldShift
         public void SetWorld(ShiftWorld next)
         {
             world = next;
+            obstaclePalette.SetWorld(next);
             bool day = world == ShiftWorld.Day;
             foreach (var item in palette) item.Renderer.sharedMaterial = day ? item.Day : item.Echo;
             RefreshHazards();
@@ -198,6 +210,9 @@ namespace Outlaws.WorldShift
             RenderSettings.fogStartDistance = day ? 140f : 48f;
             RenderSettings.fogEndDistance = day ? 260f : 150f;
             Color sky = day ? new Color(0.57f, 0.7f, 0.79f) : new Color(0.065f, 0.10f, 0.155f);
+            if (game.Environment == ShiftLevel.Ocean) sky = day ? new Color(.48f, .72f, .8f) : new Color(.025f, .07f, .13f);
+            if (game.Environment == ShiftLevel.Snow) sky = day ? new Color(.74f, .82f, .89f) : new Color(.08f, .14f, .23f);
+            if (game.Environment == ShiftLevel.Mountain) sky = day ? new Color(.57f, .65f, .7f) : new Color(.06f, .09f, .13f);
             RenderSettings.fogColor = sky;
             view.clearFlags = CameraClearFlags.SolidColor;
             view.backgroundColor = sky;
@@ -214,8 +229,8 @@ namespace Outlaws.WorldShift
                 foreach (ShiftHazard hazard in game.Hazards)
                     if (hazard.World == world && hazard.Kind == ShiftHazardKind.Gap && hazard.End > distance)
                         clearRoad = Mathf.Min(clearRoad, Mathf.Max(0f, hazard.Start - distance - 4f));
-                if (!game.SplitViewValidation && !game.TutorialLevel)
-                    foreach (var jump in WorldShiftRelay.Sections)
+                if (!game.SplitViewValidation)
+                    foreach (var jump in game.RelayLayout)
                     {
                         float edge = world == jump.Source ? jump.Takeoff : jump.Ramp;
                         float end = world == jump.Source ? jump.End : jump.Landing;
@@ -227,7 +242,7 @@ namespace Outlaws.WorldShift
             if (relayVisuals != null) relayVisuals.Refresh(distance);
             foreach (var hazard in hazards)
             {
-                if (hazard.Data.Kind != ShiftHazardKind.Oncoming) continue;
+                if (hazard.Data.Kind != ShiftHazardKind.Oncoming && !hazard.Data.LateralMotion) continue;
                 hazard.Data.BoundsAt(distance, out float start, out float end);
                 RoadPathPoint point = route.Sample((start + end) * .5f);
                 hazard.Root.SetPositionAndRotation(point.Position + point.Right * hazard.Data.LateralOffset, Quaternion.LookRotation(point.Forward, point.Up));
@@ -246,7 +261,6 @@ namespace Outlaws.WorldShift
                 hazard.Ghost.SetActive(preview);
             }
             if (game.IsMerged) RefreshFuel();
-            UpdateNightReflectors();
         }
 
         public void OnHazardImpact(ShiftHazard hit, float lateral)
@@ -267,124 +281,6 @@ namespace Outlaws.WorldShift
             foreach (PedestrianView person in pedestrians) person.Figure.RestoreStanding();
         }
 
-        private void AddFaintObstacleGlow(Transform parent)
-        {
-            foreach (Renderer surface in parent.GetComponentsInChildren<Renderer>())
-            {
-                if (surface.GetComponentInParent<WorldShiftRoadSigns>() != null
-                    || surface.name == "Night zebra stripe" || surface.name.StartsWith("Crossing sign")) continue;
-                Material[] materials = surface.sharedMaterials;
-                for (int index = 0; index < materials.Length; index++)
-                {
-                    Material original = materials[index];
-                    if (original == null || !original.HasProperty("_BaseColor") || !original.HasProperty(EmissionId)) continue;
-                    // Preserve existing police beacons and other intentional lights.
-                    if (original.IsKeywordEnabled("_EMISSION") && original.GetColor(EmissionId).maxColorComponent > .03f) continue;
-                    if (!obstacleGlowMaterials.TryGetValue(original, out Material glow))
-                    {
-                        glow = new Material(original) { name = "Night obstacle faint self light" };
-                        glow.EnableKeyword("_EMISSION");
-                        glow.SetColor(EmissionId, original.GetColor("_BaseColor") * .10f);
-                        ownedMaterials.Add(glow);
-                        obstacleGlowMaterials.Add(original, glow);
-                    }
-                    materials[index] = glow;
-                }
-                surface.sharedMaterials = materials;
-            }
-        }
-
-        private void BuildNightReflectors(Transform parent, ShiftHazard data)
-        {
-            Color white = new Color(.92f, .96f, 1f), yellow = new Color(1f, .8f, .22f);
-            float depth = data.End - data.Start;
-            // Mark the existing shapes rather than brightening whole obstacles.
-            foreach (Renderer surface in parent.GetComponentsInChildren<Renderer>())
-            {
-                if (surface.name == "Barrier reflector" || surface.name == "White cliff reflector"
-                    || surface.name == "Crossing sign") RegisterNightReflector(surface, white);
-                else if (surface.name == "Spike strip warning") RegisterNightReflector(surface, yellow);
-                else if ((surface.name == "Warning-striped cliff lip" || surface.name == "Broken deck hazard lip") && surface.sharedMaterial.color.r > .4f)
-                    RegisterNightReflector(surface, yellow);
-            }
-            if (data.Kind == ShiftHazardKind.Pedestrians)
-            {
-                foreach (Transform person in parent.GetComponentsInChildren<Transform>())
-                    if (person.name == "Grey prototype pedestrian")
-                    {
-                        RegisterNightReflector(Box(person, "Reflective chest band", new Vector3(0f, 1.2f, -.17f),
-                            new Vector3(.47f, .20f, .045f), coldEdge), yellow);
-                        RegisterNightReflector(Box(person, "Reflective head marker", new Vector3(0f, 1.77f, -.19f),
-                            new Vector3(.39f, .10f, .045f), coldEdge), white);
-                        foreach (float side in new[] { -1f, 1f })
-                            RegisterNightReflector(Box(person, "Reflective lower leg band", new Vector3(side * .13f, .36f, -.16f),
-                                new Vector3(.19f, .16f, .045f), coldEdge), yellow);
-                    }
-                return;
-            }
-            if (data.Kind != ShiftHazardKind.Police && data.Kind != ShiftHazardKind.Oncoming
-                && data.Kind != ShiftHazardKind.Fire) return;
-            for (int lane = 0; lane < 3; lane++)
-            {
-                if ((data.LaneMask & (1 << lane)) == 0) continue;
-                float x = (lane - 1) * WorldShiftLevel.RoadWidth / 3f;
-                if (data.Kind == ShiftHazardKind.Police)
-                {
-                    foreach (float z in new[] { -depth * .25f, depth * .25f })
-                        RegisterNightReflector(Box(parent, "Police reflective bumper", new Vector3(x, .62f, z - 1.76f),
-                            new Vector3(1.8f, .2f, .045f), coldEdge), yellow);
-                }
-                else if (data.Kind == ShiftHazardKind.Oncoming)
-                    RegisterNightReflector(Box(parent, "Oncoming reflective bumper", new Vector3(x, .43f, -1.76f),
-                        new Vector3(1.8f, .17f, .045f), coldEdge), yellow);
-                else
-                    RegisterNightReflector(Box(parent, "Fire closure reflective edge", new Vector3(x, .3f, -depth * .5f - .035f),
-                        new Vector3(3.1f, .24f, .06f), coldEdge), white);
-            }
-        }
-
-        private void RegisterNightReflector(Renderer surface, Color colour)
-        {
-            if (!reflectorMaterials.TryGetValue(colour, out Material material))
-            {
-                material = new Material(RuntimeMaterials.Coloured(colour));
-                material.name = "Night reflective tape";
-                material.SetFloat("_Metallic", .05f);
-                material.SetFloat("_Smoothness", .7f);
-                material.EnableKeyword("_EMISSION");
-                material.SetColor(EmissionId, colour * .14f);
-                ownedMaterials.Add(material);
-                reflectorMaterials.Add(colour, material);
-            }
-            surface.sharedMaterial = material;
-            nightReflectors.Add(new NightReflector { Surface = surface, Colour = colour });
-        }
-
-        private void UpdateNightReflectors()
-        {
-            bool illuminated = world == ShiftWorld.Echo && playerHeadlight != null && playerHeadlight.isActiveAndEnabled;
-            float outer = playerHeadlight != null ? Mathf.Cos(playerHeadlight.spotAngle * .5f * Mathf.Deg2Rad) : 1f;
-            float inner = playerHeadlight != null ? Mathf.Cos(playerHeadlight.innerSpotAngle * .5f * Mathf.Deg2Rad) : 1f;
-            foreach (NightReflector reflector in nightReflectors)
-            {
-                if (!reflector.Surface.gameObject.activeInHierarchy) continue;
-                float brightness = world == ShiftWorld.Echo ? .14f : 0f;
-                if (illuminated)
-                {
-                    Vector3 ray = reflector.Surface.bounds.center - playerHeadlight.transform.position;
-                    float distance = ray.magnitude;
-                    float alignment = distance > .01f ? Vector3.Dot(ray / distance, playerHeadlight.transform.forward) : 1f;
-                    float cone = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(outer, inner, alignment));
-                    float range = 1f - Mathf.InverseLerp(12f, playerHeadlight.range, distance);
-                    brightness += cone * range * range * 3.2f;
-                }
-                // Simulated retroreflection follows the real lamp's cone and range;
-                // outside it, only a faint baseline remains to outline the hazard.
-                reflectorProperties.SetColor(EmissionId, reflector.Colour * brightness);
-                reflector.Surface.SetPropertyBlock(reflectorProperties);
-            }
-        }
-
         private void RefreshHazards()
         {
             foreach (var hazard in hazards)
@@ -397,42 +293,6 @@ namespace Outlaws.WorldShift
         }
 
         private bool ShouldPreview(HazardView hazard, float distance) => false;
-
-        private static void BuildCrossing(Transform parent, ShiftHazard data)
-        {
-            float depth = data.End - data.Start;
-            Material white = RuntimeMaterials.Coloured(new Color(.88f, .9f, .92f));
-            Material grey = RuntimeMaterials.Coloured(new Color(.58f, .6f, .62f));
-            Material dark = RuntimeMaterials.Coloured(new Color(.28f, .3f, .33f));
-            // A real transverse zebra crossing, not a solid slab over the road.
-            for (float x = -4.65f; x <= 4.7f; x += .8f)
-                Box(parent, "Night zebra stripe", new Vector3(x, .035f, 0f), new Vector3(.42f, .06f, depth + 1f), white);
-            foreach (float side in new[] { -1f, 1f })
-            {
-                Box(parent, "Crossing sign post", new Vector3(side * 5.55f, 1f, -depth * .5f), new Vector3(.12f, 2f, .12f), dark);
-                Box(parent, "Crossing sign", new Vector3(side * 5.55f, 2f, -depth * .5f), new Vector3(.8f, .6f, .12f), white);
-            }
-            for (int lane = 0; lane < 3; lane++)
-            {
-                if ((data.LaneMask & (1 << lane)) == 0) continue;
-                for (int n = 0; n < 3; n++)
-                {
-                    var person = new GameObject("Grey prototype pedestrian").transform;
-                    person.SetParent(parent, false);
-                    person.localPosition = new Vector3((lane - 1) * WorldShiftLevel.RoadWidth / 3f + (n - 1) * 1.05f, 0f,
-                        (n - 1) * .28f);
-                    Box(person, "Torso", new Vector3(0f, 1.12f, 0f), new Vector3(.43f, .7f, .3f), grey);
-                    Renderer head = Box(person, "Head", new Vector3(0f, 1.68f, 0f), new Vector3(.37f, .38f, .35f), grey);
-                    head.transform.localRotation = Quaternion.Euler(0f, lane * 8f - 8f, 0f);
-                    foreach (float side in new[] { -1f, 1f })
-                    {
-                        Renderer arm = Box(person, "Arm", new Vector3(side * .3f, 1.1f, 0f), new Vector3(.13f, .64f, .15f), grey);
-                        arm.transform.localRotation = Quaternion.Euler(0f, 0f, side * 9f);
-                        Box(person, "Leg", new Vector3(side * .13f, .4f, side * .06f), new Vector3(.16f, .7f, .2f), dark);
-                    }
-                }
-            }
-        }
 
         private void BuildFuel()
         {
@@ -457,46 +317,6 @@ namespace Outlaws.WorldShift
         {
             for (int i = 0; i < fuelModels.Count; i++)
                 fuelModels[i].SetActive((game.GetawayMode ? world == ShiftWorld.Day : game.Pickups[i].World == world) && !game.IsFuelCollected(i));
-        }
-
-        private void SpikeStrip(Transform parent, float x, float depth)
-        {
-            var vertices = new List<Vector3>();
-            var triangles = new List<int>();
-            for (int row = 0; row < 4; row++)
-                for (int column = 0; column < 6; column++)
-                {
-                    Vector3 centre = new Vector3(x + (column - 2.5f) * .49f, .2f, (row - 1.5f) * depth / 4f);
-                    Vector3[] corners = { new Vector3(-.19f, 0f, -.19f), new Vector3(.19f, 0f, -.19f),
-                        new Vector3(.19f, 0f, .19f), new Vector3(-.19f, 0f, .19f) };
-                    for (int face = 0; face < 4; face++)
-                    {
-                        int first = vertices.Count;
-                        vertices.Add(centre + corners[face]);
-                        vertices.Add(centre + Vector3.up * .7f);
-                        vertices.Add(centre + corners[(face + 1) % 4]);
-                        triangles.Add(first); triangles.Add(first + 1); triangles.Add(first + 2);
-                    }
-                }
-            var mesh = new Mesh { name = "Prototype police spike strip" };
-            mesh.SetVertices(vertices); mesh.SetTriangles(triangles, 0); mesh.RecalculateNormals(); mesh.RecalculateBounds();
-            spikeMeshes.Add(mesh);
-            var strip = new GameObject("Metal spikes", typeof(MeshFilter), typeof(MeshRenderer));
-            strip.transform.SetParent(parent, false);
-            strip.GetComponent<MeshFilter>().sharedMesh = mesh;
-            strip.GetComponent<Renderer>().sharedMaterial = RuntimeMaterials.Coloured(new Color(.88f, .91f, .94f));
-        }
-
-        private static GameObject Visual(GameObject prefab, Transform parent, Vector3 position, Vector3 scale)
-        {
-            GameObject instance = Instantiate(prefab, parent);
-            instance.transform.localPosition = position;
-            instance.transform.localRotation = Quaternion.identity;
-            instance.transform.localScale = scale;
-            foreach (Collider collider in instance.GetComponentsInChildren<Collider>()) collider.enabled = false;
-            // Visual reuse only: the finite controller owns pickup/collision rules.
-            foreach (MonoBehaviour behaviour in instance.GetComponentsInChildren<MonoBehaviour>()) behaviour.enabled = false;
-            return instance;
         }
 
         private void BuildHeadlight(Transform player)
@@ -556,7 +376,7 @@ namespace Outlaws.WorldShift
             }
             var mesh = new Mesh { name = "Soft prototype headlight cone" };
             mesh.SetVertices(vertices); mesh.SetColors(colours); mesh.SetTriangles(triangles, 0); mesh.RecalculateBounds();
-            spikeMeshes.Add(mesh);
+            generatedMeshes.Add(mesh);
             headlightHaze = new GameObject("Headlight atmosphere", typeof(MeshFilter), typeof(MeshRenderer));
             headlightHaze.transform.SetParent(lamp, false);
             headlightHaze.GetComponent<MeshFilter>().sharedMesh = mesh;
@@ -580,13 +400,8 @@ namespace Outlaws.WorldShift
 
         private void OnDestroy()
         {
-            foreach (Mesh mesh in spikeMeshes) if (mesh != null) Destroy(mesh);
+            foreach (Mesh mesh in generatedMeshes) if (mesh != null) Destroy(mesh);
             foreach (Material material in ownedMaterials) if (material != null) Destroy(material);
-        }
-
-        private void Tint(Renderer renderer, Color day, Color echo)
-        {
-            palette.Add(new PaletteItem { Renderer = renderer, Day = RuntimeMaterials.Coloured(day), Echo = RuntimeMaterials.Coloured(echo) });
         }
 
         private static Renderer Box(Transform parent, string name, Vector3 position, Vector3 size, Material material)

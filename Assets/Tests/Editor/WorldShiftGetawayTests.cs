@@ -95,7 +95,7 @@ public sealed class WorldShiftGetawayTests
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
         yield return new EnterPlayMode();
         Capture("menu");
-        UnityEngine.Object.FindObjectsByType<UnityEngine.UI.Button>(FindObjectsSortMode.None).Single(b => b.name == "Start tutorial").onClick.Invoke();
+        UnityEngine.Object.FindObjectsByType<UnityEngine.UI.Button>(FindObjectsSortMode.None).Single(b => b.name == "Tutorial").onClick.Invoke();
         yield return null; yield return null;
         var tutorial = Find("WorldShiftCity"); tutorial.enabled = false;
         Assert.That(Get(tutorial, "TutorialLevel"), Is.True);
@@ -121,10 +121,14 @@ public sealed class WorldShiftGetawayTests
         Call(city, "RetryCheckpoint"); Assert.That(Get(city, "State").ToString(), Is.EqualTo("Paused"));
         Call(city, "TogglePause");
         Capture("city-loot");
-        float end = (float)Get(city, "RunLength");
-        Pose(city, end - 90f, -3.2f); yield return null;
-        Capture("exit-choice");
-        Call(city, "StepSimulation", 4f, 0f, false); yield return null;
+        // City continues automatically; the first cash-out side exit is at the end of Desert.
+        Pose(city, (float)Get(city, "RunLength") - 5f, 0f);
+        Call(city, "StepSimulation", .4f, 0f, false); yield return null; yield return null;
+        var desert = Find("DesertShiftTrial"); desert.enabled = false;
+        getawayHud = Find("WorldShiftGetaway");
+        drivingHud = (GameObject)getawayHud.GetType().GetField("drivingHud", Flags).GetValue(getawayHud);
+        Pose(desert, (float)Get(desert, "RunLength") - 5f, -3.2f);
+        Call(desert, "StepSimulation", .4f, 0f, false); Call(getawayHud, "Refresh");
         Assert.That(Run.Status, Is.EqualTo(GetawayRunState.RunStatus.Banked));
         int total = PlayerPrefs.GetInt("WorldShift.Getaway.Bank");
         Assert.That(total, Is.EqualTo(bank + 300));
@@ -136,7 +140,7 @@ public sealed class WorldShiftGetawayTests
     }
 
     [UnityTest]
-    public IEnumerator CompleteCityEscapeWithLootAndBankThroughTheExitLane()
+    public IEnumerator CompleteCityEscapeAutomaticallyKeepsItsCarriedLoot()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
         yield return new EnterPlayMode();
@@ -147,20 +151,20 @@ public sealed class WorldShiftGetawayTests
         for (int i = 0; i < 3400 && Get(game, "State").ToString() == "Running"; i++)
         {
             float d = (float)Get(game, "Distance");
-            string desired = d < 660f ? "Day" : d < 800f ? "Echo" : d < 1708f ? "Day"
-                : d < 1800f ? "Echo" : d < 2360f ? "Day" : d < 2524f ? "Echo" : "Day";
+            bool freezeEncounter = d >= 170f && d < 310f || d >= 670f && d < 870f;
+            string desired = freezeEncounter || d >= 1040f && d < 1180f ? "Echo" : "Day";
             if (!(bool)Get(game, "IsMerged") && Get(game, "World").ToString() != desired) Call(game, "TrySwitch");
-            float target = d > 3380f ? -3.2f : EscapeSafeLane(game, d);
+            float target = d >= 360f && d < 700f || d > 1460f ? -3.2f : EscapeSafeLane(game, d);
             Call(game, "StepSimulation", .05f, Mathf.Clamp((target - (float)Get(game, "Lateral")) * 2f, -1f, 1f), false);
             Assert.That(Get(game, "Hits"), Is.EqualTo(0), "Unexpected collision at " + d + " lateral=" + Get(game, "Lateral") + " target=" + target);
             Assert.That(Get(game, "State").ToString(), Is.Not.EqualTo("Lost"), "Escape failed at " + d);
-            if (!pictured && d > 3450f) { Capture("full-run-exit"); pictured = true; }
+            if (!pictured && d > 1530f) { Capture("full-run-exit"); pictured = true; }
         }
         Assert.That(Get(game, "State").ToString(), Is.EqualTo("Won"));
-        Assert.That(Run.Status, Is.EqualTo(GetawayRunState.RunStatus.Banked));
-        Assert.That(Run.SettledHaul, Is.GreaterThanOrEqualTo(300));
-        Assert.That(PlayerPrefs.GetInt("WorldShift.Getaway.Bank"), Is.EqualTo(bank + Run.SettledHaul));
-        Assert.That((float)Get(game, "Duration"), Is.GreaterThan(115f));
+        Assert.That(Run.Status, Is.EqualTo(GetawayRunState.RunStatus.Running));
+        Assert.That(Run.Carried, Is.GreaterThanOrEqualTo(300));
+        Assert.That(PlayerPrefs.GetInt("WorldShift.Getaway.Bank"), Is.EqualTo(bank));
+        Assert.That((float)Get(game, "Duration"), Is.InRange(55f, 65f), "The short ordinary transition removes the old finishing straight.");
     }
 
     [UnityTest]
@@ -185,7 +189,7 @@ public sealed class WorldShiftGetawayTests
         Pose(desert, (float)Get(desert, "RunLength") - 5f, 3.3f);
         Call(desert, "StepSimulation", .3f, 0f, false);
         yield return null; yield return null;
-        Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo("City_WorldShift"));
+        Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo("Ocean_WorldShift"));
         Assert.That(Run.Leg, Is.EqualTo(2));
         int haul = Run.Carried;
         city = Find("WorldShiftCity"); city.enabled = false;
@@ -277,7 +281,7 @@ public sealed class WorldShiftGetawayTests
         Pose(city, 35f, -3.2f); Call(city, "StepSimulation", .5f, 0f, false);
         Assert.That(Run.HasShield, Is.True);
         float cityGap = (float)Get(city, "PursuitGap");
-        Call(city, "TrySwitch"); Pose(city, 105f, -3.2f); Call(city, "TrySwitch");
+        Call(city, "TrySwitch"); Pose(city, 1262f, -3.2f); Call(city, "TrySwitch");
         Assert.That(Get(city, "PursuitGap"), Is.EqualTo(cityGap));
         Assert.That(Run.HasShield, Is.False);
         Assert.That(Get(city, "Hits"), Is.EqualTo(0));
@@ -380,7 +384,7 @@ public sealed class WorldShiftGetawayTests
         var prompt = (TMP_Text)hud.GetType().GetField("guidance", Flags).GetValue(hud);
         var driving = (GameObject)hud.GetType().GetField("drivingHud", Flags).GetValue(hud);
         Call(hud, "Refresh");
-        Assert.That(prompt.text, Is.EqualTo("Collect cash. Take the left exit to keep it."));
+        Assert.That(prompt.text, Is.EqualTo("Collect cash. Bank it at a marked cash-out exit."));
         Assert.That(driving.GetComponentsInChildren<TMP_Text>(true).Any(t => t.text.Contains("A / D to steer")), Is.False);
         Assert.That(driving.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Chase goal"), Is.False);
         Assert.That(prompt.fontSizeMin, Is.GreaterThanOrEqualTo(24f));
@@ -401,11 +405,11 @@ public sealed class WorldShiftGetawayTests
         Call(Get(hud, "Extras"), "Collect", 42f, 46f, -3.2f, -3.2f);
         Pose(game, 60f, 0f);
         Call(hud, "Refresh");
-        Assert.That(prompt.text, Is.EqualTo("Collect cash. Take the left exit to keep it."), "A shared obstacle cannot be removed by switching worlds.");
+        Assert.That(prompt.text, Is.EqualTo("Collect cash. Bank it at a marked cash-out exit."), "A shared obstacle cannot be removed by switching worlds.");
         Assert.That(driving.GetComponentsInChildren<TMP_Text>().Any(t => t.text == "They're close!"), Is.False);
         Capture("hud-clean-road-cue");
         Pose(game, 220f, 0f); Call(hud, "Refresh");
-        Assert.That(prompt.text, Is.Empty);
+        Assert.That(prompt.text, Is.EqualTo("Space: clear the Day barrier."));
         prompt.ForceMeshUpdate();
         Assert.That(prompt.isTextOverflowing, Is.False);
         Capture("hud-freeze-timing");
@@ -416,7 +420,7 @@ public sealed class WorldShiftGetawayTests
         Call(game, "TogglePause");
         Pose(game, (float)Get(game, "RunLength") - 90f, -3.2f);
         Call(hud, "Refresh");
-        Assert.That(prompt.gameObject.activeInHierarchy, Is.False, "Exit choices replace the guidance prompt.");
+        Assert.That(prompt.text, Is.EqualTo("Desert ahead."), "Ordinary environment changes need no route choice.");
         Capture("hud-clean-exit");
 
         Flow("FinishGetawayLeg", true); yield return null; yield return null;
@@ -438,7 +442,7 @@ public sealed class WorldShiftGetawayTests
         var prompt = (TMP_Text)hud.GetType().GetField("guidance", Flags).GetValue(hud);
         var panel = (RectTransform)prompt.transform.parent;
         void TimeAt(float time) => game.GetType().GetProperty("Duration", Flags).SetValue(game, time);
-        Pose(game, 400f, 0f); TimeAt(10f); Call(hud, "Refresh");
+        Pose(game, 1230f, -3.2f); TimeAt(10f); Call(hud, "Refresh");
         Assert.That(prompt.text, Is.Empty, "Brief shooting opportunities do not flash immediately.");
         TimeAt(10.2f); Call(hud, "Refresh"); Assert.That(prompt.text, Is.Empty);
         TimeAt(10.5f); Call(hud, "Refresh");
@@ -446,22 +450,22 @@ public sealed class WorldShiftGetawayTests
         float width = panel.sizeDelta.x;
         for (int i = 0; i < 4; i++)
         {
-            Pose(game, 400f, i % 2 == 0 ? 3.2f : 0f);
+            Pose(game, 1230f, i % 2 == 0 ? 0f : -3.2f);
             TimeAt(10.6f + i * .1f); Call(hud, "Refresh");
             Assert.That(prompt.text, Is.EqualTo("F / click to shoot the block."), "Small aim changes must not flicker the caption.");
             Assert.That(panel.sizeDelta.x, Is.EqualTo(width));
         }
-        Pose(game, 400f, 0f); TimeAt(11f); Call(combat, "TryShoot"); Call(hud, "Refresh");
+        Pose(game, 1230f, -3.2f); TimeAt(11f); Call(combat, "TryShoot"); Call(hud, "Refresh");
         Assert.That(prompt.text, Is.Empty, "A completed shot clears its hint immediately.");
-        Pose(game, 580f, 0f); Call(hud, "Refresh");
+        Pose(game, 960f, 0f); Call(hud, "Refresh");
         Assert.That(prompt.text, Is.EqualTo("Drive up the ramp to jump."), "Jump instructions preempt the quiet interval.");
-        Pose(game, 650f, 0f); Call(game, "StepSimulation", .5f, 0f, false); Call(hud, "Refresh");
+        Pose(game, 1030f, 0f); Call(game, "StepSimulation", .5f, 0f, false); Call(hud, "Refresh");
         Assert.That(prompt.text, Is.EqualTo("Space to land in Nightshift."));
         Call(game, "TrySwitch");
         TimeAt((float)Get(game, "Duration") + 12.1f); Call(hud, "Refresh");
-        Assert.That(prompt.text, Is.EqualTo("Stay in Nightshift until the road rejoins."), "An optional reminder cannot cover a landing instruction.");
+        Assert.That(prompt.text, Is.EqualTo("Stay in Nightshift. Day has no road yet."), "An optional reminder cannot cover a landing instruction.");
         Assert.That(panel.sizeDelta.x, Is.EqualTo(width));
-        Pose(game, 801f, 0f); Call(game, "StepSimulation", .025f, 0f, false); Call(hud, "Refresh");
+        Pose(game, 1229f, 0f); Call(game, "StepSimulation", .025f, 0f, false); Call(hud, "Refresh");
         Assert.That(prompt.text, Is.Empty, "A quiet interval separates action instructions from informational tips.");
         float now = (float)Get(game, "Duration");
         for (int i = 0; i < 3; i++)
@@ -478,8 +482,8 @@ public sealed class WorldShiftGetawayTests
         Assert.That(prompt.text, Is.Empty, "Old objectives and tips are never replayed after a critical action.");
         Call(Get(hud, "Extras"), "Collect", 148f, 152f, 3.2f, 3.2f); Call(hud, "Refresh");
         Assert.That(prompt.text, Is.Empty, "Power-up acknowledgements do not compete with road guidance.");
-        Pose(game, 3570f, 0f); Call(hud, "Refresh");
-        Assert.That(prompt.text, Is.Empty, "Exit choices replace the driving prompt completely.");
+        Pose(game, (float)Get(game, "RunLength") - 90f, 0f); Call(hud, "Refresh");
+        Assert.That(prompt.text, Is.EqualTo("Desert ahead."), "A normal environment ending announces the next course without a forced choice.");
     }
 
     [UnityTest]
@@ -502,13 +506,13 @@ public sealed class WorldShiftGetawayTests
             .All(r => !r.sharedMaterial.IsKeywordEnabled("_EMISSION")), Is.True);
         Assert.That(UnityEngine.Object.FindObjectsByType<AudioSource>(FindObjectsSortMode.None), Is.Empty);
         Call(hud, "Refresh");
-        Assert.That(prompt.text, Is.EqualTo("Collect cash. Take the left exit to keep it."));
+        Assert.That(prompt.text, Is.EqualTo("Collect cash. Bank it at a marked cash-out exit."));
         Pose(game, 18f, 0f); Capture("loot-box-approach");
         Pose(game, 0f, 0f);
         Call(game, "StepSimulation", 1.4f, 0f, false); Call(hud, "Refresh");
         Assert.That(Run.Carried, Is.EqualTo(100));
         Assert.That(crate.gameObject.activeSelf, Is.False);
-        Assert.That(prompt.text, Is.EqualTo("Collect cash. Take the left exit to keep it."), "Collecting cash must not flash another message.");
+        Assert.That(prompt.text, Is.EqualTo("Collect cash. Bank it at a marked cash-out exit."), "Collecting cash must not flash another message.");
         Assert.That(total.text, Is.EqualTo("<size=14>Carrying</size>\n$100"));
         Assert.That(total.rectTransform.localScale.x, Is.GreaterThan(1f));
         Capture("loot-total-feedback");
@@ -570,8 +574,8 @@ public sealed class WorldShiftGetawayTests
             Pose(game, 18f, 0f); Capture(environment == 0 ? "distinct-pickups-day" : "distinct-pickups-desert");
             Call(game, "TrySwitch"); Capture(environment == 0 ? "distinct-pickups-night" : "distinct-pickups-desert-night");
             Call(game, "TrySwitch");
-            float rampApproach = environment == 0 ? 580f : 1930f;
-            float takeoff = environment == 0 ? 660f : 2004f;
+            float rampApproach = environment == 0 ? 960f : 1930f;
+            float takeoff = environment == 0 ? 1040f : 2004f;
             Pose(game, rampApproach, 0f); Call(hud, "Refresh");
             var prompt = (TMP_Text)hud.GetType().GetField("guidance", Flags).GetValue(hud);
             Assert.That(prompt.text, Is.EqualTo("Drive up the ramp to jump."));

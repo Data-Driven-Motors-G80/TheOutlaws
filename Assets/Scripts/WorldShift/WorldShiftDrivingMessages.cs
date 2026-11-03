@@ -15,7 +15,7 @@ namespace Outlaws.WorldShift
         private WorldShiftGetawayExtras Extras => game.Extras;
         private WorldShiftCombat Combat => game.Combat;
         public const float NightReminderDelay = 12f, NightReminderInterval = 45f;
-        public const string OpeningPrompt = "Collect cash. Take the left exit to keep it.";
+        public const string OpeningPrompt = "Collect cash. Bank it at a marked cash-out exit.";
         private const string NightReminderText = "Fuel still drains. Return to Day for supplies.";
         private const string ShootPrompt = "F / click to shoot the block.";
         private float lastActionPromptAt = float.NegativeInfinity;
@@ -40,10 +40,15 @@ namespace Outlaws.WorldShift
         public string DrivingPrompt()
         {
             // One owner and one priority order. Context-critical instructions never queue behind old tips.
+            if (game.InExit && !game.CashOutAvailable) return ActionPrompt(game.NextEnvironmentName + " ahead.");
             string jump = game.JumpHint;
             if (jump.Length > 0) return ActionPrompt(jump);
+            string switchWall = game.SwitchWallHint;
+            if (switchWall.Length > 0) return ActionPrompt(switchWall);
+            if (game.Environment == ShiftLevel.Snow && Duration < 6f && Distance < 120f)
+                return ActionPrompt("Snow: steer early. Countersteer to catch a slide.");
             if (Distance >= Routing.ForkStart - 100f && Distance < Routing.ChoiceAt)
-                return ActionPrompt("Left: ammo + boost. Right: cash in Day.");
+                return ActionPrompt(""); // Overhead route banners own this choice; keep the HUD quiet.
             if (Distance >= Extras.Jump.Start - 100f && Distance < Extras.Jump.Start && !Extras.Jump.Committed)
                 return ActionPrompt("Right ramp: bonus cash in Day. Left: stay on the road.");
             string shoot = ShootingPrompt();

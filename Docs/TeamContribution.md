@@ -1,3 +1,5 @@
+> Scope: Historical contribution record. Names, dates and original work descriptions are retained; use the current documentation for present gameplay. See the [current documentation index](README.md).
+
 # Team contribution record
 
 Updated: 2026-09-27

@@ -9,14 +9,31 @@ namespace Outlaws.WorldShift
     /// <summary>Shared escape pickups, extraction gate and concise UI for both environments.</summary>
     public sealed class WorldShiftGetaway : MonoBehaviour
     {
-        public const float ExitTail = 440f;
+        public const float ExitTail = 440f, TransitionTail = 60f;
+        public static float TailLength => WorldShiftFlow.CashOutAvailable ? ExitTail : TransitionTail;
         public const float ContinueBoundary = 1.8f;
         private WorldShiftDrivingMessages messages;
         public void OnWorldChanged() => messages?.OnWorldChanged();
         internal int CurrentLeg => currentLeg;
         internal string JumpHint => IsCity
-            ? city.IsRelayAirborne || WorldShiftRelay.At(Distance) != null ? city.SectionHint : ""
-            : desert.IsAirborne || desert.Relay?.SectionAt(Distance) != null ? desert.Hint : "";
+            ? city.RelayHint : desert.Relay?.Hint(Distance, World) ?? "";
+        internal string SwitchWallHint
+        {
+            get
+            {
+                if (IsCity)
+                {
+                    foreach (var hazard in city.Hazards)
+                        if (hazard.Kind == ShiftHazardKind.SwitchWall && !Combat.IsDestroyed(hazard)
+                            && Distance >= hazard.Start - 100f && Distance <= hazard.End + 4f)
+                            return World == ShiftWorld.Day ? "Space: clear the Day barrier." : "Stay in Nightshift until past the barrier.";
+                }
+                else foreach (var gate in desert.ActiveGates)
+                    if (gate.SwitchOnly && !Combat.IsDestroyed(gate) && Distance >= gate.Start - 100f && Distance <= gate.End + 4f)
+                        return World == ShiftWorld.Day ? "Space: clear the Day barrier." : "Stay in Nightshift until past the barrier.";
+                return "";
+            }
+        }
         private sealed class Loot
         {
             public float At, X;
@@ -43,14 +60,17 @@ namespace Outlaws.WorldShift
         private static readonly Color Cyan = new Color(.3f, .85f, 1f);
         private static readonly Color Green = new Color(.4f, 1f, .68f);
         private static readonly Color Ink = new Color(.025f, .045f, .07f, .96f);
+        public ShiftLevel Environment => IsCity ? city.Environment : ShiftLevel.Desert;
+        public bool CashOutAvailable => currentLeg % 2 == 1;
+        public string NextEnvironmentName => WorldShiftFlow.EnvironmentName(WorldShiftFlow.LevelForLeg(currentLeg + 1));
         public bool InRecovery => Distance >= environmentEnd + 20f;
-        public bool InExit => Distance >= environmentEnd + 180f;
+        public bool InExit => Distance >= environmentEnd + (CashOutAvailable ? 180f : 0f);
         public WorldShiftGetawayExtras Extras { get; private set; }
         private bool IsCity => city != null;
         internal float Distance => IsCity ? city.Distance : desert.Distance;
         private float Lateral => IsCity ? city.Lateral : desert.Lateral;
         internal float Duration => IsCity ? city.Duration : desert.Duration;
-        private float Length => environmentEnd + ExitTail;
+        private float Length => environmentEnd + (CashOutAvailable ? ExitTail : TransitionTail);
         private float Fuel => IsCity ? city.FuelFraction : desert.FuelFraction;
         private float Gap => IsCity ? city.PursuitGap : desert.PursuitGap;
         internal ShiftWorld World => IsCity ? city.World : desert.World;
@@ -66,7 +86,7 @@ namespace Outlaws.WorldShift
             messages = new WorldShiftDrivingMessages(this);
             currentLeg = WorldShiftFlow.Escape.Leg;
             bestBefore = WorldShiftFlow.BestHaul;
-            environmentEnd = IsCity ? WorldShiftLevel.Length : DesertShiftLevel.Length;
+            environmentEnd = IsCity ? city.EnvironmentLength : DesertShiftLevel.Length;
             Material gold = MakeMaterial(Gold), handle = MakeMaterial(new Color(.12f, .1f, .04f));
             // Functional primitive markers only: no glow, decorative art or audio.
             foreach (var material in new[] { gold, handle })
@@ -75,9 +95,9 @@ namespace Outlaws.WorldShift
                 material.SetColor("_EmissionColor", Color.black);
             }
             // The opening trail teaches collection without a separate instructions screen.
-            AddLoot(35f, 0f, gold, handle);
-            AddLoot(55f, 0f, gold, handle);
-            AddLoot(75f, 0f, gold, handle);
+            AddLoot(IsCity ? 35f : 50f, 0f, gold, handle);
+            AddLoot(IsCity ? 55f : 75f, 0f, gold, handle);
+            AddLoot(IsCity ? 75f : 100f, 0f, gold, handle);
             if (IsCity)
             {
                 foreach (var pickup in city.Pickups)
@@ -93,9 +113,11 @@ namespace Outlaws.WorldShift
                 for (int i = 0; i < 10; i++)
                     AddLoot(desert.FuelDistance(i), -3.2f, gold, handle);
             }
+            foreach (var reward in WorldShiftEscapeProfile.PacingRewards(Environment))
+                AddLoot(reward.x, reward.y, gold, handle);
             Routing = gameObject.AddComponent<WorldShiftForkRoad>();
             Routing.Bind(this, Route, environmentEnd, !IsCity, MakeMaterial);
-            foreach (float offset in new[] { 105f, 205f }) AddLoot(Routing.ForkStart + offset, -2.8f, gold, handle);
+            foreach (float offset in new[] { 190f, 235f }) AddLoot(Routing.ForkStart + offset, -2.8f, gold, handle);
             foreach (float offset in new[] { 112f, 128f, 146f, 202f, 216f, 230f })
                 AddLoot(Routing.ForkStart + offset, Routing.RightLootLane, gold, handle);
             Extras = gameObject.AddComponent<WorldShiftGetawayExtras>();
@@ -108,6 +130,8 @@ namespace Outlaws.WorldShift
             // A spaced loot trail gives the magnet a useful window after its pickup.
             foreach (float at in new[] { 175f, 200f, 225f, 250f })
                 AddLoot(at, -3.2f, gold, handle);
+            foreach (var reward in WorldShiftEscapeProfile.SwitchRewards(Environment))
+                AddLoot(reward.x, reward.y, gold, handle);
             BuildExit();
             OnWorldChanged();
             BuildHud();
@@ -172,7 +196,7 @@ namespace Outlaws.WorldShift
         public void Finish(float lateral)
         {
             if (WorldShiftFlow.Escape.Status != GetawayRunState.RunStatus.Running || continuePending) return;
-            if (Routing.ContinueSelected(lateral)) continuePending = true;
+            if (!CashOutAvailable || Routing.ContinueSelected(lateral)) continuePending = true;
             else WorldShiftFlow.FinishGetawayLeg(false);
         }
 
@@ -211,6 +235,7 @@ namespace Outlaws.WorldShift
 
         private void BuildExit()
         {
+            if (!CashOutAvailable) return;
             Material safe = MakeMaterial(Green), risk = MakeMaterial(Gold);
             foreach (float at in new[] { environmentEnd + 240f, Length })
                 foreach (int side in new[] { -1, 1 })
@@ -304,8 +329,8 @@ namespace Outlaws.WorldShift
             resultValue = Label(result.transform, "", .15f, .49f, .85f, .68f, 64f);
             resultNote = Label(result.transform, "", .15f, .36f, .85f, .48f, 21f);
             resultTitle.alignment = resultValue.alignment = resultNote.alignment = TextAlignmentOptions.Center;
-            WorldShiftMenu.Button(result.transform, "Play again", new Vector2(.12f, .18f), new Vector2(.36f, .29f), () => WorldShiftFlow.StartGetaway(false));
-            WorldShiftMenu.Button(result.transform, "Garage", new Vector2(.38f, .18f), new Vector2(.62f, .29f), WorldShiftFlow.OpenGarage);
+            WorldShiftMenu.Button(result.transform, "Upgrade car", new Vector2(.12f, .18f), new Vector2(.36f, .29f), WorldShiftFlow.OpenGarage);
+            WorldShiftMenu.Button(result.transform, "Start next run", new Vector2(.38f, .18f), new Vector2(.62f, .29f), () => WorldShiftFlow.StartGetaway(false));
             WorldShiftMenu.Button(result.transform, "Back to menu", new Vector2(.64f, .18f), new Vector2(.88f, .29f), WorldShiftFlow.Menu);
             Refresh();
         }
@@ -343,12 +368,12 @@ namespace Outlaws.WorldShift
             float pickupPulse = Mathf.Clamp01((lootFeedbackUntil - Duration) / .35f);
             haul.color = Color.Lerp(Gold, Color.white, pickupPulse);
             haul.rectTransform.localScale = Vector3.one * (1f + .12f * pickupPulse);
-            choices.SetActive(running && InExit);
+            choices.SetActive(running && InExit && CashOutAvailable);
             choiceLeft.text = "Left: Cash out\n$" + run.Carried.ToString("N0");
-            choiceRight.text = "Right: Continue\n" + (IsCity ? "Desert" : "City") + " / " + (1f + Mathf.Min(currentLeg + 1, 40) * .5f).ToString("0.#") + "x loot";
+            choiceRight.text = "Main road: " + NextEnvironmentName + "\n" + (1f + Mathf.Min(currentLeg + 1, 40) * .5f).ToString("0.#") + "x loot";
             choiceLeftPanel.color = !Routing.ContinueSelected(Lateral) ? new Color(.08f, .3f, .2f, .98f) : Ink;
             choiceRightPanel.color = Routing.ContinueSelected(Lateral) ? new Color(.35f, .23f, .06f, .98f) : Ink;
-            string nextPrompt = running && !InExit ? messages.DrivingPrompt() : "";
+            string nextPrompt = running && (!InExit || !CashOutAvailable) ? messages.DrivingPrompt() : "";
             if (guidance.text != nextPrompt) guidance.text = nextPrompt;
             promptPanel.SetActive(nextPrompt.Length > 0);
             // A fixed responsive width avoids an autosizing/preferred-width feedback loop.
