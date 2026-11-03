@@ -164,8 +164,15 @@ same uploader and endpoint. The old `runs`/`tutorials` tabs are not used by this
 `editor`, `test` or `ignore`, or every report filters the rows out.
 
 **Updating the receiver:** `doPost` only accepts listed tabs, so paste the updated `Docs/analytics/WeeWooAnalytics.gs`
-and deploy a new version of the existing web app (Deploy → Manage deployments → Edit → New version). Until then the
-`ws_*` rows below are silently dropped.
+and `Docs/analytics/Visualizations.gs` into the Apps Script project, deploy a new version of the existing web app
+(Deploy → Manage deployments → Edit → New version), then run `setupVisualizations` once. Until the deploy, the `ws_*`
+rows below are silently dropped.
+
+**Charts:** `setupVisualizations` builds two chart dashboards with the same date/build filters: **WS Visualizations**
+(WorldShift: outcomes, deaths per environment and distance, switching fairness, fork/gate/power-up choices, tutorial,
+engagement) and the original **Visualizations** (endless-runner builds). It orders the workbook WorldShift first:
+WS Visualizations, WS Overview, WS Levels, WS Tutorial, then the original dashboard and reports, then raw tabs. Both
+dashboards redraw on filter edits and every 5 minutes when new rows arrive.
 
 | Tab | One row per | Key columns |
 | --- | --- | --- |
