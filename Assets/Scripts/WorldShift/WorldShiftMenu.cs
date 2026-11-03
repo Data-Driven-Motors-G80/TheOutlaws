@@ -32,31 +32,23 @@ namespace Outlaws.WorldShift
             safe.anchorMin = new Vector2(area.xMin / Screen.width, area.yMin / Screen.height);
             safe.anchorMax = new Vector2(area.xMax / Screen.width, area.yMax / Screen.height);
             home = Panel(safe, "Choose a mode", Vector2.zero, Vector2.one, Color.clear).gameObject;
-            var wordmark = Label(home.transform, "WorldShift", .075f, .78f, .8f, .94f, 60f);
+            var wordmark = Label(home.transform, "WorldShift", .20f, .73f, .80f, .87f, 52f);
             wordmark.fontStyle = FontStyles.Bold;
             wordmark.color = Cream;
-            Label(home.transform, "Collect cash. Escape. Upgrade your car.", .079f, .71f, .8f, .78f, 23f).color = new Color(.70f, .77f, .82f);
-
-            var escape = ModeCard(home.transform, "Endless escape", .075f, .49f);
-            Label(escape, "Endless escape", .065f, .65f, .94f, .86f, 30f).fontStyle = FontStyles.Bold;
-            Label(escape, "Grab loot. Cash out before you're caught.", .065f, .42f, .94f, .60f, 19f).color = new Color(.76f, .81f, .85f);
-            MenuButton(escape, "Play escape", new Vector2(.065f, .10f), new Vector2(.935f, .30f),
+            wordmark.alignment = TextAlignmentOptions.Center;
+            var start = MenuButton(home.transform, "Start run", new Vector2(.34f, .55f), new Vector2(.66f, .65f),
                 () => WorldShiftFlow.StartGetaway(false), true);
-
-            var training = ModeCard(home.transform, "Tutorial", .515f, .93f);
-            Label(training, "Tutorial", .065f, .65f, .94f, .86f, 30f).fontStyle = FontStyles.Bold;
-            Label(training, "First time? Learn by driving.", .065f, .42f, .94f, .60f, 19f).color = new Color(.76f, .81f, .85f);
-            MenuButton(training, "Start tutorial", new Vector2(.065f, .10f), new Vector2(.935f, .30f),
+            MenuButton(home.transform, "Tutorial", new Vector2(.34f, .42f), new Vector2(.66f, .52f),
                 () => WorldShiftFlow.StartGetaway(true), false);
-            homeSavings = Label(home.transform, "", .075f, .19f, .49f, .26f, 24f);
-            MenuButton(home.transform, "Garage", new Vector2(.515f, .16f), new Vector2(.93f, .25f),
+            MenuButton(home.transform, "Upgrade car", new Vector2(.34f, .29f), new Vector2(.66f, .39f),
                 () => ShowGarage(true), false);
-            Label(home.transform, "Steer: ← / →     Switch: SPACE     Shoot: F / click", .075f, .065f, .93f, .125f, 20f);
+            homeSavings = Label(home.transform, "", .34f, .21f, .66f, .27f, 23f);
+            homeSavings.alignment = TextAlignmentOptions.Center;
             BuildGarage(safe);
             RefreshGarage();
             if (WorldShiftFlow.ConsumeGarageRequest()) { ShowGarage(true); return; }
             if (EventSystem.current != null)
-                EventSystem.current.SetSelectedGameObject(escape.GetComponentInChildren<UnityEngine.UI.Button>().gameObject);
+                EventSystem.current.SetSelectedGameObject(start.GetComponentInChildren<UnityEngine.UI.Button>().gameObject);
         }
 
         private void BuildGarage(Transform parent)
@@ -83,7 +75,7 @@ namespace Outlaws.WorldShift
             garageMessage = Label(garage.transform, "Upgrades stay with you after a lost run.", .075f, .21f, .93f, .28f, 21f);
             MenuButton(garage.transform, "Back", new Vector2(.075f, .07f), new Vector2(.32f, .17f),
                 () => ShowGarage(false), false);
-            MenuButton(garage.transform, "Start escape", new Vector2(.65f, .07f), new Vector2(.93f, .17f),
+            MenuButton(garage.transform, "Start next run", new Vector2(.65f, .07f), new Vector2(.93f, .17f),
                 () => WorldShiftFlow.StartGetaway(false), true);
             garage.SetActive(false);
         }
@@ -127,9 +119,6 @@ namespace Outlaws.WorldShift
                 EventSystem.current.SetSelectedGameObject((show ? garage : home)
                     .GetComponentsInChildren<Button>()[show ? 3 : 0].gameObject);
         }
-
-        private RectTransform ModeCard(Transform parent, string name, float left, float right)
-            => Panel(parent, name, new Vector2(left, .30f), new Vector2(right, .66f), new Color(.075f, .105f, .145f));
 
         private RectTransform MenuButton(Transform parent, string title, Vector2 min, Vector2 max, Action action, bool primary)
         {

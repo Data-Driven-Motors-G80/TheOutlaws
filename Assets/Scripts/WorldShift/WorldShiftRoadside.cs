@@ -24,7 +24,7 @@ namespace Outlaws.WorldShift
         private Material dayEdge, echoEdge;
         private WorldShiftRoute route;
 
-        public void Build(WorldShiftRoute route)
+        public void Build(WorldShiftRoute route, ShiftLevel environment = ShiftLevel.City)
         {
             this.route = route;
             day = new[]
@@ -37,6 +37,13 @@ namespace Outlaws.WorldShift
                 RuntimeMaterials.Coloured(new Color(.48f, .47f, .43f)),
                 RuntimeMaterials.Coloured(new Color(.065f, .075f, .085f))
             };
+            if (environment == ShiftLevel.Ocean || environment == ShiftLevel.Snow || environment == ShiftLevel.Mountain)
+            {
+                var groundDay = RuntimeMaterials.Coloured(WorldShiftEscapeProfile.Ground(environment, false));
+                var groundNight = RuntimeMaterials.Coloured(WorldShiftEscapeProfile.Ground(environment, true));
+                day = new[] { groundDay, groundDay };
+                echo = new[] { groundNight, groundNight };
+            }
             dayEdge = RuntimeMaterials.Coloured(new Color(.83f, .82f, .73f));
             echoEdge = new Material(RuntimeMaterials.Coloured(new Color(.94f, .88f, .64f)));
             echoEdge.name = "Night cream road-edge paint";

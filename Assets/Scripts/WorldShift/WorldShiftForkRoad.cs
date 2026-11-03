@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
 
 namespace Outlaws.WorldShift
 {
@@ -13,11 +14,12 @@ namespace Outlaws.WorldShift
             public Transform Visual;
             public bool Touched;
         }
+        public const float AmmoOffset = 70f, BoostOffset = 130f;
         public readonly List<Blocker> Blockers = new List<Blocker>();
         public float EnvironmentEnd { get; private set; }
         public int RewardBranch { get; private set; }
         public int ExitBranch { get; private set; }
-        public static float MainForkStart(float environmentEnd) => environmentEnd == WorldShiftLevel.Length ? 1120f : 720f;
+        public static float MainForkStart(float environmentEnd) => WorldShiftEscapeProfile.Fork(environmentEnd);
         public static bool InMainFork(float environmentEnd, float d, float padding = 0f)
             => d >= MainForkStart(environmentEnd) - padding && d < MainForkStart(environmentEnd) + 280f + padding;
         public float ForkStart => MainForkStart(EnvironmentEnd);
@@ -27,6 +29,7 @@ namespace Outlaws.WorldShift
         public float ExitChoiceAt => EnvironmentEnd + 280f;
         private WorldShiftGetaway game;
         private WorldShiftRoute route;
+        private readonly WorldShiftObstacleVisual.Palette obstaclePalette = new WorldShiftObstacleVisual.Palette();
         private Material deck, ground;
         private bool desertRoute;
         public float RightLootLane => 2.4f;
@@ -35,31 +38,30 @@ namespace Outlaws.WorldShift
         public static bool Owns(float environmentEnd, float distance)
             => InMainFork(environmentEnd, distance) || distance >= environmentEnd + 200f;
         public bool RewardSeparated(float distance) => distance >= ChoiceAt && distance < Rejoin - 4f;
-        public bool ExitSeparated(float distance) => distance >= ExitChoiceAt;
+        public bool ExitSeparated(float distance) => game.CashOutAvailable && distance >= ExitChoiceAt;
+        public bool OwnsDistance(float distance) => InMainFork(EnvironmentEnd, distance) || game.CashOutAvailable && distance >= ExitStart;
         public float Spread(float d)
         {
-            if (d >= ExitStart) return 4f * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(ExitChoiceAt, EnvironmentEnd + 360f, d));
+            if (d >= ExitStart) return game.CashOutAvailable ? 4f * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(ExitChoiceAt, EnvironmentEnd + 360f, d)) : 0f;
             if (d < ForkStart || d >= Rejoin) return 0f;
             return 4f * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(ChoiceAt, ForkStart + 80f, d))
                 * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(ForkStart + 200f, Rejoin, d)));
         }
         public int Branch(float distance, float lateral)
-            => ExitSeparated(distance) ? ExitBranch != 0 ? ExitBranch : lateral >= WorldShiftGetaway.ContinueBoundary ? 1 : -1
+            => ExitSeparated(distance) ? ExitBranch != 0 ? ExitBranch : lateral <= -WorldShiftGetaway.ContinueBoundary ? -1 : 1
                 : RewardSeparated(distance) ? RewardBranch != 0 ? RewardBranch : lateral >= .4f ? 1 : -1 : 0;
-        public bool ContinueSelected(float lateral) => ExitBranch != 0 ? ExitBranch > 0 : lateral >= WorldShiftGetaway.ContinueBoundary;
-        public string Hint(float d)
-            => d >= ForkStart - 70f && d < ChoiceAt ? game.World == ShiftWorld.Day ? desertRoute ? "Open road left: ammo + boost. Loot in the canyon." : "Main road left: ammo + boost. Loot on the right." : "Left for ammo. Day brings loot." : "";
-
+        public bool ContinueSelected(float lateral) => !game.CashOutAvailable || (ExitBranch != 0 ? ExitBranch > 0 : lateral > -WorldShiftGetaway.ContinueBoundary);
         public void Bind(WorldShiftGetaway owner, WorldShiftRoute path, float environmentEnd, bool desert, Func<Color, Material> material)
         {
             game = owner; route = path; EnvironmentEnd = environmentEnd; desertRoute = desert;
             deck = material(new Color(.22f, .23f, .24f));
-            ground = material(desert ? new Color(.5f, .3f, .14f) : new Color(.32f, .37f, .31f));
+            ground = material(desert ? new Color(.5f, .3f, .14f) : game.Environment == ShiftLevel.City ? new Color(.32f, .37f, .31f) : WorldShiftEscapeProfile.Ground(game.Environment, false));
             var white = material(new Color(.85f, .89f, .85f));
             var gold = material(new Color(1f, .77f, .25f));
             var green = material(new Color(.4f, 1f, .68f));
             Build(ForkStart, Rejoin, white, gold);
-            Build(ExitStart, environmentEnd + WorldShiftGetaway.ExitTail + 80f, green, gold);
+            BuildForkBanners(material, white, gold);
+            if (game.CashOutAvailable) Build(ExitStart, environmentEnd + WorldShiftGetaway.ExitTail + 80f, green, gold);
             for (int i = 0; i < 2; i++)
             {
                 float at = ForkStart + (i == 0 ? 94f : 184f);
@@ -68,7 +70,7 @@ namespace Outlaws.WorldShift
                 var root = new GameObject(desert ? "Breakable fork rock" : "Breakable fork barrier").transform;
                 root.SetParent(transform, false);
                 root.SetPositionAndRotation(Position(at, x) + p.Up * .65f, Quaternion.LookRotation(p.Forward, p.Up));
-                WorldShiftObstacleVisual.Build(root, Vector3.zero, new Vector3(1.2f, 1.3f, 1.4f));
+                WorldShiftObstacleVisual.Build(root, Vector3.zero, new Vector3(1.2f, 1.3f, 1.4f), obstaclePalette);
                 Blockers.Add(new Blocker { At = at, X = x, Visual = root });
             }
             BuildBoundaries(material);
@@ -91,7 +93,7 @@ namespace Outlaws.WorldShift
         public void BeginStep(float from, float to, float lateral)
         {
             if (RewardBranch == 0 && to >= ChoiceAt && from < Rejoin) RewardBranch = lateral >= .4f ? 1 : -1;
-            if (ExitBranch == 0 && to >= ExitChoiceAt) ExitBranch = lateral >= WorldShiftGetaway.ContinueBoundary ? 1 : -1;
+            if (game.CashOutAvailable && ExitBranch == 0 && to >= ExitChoiceAt) ExitBranch = lateral <= -WorldShiftGetaway.ContinueBoundary ? -1 : 1;
         }
         public void Constrain(float distance, AutoDriveCar driver)
         {
@@ -115,6 +117,9 @@ namespace Outlaws.WorldShift
         }
         public void Present(ShiftWorld world)
         {
+            obstaclePalette.SetWorld(world);
+            if (game.Environment != ShiftLevel.City && game.Environment != ShiftLevel.Desert)
+                ground.color = WorldShiftEscapeProfile.Ground(game.Environment, world == ShiftWorld.Echo);
             deck.color = world == ShiftWorld.Day ? new Color(.22f, .23f, .24f) : new Color(.085f, .105f, .14f);
             foreach (var block in Blockers) block.Visual.gameObject.SetActive(WorldShiftCombat.IsActive(game.Combat, block)
                 && block.At > game.Distance - 15f && block.At < game.Distance + 190f);
@@ -157,6 +162,42 @@ namespace Outlaws.WorldShift
                 }
             }
         }
+        private void BuildForkBanners(Func<Color, Material> material, Material left, Material right)
+        {
+            float at = ForkStart - 25f;
+            var p = route.Sample(at);
+            var root = new GameObject("Fork route banners").transform;
+            root.SetParent(transform, false);
+            root.SetPositionAndRotation(p.Position, Quaternion.LookRotation(p.Forward, p.Up));
+            var dark = material(new Color(.025f, .04f, .055f));
+            float outside = 7.1f;
+            foreach (int side in new[] { -1, 1 })
+            {
+                BannerBox(root, "Roadside sign support", new Vector3(side * outside, 3.35f, 0f), new Vector3(.14f, 6.7f, .14f), left);
+                float x = side * 3.35f;
+                BannerBox(root, "Route banner border", new Vector3(x, 5.6f, 0f), new Vector3(6.3f, 2.05f, .18f), side < 0 ? left : right);
+                BannerBox(root, "Route banner panel", new Vector3(x, 5.6f, -.11f), new Vector3(6.05f, 1.8f, .06f), dark);
+                var label = new GameObject(side < 0 ? "Fork left route" : "Fork right route", typeof(TextMeshPro)).GetComponent<TextMeshPro>();
+                label.transform.SetParent(root, false);
+                label.transform.localPosition = new Vector3(x, 5.6f, -.16f);
+                label.font = TMP_Settings.defaultFontAsset;
+                label.text = side < 0 ? "AMMO + BOOST" : "CASH";
+                label.color = Color.white; label.alignment = TextAlignmentOptions.Center;
+                label.fontSize = 8.8f; label.enableAutoSizing = true; label.fontSizeMin = 6.5f; label.fontSizeMax = 8.8f;
+                label.textWrappingMode = TextWrappingModes.NoWrap;
+                label.rectTransform.sizeDelta = new Vector2(5.85f, 1.65f);
+            }
+            BannerBox(root, "Overhead sign beam", new Vector3(0f, 6.7f, 0f), new Vector3(outside * 2f, .14f, .14f), left);
+        }
+        private static void BannerBox(Transform parent, string name, Vector3 at, Vector3 size, Material material)
+        {
+            var box = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            box.name = name; box.transform.SetParent(parent, false);
+            box.transform.localPosition = at; box.transform.localScale = size;
+            box.GetComponent<Collider>().enabled = false;
+            box.GetComponent<Renderer>().sharedMaterial = material;
+        }
+
         public float Width(float d, int side)
             => Mathf.Lerp(WorldShiftLevel.RoadWidth * .5f, WorldShiftLevel.RoadWidth, Spread(d) / 4f);
 

@@ -4,16 +4,20 @@ namespace Outlaws.WorldShift
 {
     public static class WorldShiftTutorial
     {
-        public const float Length = 576f, FinalLessonStart = 460f, MergeStart = FinalLessonStart;
-        public static readonly string[] LessonKeys = { "←   →", "SPACE", "SPACE", "F", "←   →" };
+        public const float Length = 900f, FinalLessonStart = 460f, MergeStart = FinalLessonStart;
+        public const string NightSuppliesMessage = "No cash, fuel or power-ups in Nightshift.\nReturn to Day.";
+        public const string NightLandingMessage = "Stay in Nightshift until the roads rejoin.";
+        public static readonly string[] LessonKeys = { "A / D", "SPACE", "SPACE", "F / CLICK", "A / D", "SPACE" };
         public static readonly string[] LessonMessages =
         {
             "Steer around the block.",
-            "Freeze traffic.\nIt still blocks the road.",
-            "Switch back for supplies.\nFuel and police keep going.",
+            "Enter Nightshift to escape the roadblock.",
+            "Return to Day for cash and supplies.",
             "Shoot the marked block.",
-            "Steer through the gap."
+            "Steer through the gap.",
+            "Take the Day ramp.\nSwitch to Nightshift in the air."
         };
+        public static readonly ShiftRelay[] Relays = { new ShiftRelay(1, 650f, 710f, 794f, ShiftWorld.Day) };
         public const float FirstFinalObstacle = 510f, LastFinalObstacle = 558f;
         public static readonly ShiftHazard ShootingObstacle = new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.Barrier, 440f, 446f, 2);
         public static readonly ShiftHazard[] Hazards =
@@ -25,7 +29,8 @@ namespace Outlaws.WorldShift
             new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.HalfBarrier, FirstFinalObstacle, FirstFinalObstacle + 6f, 3, halfSide: -1),
             new ShiftHazard(ShiftWorld.Echo, ShiftHazardKind.HalfBarrier, LastFinalObstacle, LastFinalObstacle + 6f, 6, halfSide: 1),
             new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.Barrier, 440f, 446f, 1),
-            new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.Barrier, 440f, 446f, 4)
+            new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.Barrier, 440f, 446f, 4),
+            new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.SwitchWall, 168f, 174f, 7)
         };
         public static ShiftHazard[] CreateHazards()
         {
@@ -35,17 +40,18 @@ namespace Outlaws.WorldShift
                 var h = Hazards[i];
                 bool traffic = i == 1 || i == 2;
                 result[i] = new ShiftHazard(h.World, traffic ? ShiftHazardKind.Oncoming : h.Kind, i == 1 ? 192f : h.Start, i == 1 ? 198f : h.End,
-                    i == 2 ? 1 : traffic ? 2 : h.LaneMask, i == 1 ? 1.5f : i == 2 ? 8f : 0f, h.HalfSide, true, lateralMotion: i == 1);
+                    i == 2 ? 1 : traffic ? 2 : h.LaneMask, i == 1 ? 1.5f : i == 2 ? 8f : 0f, h.HalfSide, h.Kind != ShiftHazardKind.SwitchWall, lateralMotion: i == 1);
             }
             return result;
         }
         public static readonly ShiftCheckpoint[] Checkpoints =
         {
-            new ShiftCheckpoint(0f, ShiftWorld.Day, 0f, "STEER", "Left / right arrows: steer."),
-            new ShiftCheckpoint(110f, ShiftWorld.Day, 0f, "SWITCH", "Press Space to freeze obstacles in Nightshift."),
-            new ShiftCheckpoint(220f, ShiftWorld.Echo, 0f, "SWITCH BACK", "Return to Day to collect supplies."),
+            new ShiftCheckpoint(0f, ShiftWorld.Day, 0f, "STEER", "A / D: steer."),
+            new ShiftCheckpoint(110f, ShiftWorld.Day, 0f, "SWITCH", "Enter Nightshift to escape the roadblock."),
+            new ShiftCheckpoint(220f, ShiftWorld.Echo, 0f, "SWITCH BACK", "Return to Day for cash and supplies."),
             new ShiftCheckpoint(330f, ShiftWorld.Day, 0f, "SHOOT", "F / click: shoot the block."),
-            new ShiftCheckpoint(FinalLessonStart, ShiftWorld.Day, 2.5f, "YOUR CHOICE", "Steer through the gap.")
+            new ShiftCheckpoint(FinalLessonStart, ShiftWorld.Day, 2.5f, "YOUR CHOICE", "Steer through the gap."),
+            new ShiftCheckpoint(580f, ShiftWorld.Day, 0f, "JUMP", "Take the Day ramp. Switch to Nightshift in the air.")
         };
     }
     // A tiny Day-only trail demonstrates the same reward rule without another HUD.
@@ -55,7 +61,6 @@ namespace Outlaws.WorldShift
         private readonly float[] at = { 276f, 296f };
         private readonly Transform[] boxes = new Transform[2];
         private readonly bool[] taken = new bool[2];
-        private readonly GameObject[] previews = new GameObject[2];
         private Transform trafficCue;
         private LineRenderer trafficOutline, motionArrow;
         private Material cueMaterial;
@@ -86,17 +91,6 @@ namespace Outlaws.WorldShift
                 new Vector3(-1.4f, .25f, -2.8f), new Vector3(-2f, .25f, -3.4f),
                 new Vector3(2f, .25f, -3.4f), new Vector3(1.4f, .25f, -4f),
                 new Vector3(2f, .25f, -3.4f), new Vector3(1.4f, .25f, -2.8f) });
-            for (int i = 0; i < previews.Length; i++)
-            {
-                var ghost = new GameObject("Tutorial supply outline");
-                ghost.transform.SetParent(transform, false);
-                var point = game.Route.Sample(at[i]);
-                ghost.transform.SetPositionAndRotation(point.Position + Vector3.up * .3f, Quaternion.LookRotation(point.Forward, point.Up));
-                var line = Line(ghost.transform, "Supply location", new[] { new Vector3(-.7f,0f,-.7f),
-                    new Vector3(-.7f,0f,.7f), new Vector3(.7f,0f,.7f), new Vector3(.7f,0f,-.7f), new Vector3(-.7f,0f,-.7f) });
-                line.startColor = line.endColor = new Color(1f, .8f, .25f, .65f);
-                previews[i] = ghost;
-            }
             Present(game.World);
         }
         public void Step(float from, float to, float a, float b)
@@ -134,9 +128,6 @@ namespace Outlaws.WorldShift
                     motionArrow.transform.localRotation = Quaternion.Euler(0f, hazard.LateralMotion ? 0f : 90f, 0f);
                 }
             }
-            for (int i = 0; i < previews.Length; i++)
-                if (previews[i] != null) previews[i].SetActive(game.TutorialLessonIndex == 2 && !taken[i]
-                    && world == ShiftWorld.Echo && at[i] > game.Distance);
             for (int i = 0; i < boxes.Length; i++)
                 if (boxes[i] != null) boxes[i].gameObject.SetActive(!taken[i] && world == ShiftWorld.Day && at[i] > game.Distance - 10f && at[i] < game.Distance + 170f);
         }

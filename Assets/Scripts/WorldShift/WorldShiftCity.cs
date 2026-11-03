@@ -11,6 +11,9 @@ namespace Outlaws.WorldShift
         // Every solid hazard costs half the initial 45 m gap. Capture still depends
         // on the remaining pursuit distance, never on a scripted collision count.
         private const float CollisionPursuitDrain = .5f;
+        [SerializeField] private ShiftLevel environment = ShiftLevel.City;
+        public ShiftLevel Environment => environment;
+        public float EnvironmentLength => GetawayMode ? WorldShiftEscapeProfile.Length(environment) : WorldShiftLevel.Length;
         [SerializeField] private bool splitViewValidation;
         [SerializeField] private bool tutorialLevel;
         public bool TutorialLevel => tutorialLevel;
@@ -28,26 +31,41 @@ namespace Outlaws.WorldShift
         private AutoDriveCar driver;
         private WorldShiftRelay relay;
         public bool IsRelayAirborne => relay != null && relay.IsAirborne;
+        private ShiftRelay[] escapeRelays;
+        public ShiftRelay[] RelayLayout => tutorialLevel ? WorldShiftTutorial.Relays : GetawayMode ? escapeRelays : WorldShiftRelay.Sections;
+        public string RelayHint => relay?.Hint(Distance, World) ?? "";
         public int RelaysCompleted => relay?.Completed ?? 0;
         public bool IsBoosting => Speed > WorldShiftLevel.Speed * WorldShiftLevel.CruiseSpeedMultiplier + .1f;
         private readonly FuelState fuel = new FuelState();
         private readonly RiskRunState pursuit = new RiskRunState();
         private readonly System.Collections.Generic.HashSet<ShiftHazard> hitHazards = new System.Collections.Generic.HashSet<ShiftHazard>();
         private bool tutorialHintCompleted;
-        private bool tutorialTrafficMoved, tutorialFrozen, tutorialReturned, tutorialSawNight;
-        private float tutorialFrozenAt;
-        public string TutorialControlKey => checkpointIndex == 3 && TutorialShotComplete ? "←   →" : checkpointIndex == 1 && tutorialFrozen || checkpointIndex == 2 && tutorialReturned
-            ? "←   →" : WorldShiftTutorial.LessonKeys[checkpointIndex];
+        public string TutorialControlKey => State == ShiftRunState.Retrying
+            ? checkpointIndex == 5 ? "A / D" : WorldShiftTutorial.LessonKeys[checkpointIndex]
+            : checkpointIndex == 3 && TutorialShotComplete ? "A / D"
+            : checkpointIndex == 1 ? World == ShiftWorld.Day ? "SPACE" : "A / D"
+            : checkpointIndex == 2 ? World == ShiftWorld.Echo ? "SPACE" : "A / D"
+            : checkpointIndex == 5 ? IsRelayAirborne && World == ShiftWorld.Day ? "SPACE" : "A / D"
+            : WorldShiftTutorial.LessonKeys[checkpointIndex];
         public int TutorialLessonIndex => checkpointIndex;
         public bool TutorialLessonComplete => checkpointIndex == 3
             ? TutorialShotComplete : tutorialHintCompleted;
-        public string TutorialPrompt => tutorialLevel && checkpointIndex == 3 && TutorialShotComplete && Distance < 450f
-            ? "Drive through the gap." : !tutorialLevel || TutorialLessonComplete ? ""
-            : checkpointIndex == 1 ? tutorialFrozen
-                ? Duration - tutorialFrozenAt < 1f ? "Frozen. Still solid." : "Steer past."
-                : World == ShiftWorld.Echo ? "Wake traffic. Then freeze it." : "Freeze traffic."
-            : checkpointIndex == 2 ? tutorialReturned ? "Collect the cash."
-                : !tutorialSawNight && World == ShiftWorld.Day ? "Freeze traffic first." : "Bring supplies back."
+        public string TutorialPrompt => !tutorialLevel ? ""
+            : State == ShiftRunState.Retrying ? checkpointIndex == 2
+                ? WorldShiftTutorial.NightSuppliesMessage : WorldShiftTutorial.LessonMessages[checkpointIndex]
+            : checkpointIndex == 3 && TutorialShotComplete && Distance < WorldShiftTutorial.FinalLessonStart
+                ? WorldShiftTutorial.LessonMessages[4]
+            : TutorialLessonComplete ? ""
+            : checkpointIndex == 1 ? World == ShiftWorld.Day
+                ? "Enter Nightshift to escape the roadblock."
+                : "The Day barrier is gone.\nSteer past the stopped traffic."
+            : checkpointIndex == 2 ? World == ShiftWorld.Echo
+                ? WorldShiftTutorial.NightSuppliesMessage
+                : "Collect cash in Day to fund your escape."
+            : checkpointIndex == 5 ? World == ShiftWorld.Echo
+                ? IsRelayAirborne || RelaysCompleted > 0 ? WorldShiftTutorial.NightLandingMessage
+                    : "Return to Day to reach the ramp."
+                : WorldShiftTutorial.LessonMessages[5]
             : WorldShiftTutorial.LessonMessages[checkpointIndex];
         private bool TutorialWaitingForLesson
         {
@@ -75,12 +93,12 @@ namespace Outlaws.WorldShift
         public float Lateral { get; private set; }
         public float Duration { get; private set; }
         public bool SplitViewValidation => splitViewValidation;
-        public float RunLength => tutorialLevel ? WorldShiftTutorial.Length : splitViewValidation ? WorldShiftSplitView.Length : WorldShiftLevel.Length + (GetawayMode ? WorldShiftGetaway.ExitTail : 0f);
+        public float RunLength => tutorialLevel ? WorldShiftTutorial.Length : splitViewValidation ? WorldShiftSplitView.Length : GetawayMode ? EnvironmentLength + WorldShiftGetaway.TailLength : WorldShiftLevel.Length;
         private ShiftHazard[] escapeHazards, tutorialHazards;
         private ShiftFuelPickup[] escapeFuel;
         public ShiftHazard[] Hazards => tutorialLevel ? tutorialHazards : splitViewValidation ? WorldShiftSplitView.Layout : GetawayMode ? escapeHazards : WorldShiftLevel.Hazards;
         public ShiftFuelPickup[] Pickups => tutorialLevel ? System.Array.Empty<ShiftFuelPickup>() : splitViewValidation ? WorldShiftSplitView.Fuel : GetawayMode ? escapeFuel : WorldShiftLevel.FuelPickups;
-        public ShiftCheckpoint[] Checkpoints => tutorialLevel ? WorldShiftTutorial.Checkpoints : splitViewValidation ? WorldShiftSplitView.Checkpoints : WorldShiftLevel.Checkpoints;
+        public ShiftCheckpoint[] Checkpoints => tutorialLevel ? WorldShiftTutorial.Checkpoints : splitViewValidation ? WorldShiftSplitView.Checkpoints : GetawayMode ? WorldShiftLevel.EscapeCheckpoints : WorldShiftLevel.Checkpoints;
         // Side-by-side worlds are retained only in the standalone rendering validation scene.
         public bool IsJoinedDistance(float at) => splitViewValidation
             && at >= WorldShiftSplitView.JoinStart && at < WorldShiftSplitView.JoinEnd;
@@ -106,7 +124,7 @@ namespace Outlaws.WorldShift
             || (Combat?.IsDestroyed(tutorialHazards[6]) ?? false) || (Combat?.IsDestroyed(tutorialHazards[7]) ?? false));
         public bool TutorialShootingActive => tutorialLevel && checkpointIndex == 3 && Distance >= 330f && Distance < WorldShiftTutorial.FinalLessonStart;
         private bool WaitingForTutorialShot => TutorialShootingActive && !TutorialShotComplete;
-        private float BaseSpeed => tutorialLevel ? TutorialWaitingForLesson || WaitingForTutorialShot && Distance >= 410f ? 0f : 18f : JumpSequence ? relay?.SpeedAt(Distance) ?? WorldShiftLevel.Speed
+        private float BaseSpeed => tutorialLevel ? TutorialWaitingForLesson || WaitingForTutorialShot && Distance >= 410f ? 0f : JumpSequence ? relay.SpeedAt(Distance) : 18f : JumpSequence ? relay?.SpeedAt(Distance) ?? WorldShiftLevel.Speed
             : WorldShiftLevel.Speed * (splitViewValidation ? 1f : WorldShiftLevel.CruiseSpeedMultiplier);
         public float Speed => BaseSpeed * (JumpSequence ? 1f : Getaway?.Extras.SpeedMultiplier ?? 1f);
         public ChaseCar Police { get; private set; }
@@ -134,7 +152,12 @@ namespace Outlaws.WorldShift
         {
             GetawayMode = !tutorialLevel && !splitViewValidation && WorldShiftFlow.Escape.Status == GetawayRunState.RunStatus.Running;
             if (GetawayMode) { fuel.SetCapacity(WorldShiftFlow.Garage.FuelCapacity); fuel.RefillToFull(); }
-            if (GetawayMode) { escapeHazards = WorldShiftLevel.CreateEscapeHazards(); escapeFuel = WorldShiftLevel.CreateEscapeFuel(); }
+            if (GetawayMode)
+            {
+                escapeHazards = WorldShiftEscapeProfile.Hazards(environment, WorldShiftFlow.ObstacleMotionMultiplier);
+                escapeFuel = WorldShiftEscapeProfile.Fuel(environment);
+                escapeRelays = WorldShiftEscapeProfile.Relays(environment);
+            }
             if (tutorialLevel) tutorialHazards = WorldShiftTutorial.CreateHazards();
             if (roadTemplate == null || carPrefab == null || view == null || sun == null)
             { Debug.LogError("WorldShiftCity: missing scene references.", this); enabled = false; return; }
@@ -142,15 +165,17 @@ namespace Outlaws.WorldShift
             roadObject.transform.SetParent(transform, false);
             Route = roadObject.AddComponent<WorldShiftRoute>();
             fuelTaken = new bool[Pickups.Length];
+            Route.Environment = environment;
             Route.SharedWorldRules = GetawayMode || tutorialLevel;
-            Route.Build(roadTemplate, splitViewValidation || tutorialLevel, RunLength, extraLength: GetawayMode ? WorldShiftGetaway.ExitTail : 0f);
-            if (!splitViewValidation && !tutorialLevel) relay = new WorldShiftRelay(Route);
+            Route.Build(roadTemplate, splitViewValidation || tutorialLevel, RunLength, relayLayout: splitViewValidation ? null : RelayLayout, extraLength: GetawayMode ? WorldShiftGetaway.TailLength : 0f);
+            if (!splitViewValidation) relay = new WorldShiftRelay(Route, RelayLayout, tutorialLevel ? 18f : WorldShiftLevel.Speed);
             Player = new GameObject("Player - same position in both worlds").transform;
             Player.SetParent(transform, false);
             var visual = new GameObject("Original driving body").transform;
             visual.SetParent(Player, false);
             WorldShiftBlockVisuals.Vehicle(visual, false);
             driver = Player.gameObject.AddComponent<AutoDriveCar>();
+            driver.EnvironmentSteeringGrip = GetawayMode ? WorldShiftEscapeProfile.SteeringGrip(environment) : 1f;
             driver.ConfigureExternalRoute(d =>
             {
                 var ground = relay != null ? relay.SampleDriver(d) : Route.Sample(d);
@@ -158,7 +183,7 @@ namespace Outlaws.WorldShift
                 return Getaway?.Extras != null ? Getaway.Extras.Sample(d, ground) : ground;
             }, visual, WorldShiftLevel.Speed);
             presentation = gameObject.AddComponent<WorldShiftPresentation>();
-            presentation.Build(this, Route, visual, view, sun, obstaclePrefab, policePrefab, streetlightPrefab, fuelPrefab);
+            presentation.Build(this, Route, visual, view, sun);
             ApplyWorld(ShiftWorld.Day);
             Police = ChaseCar.CreateForFiniteRoute(policePrefab, transform, Player, d => Route.SampleDriver(d, relay != null ? relay.SamplePolice(d) : Route.Sample(d), Lateral));
             UpdatePolice(0f);
@@ -177,7 +202,7 @@ namespace Outlaws.WorldShift
 
         private void Start()
         {
-            if (WorldShiftFlow.ConsumeAutoStart(tutorialLevel ? ShiftLevel.Tutorial : ShiftLevel.City)) BeginRun();
+            if (WorldShiftFlow.ConsumeAutoStart(tutorialLevel ? ShiftLevel.Tutorial : environment)) BeginRun();
         }
 
         private void Update()
@@ -187,7 +212,7 @@ namespace Outlaws.WorldShift
             {
                 if (keyboard.escapeKey.wasPressedThisFrame) TogglePause();
                 if (State == ShiftRunState.Ready && keyboard.enterKey.wasPressedThisFrame) BeginRun();
-                else if (!GetawayMode && State == ShiftRunState.Won && keyboard.enterKey.wasPressedThisFrame) WorldShiftFlow.Next(tutorialLevel ? ShiftLevel.Tutorial : ShiftLevel.City);
+                else if (!GetawayMode && State == ShiftRunState.Won && keyboard.enterKey.wasPressedThisFrame) WorldShiftFlow.Next(tutorialLevel ? ShiftLevel.Tutorial : environment);
                 else if (!GetawayMode && State == ShiftRunState.Won && keyboard.rKey.wasPressedThisFrame) RestartRun();
                 else if ((State == ShiftRunState.Running || State == ShiftRunState.Paused) && keyboard.rKey.wasPressedThisFrame) RetryCheckpoint();
             }
@@ -241,6 +266,7 @@ namespace Outlaws.WorldShift
         public bool TrySwitch()
         {
             if (State != ShiftRunState.Running) return false;
+            if ((GetawayMode || tutorialLevel) && (relay?.HoldingLanding(Distance, World) ?? false)) return false;
             if (IsMerged)
             {
                 Notify("A / D  CROSS WORLDS", 1.5f);
@@ -250,16 +276,6 @@ namespace Outlaws.WorldShift
             ApplyWorld(next);
             Getaway?.OnWorldChanged();
             Switches++;
-            if (tutorialLevel && checkpointIndex == 1 && !tutorialHintCompleted)
-            {
-                tutorialFrozen = next == ShiftWorld.Echo && tutorialTrafficMoved;
-                if (tutorialFrozen) tutorialFrozenAt = Duration;
-            }
-            if (tutorialLevel && checkpointIndex == 2)
-            {
-                if (next == ShiftWorld.Echo) tutorialSawNight = true;
-                else if (tutorialSawNight) tutorialReturned = true;
-            }
             CompleteTutorialHint();
             // A switch always commits. Occupied destinations use the same impact
             // path as driving into a hazard; missing road still causes a fall.
@@ -309,19 +325,17 @@ namespace Outlaws.WorldShift
                         if (tutorialLevel && checkpointIndex == 0) continue;
                         hazard.Advance(dt, Distance, World);
                     }
-                if (tutorialLevel)
-                {
-                    if (checkpointIndex == 1 && World == ShiftWorld.Day && tutorialHazards[1].MotionTravel > 0f)
-                        tutorialTrafficMoved = true;
-                }
                 float speed = Speed;
                 Getaway?.BeginStep(previous, previous + speed * dt, driver);
                 if (relay != null)
                 {
-                    driver.ExternalVerticalControl = WorldShiftRelay.At(previous) != null || (Getaway?.Extras.Jump.Traversing ?? false);
+                    driver.ExternalVerticalControl = relay.SectionAt(previous) != null || (Getaway?.Extras.Jump.Traversing ?? false);
                     if (relay.BeginStep(previous, previous + speed * dt, World))
                         Notify("SPACE  /  SWITCH TO LAND", 2.5f);
                 }
+                bool snowSlide = GetawayMode && WorldShiftEscapeProfile.SnowSlide(environment, previous, RelayLayout);
+                driver.EnvironmentReleaseGrip = snowSlide ? .6f : 1f;
+                driver.EnvironmentCountersteerGrip = snowSlide ? 1.25f : 1f;
                 driver.StepExternal(dt, (IsRelayAirborne ? steer * .4f : steer) * (JumpSequence ? 1f : Getaway?.Extras.SteeringMultiplier ?? 1f), speed);
                 Getaway?.FinishStep(driver.RoadPositionDistance, driver);
                 float nextLateral = driver.LateralOffset;
@@ -374,7 +388,6 @@ namespace Outlaws.WorldShift
                 if (checkpointIndex + 1 < Checkpoints.Length && Distance >= Checkpoints[checkpointIndex + 1].Distance)
                 {
                     checkpointIndex++;
-                    ResetTutorialDemo();
                     tutorialHintCompleted = false;
                     tutorialCheckpointSwitches = Switches;
                     tutorialCheckpointLateral = Lateral;
@@ -550,17 +563,12 @@ namespace Outlaws.WorldShift
                 case 0: tutorialHintCompleted = Mathf.Abs(Lateral - Checkpoints[0].Lateral) >= .8f; break;
                 case 1:
                     tutorialHazards[1].BoundsAt(Distance, out _, out float end);
-                    tutorialHintCompleted = tutorialFrozen && World == ShiftWorld.Echo && Distance > end + 5f;
+                    tutorialHintCompleted = World == ShiftWorld.Echo && Distance > end + 5f;
                     break;
-                case 2: tutorialHintCompleted = tutorialReturned && TutorialRewards != null && TutorialRewards.Collected > 0; break;
+                case 2: tutorialHintCompleted = World == ShiftWorld.Day && TutorialRewards != null && TutorialRewards.Collected > 0; break;
                 case 4: tutorialHintCompleted = Distance >= WorldShiftTutorial.LastFinalObstacle + 12f; break;
+                case 5: tutorialHintCompleted = RelaysCompleted > 0 && Distance >= WorldShiftTutorial.Relays[0].End; break;
             }
-        }
-
-        private void ResetTutorialDemo()
-        {
-            tutorialTrafficMoved = tutorialFrozen = tutorialReturned = false;
-            tutorialSawNight = World == ShiftWorld.Echo;
         }
 
         private void RestoreCheckpoint()
@@ -594,7 +602,6 @@ namespace Outlaws.WorldShift
             wasMerged = IsMerged;
             riftEntryWorld = checkpoint.World;
             ApplyWorld(IsMerged ? WorldShiftLevel.WorldAt(Lateral) : checkpoint.World);
-            ResetTutorialDemo();
             UpdatePolice(0f);
             UpdateCamera(true);
             Notify("CHECKPOINT " + (checkpointIndex + 1), 2f);

@@ -9,7 +9,7 @@ public static class DesertSceneSetup
 {
     private static readonly string[] Scenes = { "Env_City", "Env_Snow", "Env_OceanCoast", "Env_Desert" };
 
-    [MenuItem("The Outlaws/Create Desert Prototype")]
+    [MenuItem("The Outlaws/Legacy World/Create Desert Prototype")]
     public static void Create()
     {
         const string path = "Assets/Scenes/Env_Desert.unity";

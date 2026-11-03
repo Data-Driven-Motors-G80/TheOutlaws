@@ -1,3 +1,5 @@
+> Scope: Historical integration/provenance record. This is not the current game specification. See the [current documentation index](README.md).
+
 # Integration notes
 
 ## Team 19 foundation

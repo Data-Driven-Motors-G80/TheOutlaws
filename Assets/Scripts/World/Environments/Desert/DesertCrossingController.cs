@@ -160,7 +160,7 @@ public sealed class DesertCrossingController : MonoBehaviour
     private GameObject CreateWarning(RoadPathPoint point, int direction)
         => CreateWarning(transform, point, direction);
 
-    public static GameObject CreateWarning(Transform parent, RoadPathPoint point, int direction, bool oscillating = false)
+    public static GameObject CreateWarning(Transform parent, RoadPathPoint point, int direction, bool oscillating = false, bool showSign = true)
     {
         var marker = new GameObject(direction > 0 ? "ROCK >>>" : "<<< ROCK");
         marker.transform.SetParent(parent, false);
@@ -175,6 +175,7 @@ public sealed class DesertCrossingController : MonoBehaviour
             Collider collider = dash.GetComponent<Collider>(); collider.enabled = false; Destroy(collider);
             dash.GetComponent<Renderer>().sharedMaterial = RuntimeMaterials.Coloured(new Color(1f, 0.85f, 0.18f));
         }
+        if (!showSign) return marker;
         var sign = GameObject.CreatePrimitive(PrimitiveType.Cube);
         sign.name = "Rock warning sign";
         sign.transform.SetParent(marker.transform, false);

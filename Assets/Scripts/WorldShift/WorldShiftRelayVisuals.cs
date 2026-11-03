@@ -18,7 +18,7 @@ namespace Outlaws.WorldShift
         private Material boost, white, amber, cyan, ghost;
 
         public void Build(WorldShiftCity controller, WorldShiftRoute sharedRoute)
-            => Build(sharedRoute, WorldShiftRelay.Sections);
+            => Build(sharedRoute, controller.RelayLayout);
 
         public void Build(WorldShiftRoute sharedRoute, ShiftRelay[] sections)
         {

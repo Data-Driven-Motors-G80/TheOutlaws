@@ -33,12 +33,21 @@ public sealed class WorldShiftCampaignTests
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
         var menu = Find("WorldShiftMenu");
         var buttons = menu.GetComponentsInChildren<Button>();
-        Assert.That(buttons.Select(b => b.name), Is.EquivalentTo(new[] { "Play escape", "Start tutorial", "Garage" }));
+        Assert.That(buttons.Select(b => b.name), Is.EquivalentTo(new[] { "Start run", "Tutorial", "Upgrade car" }));
         Assert.That(menu.GetComponentsInChildren<Image>().All(image => image.sprite == null), Is.True,
             "The playtest menu uses flat panels without decorative sprites.");
         Assert.That(menu.GetComponentsInChildren<Mask>(), Is.Empty);
         Assert.That(menu.GetComponentsInChildren<Transform>().Any(t => t.name == "Road preview" || t.name == "Day and night road"), Is.False);
         Canvas.ForceUpdateCanvases();
+        var home = (GameObject)menu.GetType().GetField("home", Flags).GetValue(menu);
+        var actions = home.GetComponentsInChildren<Button>();
+        Assert.That(actions.Select(b => b.name), Is.EqualTo(new[] { "Start run", "Tutorial", "Upgrade car" }));
+        var positions = actions.Select(b => b.transform.position).ToArray();
+        Assert.That(positions[0].x, Is.EqualTo(positions[1].x).Within(.1f));
+        Assert.That(positions[1].x, Is.EqualTo(positions[2].x).Within(.1f));
+        Assert.That(positions[0].y, Is.GreaterThan(positions[1].y));
+        Assert.That(positions[1].y, Is.GreaterThan(positions[2].y));
+        Assert.That(home.GetComponentsInChildren<TMPro.TMP_Text>().Length, Is.EqualTo(5), "Title, three actions and saved cash; no duplicate descriptions or footer.");
         foreach (var label in menu.GetComponentsInChildren<TMPro.TMP_Text>())
         {
             label.ForceMeshUpdate();
@@ -52,7 +61,7 @@ public sealed class WorldShiftCampaignTests
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
         var menu = Find("WorldShiftMenu");
-        menu.GetComponentsInChildren<Button>().Single(b => b.name == "Garage").onClick.Invoke();
+        menu.GetComponentsInChildren<Button>().Single(b => b.name == "Upgrade car").onClick.Invoke();
         var buttons = menu.GetComponentsInChildren<Button>();
         Assert.That(buttons.Select(b => b.name), Does.Contain("Upgrade Fuel tank"));
         Assert.That(buttons.Select(b => b.name), Does.Contain("Upgrade Armor"));
@@ -64,7 +73,7 @@ public sealed class WorldShiftCampaignTests
             Assert.That(label.isTextOverflowing, Is.False, label.text);
         }
         Capture("garage-upgrades");
-        buttons.Single(b => b.name == "Start escape").onClick.Invoke();
+        buttons.Single(b => b.name == "Start next run").onClick.Invoke();
         yield return null; yield return null;
         Assert.That(Get(Find("WorldShiftCity"), "GetawayMode"), Is.True);
     }
@@ -105,10 +114,10 @@ public sealed class WorldShiftCampaignTests
             Call(game, "StepSimulation", .05f, steer, false);
         }
         Assert.That(Get(game, "TutorialLessonIndex"), Is.EqualTo(2));
-        Call(hud, "Refresh"); Assert.That(prompt.text, Is.EqualTo("Bring supplies back."));
-        Capture("tutorial-supply-outlines"); Capture("tutorial-supply-outlines-1080");
+        Call(hud, "Refresh"); Assert.That(prompt.text, Is.EqualTo("No cash, fuel or power-ups in Nightshift.\nReturn to Day."));
+        Capture("tutorial-night-no-loot"); Capture("tutorial-night-no-loot-1080");
         Call(game, "TrySwitch"); Call(hud, "Refresh");
-        Assert.That(prompt.text, Is.EqualTo("Collect the cash."));
+        Assert.That(prompt.text, Is.EqualTo("Collect cash in Day to fund your escape."));
         Assert.That(Get(game, "TutorialLessonComplete"), Is.False);
         for (int i = 0; i < 200 && !(bool)Get(game, "TutorialLessonComplete"); i++)
             Call(game, "StepSimulation", .05f, Mathf.Clamp(-(float)Get(game, "Lateral") * 2f, -1f, 1f), false);
@@ -124,8 +133,8 @@ public sealed class WorldShiftCampaignTests
         Assert.That(Get(game, "TutorialLessonIndex"), Is.EqualTo(1));
         Assert.That(Get(game, "Distance"), Is.EqualTo(110f));
         Assert.That((float)Get(traffic, "MotionTravel"), Is.Zero);
-        // Switching before any motion requires returning to Day to demonstrate motion.
-        Call(game, "TrySwitch"); Assert.That(Get(game, "TutorialControlKey"), Is.EqualTo("SPACE"));
+        // An early correct switch counts; there is no forced return just to replay motion.
+        Call(game, "TrySwitch"); Assert.That(Get(game, "TutorialControlKey"), Is.EqualTo("A / D"));
         Call(game, "TrySwitch");
         // Contact with the frozen block is still a collision and retries locally.
         Call(game, "StepSimulation", .1f, 0f, false); Call(game, "TrySwitch");
@@ -142,14 +151,98 @@ public sealed class WorldShiftCampaignTests
     }
 
     [UnityTest]
+    public IEnumerator TutorialMessagesStayStableAcrossRetriesTakeoffLandingAndGapHandoff()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
+        Flow("StartGetaway", true); yield return null; yield return null;
+        var game = Find("WorldShiftCity"); game.enabled = false; var hud = Find("WorldShiftHud");
+        var prompt = (TMPro.TMP_Text)hud.GetType().GetField("lessonHint", Flags).GetValue(hud);
+        for (int lesson = 0; lesson < 6; lesson++)
+        {
+            game.GetType().GetField("checkpointIndex", Flags).SetValue(game, lesson); Call(game, "RetryCheckpoint");
+            string instruction = (string)Get(game, "TutorialPrompt"), key = (string)Get(game, "TutorialControlKey");
+            if (lesson == 1 || lesson == 2 || lesson == 5) Call(game, "TrySwitch");
+            Call(game, "Fail", "TEST RETRY"); Call(hud, "Refresh");
+            Assert.That(prompt.text, Is.EqualTo(instruction), "Retry keeps the upcoming lesson, rather than flashing a generic message: " + lesson);
+            Assert.That(Get(game, "TutorialControlKey"), Is.EqualTo(key));
+            Call(game, "StepSimulation", .8f, 0f, false); Call(hud, "Refresh");
+            Assert.That(prompt.text, Is.EqualTo(instruction));
+        }
+        game.GetType().GetField("checkpointIndex", Flags).SetValue(game, 3); Call(game, "RetryCheckpoint");
+        Assert.That(Get(game, "TutorialControlKey"), Is.EqualTo("F / CLICK"));
+        Pose(game, 410f, 0f); Assert.That(Call(Get(game, "Combat"), "TryShoot"), Is.True);
+        foreach (float d in new[] { 449f, 450f, 459f, 460f })
+        {
+            Pose(game, d, 3.2f); Call(game, "StepSimulation", .001f, 0f, false); Call(hud, "Refresh");
+            Assert.That(prompt.text, Is.EqualTo("Steer through the gap."), "No blank flash or rewording at the gap handoff.");
+        }
+        game.GetType().GetField("checkpointIndex", Flags).SetValue(game, 5); Call(game, "RetryCheckpoint");
+        string rampPrompt = (string)Get(game, "TutorialPrompt");
+        Pose(game, 709.5f, 0f); Call(game, "StepSimulation", .025f, 0f, false);
+        Assert.That(Get(game, "IsRelayAirborne"), Is.True);
+        Assert.That(Get(game, "TutorialPrompt"), Is.EqualTo(rampPrompt), "Takeoff does not briefly repeat the same switch instruction.");
+        Call(game, "TrySwitch"); string landingPrompt = (string)Get(game, "TutorialPrompt");
+        for (int i = 0; i < 200 && (bool)Get(game, "IsRelayAirborne"); i++)
+        {
+            Call(game, "StepSimulation", .05f, 0f, false);
+            Assert.That(Get(game, "TutorialPrompt"), Is.EqualTo(landingPrompt));
+        }
+        Assert.That(Get(game, "RelaysCompleted"), Is.EqualTo(1));
+        Call(hud, "Refresh"); Assert.That(prompt.text, Is.EqualTo(landingPrompt));
+    }
+
+    [UnityTest]
+    public IEnumerator TutorialNightHasNoLootAndJumpUsesGameplayLandingProtection()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
+        Flow("StartGetaway", true); yield return null; yield return null;
+        var game = Find("WorldShiftCity"); game.enabled = false;
+        game.GetType().GetField("checkpointIndex", Flags).SetValue(game, 2);
+        Call(game, "RetryCheckpoint");
+        var rewards = Get(game, "TutorialRewards");
+        Call(rewards, "Present", Get(game, "World"));
+        var boxes = (Transform[])rewards.GetType().GetField("boxes", Flags).GetValue(rewards);
+        Assert.That(boxes.All(b => !b.gameObject.activeSelf), Is.True, "Nightshift must show no cash.");
+        Assert.That(Resources.FindObjectsOfTypeAll<GameObject>().Any(g => g.name == "Tutorial supply outline"), Is.False);
+        Call(rewards, "Step", 270f, 300f, 0f, 0f);
+        Assert.That(Get(rewards, "Collected"), Is.EqualTo(0), "Crossing cash positions at night gives nothing.");
+        Call(game, "TrySwitch");
+        Assert.That(boxes.All(b => b.gameObject.activeSelf), Is.True);
+        Call(rewards, "Step", 270f, 300f, 0f, 0f);
+        Assert.That(Get(rewards, "Collected"), Is.EqualTo(2));
+
+        game.GetType().GetField("checkpointIndex", Flags).SetValue(game, 5); Call(game, "RetryCheckpoint");
+        // Missing the midair switch retries only the jump.
+        for (int i = 0; i < 600 && Get(game, "State").ToString() == "Running"; i++)
+            Call(game, "StepSimulation", .05f, 0f, false);
+        Assert.That(Get(game, "State").ToString(), Is.EqualTo("Retrying"));
+        Call(game, "StepSimulation", 1.1f, 0f, false);
+        Assert.That(Get(game, "Distance"), Is.EqualTo(580f));
+        for (int i = 0; i < 600 && !(bool)Get(game, "IsRelayAirborne"); i++)
+            Call(game, "StepSimulation", .05f, 0f, false);
+        Assert.That(Get(game, "IsRelayAirborne"), Is.True);
+        Call(game, "TrySwitch");
+        Call(Find("WorldShiftHud"), "Refresh"); Capture("tutorial-night-jump");
+        for (int i = 0; i < 200 && (bool)Get(game, "IsRelayAirborne"); i++)
+            Call(game, "StepSimulation", .05f, 0f, false);
+        Assert.That(Get(game, "RelaysCompleted"), Is.EqualTo(1));
+        Assert.That(Call(game, "TrySwitch"), Is.False, "Early return switches are ignored on the one-world landing.");
+        Assert.That(Get(game, "World").ToString(), Is.EqualTo("Echo"));
+        for (int i = 0; i < 200 && (float)Get(game, "Distance") < 851f; i++)
+            Call(game, "StepSimulation", .05f, 0f, false);
+        Assert.That(Get(game, "TutorialLessonComplete"), Is.True);
+        Assert.That(Call(game, "TrySwitch"), Is.True, "Both roads are safe after rejoining.");
+    }
+
+    [UnityTest]
     public IEnumerator MenuTutorialCityDesertAndCollisionSmoke()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
         yield return new EnterPlayMode();
         var menuButtons = UnityEngine.Object.FindObjectsByType<Button>(FindObjectsSortMode.None);
-        Assert.That(menuButtons.Select(b => b.name), Is.EquivalentTo(new[] { "Play escape", "Start tutorial", "Garage" }));
+        Assert.That(menuButtons.Select(b => b.name), Is.EquivalentTo(new[] { "Start run", "Tutorial", "Upgrade car" }));
         Capture("01-menu");
-        menuButtons.Single(b => b.name == "Play escape").onClick.Invoke();
+        menuButtons.Single(b => b.name == "Start run").onClick.Invoke();
         yield return null; yield return null;
         var escape = Find("WorldShiftCity"); escape.enabled = false;
         Assert.That(Get(escape, "TutorialLevel"), Is.False, "Escape must start directly, even in a fresh session.");
@@ -188,7 +281,7 @@ public sealed class WorldShiftCampaignTests
                 Assert.That((float)Get(tutorial, "Speed"), Is.EqualTo(18f));
                 learnedShooting = true;
             }
-            string desired = d >= 130f && d < 260f ? "Echo" : "Day";
+            string desired = d >= 130f && d < 260f || d >= 710f ? "Echo" : "Day";
             if (Get(tutorial, "World").ToString() != desired)
             {
                 Call(tutorial, "TrySwitch");
@@ -201,13 +294,13 @@ public sealed class WorldShiftCampaignTests
                         Call(tutorial, "TrySwitch");
                         Assert.That(Get(tutorial, "TutorialLessonComplete"), Is.False);
                         Call(tutorial, "RetryCheckpoint");
-                        Assert.That(Get(tutorial, "SectionHint"), Is.EqualTo("Press Space to freeze obstacles in Nightshift."), "Retrying the lesson restores its instruction.");
+                        Assert.That(Get(tutorial, "SectionHint"), Is.EqualTo("Enter Nightshift to escape the roadblock."), "Retrying the lesson restores its instruction.");
                         Call(tutorial, "TrySwitch");
                         Assert.That(Get(tutorial, "TutorialLessonComplete"), Is.False);
                     }
                 }
             }
-            float target = d < 240f || d < 534f && d >= 400f ? 3.2f : d >= 534f ? -3.2f : 0f;
+            float target = d >= 580f ? 0f : d < 240f || d < 534f && d >= 400f ? 3.2f : d >= 534f ? -3.2f : 0f;
             Call(tutorial, "StepSimulation", .05f, Mathf.Clamp((target - (float)Get(tutorial, "Lateral")) * 2f, -1f, 1f), false);
             if (d < 100f && Mathf.Abs((float)Get(tutorial, "Lateral")) >= .8f)
                 Assert.That(Get(tutorial, "SectionHint"), Is.Empty, "Steering clears the steering instruction.");

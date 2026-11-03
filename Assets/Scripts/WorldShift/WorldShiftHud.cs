@@ -61,12 +61,12 @@ namespace Outlaws.WorldShift
             lessonKey.color = Ink;
             lessonKey.fontStyle = FontStyles.Bold;
             lessonKey.alignment = TextAlignmentOptions.Center;
-            var rightKeyBox = WorldShiftMenu.Panel(lessonPrompt.transform, "Right arrow key", new Vector2(.145f, .18f),
+            var rightKeyBox = WorldShiftMenu.Panel(lessonPrompt.transform, "D key", new Vector2(.145f, .18f),
                 new Vector2(.25f, .82f), White);
             lessonRightKeyBox = rightKeyBox.GetComponent<Image>();
             var rightEdge = rightKeyBox.gameObject.AddComponent<UnityEngine.UI.Outline>();
             rightEdge.effectColor = new Color(1f, .78f, .25f); rightEdge.effectDistance = new Vector2(3f, -3f);
-            lessonRightKey = WorldShiftMenu.Label(rightKeyBox, "→", .03f, .05f, .97f, .95f, 38f);
+            lessonRightKey = WorldShiftMenu.Label(rightKeyBox, "D", .03f, .05f, .97f, .95f, 38f);
             lessonRightKey.color = Ink; lessonRightKey.alignment = TextAlignmentOptions.Midline;
             lessonHint = WorldShiftMenu.Label(lessonPrompt.transform, "", .26f, .08f, .975f, .92f, 28f);
             lessonHint.name = "Tutorial instruction";
@@ -80,7 +80,7 @@ namespace Outlaws.WorldShift
             lessonReady = LessonPanel("Let's take a quick spin.", "You'll pick it up as we go.");
             WorldShiftMenu.Button(lessonReady.transform, "Let's drive", new Vector2(.26f, .25f), new Vector2(.74f, .36f), game.BeginRun);
             WorldShiftMenu.Button(lessonReady.transform, "Back to menu", new Vector2(.36f, .11f), new Vector2(.64f, .20f), WorldShiftFlow.Menu);
-            lessonPause = LessonPanel("Paused", "Take your time.");
+            lessonPause = LessonPanel("Paused", "A / D: steer. Space: switch.\nF / click: shoot.");
             WorldShiftMenu.Button(lessonPause.transform, "Keep going", new Vector2(.26f, .32f), new Vector2(.74f, .43f), game.TogglePause);
             WorldShiftMenu.Button(lessonPause.transform, "Skip the lesson", new Vector2(.26f, .18f), new Vector2(.74f, .29f), () => WorldShiftFlow.Next(ShiftLevel.Tutorial));
             WorldShiftMenu.Button(lessonPause.transform, "Back to menu", new Vector2(.36f, .06f), new Vector2(.64f, .14f), WorldShiftFlow.Menu);
@@ -107,14 +107,14 @@ namespace Outlaws.WorldShift
             lessonDone.SetActive(game.State == ShiftRunState.Won);
             bool driving = game.State == ShiftRunState.Running || game.State == ShiftRunState.Retrying;
             lessonDriving.SetActive(driving);
-            lessonHint.text = game.State == ShiftRunState.Retrying ? "Try again." : game.TutorialPrompt;
+            lessonHint.text = game.TutorialPrompt;
             string key = game.TutorialControlKey;
-            bool arrows = key.Contains("←");
-            lessonKey.text = arrows ? "←" : key;
-            lessonKey.alignment = arrows ? TextAlignmentOptions.Midline : TextAlignmentOptions.Center;
-            lessonKey.fontSizeMax = arrows ? 38f : 30f;
-            lessonRightKeyBox.gameObject.SetActive(arrows);
-            ((RectTransform)lessonKeyBox.transform).anchorMax = new Vector2(arrows ? .13f : .25f, .82f);
+            bool steeringKeys = key == "A / D";
+            lessonKey.text = steeringKeys ? "A" : key;
+            lessonKey.alignment = steeringKeys ? TextAlignmentOptions.Midline : TextAlignmentOptions.Center;
+            lessonKey.fontSizeMax = steeringKeys ? 38f : 30f;
+            lessonRightKeyBox.gameObject.SetActive(steeringKeys);
+            ((RectTransform)lessonKeyBox.transform).anchorMax = new Vector2(steeringKeys ? .13f : .25f, .82f);
             // Pulse only while the game is running; completed actions clear the entire card.
             float pulse = game.State == ShiftRunState.Running ? .5f + .5f * Mathf.Sin(game.Duration * 3f) : .5f;
             lessonKeyBox.color = lessonRightKeyBox.color = Color.Lerp(new Color(1f, .87f, .47f), White, pulse);
