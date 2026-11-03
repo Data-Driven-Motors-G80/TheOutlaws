@@ -474,7 +474,7 @@ public sealed class WorldShiftGetawayTests
     }
 
     [UnityTest]
-    public IEnumerator PowerupsUseEffectSymbolsAndRampsExplainAutomaticJumping()
+    public IEnumerator PowerupsUsePlainLabelsAndRampsExplainAutomaticJumping()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
         yield return new EnterPlayMode();
@@ -486,7 +486,7 @@ public sealed class WorldShiftGetawayTests
             foreach (string field in new[] { "shieldPickup", "magnetPickup", "boostPickup" })
             {
                 var marker = (Transform)extras.GetType().GetField(field, Flags).GetValue(extras);
-                Assert.That(marker.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Power-up diamond"), Is.True);
+                Assert.That(marker.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Pickup block"), Is.True);
                 Assert.That(marker.GetComponentsInChildren<TMP_Text>(true).Any(t => t.text.Contains("$")), Is.False);
                 Assert.That(marker.GetComponentsInChildren<Collider>(true).All(c => !c.enabled), Is.True);
             }
@@ -509,8 +509,6 @@ public sealed class WorldShiftGetawayTests
                         float d = (float)pickup.GetType().GetField("Distance").GetValue(pickup);
                         if (Mathf.Abs(at - d) > 1f) continue;
                         float lane = (int)pickup.GetType().GetField("Lane").GetValue(pickup) * 10f / 3f;
-                        // Only compare the fuel in the same world as this cash box.
-                        if (!pickup.GetType().GetField("World").GetValue(pickup).Equals(item.GetType().GetField("World").GetValue(item))) continue;
                         Assert.That(Mathf.Abs(x - lane), Is.GreaterThan(2.5f));
                     }
                 }

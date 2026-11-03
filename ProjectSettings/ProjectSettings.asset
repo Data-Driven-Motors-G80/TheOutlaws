@@ -913,7 +913,13 @@ PlayerSettings:
   XboxOneOverrideIdentityName: 
   XboxOneOverrideIdentityPublisher: 
   vrEditorSettings: {}
-  cloudServicesEnabled: {}
+  cloudServicesEnabled:
+    Build: 0
+    Game Performance: 0
+    Legacy Analytics: 0
+    Purchasing: 0
+    UDP: 0
+    Unity Ads: 0
   luminIcon:
     m_Name: 
     m_ModelFolderPath: 
@@ -935,11 +941,11 @@ PlayerSettings:
   captureStartupLogs: {}
   activeInputHandler: 1
   windowsGamepadBackendHint: 0
-  cloudProjectId: 556b88f2-2c05-4c9a-80d9-fc585bad4dab
+  cloudProjectId: 4515df0d-4ff3-40f5-9155-0698ff9718d3
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
   projectName: Money Heist
-  organizationId: kangod
+  organizationId: unity_25a2d0f7c10c3a43b1a8
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0
   hmiLoadingImage: {fileID: 0}

@@ -35,14 +35,14 @@ public sealed class ChaseCar : MonoBehaviour
 
     public bool IsFiniteRoute => finiteRoute != null;
 
-    /// <summary>Reuse this follower and the police prefab on a manually ticked finite road.</summary>
+    /// <summary>Reuse this follower with a plain police block on a manually ticked finite road.</summary>
     public static ChaseCar CreateForFiniteRoute(GameObject prefab, Transform parent, Transform targetPlayer,
         System.Func<float, RoadPathPoint> sample)
     {
-        if (prefab == null) throw new System.ArgumentNullException(nameof(prefab));
         if (sample == null) throw new System.ArgumentNullException(nameof(sample));
-        GameObject instance = Instantiate(prefab, parent);
-        instance.name = "Chasing police - original ChaseCar";
+        GameObject instance = new GameObject("Chasing police block");
+        instance.transform.SetParent(parent, false);
+        Outlaws.WorldShift.WorldShiftBlockVisuals.Vehicle(instance.transform, true);
         ChaseCar chase = instance.GetComponent<ChaseCar>();
         if (chase == null) chase = instance.AddComponent<ChaseCar>();
         chase.finiteRoute = sample;
@@ -52,14 +52,7 @@ public sealed class ChaseCar : MonoBehaviour
         // controller supplies the simulation time and pursuit gap explicitly.
         chase.enabled = false;
         foreach (Collider collider in instance.GetComponentsInChildren<Collider>()) collider.enabled = false;
-        foreach (Light light in instance.GetComponentsInChildren<Light>()) light.shadows = LightShadows.None;
         chase.policeRenderers = instance.GetComponentsInChildren<Renderer>(true);
-        foreach (Renderer renderer in chase.policeRenderers)
-        {
-            renderer.forceRenderingOff = false;
-            if (renderer.name == "Police Body" || renderer.name == "Police Cabin")
-                renderer.sharedMaterial = RuntimeMaterials.Coloured(new Color(.64f, .70f, .79f));
-        }
         return chase;
     }
 

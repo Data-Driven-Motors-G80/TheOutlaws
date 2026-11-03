@@ -51,51 +51,29 @@ namespace Outlaws.WorldShift
             Material deck = material(new Color(.10f, .17f, .22f));
             Material cyan = material(new Color(.25f, .85f, 1f));
             Material orange = material(new Color(1f, .38f, .12f));
-            Material marker = material(new Color(.035f, .055f, .08f));
-            marker.DisableKeyword("_EMISSION");
-            marker.SetColor("_EmissionColor", Color.black);
             BuildRamp(deck, gold);
             var point = route.Sample(ShieldDistance);
             shieldPickup = Root("One-hit shield pickup", point.Position + point.Right * ShieldLane + Vector3.up * 1.5f, point.Forward);
-            PowerMarker(shieldPickup, marker, cyan);
-            Line(shieldPickup, "Shield outline", new[] { new Vector3(0f, 1.3f, 0f), new Vector3(-.65f, 1f, 0f),
-                new Vector3(-.52f, .1f, 0f), new Vector3(0f, -.3f, 0f), new Vector3(.52f, .1f, 0f), new Vector3(.65f, 1f, 0f) }, cyan, .12f, true);
-            Line(shieldPickup, "Shield check", new[] { new Vector3(-.27f, .45f, 0f), new Vector3(-.03f, .20f, 0f), new Vector3(.34f, .76f, 0f) }, cyan, .09f, false);
+            WorldShiftPickupVisual.Build(shieldPickup, "SHIELD", cyan);
             shieldAura = new GameObject("One-hit shield around car").transform;
-            shieldAura.SetParent(player, false); shieldAura.localPosition = Vector3.up * .9f;
-            for (int ring = 0; ring < 3; ring++)
-            {
-                var points = new Vector3[48];
-                for (int i = 0; i < points.Length; i++)
-                {
-                    float a = i * Mathf.PI * 2f / points.Length;
-                    points[i] = ring == 0 ? new Vector3(Mathf.Cos(a) * 1.25f, 0f, Mathf.Sin(a) * 1.95f)
-                        : ring == 1 ? new Vector3(0f, Mathf.Cos(a), Mathf.Sin(a) * 1.95f)
-                        : new Vector3(Mathf.Cos(a) * 1.25f, Mathf.Sin(a), 0f);
-                }
-                Line(shieldAura, "Shield ring", points, cyan, .045f, true);
-            }
+            shieldAura.SetParent(player, false); shieldAura.localPosition = Vector3.up * .15f;
+            Line(shieldAura, "Active shield square", new[] { new Vector3(-1.1f, 0f, -1.8f), new Vector3(1.1f, 0f, -1.8f),
+                new Vector3(1.1f, 0f, 1.8f), new Vector3(-1.1f, 0f, 1.8f) }, cyan, .06f, true);
             Material purple = material(new Color(.85f, .45f, 1f));
             point = route.Sample(MagnetDistance);
             magnetPickup = Root("Loot magnet pickup", point.Position + point.Right * MagnetLane + Vector3.up * 1.5f, point.Forward);
-            PowerMarker(magnetPickup, marker, purple);
-            Line(magnetPickup, "Magnet", new[] { new Vector3(-.6f, 1f, 0f), new Vector3(-.6f, .1f, 0f),
-                new Vector3(-.35f, -.25f, 0f), new Vector3(.35f, -.25f, 0f), new Vector3(.6f, .1f, 0f), new Vector3(.6f, 1f, 0f) }, purple, .22f, false);
+            WorldShiftPickupVisual.Build(magnetPickup, "MAGNET", purple);
             point = route.Sample(BoostDistance);
             boostPickup = Root("Getaway boost pickup", road.Forks.Position(BoostDistance, BoostLane) + Vector3.up * 1.5f, point.Forward);
-            PowerMarker(boostPickup, marker, orange);
-            Line(boostPickup, "Boost bolt", new[] { new Vector3(.3f, 1.3f, 0f), new Vector3(-.45f, .4f, 0f),
-                new Vector3(.2f, .4f, 0f), new Vector3(-.3f, -.4f, 0f) }, orange, .22f, false);
-            magnetAura = new GameObject("Active magnet ring").transform;
-            magnetAura.SetParent(player, false); magnetAura.localPosition = Vector3.up * .25f;
-            var circle = new Vector3[48];
-            for (int i = 0; i < circle.Length; i++)
-            { float a = i * Mathf.PI * 2f / circle.Length; circle[i] = new Vector3(Mathf.Cos(a) * 2f, 0f, Mathf.Sin(a) * 2.6f); }
-            Line(magnetAura, "Magnet timer ring", circle, purple, .07f, true);
-            boostAura = new GameObject("Active boost trails").transform;
-            boostAura.SetParent(player, false);
-            foreach (float side in new[] { -.65f, .65f })
-                Line(boostAura, "Boost trail", new[] { new Vector3(side, .4f, -1.4f), new Vector3(side, .4f, -4.5f) }, orange, .16f, false);
+            WorldShiftPickupVisual.Build(boostPickup, "BOOST", orange);
+            magnetAura = new GameObject("Active magnet indicator").transform;
+            magnetAura.SetParent(player, false); magnetAura.localPosition = new Vector3(0f, 1.2f, -1.1f);
+            Line(magnetAura, "Active magnet symbol", new[] { new Vector3(-.35f, .4f, 0f), new Vector3(-.35f, -.2f, 0f),
+                new Vector3(0f, -.4f, 0f), new Vector3(.35f, -.2f, 0f), new Vector3(.35f, .4f, 0f) }, purple, .1f, false);
+            boostAura = new GameObject("Active boost indicator").transform;
+            boostAura.SetParent(player, false); boostAura.localPosition = new Vector3(0f, 1.2f, -1.1f);
+            Line(boostAura, "Active boost symbol", new[] { new Vector3(.2f, .5f, 0f), new Vector3(-.3f, 0f, 0f),
+                new Vector3(.2f, 0f, 0f), new Vector3(-.2f, -.5f, 0f) }, orange, .1f, false);
             Refresh();
         }
 
@@ -178,7 +156,7 @@ namespace Outlaws.WorldShift
             if (boostAura != null)
             {
                 boostAura.gameObject.SetActive(BoostActive);
-                boostAura.localScale = new Vector3(1f, 1f, Mathf.Clamp01((boostUntil - game.Duration) / BoostDuration));
+                boostAura.localScale = Vector3.one * Mathf.Clamp01((boostUntil - game.Duration) / BoostDuration);
             }
         }
 
@@ -228,21 +206,6 @@ namespace Outlaws.WorldShift
                 var root = Root("Bonus landing marker", p.Position + Vector3.up * .09f, p.Forward);
                 Line(root, "Landing strip", new[] { new Vector3(1.8f, 0f, 0f), new Vector3(4.6f, 0f, 0f) }, gold, .12f, false);
             }
-        }
-
-        private static void PowerMarker(Transform parent, Material backing, Material icon)
-        {
-            // Diamond signs communicate a temporary effect; rectangular $ cases are money.
-            var plate = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            plate.name = "Power-up diamond";
-            plate.transform.SetParent(parent, false);
-            plate.transform.localPosition = new Vector3(0f, .5f, .16f);
-            plate.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
-            plate.transform.localScale = new Vector3(1.8f, 1.8f, .12f);
-            plate.GetComponent<Renderer>().sharedMaterial = backing;
-            plate.GetComponent<Collider>().enabled = false;
-            Line(parent, "Power-up diamond border", new[] { new Vector3(0f, 1.78f, .08f), new Vector3(-1.28f, .5f, .08f),
-                new Vector3(0f, -.78f, .08f), new Vector3(1.28f, .5f, .08f) }, icon, .08f, true);
         }
 
         private Transform Root(string name, Vector3 position, Vector3 forward)

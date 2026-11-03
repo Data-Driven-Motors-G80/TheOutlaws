@@ -7,7 +7,7 @@ namespace Outlaws.WorldShift
     public sealed class WorldShiftCombat : MonoBehaviour
     {
         private sealed class AmmoPickup { public float At, X; public bool Taken; public Transform Visual; }
-        private struct Target { public object Key; public float At, X; public bool Breakable; }
+        private struct Target { public object Key; public float At, X; }
         private sealed class ShotVisual { public Transform Body; public Vector3[] Path; public float Started; }
         private WorldShiftCity city;
         private DesertShiftTrial desert;
@@ -29,15 +29,17 @@ namespace Outlaws.WorldShift
         private WorldShiftRoute Route => city != null ? city.Route : desert.Route;
         private Transform Player => city != null ? city.Player : desert.Player;
         private WorldShiftGetaway Game => city != null ? city.Getaway : desert.Getaway;
+        public static bool IsActive(WorldShiftCombat combat, object key, bool visible = true)
+            => visible && key != null && !(combat?.IsDestroyed(key) ?? false);
         public bool IsDestroyed(object key) => key != null && destroyed.Contains(key);
         public string Hint
         {
             get
             {
                 var target = FindTarget();
-                if (target.Key == null || !target.Breakable) return "";
+                if (target.Key == null) return "";
                 if (Ammo > 0) return "Click to shoot.";
-                return target.Key is WorldShiftForkRoad.Blocker ? "Steer around it." : "Steer around it.";
+                return "Steer around it.";
             }
         }
         public void Bind(WorldShiftCity game) { city = game; Initialize(); }
@@ -54,12 +56,7 @@ namespace Outlaws.WorldShift
         {
             var p = Route.Sample(at); var root = new GameObject("Ammo refill - three rounds").transform;
             root.SetParent(transform, false); root.SetPositionAndRotation(p.Position + p.Right * x + p.Up * 1.4f, Quaternion.LookRotation(p.Forward, p.Up));
-            for (int i = 0; i < 3; i++)
-            {
-                var round = GameObject.CreatePrimitive(PrimitiveType.Capsule); round.name = "Ammo round"; round.transform.SetParent(root, false);
-                round.transform.localPosition = new Vector3((i - 1) * .38f, 0f, 0f); round.transform.localScale = new Vector3(.2f, .5f, .2f);
-                round.GetComponent<Collider>().enabled = false; round.GetComponent<Renderer>().sharedMaterial = RuntimeMaterials.Coloured(Color.white);
-            }
+            WorldShiftPickupVisual.Build(root, "AMMO", RuntimeMaterials.Coloured(new Color(.8f, .85f, .92f)));
             pickups.Add(new AmmoPickup { At = at, X = x, Visual = root });
         }
         public void ResetPractice()
@@ -80,7 +77,7 @@ namespace Outlaws.WorldShift
             nextShot = Duration + .18f; ShotsFired++;
             LastShotAt = Duration;
             var target = FindTarget();
-            if (target.Key != null && target.Breakable) destroyed.Add(target.Key);
+            if (target.Key != null) destroyed.Add(target.Key);
             float end = target.Key != null ? target.At : Distance + OutlawProjectile.MaximumRange;
             float x = target.Key != null ? target.X : Lateral;
             var driver = Player.GetComponent<AutoDriveCar>();
@@ -111,49 +108,64 @@ namespace Outlaws.WorldShift
         }
         private Target FindTarget()
         {
-            Target best = new Target { At = Distance + 70f };
+            Target best = new Target { At = Distance + OutlawProjectile.MaximumRange };
             if (city != null)
             {
                 foreach (var h in city.Hazards)
                 {
                     if (city.TutorialLevel && (!city.TutorialShootingActive || h != city.TutorialShootingObstacle)) continue;
-                    if (IsDestroyed(h) || !h.VisibleIn(World) || Airborne || h.Kind == ShiftHazardKind.Gap || h.Kind == ShiftHazardKind.Fire || h.Kind == ShiftHazardKind.Spikes) continue;
+                    if (!IsActive(this, h, h.VisibleIn(World)) || Airborne || h.Kind == ShiftHazardKind.Gap) continue;
                     h.BoundsAt(Distance, out float at, out float end);
                     float x = Lateral;
                     bool occupied = h.Kind == ShiftHazardKind.HalfBarrier ? h.HalfSide < 0 ? Lateral < .7f : Lateral > -.7f
                         : (h.LaneMask & (1 << Mathf.Clamp(Mathf.RoundToInt(Lateral / (WorldShiftLevel.RoadWidth / 3f)) + 1, 0, 2))) != 0;
                     if (!occupied) continue;
                     if (h.Kind == ShiftHazardKind.HalfBarrier) x = Mathf.Clamp(Lateral, h.HalfSide < 0 ? -4f : .5f, h.HalfSide < 0 ? -.5f : 4f);
-                    Offer(ref best, h, at, x, h.Kind == ShiftHazardKind.Barrier || h.Kind == ShiftHazardKind.HalfBarrier);
+                    Offer(ref best, h, at, x, end: end);
                 }
             }
             else
             {
                 foreach (var rock in desert.Rocks)
-                    if (!IsDestroyed(rock) && desert.RockVisible(rock, World) && rock.Airborne == Airborne)
-                        Offer(ref best, rock, rock.Distance - rock.Radius, desert.RockLateral(rock, World), true, rock.Radius + .7f);
+                {
+                    if (IsActive(this, rock, desert.RockVisible(rock, World)) && rock.Airborne == Airborne)
+                        Offer(ref best, rock, rock.Distance - rock.Radius, desert.RockLateral(rock, World), rock.Radius + .7f, rock.Distance + rock.Radius);
+                    if (!Airborne && desert.HasGuards(rock))
+                        foreach (float side in new[] { -1f, 1f })
+                            foreach (float offset in DesertShiftTrial.CrossingGuardOffsets)
+                            {
+                                object key = DesertShiftTrial.GuardKey(rock, side, offset);
+                                if (IsActive(this, key)) Offer(ref best, key, rock.Distance + offset - 1.25f, side * 3.625f,
+                                    end: rock.Distance + offset + 1.25f);
+                            }
+                }
                 if (!Airborne) foreach (var gate in desert.ActiveGates)
                 {
-                    if (IsDestroyed(gate) || (!desert.GetawayMode && gate.World != World)) continue;
+                    if (!IsActive(this, gate, desert.GetawayMode || gate.World == World)) continue;
                     if (gate.HalfSide < 0 && Lateral > .7f || gate.HalfSide > 0 && Lateral < -.7f) continue;
-                    Offer(ref best, gate, gate.Start, Lateral, true);
+                    Offer(ref best, gate, gate.Start, Lateral, end: gate.End);
                 }
                 if (!Airborne) foreach (var car in desert.Traffic)
-                    Offer(ref best, car, car.Position(World, false) - DesertShiftTraffic.HalfLength,
-                        car.Lane * WorldShiftLevel.RoadWidth / 3f, false, 1.6f);
+                    if (IsActive(this, car)) Offer(ref best, car, car.Position(World, false) - DesertShiftTraffic.HalfLength,
+                        car.Lane * WorldShiftLevel.RoadWidth / 3f, end: car.Position(World, false) + DesertShiftTraffic.HalfLength);
+                if (!Airborne) foreach (var block in desert.ActiveObstacles)
+                    if (IsActive(this, block)) Offer(ref best, block, block.x - 1.25f,
+                        block.y * WorldShiftLevel.RoadWidth / 3f, end: block.x + 1.25f);
             }
             if (!Airborne && Game?.Routing != null) foreach (var block in Game.Routing.Blockers)
-                if (!IsDestroyed(block) && Game.Routing.Branch(block.At, Lateral) > 0)
-                    Offer(ref best, block, block.At - .7f, block.X, true, 1.5f);
+                if (IsActive(this, block) && Game.Routing.Branch(block.At, Lateral) > 0)
+                    Offer(ref best, block, block.At - .7f, block.X, 1.5f, block.At + .7f);
             return best;
         }
-        private void Offer(ref Target best, object key, float at, float x, bool breakable, float aim = 1.6f)
+        private void Offer(ref Target best, object key, float at, float x, float aim = 1.6f, float end = float.NaN)
         {
+            // Resolve contact even when the muzzle has already entered or passed through a close block.
+            if (!float.IsNaN(end) && end >= Distance) at = Mathf.Max(at, Distance + 2.2f);
             if (at < Distance + 2f || at >= best.At || Mathf.Abs(x - Lateral) > aim) return;
             // Never auto-aim across the gap into a different fork branch.
             if (Game?.Routing != null && WorldShiftForkRoad.Owns(Game.Routing.EnvironmentEnd, at)
                 && Game.Routing.Branch(at, Lateral) != 0 && Mathf.Sign(x) != Game.Routing.Branch(at, Lateral)) return;
-            best = new Target { Key = key, At = at, X = x, Breakable = breakable };
+            best = new Target { Key = key, At = at, X = x };
         }
         private Vector3 Position(float d, float x) => Game?.Routing != null ? Game.Routing.Position(d, x) : Route.Sample(d).Position + Route.Sample(d).Right * x;
         public void Step(float from, float to, float a, float b)
@@ -202,14 +214,6 @@ namespace Outlaws.WorldShift
         {
             foreach (var shot in shots) Destroy(shot.Body.gameObject);
             shots.Clear();
-        }
-        public static void MarkBreakable(Transform parent, Vector3 position)
-        {
-            var line = new GameObject("Breakable crack symbol", typeof(LineRenderer)).GetComponent<LineRenderer>();
-            line.transform.SetParent(parent, false); line.transform.localPosition = position; line.useWorldSpace = false;
-            line.sharedMaterial = RuntimeMaterials.Coloured(Color.white); line.widthMultiplier = .12f;
-            line.positionCount = 5; line.SetPositions(new[] { new Vector3(-.3f, .5f, 0f), new Vector3(.15f, .2f, 0f),
-                new Vector3(-.15f, 0f, 0f), new Vector3(.25f, -.25f, 0f), new Vector3(-.1f, -.5f, 0f) });
         }
     }
 }

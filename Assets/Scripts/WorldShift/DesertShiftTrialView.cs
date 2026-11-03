@@ -17,6 +17,7 @@ namespace Outlaws.WorldShift
         private readonly List<RockView> rocks = new List<RockView>();
         private readonly List<GateView> gates = new List<GateView>();
         private readonly List<TrafficView> traffic = new List<TrafficView>();
+        private readonly Dictionary<object, GameObject> extraBlocks = new Dictionary<object, GameObject>();
         private readonly List<Transform> fieldSigns = new List<Transform>();
         private readonly List<Renderer> sand = new List<Renderer>();
         private DesertShiftTrial game;
@@ -63,6 +64,7 @@ namespace Outlaws.WorldShift
             foreach (var block in game.ActiveObstacles)
             {
                 Transform row = RoadRoot("Original desert ordinary row", block.x);
+                extraBlocks.Add(block, row.gameObject);
                 OriginalObstacle(row, new Vector3(block.y * WorldShiftLevel.RoadWidth / 3f, .7f, 0f),
                     new Vector3(1.8f, 1.4f, 2.5f));
             }
@@ -75,9 +77,7 @@ namespace Outlaws.WorldShift
             {
                 Transform pickup = RoadRoot("Shared fuel " + i, game.FuelDistance(i));
                 var green = Material(new Color(.2f, .85f, .45f));
-                Box(pickup, "Fuel can", new Vector3(0f, .8f, 0f), new Vector3(.8f, 1.4f, .7f), green);
-                Box(pickup, "Fuel spout", new Vector3(.2f, 1.6f, 0f), new Vector3(.22f, .3f, .35f), green);
-                WorldText(pickup, "F", new Vector3(0f, .85f, -.365f), Color.white, 7f);
+                WorldShiftPickupVisual.Build(pickup, "FUEL", green);
                 fuelViews.Add(pickup.gameObject);
             }
             if (!game.GetawayMode) BuildHud();
@@ -178,7 +178,12 @@ namespace Outlaws.WorldShift
             if (game.HasGuards(data)) foreach (float side in new[] { -1f, 1f })
             {
                 foreach (float z in new[] { -4.5f, 4.5f })
-                    OriginalObstacle(crossing, new Vector3(side * 3.625f, .45f, z), new Vector3(2.75f, .9f, 2.5f));
+                {
+                    var guard = new GameObject("Crossing X guard").transform;
+                    guard.SetParent(crossing, false);
+                    OriginalObstacle(guard, new Vector3(side * 3.625f, .45f, z), new Vector3(2.75f, .9f, 2.5f));
+                    extraBlocks.Add(DesertShiftTrial.GuardKey(data, side, z), guard.gameObject);
+                }
             }
             if (!data.Airborne && data.MergeSide == 0 && (!game.FullLevel || !DesertShiftLevel.InRockField(data.Distance) || data.Guarded))
                 DesertCrossingController.CreateWarning(crossing, game.Route.Sample(data.Distance), data.Direction > 0f ? 1 : -1, true);
@@ -241,9 +246,9 @@ namespace Outlaws.WorldShift
             for (int i = 0; i < rocks.Count; i++)
             {
                 RockView item = rocks[i]; DesertTrialRock data = game.Rocks[i];
-                item.Root.gameObject.SetActive(!(game.Combat?.IsDestroyed(data) ?? false) && game.RockVisible(data, world) && data.Distance > game.Distance - 40f && data.Distance < game.Distance + 240f);
+                item.Root.gameObject.SetActive(WorldShiftCombat.IsActive(game.Combat, data) && game.RockVisible(data, world) && data.Distance > game.Distance - 40f && data.Distance < game.Distance + 240f);
                 item.Marker.SetActive(data.Distance > game.Distance - 40f && data.Distance < game.Distance + 240f
-                    && (!(game.Combat?.IsDestroyed(data) ?? false) || game.HasGuards(data)));
+                    && (WorldShiftCombat.IsActive(game.Combat, data) || game.HasGuards(data)));
                 RoadPathPoint point = game.RockPoint(data);
                 float x = game.RockLateral(data, world);
                 item.Root.SetPositionAndRotation(point.Position + point.Right * x + point.Up * data.Radius,
@@ -256,11 +261,12 @@ namespace Outlaws.WorldShift
             {
                 var data = game.Traffic[i]; var item = traffic[i];
                 float at = data.Position(world, game.IsMerged);
-                item.Root.gameObject.SetActive(at > game.Distance - 40f && at < game.Distance + 240f);
+                item.Root.gameObject.SetActive(WorldShiftCombat.IsActive(game.Combat, data) && at > game.Distance - 40f && at < game.Distance + 240f);
                 var point = game.Route.Sample(at);
                 item.Root.SetPositionAndRotation(point.Position, Quaternion.LookRotation(point.Forward, point.Up));
                 item.Lock.SetActive(game.FrozenView(world));
             }
+            foreach (var block in extraBlocks) block.Value.SetActive(WorldShiftCombat.IsActive(game.Combat, block.Key));
             for (int i = 0; i < fieldSigns.Count; i++)
             {
                 float ahead = DesertShiftLevel.RockFields[i].x - 50f - game.Distance;
@@ -269,7 +275,7 @@ namespace Outlaws.WorldShift
             for (int i = 0; i < gates.Count; i++)
             {
                 var data = game.ActiveGates[i]; GateView item = gates[i];
-                bool active = (game.GetawayMode || data.World == world) && !(game.Combat?.IsDestroyed(data) ?? false);
+                bool active = (game.GetawayMode || data.World == world) && WorldShiftCombat.IsActive(game.Combat, data);
                 item.Root.SetActive(data.End > game.Distance - 20f && data.Start < game.Distance + 220f);
                 item.Solid.SetActive(active);
             }

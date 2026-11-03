@@ -130,7 +130,8 @@ namespace Outlaws.WorldShift
         private DesertShiftTrialView presentation;
         private float retryTime, messageTime;
         private float checkpointDaySeconds;
-        private static readonly float[] CrossingGuardOffsets = { -4.5f, 4.5f };
+        internal static object GuardKey(DesertTrialRock rock, float side, float offset) => (rock, side, offset);
+        internal static readonly float[] CrossingGuardOffsets = { -4.5f, 4.5f };
         public WorldShiftRoute Route { get; private set; }
         public Transform Player { get; private set; }
         public ShiftWorld World { get; private set; } = ShiftWorld.Day;
@@ -179,11 +180,7 @@ namespace Outlaws.WorldShift
             Player.SetParent(transform, false);
             var visual = new GameObject("Original driving body").transform;
             visual.SetParent(Player, false);
-            GameObject body = Instantiate(carPrefab, visual);
-            body.transform.localPosition = Vector3.up * .55f;
-            body.transform.localScale = new Vector3(1.6f, .85f, 3f);
-            foreach (Collider collider in body.GetComponentsInChildren<Collider>()) collider.enabled = false;
-            body.GetComponent<Renderer>().sharedMaterial = RuntimeMaterials.Coloured(new Color(1f, .76f, .18f));
+            WorldShiftBlockVisuals.Vehicle(visual, false);
             driver = Player.gameObject.AddComponent<AutoDriveCar>();
             driver.ConfigureExternalRoute(DriverPoint, visual, Speed);
             driver.ExternalVerticalControl = fullLevel;
@@ -296,13 +293,16 @@ namespace Outlaws.WorldShift
                 if (State != ShiftRunState.Running) break;
                 foreach (var rock in Rocks)
                     if (!IsAirborne && HasGuards(rock))
-                    foreach (float offset in CrossingGuardOffsets)
-                        if (Distance + 1.5f >= rock.Distance + offset - 1.25f && before - 1.5f <= rock.Distance + offset + 1.25f
-                            && Mathf.Max(Mathf.Abs(previousX), Mathf.Abs(Lateral)) + .8f > 2.25f)
-                            Impact("guard" + rock.Distance, "BARRIER HIT");
+                        foreach (float offset in CrossingGuardOffsets)
+                            foreach (float side in new[] { -1f, 1f })
+                                if (WorldShiftCombat.IsActive(Combat, GuardKey(rock, side, offset))
+                                    && Distance + 1.5f >= rock.Distance + offset - 1.25f && before - 1.5f <= rock.Distance + offset + 1.25f
+                                    && Mathf.Max(previousX, Lateral) + .8f > (side < 0f ? -5f : 2.25f)
+                                    && Mathf.Min(previousX, Lateral) - .8f < (side < 0f ? -2.25f : 5f))
+                                    Impact("guard" + rock.Distance, "BARRIER HIT");
                 if (State != ShiftRunState.Running) break;
                 foreach (var block in ActiveObstacles)
-                    if (Distance + 1.5f >= block.x - 1.25f && before - 1.5f <= block.x + 1.25f
+                    if (WorldShiftCombat.IsActive(Combat, block) && Distance + 1.5f >= block.x - 1.25f && before - 1.5f <= block.x + 1.25f
                         && Mathf.Max(previousX, Lateral) >= block.y * WorldShiftLevel.RoadWidth / 3f - 1.7f
                         && Mathf.Min(previousX, Lateral) <= block.y * WorldShiftLevel.RoadWidth / 3f + 1.7f)
                         Impact("block" + block, "ROADBLOCK");
@@ -334,7 +334,7 @@ namespace Outlaws.WorldShift
             foreach (var gate in ActiveGates)
             {
                 bool visible = GetawayMode || gate.World == World;
-                if ((Combat?.IsDestroyed(gate) ?? false)) continue;
+                if (!WorldShiftCombat.IsActive(Combat, gate)) continue;
                 if (!visible || Distance + 1.5f < gate.Start || before - 1.5f > gate.End) continue;
                 float min = gate.HalfSide > 0 ? 0f : -5f, max = gate.HalfSide < 0 ? 0f : 5f;
                 if (Mathf.Max(previousX, Lateral) + .8f > min && Mathf.Min(previousX, Lateral) - .8f < max)
@@ -349,7 +349,7 @@ namespace Outlaws.WorldShift
                 ShiftWorld owner = rock.MergeSide > 0 ? ShiftWorld.Echo : ShiftWorld.Day;
                 float oldX = RockLateral(rock, IsMerged ? owner : World);
                 rock.Advance(dt, IsMerged ? ShiftWorld.Day : World);
-                if ((Combat?.IsDestroyed(rock) ?? false)) continue;
+                if (!WorldShiftCombat.IsActive(Combat, rock)) continue;
                 if (rock.Airborne != IsAirborne || (!IsMerged && !RockVisible(rock, World))) continue;
                 if (Distance + 1.5f + rock.Radius < rock.Distance || before - 1.5f - rock.Radius > rock.Distance) continue;
                 float x = RockLateral(rock, IsMerged ? owner : World);
@@ -374,7 +374,7 @@ namespace Outlaws.WorldShift
             {
                 float oldDay = car.Position(ShiftWorld.Day, IsMerged);
                 car.Advance(dt, IsMerged ? ShiftWorld.Day : World, Distance);
-                if (IsAirborne) continue;
+                if (IsAirborne || !WorldShiftCombat.IsActive(Combat, car)) continue;
                 float x = car.Lane * WorldShiftLevel.RoadWidth / 3f;
                 for (int i = 0; i < 2; i++)
                 {

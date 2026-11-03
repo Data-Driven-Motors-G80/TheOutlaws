@@ -61,12 +61,6 @@ namespace Outlaws.WorldShift
             route = sharedRoute; view = camera; sun = directional;
             warmEdge = RuntimeMaterials.Coloured(new Color(1f, 0.72f, 0.3f));
             coldEdge = RuntimeMaterials.Coloured(new Color(0.2f, 0.85f, 1f));
-            // A simple cabin makes facing direction readable without importing art.
-            Box(player, "Car cabin", new Vector3(0f, 1.05f, -0.25f), new Vector3(1.25f, 0.5f, 1.4f),
-                RuntimeMaterials.Coloured(new Color(0.08f, 0.12f, 0.17f)));
-            foreach (float side in new[] { -0.5f, 0.5f })
-                Box(player, "Headlight marker", new Vector3(side, 0.6f, 1.51f), new Vector3(0.3f, 0.22f, 0.05f),
-                    Reflective(new Color(1f, 1f, 0.85f), .8f));
             BuildHeadlight(player);
             roadside = gameObject.AddComponent<WorldShiftRoadside>();
             roadside.Build(route);
@@ -113,52 +107,16 @@ namespace Outlaws.WorldShift
                             Day = RuntimeMaterials.Coloured(new Color(.92f, .8f, .56f)),
                             Echo = Reflective(new Color(.3f, .6f, .82f), .32f) });
                     }
-                    int litSide = Mathf.RoundToInt((at + 80f) / 40f) % 2 == 0 ? -1 : 1;
-                    if (side == litSide) BuildFacadeFill(block, side);
-                    if (streetlightPrefab != null)
-                    {
-                        foreach (float z in new[] { side < 0 ? -10f : 10f })
-                        {
-                            RoadPathPoint lampPoint = route.Sample(at + 20f + z);
-                            GameObject lamp = Visual(streetlightPrefab, block, Vector3.zero, Vector3.one * 1.35f);
-                            lamp.transform.SetPositionAndRotation(lampPoint.Position + lampPoint.Right * side * 5.8f,
-                                Quaternion.LookRotation(lampPoint.Forward, lampPoint.Up));
-                            lamp.name = "Echo - existing CityStreetlight prefab";
-                            foreach (Light light in lamp.GetComponentsInChildren<Light>())
-                            {
-                                light.shadows = LightShadows.None;
-                                // Small roadside pools; the player's forward beam owns road visibility.
-                                light.intensity = 48f;
-                                light.range = 9f;
-                                light.spotAngle = 80f;
-                                light.innerSpotAngle = 48f;
-                                light.transform.rotation = Quaternion.LookRotation(-lampPoint.Up, lampPoint.Forward);
-                            }
-                            nightLamps.Add(lamp);
-                        }
-                    }
+                    // Plain posts retain useful roadside scale without decorative lamps or light pools.
+                    var lampPoint = route.Sample(at + 20f + (side < 0 ? -10f : 10f));
+                    var post = new GameObject("Street-light post").transform;
+                    post.SetParent(block, false);
+                    post.SetPositionAndRotation(lampPoint.Position + lampPoint.Right * side * 5.8f,
+                        Quaternion.LookRotation(lampPoint.Forward, lampPoint.Up));
+                    Box(post, "Post", Vector3.up * 1.6f, new Vector3(.12f, 3.2f, .12f), RuntimeMaterials.Coloured(new Color(.3f, .33f, .36f)));
+                    Box(post, "Roadside marker", Vector3.up * 3.2f, new Vector3(.45f, .16f, .3f), RuntimeMaterials.Coloured(Color.white));
                 }
             }
-        }
-
-        private void BuildFacadeFill(Transform block, int side)
-        {
-            var root = new GameObject("Echo facade light strip and soft fill");
-            root.transform.SetParent(block, false);
-            root.transform.localPosition = new Vector3(side * 8.7f, 3.1f, -9f);
-            Box(root.transform, "Low facade light strip", Vector3.zero, new Vector3(.12f, .12f, 7f),
-                Reflective(new Color(.38f, .6f, .83f), .4f));
-            var source = new GameObject("Weak facade pavement fill");
-            source.transform.SetParent(root.transform, false);
-            source.transform.localPosition = new Vector3(-side * .35f, 0f, 0f);
-            Light light = source.AddComponent<Light>();
-            light.type = LightType.Point;
-            light.color = new Color(.44f, .64f, 1f);
-            light.intensity = 6f;
-            light.range = 14f;
-            light.shadows = LightShadows.None;
-            // One alternating fill per block leaves dark stretches between pools.
-            nightLamps.Add(root);
         }
 
         private void BuildHazard(ShiftHazard data)
@@ -473,7 +431,7 @@ namespace Outlaws.WorldShift
         {
             foreach (var hazard in hazards)
             {
-                bool active = hazard.Data.VisibleIn(world) && !(game.Combat?.IsDestroyed(hazard.Data) ?? false);
+                bool active = hazard.Data.VisibleIn(world) && WorldShiftCombat.IsActive(game.Combat, hazard.Data);
                 bool preview = ShouldPreview(hazard, game.Distance);
                 hazard.Solid.SetActive(active);
                 hazard.Ghost.SetActive(preview);
@@ -532,9 +490,7 @@ namespace Outlaws.WorldShift
                 var model = new GameObject("Collectible fuel").transform;
                 model.SetParent(root, false);
                 var green = RuntimeMaterials.Coloured(new Color(.2f, .85f, .45f));
-                Box(model, "Fuel can", new Vector3(0f, .8f, 0f), new Vector3(.8f, 1.4f, .7f), green);
-                Box(model, "Fuel spout", new Vector3(.2f, 1.6f, 0f), new Vector3(.22f, .3f, .35f), green);
-                Label(model, "F", new Vector3(0f, .85f, -.365f), .7f, Color.white).fontSize = 7f;
+                WorldShiftPickupVisual.Build(model, "FUEL", green);
                 fuelModels.Add(model.gameObject);
             }
         }

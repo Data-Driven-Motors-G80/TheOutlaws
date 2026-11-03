@@ -11,34 +11,16 @@ namespace Outlaws.WorldShift
     {
         public const float ExitTail = 440f;
         public const float ContinueBoundary = 1.8f;
-        public const float NightReminderDelay = 12f, NightReminderInterval = 45f;
-        public const string OpeningPrompt = "Collect cash. Take the left exit to keep it.";
-        private const string NightReminderText = "Fuel still drains. Return to Day for supplies.";
-        private const string ShootPrompt = "F / click to shoot the block.";
-        private float lastActionPromptAt = float.NegativeInfinity;
-        private float shootCandidateSince = float.PositiveInfinity;
-        private float shootLastEligibleAt = float.NegativeInfinity;
-        private float shootShownAt = float.PositiveInfinity;
-        private bool shootHintFinished;
-        private float nightEnteredAt = float.PositiveInfinity;
-        public void OnWorldChanged()
-            => nightEnteredAt = World == ShiftWorld.Echo ? Duration : float.PositiveInfinity;
-        private string NightReminder
-        {
-            get
-            {
-                if (World != ShiftWorld.Echo || State != ShiftRunState.Running) return "";
-                float elapsed = Duration - nightEnteredAt - NightReminderDelay;
-                if (elapsed < 0f) return "";
-                float phase = Mathf.Repeat(elapsed, NightReminderInterval);
-                return phase < 6f ? NightReminderText : "";
-            }
-        }
+        private WorldShiftDrivingMessages messages;
+        public void OnWorldChanged() => messages?.OnWorldChanged();
+        internal int CurrentLeg => currentLeg;
+        internal string JumpHint => IsCity
+            ? city.IsRelayAirborne || WorldShiftRelay.At(Distance) != null ? city.SectionHint : ""
+            : desert.IsAirborne || desert.Relay?.SectionAt(Distance) != null ? desert.Hint : "";
         private sealed class Loot
         {
             public float At, X;
-            public ShiftWorld World;
-            public bool Taken, Bonus, AnyWorld;
+            public bool Taken, Bonus;
             public Transform Visual;
         }
         private WorldShiftCity city;
@@ -51,7 +33,7 @@ namespace Outlaws.WorldShift
         private WorldShiftStatusStrip statusStrip;
         private Image choiceLeftPanel, choiceRightPanel;
         private GameObject result, pause, choices, mirrorPanel, drivingHud;
-        private bool continuePending, openingGoalDismissed;
+        private bool continuePending;
         private float environmentEnd;
         private float lootFeedbackUntil = float.NegativeInfinity;
         private int currentLeg, bestBefore;
@@ -72,7 +54,7 @@ namespace Outlaws.WorldShift
         private float Fuel => IsCity ? city.FuelFraction : desert.FuelFraction;
         private float Gap => IsCity ? city.PursuitGap : desert.PursuitGap;
         internal ShiftWorld World => IsCity ? city.World : desert.World;
-        private ShiftRunState State => IsCity ? city.State : desert.State;
+        internal ShiftRunState State => IsCity ? city.State : desert.State;
         private WorldShiftRoute Route => IsCity ? city.Route : desert.Route;
         private RearViewCamera RearView => IsCity ? city.RearView : desert.RearView;
 
@@ -81,6 +63,7 @@ namespace Outlaws.WorldShift
 
         private void Initialize()
         {
+            messages = new WorldShiftDrivingMessages(this);
             currentLeg = WorldShiftFlow.Escape.Leg;
             bestBefore = WorldShiftFlow.BestHaul;
             environmentEnd = IsCity ? WorldShiftLevel.Length : DesertShiftLevel.Length;
@@ -92,39 +75,39 @@ namespace Outlaws.WorldShift
                 material.SetColor("_EmissionColor", Color.black);
             }
             // The opening trail teaches collection without a separate instructions screen.
-            AddLoot(35f, 0f, ShiftWorld.Day, gold, handle);
-            AddLoot(55f, 0f, ShiftWorld.Day, gold, handle);
-            AddLoot(75f, 0f, ShiftWorld.Day, gold, handle);
+            AddLoot(35f, 0f, gold, handle);
+            AddLoot(55f, 0f, gold, handle);
+            AddLoot(75f, 0f, gold, handle);
             if (IsCity)
             {
                 foreach (var pickup in city.Pickups)
                 {
                     // Offer a separate lane choice; never hide a fuel pickup inside a cash box.
                     if (pickup.Distance > environmentEnd - 100f) continue;
-                    AddLoot(pickup.Distance, pickup.Lane == 0 ? -3.2f : 0f, pickup.World, gold, handle);
+                    AddLoot(pickup.Distance, pickup.Lane == 0 ? -3.2f : 0f, gold, handle);
                 }
             }
             else
             {
-                // Alternate worlds on safe central stretches.
+                // Cash alongside fuel on safe central stretches.
                 for (int i = 0; i < 10; i++)
-                    AddLoot(desert.FuelDistance(i), -3.2f, i % 2 == 0 ? ShiftWorld.Day : ShiftWorld.Echo, gold, handle);
+                    AddLoot(desert.FuelDistance(i), -3.2f, gold, handle);
             }
             Routing = gameObject.AddComponent<WorldShiftForkRoad>();
             Routing.Bind(this, Route, environmentEnd, !IsCity, MakeMaterial);
-            foreach (float offset in new[] { 105f, 205f }) AddLoot(Routing.ForkStart + offset, -2.8f, ShiftWorld.Day, gold, handle, anyWorld: true);
+            foreach (float offset in new[] { 105f, 205f }) AddLoot(Routing.ForkStart + offset, -2.8f, gold, handle);
             foreach (float offset in new[] { 112f, 128f, 146f, 202f, 216f, 230f })
-                AddLoot(Routing.ForkStart + offset, Routing.RightLootLane, ShiftWorld.Day, gold, handle, anyWorld: true);
+                AddLoot(Routing.ForkStart + offset, Routing.RightLootLane, gold, handle);
             Extras = gameObject.AddComponent<WorldShiftGetawayExtras>();
             Extras.Bind(this, Route, IsCity ? city.Player : desert.Player, environmentEnd, MakeMaterial);
             foreach (float at in new[] { Extras.Jump.Start + 8f, Extras.Jump.Start + 22f, Extras.Jump.Takeoff + 8f,
                 Extras.Jump.Takeoff + 24f, Extras.Jump.Takeoff + 42f, Extras.Jump.Landing - 8f })
-                AddLoot(at, WorldShiftBonusJump.Lane, ShiftWorld.Echo, gold, handle, Extras.Jump.HeightAt(at), true);
-            AddLoot(Extras.Jump.Start + 16f, -3.2f, ShiftWorld.Day, gold, handle);
-            AddLoot(Extras.Jump.Start + 60f, -3.2f, ShiftWorld.Day, gold, handle);
+                AddLoot(at, WorldShiftBonusJump.Lane, gold, handle, Extras.Jump.HeightAt(at), true);
+            AddLoot(Extras.Jump.Start + 16f, -3.2f, gold, handle);
+            AddLoot(Extras.Jump.Start + 60f, -3.2f, gold, handle);
             // A spaced loot trail gives the magnet a useful window after its pickup.
             foreach (float at in new[] { 175f, 200f, 225f, 250f })
-                AddLoot(at, -3.2f, ShiftWorld.Echo, gold, handle);
+                AddLoot(at, -3.2f, gold, handle);
             BuildExit();
             OnWorldChanged();
             BuildHud();
@@ -141,10 +124,10 @@ namespace Outlaws.WorldShift
             return material;
         }
 
-        private void AddLoot(float at, float x, ShiftWorld owner, Material gold, Material handle, float rise = 0f, bool bonus = false, bool anyWorld = false)
+        private void AddLoot(float at, float x, Material gold, Material handle, float rise = 0f, bool bonus = false)
         {
-            var root = CreateLootBox(transform, "Loot " + owner + " " + at, Route.Sample(at), x, gold, handle, rise);
-            loot.Add(new Loot { At = at, X = x, World = ShiftWorld.Day, Visual = root, Bonus = bonus, AnyWorld = anyWorld });
+            var root = CreateLootBox(transform, "Loot Day " + at, Route.Sample(at), x, gold, handle, rise);
+            loot.Add(new Loot { At = at, X = x, Visual = root, Bonus = bonus });
         }
 
         public static Transform CreateLootBox(Transform parent, string name, RoadPathPoint point, float x, Material gold, Material handle, float rise = 0f)
@@ -154,10 +137,6 @@ namespace Outlaws.WorldShift
             root.SetPositionAndRotation(point.Position + point.Right * x + Vector3.up * (.15f + rise), Quaternion.LookRotation(point.Forward));
             // A low, chunky cash box differs from the tall road barriers. The symbol belongs on its face.
             Box(root, new Vector3(0f, .6f, 0f), new Vector3(1.7f, 1f, 1.05f), gold);
-            Box(root, new Vector3(0f, 1.15f, 0f), new Vector3(1.8f, .16f, 1.12f), gold);
-            Box(root, new Vector3(-.28f, 1.36f, 0f), new Vector3(.13f, .3f, .16f), handle);
-            Box(root, new Vector3(.28f, 1.36f, 0f), new Vector3(.13f, .3f, .16f), handle);
-            Box(root, new Vector3(0f, 1.51f, 0f), new Vector3(.69f, .13f, .16f), handle);
             Box(root, new Vector3(0f, .62f, -.54f), new Vector3(1.12f, .78f, .04f), handle);
             WorldLabel(root, "$", new Vector3(0f, .62f, -.566f), Gold, 10f);
             var symbol = root.GetComponentInChildren<TextMeshPro>();
@@ -368,7 +347,7 @@ namespace Outlaws.WorldShift
             choiceRight.text = "Right: Keep going\n" + (IsCity ? "Desert" : "City") + " / " + (1f + Mathf.Min(currentLeg + 1, 40) * .5f).ToString("0.#") + "x loot";
             choiceLeftPanel.color = !Routing.ContinueSelected(Lateral) ? new Color(.08f, .3f, .2f, .98f) : Ink;
             choiceRightPanel.color = Routing.ContinueSelected(Lateral) ? new Color(.35f, .23f, .06f, .98f) : Ink;
-            string nextPrompt = running && !InExit ? DrivingPrompt() : "";
+            string nextPrompt = running && !InExit ? messages.DrivingPrompt() : "";
             if (guidance.text != nextPrompt) guidance.text = nextPrompt;
             promptPanel.SetActive(nextPrompt.Length > 0);
             // A fixed responsive width avoids an autosizing/preferred-width feedback loop.
@@ -385,62 +364,6 @@ namespace Outlaws.WorldShift
             resultNote.text = banked ? "Best getaway: $" + WorldShiftFlow.BestHaul.ToString("N0") + "\nTotal saved: $" + WorldShiftFlow.Banked.ToString("N0")
                 : "This run's loot is gone. You still have $" + WorldShiftFlow.Banked.ToString("N0") + " saved.";
         }
-
-        private string DrivingPrompt()
-        {
-            // One owner and one priority order. Context-critical instructions never queue behind old tips.
-            string jump = IsCity ? CityHint() : DesertHint();
-            if (jump.Length > 0) return ActionPrompt(jump);
-            if (Distance >= Routing.ForkStart - 100f && Distance < Routing.ChoiceAt)
-                return ActionPrompt("Left: ammo + boost. Right: cash in Day.");
-            if (Distance >= Extras.Jump.Start - 100f && Distance < Extras.Jump.Start && !Extras.Jump.Committed)
-                return ActionPrompt("Right ramp: bonus cash in Day. Left: stay on the road.");
-            string shoot = ShootingPrompt();
-            if (shoot.Length > 0) return ActionPrompt(shoot);
-            // Give the player a quiet beat between an action and optional information.
-            if (Duration - lastActionPromptAt < 1f) return "";
-            if (NightReminder.Length > 0) return NightReminder;
-            if (!openingGoalDismissed && currentLeg == 0 && World == ShiftWorld.Day && Duration < 5f && Distance < 150f)
-                return OpeningPrompt;
-            return "";
-        }
-
-        private string ActionPrompt(string text)
-        {
-            openingGoalDismissed = true;
-            lastActionPromptAt = Duration;
-            return text;
-        }
-
-        private string ShootingPrompt()
-        {
-            if (shootHintFinished || Combat == null) return "";
-            if (Combat.ShotsFired > 0) { shootHintFinished = true; return ""; }
-            if (Combat.Ammo <= 0) return "";
-            if (Combat.Hint == "Click to shoot.")
-            {
-                shootLastEligibleAt = Duration;
-                if (float.IsPositiveInfinity(shootCandidateSince)) shootCandidateSince = Duration;
-                if (Duration - shootCandidateSince < .4f) return "";
-                if (float.IsPositiveInfinity(shootShownAt)) shootShownAt = Duration;
-                if (Duration - shootShownAt < 4f) return ShootPrompt;
-                shootHintFinished = true;
-            }
-            else
-            {
-                // Brief aim changes must not make the caption alternate every frame.
-                if (!float.IsPositiveInfinity(shootShownAt) && Duration - shootLastEligibleAt < .35f) return ShootPrompt;
-                if (!float.IsPositiveInfinity(shootShownAt)) shootHintFinished = true;
-                shootCandidateSince = float.PositiveInfinity;
-            }
-            return "";
-        }
-
-        private string CityHint()
-            => city.IsRelayAirborne || WorldShiftRelay.At(Distance) != null ? city.SectionHint : "";
-
-        private string DesertHint()
-            => desert.IsAirborne || desert.Relay?.SectionAt(Distance) != null ? desert.Hint : "";
 
         private void OnDestroy() { foreach (var material in materials) if (material != null) Destroy(material); }
     }

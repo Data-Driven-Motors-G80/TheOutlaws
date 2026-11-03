@@ -28,6 +28,26 @@ public sealed class WorldShiftCampaignTests
     [UnityTearDown] public IEnumerator Cleanup() { if (Application.isPlaying) yield return new ExitPlayMode(); }
 
     [UnityTest]
+    public IEnumerator MenuUsesPlainPanelsAndKeepsBothActions()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
+        var menu = Find("WorldShiftMenu");
+        var buttons = menu.GetComponentsInChildren<Button>();
+        Assert.That(buttons.Select(b => b.name), Is.EquivalentTo(new[] { "Play escape", "Start tutorial" }));
+        Assert.That(menu.GetComponentsInChildren<Image>().All(image => image.sprite == null), Is.True,
+            "The playtest menu uses flat panels without decorative sprites.");
+        Assert.That(menu.GetComponentsInChildren<Mask>(), Is.Empty);
+        Assert.That(menu.GetComponentsInChildren<Transform>().Any(t => t.name == "Road preview" || t.name == "Day and night road"), Is.False);
+        Canvas.ForceUpdateCanvases();
+        foreach (var label in menu.GetComponentsInChildren<TMPro.TMP_Text>())
+        {
+            label.ForceMeshUpdate();
+            Assert.That(label.isTextOverflowing, Is.False, label.text);
+        }
+        Capture("plain-playtest-menu");
+    }
+
+    [UnityTest]
     public IEnumerator TutorialWaitsOnlyForUnfinishedActions()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();

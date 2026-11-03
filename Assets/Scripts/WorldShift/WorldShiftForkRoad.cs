@@ -106,9 +106,9 @@ namespace Outlaws.WorldShift
         {
             foreach (var block in Blockers)
             {
-                bool destroyed = game.Combat != null && game.Combat.IsDestroyed(block);
-                block.Visual.gameObject.SetActive(!destroyed && block.At > game.Distance - 15f && block.At < game.Distance + 190f);
-                if (block.Touched || destroyed || RewardBranch <= 0 || to + 2f < block.At || from - 2f > block.At) continue;
+                bool active = WorldShiftCombat.IsActive(game.Combat, block);
+                block.Visual.gameObject.SetActive(active && block.At > game.Distance - 15f && block.At < game.Distance + 190f);
+                if (block.Touched || !active || RewardBranch <= 0 || to + 2f < block.At || from - 2f > block.At) continue;
                 if (Mathf.Max(a, b) < block.X - 1.4f || Mathf.Min(a, b) > block.X + 1.4f) continue;
                 block.Touched = true; game.HitForkObstacle(block.At);
             }
@@ -116,7 +116,7 @@ namespace Outlaws.WorldShift
         public void Present(ShiftWorld world)
         {
             deck.color = world == ShiftWorld.Day ? new Color(.22f, .23f, .24f) : new Color(.085f, .105f, .14f);
-            foreach (var block in Blockers) block.Visual.gameObject.SetActive(!(game.Combat?.IsDestroyed(block) ?? false)
+            foreach (var block in Blockers) block.Visual.gameObject.SetActive(WorldShiftCombat.IsActive(game.Combat, block)
                 && block.At > game.Distance - 15f && block.At < game.Distance + 190f);
         }
 

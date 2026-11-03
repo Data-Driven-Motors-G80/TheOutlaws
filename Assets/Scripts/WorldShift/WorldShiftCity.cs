@@ -35,7 +35,7 @@ namespace Outlaws.WorldShift
         private readonly System.Collections.Generic.HashSet<ShiftHazard> hitHazards = new System.Collections.Generic.HashSet<ShiftHazard>();
         private bool tutorialHintCompleted;
         public string TutorialPrompt => !tutorialLevel ? ""
-            : checkpointIndex == 3 && (Combat?.IsDestroyed(TutorialShootingObstacle) ?? false)
+            : checkpointIndex == 3 && !WorldShiftCombat.IsActive(Combat, TutorialShootingObstacle)
                 ? "Block cleared. Keep driving." : WorldShiftTutorial.LessonMessages[checkpointIndex];
         private bool TutorialWaitingForLesson
         {
@@ -90,7 +90,7 @@ namespace Outlaws.WorldShift
         private bool JumpSequence => relay?.SectionAt(Distance) != null || (Getaway?.Extras.IsJumpSequence(Distance) ?? false);
         public ShiftHazard TutorialShootingObstacle => tutorialLevel ? tutorialHazards[3] : null;
         public bool TutorialShootingActive => tutorialLevel && Distance >= 380f && Distance < WorldShiftTutorial.FinalLessonStart;
-        private bool WaitingForTutorialShot => TutorialShootingActive && !(Combat?.IsDestroyed(TutorialShootingObstacle) ?? false);
+        private bool WaitingForTutorialShot => TutorialShootingActive && WorldShiftCombat.IsActive(Combat, TutorialShootingObstacle);
         private float BaseSpeed => tutorialLevel ? TutorialWaitingForLesson || WaitingForTutorialShot && Distance >= 410f ? 0f : 18f : JumpSequence ? relay?.SpeedAt(Distance) ?? WorldShiftLevel.Speed
             : WorldShiftLevel.Speed * (splitViewValidation ? 1f : WorldShiftLevel.CruiseSpeedMultiplier);
         public float Speed => BaseSpeed * (JumpSequence ? 1f : Getaway?.Extras.SpeedMultiplier ?? 1f);
@@ -133,14 +133,7 @@ namespace Outlaws.WorldShift
             Player.SetParent(transform, false);
             var visual = new GameObject("Original driving body").transform;
             visual.SetParent(Player, false);
-            var body = Instantiate(carPrefab, visual);
-            body.name = "Original prototype car";
-            body.transform.localPosition = Vector3.up * 0.55f;
-            body.transform.localRotation = Quaternion.identity;
-            body.transform.localScale = new Vector3(1.6f, 0.85f, 3f);
-            foreach (Collider collider in body.GetComponentsInChildren<Collider>()) collider.enabled = false;
-            // Keep a consistently recognisable player in both palettes.
-            body.GetComponent<Renderer>().sharedMaterial = RuntimeMaterials.Coloured(new Color(1f, 0.76f, 0.18f));
+            WorldShiftBlockVisuals.Vehicle(visual, false);
             driver = Player.gameObject.AddComponent<AutoDriveCar>();
             driver.ConfigureExternalRoute(d =>
             {
@@ -404,7 +397,7 @@ namespace Outlaws.WorldShift
             float clearance = WorldShiftLevel.RoadWidth / 6f + .8f + .03f;
             foreach (var hazard in Hazards)
             {
-                if (hazard.World != World || hazard.Kind != ShiftHazardKind.Divider
+                if (!WorldShiftCombat.IsActive(Combat, hazard, hazard.VisibleIn(World)) || hazard.Kind != ShiftHazardKind.Divider
                     || to + 1.5f < hazard.Start || from - 1.5f > hazard.End || Mathf.Abs(lateral) >= clearance) continue;
                 float side = Mathf.Abs(previousLateral) > .1f ? Mathf.Sign(previousLateral)
                     : Mathf.Abs(steer) > .1f ? Mathf.Sign(steer) : 1f;
@@ -454,7 +447,7 @@ namespace Outlaws.WorldShift
             foreach (var hazard in Hazards)
             {
                 bool merged = IsJoinedDistance(hazard.Start);
-                if ((Combat?.IsDestroyed(hazard) ?? false)) continue;
+                if (!WorldShiftCombat.IsActive(Combat, hazard)) continue;
                 if ((!merged && !hazard.VisibleIn(world)) || (skipHandled && hitHazards.Contains(hazard))) continue;
                 // A missing deck drops the car when its centre crosses the lip.
                 float halfLength = hazard.Kind == ShiftHazardKind.Gap ? 0f : 1.5f;

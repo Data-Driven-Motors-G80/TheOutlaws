@@ -166,6 +166,97 @@ public sealed class WorldShiftCombatRoutesTests
     }
 
     [UnityTest]
+    public IEnumerator EveryCityXBlockTypeCanBeDestroyedIncludingDistantAndCloseTargets()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
+        Flow("Select", Enum.Parse(FlowType.Assembly.GetType("Outlaws.WorldShift.ShiftLevel"), "City"), false);
+        yield return null; yield return null;
+        var game = Find("WorldShiftCity"); game.enabled = false; var combat = Get(game, "Combat");
+        var kinds = ((IEnumerable)Get(game, "Hazards")).Cast<object>()
+            .Where(h => Field(h, "Kind").ToString() != "Gap").GroupBy(h => Field(h, "Kind").ToString()).Select(g => g.First()).ToArray();
+        Assert.That(kinds.Length, Is.EqualTo(8));
+        foreach (var hazard in kinds)
+        {
+            Call(combat, "ResetPractice");
+            string kind = Field(hazard, "Kind").ToString();
+            float start = (float)Field(hazard, "Start");
+            int mask = (int)Field(hazard, "LaneMask");
+            float lane = kind == "HalfBarrier" ? (int)Field(hazard, "HalfSide") * 2.5f
+                : kind == "Divider" ? 0f : (mask & 1) != 0 ? -10f / 3f : (mask & 2) != 0 ? 0f : 10f / 3f;
+            float from = kind == "Oncoming" ? start - 130f : kind == "Divider" ? start + 10f : kind == "HalfBarrier" ? (float)Field(hazard, "End") - .5f : start - 30f;
+            Call(game, "ApplyWorld", Field(hazard, "World")); Pose(game, from, lane);
+            if (kind == "Divider")
+            {
+                Assert.That(Mathf.Abs((float)Call(game, "ResolveDividers", from, from + .1f, 0f, 0f, 0f)), Is.GreaterThan(2f),
+                    "An intact divider still constrains steering.");
+                Pose(game, from, lane);
+            }
+            Assert.That(Call(combat, "TryShoot"), Is.True, kind);
+            Assert.That(Call(combat, "IsDestroyed", hazard), Is.True, "X blocks cannot retain hidden immunity from their old type: " + kind);
+            Assert.That(Get(combat, "Ammo"), Is.EqualTo(2));
+            var bounds = new object[] { from, 0f, 0f }; Call(hazard, "BoundsAt", bounds);
+            float at = Mathf.Max((float)bounds[1], Mathf.Min(from + 2.2f, (float)bounds[2] - .1f));
+            Assert.That(Call(game, "FindCollision", Get(game, "World"), at, at + .1f, lane, lane, false), Is.Null,
+                "A destroyed block must lose its collision: " + kind);
+            if (kind == "Divider")
+            {
+                Assert.That(Call(game, "ResolveDividers", at, at + .1f, 0f, 0f, 0f), Is.EqualTo(0f),
+                    "Shooting a divider must also clear its steering constraint.");
+                Call(game, "StepSimulation", .1f, 0f, false);
+                Assert.That((float)Get(game, "Lateral"), Is.EqualTo(0f).Within(.1f), "Allow road-curve drift, but no invisible divider push.");
+            }
+            var root = game.GetComponentsInChildren<Transform>(true).Single(t => t.name == Field(hazard, "World") + " " + kind + " " + start);
+            Assert.That(root.Find("Solid - collides in this world").gameObject.activeSelf, Is.False, kind);
+        }
+    }
+
+    [UnityTest]
+    public IEnumerator DesertTrafficBlocksLoseTheirVisualAndCollisionWhenShotInEitherMode()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
+        for (int world = 0; world < 2; world++)
+        {
+            Flow("StartGetaway", false); yield return null; yield return null;
+            Flow("FinishGetawayLeg", true); yield return null; yield return null;
+            var game = Find("DesertShiftTrial"); game.enabled = false; var combat = Get(game, "Combat");
+            var traffic = ((IEnumerable)Get(game, "Traffic")).Cast<object>().First();
+            if (world == 1) Call(game, "TrySwitch");
+            float at = (float)Call(traffic, "Position", Get(game, "World"), false);
+            float lane = (int)Field(traffic, "Lane") * 10f / 3f;
+            Pose(game, at - 25f, lane);
+            Assert.That(Call(combat, "TryShoot"), Is.True);
+            Assert.That(Call(combat, "IsDestroyed", traffic), Is.True);
+            var root = game.GetComponentsInChildren<Transform>(true).Single(t => t.name == "Freezeable oncoming police " + Field(traffic, "Start"));
+            Assert.That(root.gameObject.activeSelf, Is.False);
+            Pose(game, at, lane);
+            float gap = (float)Get(game, "PursuitGap");
+            Call(game, "StepTraffic", .01f, at - .1f, lane);
+            Assert.That((float)Get(game, "PursuitGap"), Is.EqualTo(gap), "Destroyed traffic cannot retain an invisible collision.");
+        }
+    }
+
+    [UnityTest]
+    public IEnumerator ShootingACrossingGuardClearsOnlyThatBlockAndItsCollision()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
+        Flow("Select", Enum.Parse(FlowType.Assembly.GetType("Outlaws.WorldShift.ShiftLevel"), "Desert"), false);
+        yield return null; yield return null;
+        var game = Find("DesertShiftTrial"); game.enabled = false; var combat = Get(game, "Combat");
+        var rock = ((IEnumerable)Field(game, "Rocks")).Cast<object>().First();
+        object key = Call(game, "GuardKey", rock, 1f, -4.5f);
+        Pose(game, 145f, 3.625f);
+        Assert.That(Call(combat, "TryShoot"), Is.True);
+        Assert.That(Call(combat, "IsDestroyed", key), Is.True);
+        var blocks = (IDictionary)Field(Find("DesertShiftTrialView"), "extraBlocks");
+        Assert.That(((GameObject)blocks[key]).activeSelf, Is.False);
+        Assert.That(Call(combat, "IsDestroyed", Call(game, "GuardKey", rock, -1f, -4.5f)), Is.False);
+        Pose(game, 175.5f, 3.625f);
+        float gap = (float)Get(game, "PursuitGap");
+        Call(game, "StepSimulation", .01f, 0f, false);
+        Assert.That((float)Get(game, "PursuitGap"), Is.GreaterThan(gap - .1f));
+    }
+
+    [UnityTest]
     public IEnumerator CityShotsClearBothWorldsRespectPauseAmmoAndCurvedRoads()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
@@ -261,11 +352,15 @@ public sealed class WorldShiftCombatRoutesTests
             }
             Pose(game, start - 20f, right ? rightLane : -2.8f);
             float gap = (float)Get(game, "PursuitGap");
+            float shotRange = (float)FlowType.Assembly.GetType("OutlawProjectile").GetField("MaximumRange").GetRawConstantValue();
             bool pictured = false;
             for (int i = 0; i < 900 && (float)Get(game, "Distance") < rejoin + 4f; i++)
             {
                 float d = (float)Get(game, "Distance");
-                if (right && ((string)Get(combat, "Hint")).StartsWith("Click")) Call(combat, "TryShoot");
+                bool forkBlockAhead = ((IEnumerable)Field(routing, "Blockers")).Cast<object>().Any(block =>
+                    !(bool)Call(combat, "IsDestroyed", block) && (float)Field(block, "At") > d
+                    && (float)Field(block, "At") < d + shotRange);
+                if (right && forkBlockAhead && ((string)Get(combat, "Hint")).StartsWith("Click")) Call(combat, "TryShoot");
                 Call(game, "StepSimulation", .025f, Mathf.Clamp(((right ? rightLane : -2.8f) - (float)Get(game, "Lateral")) * 2f, -1f, 1f), false);
                 Assert.That(Get(game, "State").ToString(), Is.EqualTo("Running"));
                 if (!pictured && d > start + 155f)
@@ -376,33 +471,90 @@ public sealed class WorldShiftCombatRoutesTests
             Call(game, "TrySwitch");
             Assert.That(Get(extras, "BoostActive"), Is.True, "Returning promptly to Day restores unexpired powers.");
             Call(game, "TrySwitch");
-            Assert.That(Get(hud, "NightReminder"), Is.EqualTo(""));
+            Assert.That(Get(Field(hud, "messages"), "NightReminder"), Is.EqualTo(""));
             Call(game, "StepSimulation", .1f, 0f, false);
             game.GetType().GetProperty("Duration", Flags).SetValue(game, (float)Get(game, "Duration") + 12f);
-            Assert.That((string)Get(hud, "NightReminder"), Does.Contain("Return to Day for supplies"));
+            Assert.That((string)Get(Field(hud, "messages"), "NightReminder"), Does.Contain("Return to Day for supplies"));
             Call(game, "TogglePause");
             float duration = (float)Get(game, "Duration");
             Call(game, "StepSimulation", 10f, 0f, false);
             Assert.That(Get(game, "Duration"), Is.EqualTo(duration));
             Call(game, "TogglePause");
-            Assert.That((string)Get(hud, "NightReminder"), Does.Contain("Return to Day for supplies"));
+            Assert.That((string)Get(Field(hud, "messages"), "NightReminder"), Does.Contain("Return to Day for supplies"));
             // A render of the other world must not reset the player's Night stay.
             Call(game, "PresentWorldForCamera", Enum.Parse(Get(game, "World").GetType(), "Day"));
-            Assert.That((string)Get(hud, "NightReminder"), Does.Contain("Return to Day for supplies"));
+            Assert.That((string)Get(Field(hud, "messages"), "NightReminder"), Does.Contain("Return to Day for supplies"));
             Call(game, "PresentWorldForCamera", Get(game, "World"));
             game.GetType().GetProperty("Duration", Flags).SetValue(game, duration + 2f);
-            Assert.That((string)Get(hud, "NightReminder"), Does.Contain("Return to Day for supplies"));
+            Assert.That((string)Get(Field(hud, "messages"), "NightReminder"), Does.Contain("Return to Day for supplies"));
             Capture("night-reminder-" + environment);
             game.GetType().GetProperty("Duration", Flags).SetValue(game, duration + 4f);
-            Assert.That((string)Get(hud, "NightReminder"), Does.Contain("Return to Day for supplies"));
+            Assert.That((string)Get(Field(hud, "messages"), "NightReminder"), Does.Contain("Return to Day for supplies"));
             game.GetType().GetProperty("Duration", Flags).SetValue(game, duration + 7f);
-            Assert.That(Get(hud, "NightReminder"), Is.EqualTo(""));
+            Assert.That(Get(Field(hud, "messages"), "NightReminder"), Is.EqualTo(""));
             game.GetType().GetProperty("Duration", Flags).SetValue(game, duration + 45f);
-            Assert.That((string)Get(hud, "NightReminder"), Does.Contain("Return to Day for supplies"));
+            Assert.That((string)Get(Field(hud, "messages"), "NightReminder"), Does.Contain("Return to Day for supplies"));
             Call(game, "TrySwitch");
-            Assert.That(Get(hud, "NightReminder"), Is.EqualTo(""));
+            Assert.That(Get(Field(hud, "messages"), "NightReminder"), Is.EqualTo(""));
             Call(game, "TrySwitch");
-            Assert.That(Get(hud, "NightReminder"), Is.EqualTo(""), "A new Night visit gets its own grace period.");
+            Assert.That(Get(Field(hud, "messages"), "NightReminder"), Is.EqualTo(""), "A new Night visit gets its own grace period.");
+            game.GetType().GetProperty("Duration", Flags).SetValue(game, (float)Get(game, "Duration") + 12f);
+            Assert.That((string)Get(Field(hud, "messages"), "NightReminder"), Is.Not.Empty);
+            float end = (float)Field(hud, "environmentEnd");
+            Pose(game, end + 25f, 0f);
+            Assert.That(Get(Field(hud, "messages"), "NightReminder"), Is.EqualTo(""),
+                "Recovery pauses fuel and pursuit, so its reminder must not claim fuel still drains.");
+        }
+    }
+
+    [UnityTest]
+    public IEnumerator BlockCarsAndLabeledPickupsStayReadableInBothEnvironments()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
+        for (int environment = 0; environment < 2; environment++)
+        {
+            Flow("StartGetaway", false); yield return null; yield return null;
+            if (environment == 1) { Flow("FinishGetawayLeg", true); yield return null; yield return null; }
+            var game = Find(environment == 0 ? "WorldShiftCity" : "DesertShiftTrial"); game.enabled = false;
+            var player = (Transform)Get(game, "Player");
+            var body = player.Find("Original driving body/Player block");
+            var police = (Component)Get(game, "Police");
+            Assert.That(body, Is.Not.Null);
+            Assert.That(player.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Car cabin" || t.name == "Headlight marker"), Is.False);
+            Assert.That(body.GetComponentsInChildren<Renderer>().Length, Is.EqualTo(2));
+            Assert.That(police.GetComponentsInChildren<Light>(true), Is.Empty);
+            Assert.That(police.GetComponentsInChildren<Renderer>(true).Length, Is.EqualTo(2));
+            Assert.That(police.GetComponentsInChildren<Collider>(true).All(c => !c.enabled), Is.True);
+            if (environment == 0)
+            {
+                var posts = game.GetComponentsInChildren<Transform>(true).Where(t => t.name == "Street-light post").ToArray();
+                Assert.That(posts, Is.Not.Empty);
+                Assert.That(posts.All(p => p.GetComponentsInChildren<Light>(true).Length == 0), Is.True);
+                Assert.That(game.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Weak facade pavement fill"), Is.False);
+            }
+            var hud = Get(game, "Getaway"); var extras = Get(hud, "Extras");
+            foreach (string name in new[] { "shieldPickup", "magnetPickup", "boostPickup" })
+            {
+                var pickup = (Transform)Field(extras, name);
+                Assert.That(pickup.Find("Pickup block").localRotation, Is.EqualTo(Quaternion.identity));
+                Assert.That(pickup.GetComponentsInChildren<Collider>(true).All(c => !c.enabled), Is.True);
+                Assert.That(pickup.GetComponentsInChildren<LineRenderer>(true), Is.Empty);
+                Assert.That(pickup.GetComponentInChildren<TMPro.TMP_Text>(true).text,
+                    Is.EqualTo(name.Replace("Pickup", "").ToUpperInvariant()));
+            }
+            var labels = game.GetComponentsInChildren<TMPro.TMP_Text>(true).Where(t => t.name == "Pickup label").ToArray();
+            Assert.That(labels.Any(t => t.text == "FUEL"), Is.True);
+            Assert.That(labels.Any(t => t.text == "AMMO"), Is.True);
+            var cash = game.GetComponentsInChildren<Transform>(true).Single(t => t.name == "Loot Day 35");
+            Assert.That(cash.GetComponentsInChildren<Collider>(true).Length, Is.EqualTo(2), "Cash needs only a block and a readable symbol face.");
+            Assert.That(cash.GetComponentInChildren<TMPro.TMP_Text>(true).text, Is.EqualTo("$"));
+            Vector3 policeBefore = police.transform.position;
+            Call(game, "StepSimulation", .25f, 0f, false);
+            Assert.That(Vector3.Distance(policeBefore, police.transform.position), Is.GreaterThan(1f));
+            Pose(game, 20f, -3.2f);
+            Capture("labeled-pickups-day-" + environment);
+            Call(game, "TrySwitch");
+            Capture("block-prototypes-night-" + environment);
         }
     }
 
