@@ -2,7 +2,22 @@
 
 Applies throughout this repository. Read before making changes. The user's latest request takes priority.
 
-## Product decisions
+## Product decisions — level play (current)
+- The home screen is a level select: 0 Training, 1 City, 2 Desert, 3 Ocean, 4 Snow, 5 Mountain. Each level unlocks after beating the previous one (lock icon until then). Progress is saved in PlayerPrefs.
+- Team testing: Shift+U on the home screen, or **The Outlaws > Levels > Unlock All Levels (testing)** in the Editor, opens every level without changing saved progress. **Reset Level Progress** clears it.
+- Every level runs in `City_WorldShift`; `WorldShiftLevelCourse` decides the environment and layout. New levels need course data, not a new scene.
+- Core mechanic: still obstacles belong to Day or Night. The other world's still obstacles always show as dashed outlines (Day = yellow, Night = black). Dashes are passable; switching while inside one is a crash. Oncoming traffic belongs to one world and also shows as dashes.
+- Anything that moves sideways (sliders, desert rocks) or rolls toward you (rolling rocks) exists in both worlds, keeps one orange colour, moves in Day and freezes in Night. No vertical movers yet.
+- One hit = crash. The police car (otherwise a fixed distance behind) pulls up to you, then you restart at the last checkpoint. No lives, pursuit gap or police meter.
+- Each level has 5 sections. Every section ends with a big ramp: launch in one world, switch midair, land in the other. Landings are checkpoints; the last landing is the finish. Training uses plain gates for its first four steps.
+- Removed from play: cash, garage/upgrades, shooting/ammo, road splitting (forks), cash-out exits, the optional bonus ramp. Disabled (code kept for later levels): fuel, power-ups, the rift.
+- Use as little text as possible. Training teaches with green highway signs (key caps + arrows/pictograms). The HUD is icons only: sun/moon, checkpoint progress, pause.
+- Levels 3–5 are first-pass translations of the earlier Ocean/Snow/Mountain courses; teammates own their tuning.
+- Analytics: `WorldShiftLevelAnalytics` writes one `ws_level_attempts` row per attempt and `wl_*` events (see Docs/ANALYTICS.md, "Levels").
+
+## Legacy endless escape (not reachable from the menu)
+The rules below describe the older endless five-environment escape. Its code and tests are retained until the level game settles; do not extend it.
+
 - Escape advances automatically in this order: City → Desert → Ocean → Snow → Mountain → City. Ocean, Snow and Mountain use low-fidelity authored profiles on the shared finite driving controller.
 - On ordinary transitions, the optional bonus ramp starts 60 m before the environment boundary and lands at least 24 m before the finish. Keep its approach flat/straight and free of Snow coasting. Never transition mid-ramp or in flight.
 - Ordinary environment transitions use a 60 m tail (about 2–3 seconds); cash-out legs keep a 440 m decision approach.
@@ -42,7 +57,7 @@ Applies throughout this repository. Read before making changes. The user's lates
 - Reuse the current Unity session when supported. Do not close the user's Editor or launch a second Unity instance against the same project.
 - If an isolated test copy is needed, reuse an existing one and sync only changed files. Never assume its source or results are current. Avoid repeatedly copying Library or creating fresh projects for small changes.
 - The temporary test copy used in this session is `/tmp/outlaws-balance-check`. Check it exists and matches the relevant source before using it.
-- Unity version comes from `ProjectSettings/ProjectVersion.txt` (currently `6000.3.23f1`). Use targeted `-testFilter` values and save results/logs under `/tmp`.
+- Unity version comes from `ProjectSettings/ProjectVersion.txt` (currently `6000.3.22f1`). Use targeted `-testFilter` values and save results/logs under `/tmp`.
 - `--burst-disable-compilation` has avoided a native Burst startup crash in the temporary test runner. This is a test-run flag, not a project-setting change.
 - Report exactly what was checked and what remains unverified. Keep progress updates and final responses brief.
 - Preserve unrelated working-tree changes, local Unity account links, editor-tool settings and material serialization noise. Do not stage them incidentally.
@@ -58,4 +73,5 @@ Applies throughout this repository. Read before making changes. The user's lates
 - `WorldShiftCombat.cs`: shared obstacle active-state check for targeting, collision, steering and rendering. `WorldShiftGetawayExtras.cs`: shield, magnet, boost and optional bonus ramp. `WorldShiftObstacleVisual.cs`: consistent X blocks. `WorldShiftBlockVisuals.cs`: player and police blocks. `WorldShiftPickupVisual.cs`: shared labeled supply blocks.
 - `WorldShiftPresentation.cs`, `DesertShiftTrialView.cs`: environment and hazard visuals.
 - `Assets/Tests/Editor/WorldShiftEnvironmentFlowTests.cs`: automatic cycle, cash-out, resource persistence and new full-course runs. `Assets/Tests/Editor/WorldShiftCampaignTests.cs`: tutorial and scene flow. `WorldShiftCombatRoutesTests.cs`: modes, routes, combat and resources. `WorldShiftGetawayTests.cs`: escape and HUD. `WorldShiftRelayTests.cs`: jumps.
+- Level play: `WorldShiftLevels.cs` (unlocks, flow), `WorldShiftLevelCourse.cs` (all level layouts), `WorldShiftLevelHud.cs`, `WorldShiftLevelProps.cs` (dashes, highway signs), `WorldShiftIcons.cs`, `WorldShiftLevelAnalytics.cs`. Level-mode branches in `WorldShiftCity` are guarded by `LevelMode`. Tests: `Assets/Tests/Editor/WorldShiftLevelTests.cs`.
 - `ProjectSettings/EditorBuildSettings.asset`: scene list; `WorldShift_Menu` is first, followed by City, Desert, Ocean, Snow, Mountain and the tutorial.

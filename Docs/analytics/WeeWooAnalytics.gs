@@ -11,7 +11,7 @@
  * Each sheet gets new columns automatically the first time a field appears.
  */
 
-var SHEETS = ['events', 'runs', 'sessions', 'tutorials', 'ws_runs', 'ws_legs', 'ws_tutorials'];
+var SHEETS = ['events', 'runs', 'sessions', 'tutorials', 'ws_runs', 'ws_legs', 'ws_tutorials', 'ws_level_attempts'];
 var DASHBOARD = 'dashboard';
 // Current tutorial lessons in play order: [step name sent by the game, column prefix, label].
 // Older builds' lessons (Shield before the mystery boxes, Reverse, Recovery, PursuitCollision) stay in the raw tabs.
@@ -73,7 +73,7 @@ function doPost(e) {
     // A report failure must not reject already-saved rows and provoke duplicate uploads.
     var reportError = '';
     // Rebuild only the reports whose summaries changed; uploads queue behind this reply.
-    var legacy = !!(bySheet.runs || bySheet.tutorials), worldShift = !!(bySheet.ws_runs || bySheet.ws_tutorials);
+    var legacy = !!(bySheet.runs || bySheet.tutorials), worldShift = !!(bySheet.ws_runs || bySheet.ws_tutorials || bySheet.ws_level_attempts);
     if (legacy || worldShift) {
       try { updateMetricTabs(book, legacy, worldShift); }
       catch (err) { reportError = String(err); console.error(reportError); }
@@ -603,7 +603,46 @@ function worldShiftReports(book) {
     tutorialFields.push(['s_' + step, label + ' (s)'], ['retries_' + step, label + ' retries']);
   });
 
+  // Level play (current game): one ws_level_attempts row per attempt.
+  var attempts = latest(table(book, 'ws_level_attempts'), function (r) { return r.attempt_id; });
+  var LEVEL_NAMES = ['Training', 'City', 'Desert', 'Ocean', 'Snow', 'Mountain'];
+  var played = attempts.filter(function (a) { return !truthy(a.unlock_all); });
+  var levelPlay = [['Level attempts', attempts.length], ['Players', unique(attempts, 'player_id').length],
+    ['Attempts with Unlock All on (team testing)', attempts.length - played.length],
+    ['Outcomes', counts(attempts, 'outcome')], ['How attempts started', counts(attempts, 'from')],
+    ['Highest level beaten by each player (no Unlock All)', counts(unique(played, 'player_id').map(function (p) {
+      var beaten = filter(filter(played, 'player_id', p), 'outcome', 'complete');
+      return { best: beaten.length ? LEVEL_NAMES[Math.max.apply(null, metricNumbers(beaten, 'level'))] : 'none' };
+    }), 'best')]];
+  LEVEL_NAMES.forEach(function (name, index) {
+    var here = filter(attempts, 'level', index), done = filter(here, 'outcome', 'complete');
+    if (!here.length) return;
+    levelPlay.push([index + ' ' + name.toUpperCase(), '']);
+    levelPlay.push(['  Attempts / completed', here.length + ' / ' + done.length + ' (' + pct(done.length, here.length) + ')']);
+    levelPlay.push(['  Median deaths in a completed attempt', med(done, 'deaths')]);
+    levelPlay.push(['  Median driving time to complete (s)', med(done, 'drive_s')]);
+    levelPlay.push(['  Deaths by section (all attempts)', [0, 1, 2, 3, 4].map(function (s) { return 'S' + (s + 1) + ': ' + total(here, 'deaths_' + s); }).join(', ')]);
+    levelPlay.push(['  Median seconds per section', [0, 1, 2, 3, 4].map(function (s) {
+      return 'S' + (s + 1) + ': ' + median(metricNumbers(here, 's_' + s).filter(function (v) { return v >= 0; })); }).join(', ')]);
+    levelPlay.push(['  Deaths from switching into dashes', pct(total(here, 'switch_deaths'), total(here, 'deaths')) + ' of ' + total(here, 'deaths')]);
+    var causes = {};
+    here.forEach(function (a) { String(a.death_causes || '').split(';').forEach(function (c) {
+      var kv = c.split('='); if (kv[0]) causes[kv[0]] = (causes[kv[0]] || 0) + Number(kv[1] || 0); }); });
+    levelPlay.push(['  Death causes (cause:hazard)', Object.keys(causes).map(function (k) { return k + ': ' + causes[k]; }).join(', ')]);
+    levelPlay.push(['  Quit before finishing (menu/tab closed)', pct(here.filter(function (a) { return a.outcome === 'menu' || a.outcome === 'tab_closed' || a.outcome === 'left'; }).length, here.length)]);
+    levelPlay.push(['  Median switches per minute / time in Night (%)', med(here, 'switches_per_min') + ' / ' + med(here, 'night_pct')]);
+    levelPlay.push(['  Switches made in the air (ramps)', total(here, 'air_switches') + ' of ' + total(here, 'switches')]);
+  });
+  var attemptFields = [['ts', 'Timestamp (UTC)'], ['build', 'Build'], ['player_id', 'Player'], ['level', 'Level'], ['level_name', 'Name'],
+    ['outcome', 'Outcome'], ['from', 'Started from'], ['attempt', 'Attempt # in session'], ['unlock_all', 'Unlock All'],
+    ['drive_s', 'Driving (s)'], ['deaths', 'Deaths'], ['switch_deaths', 'Switch deaths'], ['checkpoints_reached', 'Checkpoints'],
+    ['furthest_m', 'Furthest (m)'], ['switches', 'Switches'], ['switches_per_min', 'Switches / min'], ['night_pct', 'Night %'],
+    ['air_switches', 'Air switches'], ['pauses', 'Pauses'], ['death_causes', 'Death causes']];
+  [0, 1, 2, 3, 4].forEach(function (s) { attemptFields.push(['deaths_' + s, 'S' + (s + 1) + ' deaths'], ['s_' + s, 'S' + (s + 1) + ' (s)']); });
+
   return [
+    report('WS Level Play', 'Non-test level-play attempts (level select build). Sections end at ramps/checkpoints. ' +
+      '"Switch deaths" means switching while inside the other world\'s dashed outline. -1 means not reached.', levelPlay, attemptFields, attempts),
     report('WS Overview', note, overview, runFields, runs),
     report('WS Levels', note, levels, legFields, legs),
     report('WS Tutorial', 'Non-test WorldShift tutorial attempts (not unique people). Seconds are driving time per lesson.', tutorialSummary, tutorialFields, tutorials)

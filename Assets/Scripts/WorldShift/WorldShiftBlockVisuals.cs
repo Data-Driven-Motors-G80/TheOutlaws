@@ -11,9 +11,10 @@ namespace Outlaws.WorldShift
             root.transform.SetParent(parent, false);
             Vector3 size = police ? new Vector3(1.8f, .85f, 3.6f) : new Vector3(1.6f, .85f, 3f);
             Box(root.transform, "Vehicle body", new Vector3(0f, .55f, 0f), size,
-                RuntimeMaterials.Coloured(police ? new Color(.25f, .48f, .85f) : new Color(1f, .76f, .18f)));
+                // The player is white so it never reads as a yellow Day or black Night obstacle.
+                RuntimeMaterials.Coloured(police ? new Color(.25f, .48f, .85f) : new Color(.93f, .94f, .96f)));
             Box(root.transform, "Front direction stripe", new Vector3(0f, .65f, size.z * .5f + .025f),
-                new Vector3(size.x * .7f, .12f, .04f), RuntimeMaterials.Coloured(Color.white));
+                new Vector3(size.x * .7f, .12f, .04f), RuntimeMaterials.Coloured(police ? Color.white : new Color(.85f, .1f, .12f)));
             return root;
         }
 

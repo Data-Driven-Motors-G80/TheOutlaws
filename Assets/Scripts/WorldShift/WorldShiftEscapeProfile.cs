@@ -114,7 +114,9 @@ namespace Outlaws.WorldShift
             return System.Array.ConvertAll(encounters.ToArray(), h => new ShiftHazard(h.World, h.Kind, h.Start, h.End, h.LaneMask,
                 h.MotionSpeed * motionMultiplier, h.HalfSide, h.SharedAcrossWorlds, h.LateralMotion));
         }
-        public static Color Ground(ShiftLevel level, bool night) => level == ShiftLevel.Ocean
+        public static Color Ground(ShiftLevel level, bool night) => level == ShiftLevel.Desert
+            ? night ? new Color(.17f, .24f, .31f) : new Color(.52f, .32f, .16f)
+            : level == ShiftLevel.Ocean
             ? night ? new Color(.025f, .12f, .18f) : new Color(.12f, .5f, .63f)
             : level == ShiftLevel.Snow ? night ? new Color(.36f, .46f, .57f) : new Color(.82f, .89f, .93f)
             : night ? new Color(.13f, .15f, .18f) : new Color(.38f, .39f, .36f);

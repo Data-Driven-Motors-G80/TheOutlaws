@@ -28,57 +28,6 @@ public sealed class WorldShiftCampaignTests
     [UnityTearDown] public IEnumerator Cleanup() { if (Application.isPlaying) yield return new ExitPlayMode(); }
 
     [UnityTest]
-    public IEnumerator MenuUsesPlainPanelsAndKeepsBothActions()
-    {
-        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
-        var menu = Find("WorldShiftMenu");
-        var buttons = menu.GetComponentsInChildren<Button>();
-        Assert.That(buttons.Select(b => b.name), Is.EquivalentTo(new[] { "Start run", "Tutorial", "Upgrade car" }));
-        Assert.That(menu.GetComponentsInChildren<Image>().All(image => image.sprite == null), Is.True,
-            "The playtest menu uses flat panels without decorative sprites.");
-        Assert.That(menu.GetComponentsInChildren<Mask>(), Is.Empty);
-        Assert.That(menu.GetComponentsInChildren<Transform>().Any(t => t.name == "Road preview" || t.name == "Day and night road"), Is.False);
-        Canvas.ForceUpdateCanvases();
-        var home = (GameObject)menu.GetType().GetField("home", Flags).GetValue(menu);
-        var actions = home.GetComponentsInChildren<Button>();
-        Assert.That(actions.Select(b => b.name), Is.EqualTo(new[] { "Start run", "Tutorial", "Upgrade car" }));
-        var positions = actions.Select(b => b.transform.position).ToArray();
-        Assert.That(positions[0].x, Is.EqualTo(positions[1].x).Within(.1f));
-        Assert.That(positions[1].x, Is.EqualTo(positions[2].x).Within(.1f));
-        Assert.That(positions[0].y, Is.GreaterThan(positions[1].y));
-        Assert.That(positions[1].y, Is.GreaterThan(positions[2].y));
-        Assert.That(home.GetComponentsInChildren<TMPro.TMP_Text>().Length, Is.EqualTo(5), "Title, three actions and saved cash; no duplicate descriptions or footer.");
-        foreach (var label in menu.GetComponentsInChildren<TMPro.TMP_Text>())
-        {
-            label.ForceMeshUpdate();
-            Assert.That(label.isTextOverflowing, Is.False, label.text);
-        }
-        Capture("plain-playtest-menu");
-    }
-
-    [UnityTest]
-    public IEnumerator GarageShowsThreeUpgradesAndAllowsFreeStart()
-    {
-        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
-        var menu = Find("WorldShiftMenu");
-        menu.GetComponentsInChildren<Button>().Single(b => b.name == "Upgrade car").onClick.Invoke();
-        var buttons = menu.GetComponentsInChildren<Button>();
-        Assert.That(buttons.Select(b => b.name), Does.Contain("Upgrade Fuel tank"));
-        Assert.That(buttons.Select(b => b.name), Does.Contain("Upgrade Armor"));
-        Assert.That(buttons.Select(b => b.name), Does.Contain("Upgrade Headlights"));
-        Canvas.ForceUpdateCanvases();
-        foreach (var label in menu.GetComponentsInChildren<TMPro.TMP_Text>())
-        {
-            label.ForceMeshUpdate();
-            Assert.That(label.isTextOverflowing, Is.False, label.text);
-        }
-        Capture("garage-upgrades");
-        buttons.Single(b => b.name == "Start next run").onClick.Invoke();
-        yield return null; yield return null;
-        Assert.That(Get(Find("WorldShiftCity"), "GetawayMode"), Is.True);
-    }
-
-    [UnityTest]
     public IEnumerator TutorialWaitsOnlyForUnfinishedActions()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
@@ -239,10 +188,8 @@ public sealed class WorldShiftCampaignTests
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
         yield return new EnterPlayMode();
-        var menuButtons = UnityEngine.Object.FindObjectsByType<Button>(FindObjectsSortMode.None);
-        Assert.That(menuButtons.Select(b => b.name), Is.EquivalentTo(new[] { "Start run", "Tutorial", "Upgrade car" }));
-        Capture("01-menu");
-        menuButtons.Single(b => b.name == "Start run").onClick.Invoke();
+        // The home screen is now the level select; the older endless escape is started directly.
+        Flow("StartGetaway", false);
         yield return null; yield return null;
         var escape = Find("WorldShiftCity"); escape.enabled = false;
         Assert.That(Get(escape, "TutorialLevel"), Is.False, "Escape must start directly, even in a fresh session.");

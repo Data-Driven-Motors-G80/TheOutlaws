@@ -40,6 +40,8 @@ namespace Outlaws.WorldShift
         private WorldShiftConvergence convergence;
         private WorldShiftRelayVisuals relayVisuals;
         private readonly WorldShiftObstacleVisual.Palette obstaclePalette = new WorldShiftObstacleVisual.Palette();
+        // Level play: sliding and rolling hazards exist in both worlds and keep one colour.
+        private readonly WorldShiftObstacleVisual.Palette moverPalette = new WorldShiftObstacleVisual.Palette(WorldShiftLevelProps.MoverColour, Color.white);
         private readonly List<Material> ownedMaterials = new List<Material>();
         private readonly List<PedestrianView> pedestrians = new List<PedestrianView>();
         private readonly Dictionary<(Color, float), Material> glowMaterials = new Dictionary<(Color, float), Material>();
@@ -49,6 +51,7 @@ namespace Outlaws.WorldShift
         {
             game = controller;
             route = sharedRoute; view = camera; sun = directional;
+            obstaclePalette.LevelColours = game.LevelMode;
             BuildHeadlight(player);
             roadside = gameObject.AddComponent<WorldShiftRoadside>();
             roadside.Build(route, game.Environment);
@@ -63,6 +66,7 @@ namespace Outlaws.WorldShift
             BuildFuel();
             BuildCheckpoints();
             BuildCoastalBridge();
+            BuildSigns();
             UpdateVisibility(0f);
         }
 
@@ -86,6 +90,16 @@ namespace Outlaws.WorldShift
             }
         }
 
+        private void BuildSigns()
+        {
+            if (!game.LevelMode) return;
+            foreach (var sign in game.Course.Signs)
+            {
+                var root = WorldShiftLevelProps.HighwaySign(transform, route, sign);
+                chunks.Add(new Chunk { Root = root.gameObject, At = sign.Distance, Tail = 10f });
+            }
+        }
+
         private void BuildHazard(ShiftHazard data)
         {
             RoadPathPoint point = route.Sample((data.Start + data.End) * 0.5f);
@@ -98,6 +112,16 @@ namespace Outlaws.WorldShift
             var solid = new GameObject("Solid - collides in this world"); solid.transform.SetParent(root, false);
             var ghost = new GameObject("Outline - belongs to other world"); ghost.transform.SetParent(root, false);
             float depth = data.End - data.Start;
+            var palette = game.LevelMode && data.SharedAcrossWorlds ? moverPalette : obstaclePalette;
+            // The other world's still obstacles show as passable dashes in their own colour.
+            Material dashes = game.LevelMode && !data.SharedAcrossWorlds
+                ? WorldShiftLevelProps.Glow(data.World == ShiftWorld.Day ? WorldShiftLevelProps.DayColour : WorldShiftLevelProps.NightColour,
+                    data.World == ShiftWorld.Day ? .8f : 0f) : null;
+            void Block(Transform frame, Transform ghostFrame, Vector3 centre, Vector3 size)
+            {
+                WorldShiftObstacleVisual.Build(frame, centre, size, palette);
+                if (dashes != null) WorldShiftLevelProps.DashedOutline(ghostFrame, centre, size, dashes);
+            }
             if (data.Kind == ShiftHazardKind.Gap)
             {
                 WorldShiftRoadSigns.BuildGapWarnings(solid.transform, route, data.Start, data.World == ShiftWorld.Echo);
@@ -115,17 +139,22 @@ namespace Outlaws.WorldShift
                     frame.SetParent(solid.transform, false);
                     var sample = route.Sample(at);
                     frame.SetPositionAndRotation(sample.Position, Quaternion.LookRotation(sample.Forward, sample.Up));
+                    var ghostFrame = new GameObject("Other-world footprint section").transform;
+                    ghostFrame.SetParent(ghost.transform, false);
+                    ghostFrame.SetPositionAndRotation(frame.position, frame.rotation);
                     if (data.Kind == ShiftHazardKind.SwitchWall)
-                        WorldShiftObstacleVisual.Build(frame, new Vector3(0f, .9f, 0f), new Vector3(WorldShiftLevel.RoadWidth, 1.8f, length), obstaclePalette);
+                        Block(frame, ghostFrame, new Vector3(0f, .9f, 0f), new Vector3(WorldShiftLevel.RoadWidth, 1.8f, length));
                     else if (data.Kind == ShiftHazardKind.HalfBarrier)
-                        WorldShiftObstacleVisual.Build(frame, new Vector3(data.HalfSide * 2.5f, .9f, 0f), new Vector3(5f, 1.8f, length), obstaclePalette);
+                        Block(frame, ghostFrame, new Vector3(data.HalfSide * 2.5f, .9f, 0f), new Vector3(5f, 1.8f, length));
                     else if (data.Kind == ShiftHazardKind.Divider)
-                        WorldShiftObstacleVisual.Build(frame, new Vector3(0f, .9f, 0f), new Vector3(3.05f, 1.8f, length), obstaclePalette);
+                        Block(frame, ghostFrame, new Vector3(0f, .9f, 0f), new Vector3(3.05f, 1.8f, length));
+                    else if (game.LevelMode && data.LaneMask == 7 && !data.LateralMotion)
+                        Block(frame, ghostFrame, new Vector3(0f, .9f, 0f), new Vector3(WorldShiftLevel.RoadWidth, 1.8f, length));
                     else for (int lane = 0; lane < 3; lane++)
                     {
                         if ((data.LaneMask & (1 << lane)) == 0) continue;
                         float x = (lane - 1) * WorldShiftLevel.RoadWidth / 3f;
-                        WorldShiftObstacleVisual.Build(frame, new Vector3(x, .9f, 0f), new Vector3(data.LateralMotion ? 1.6f : 3.05f, 1.8f, length), obstaclePalette);
+                        Block(frame, ghostFrame, new Vector3(x, .9f, 0f), new Vector3(data.LateralMotion ? 1.6f : 3.05f, 1.8f, length));
                     }
                 }
             }
@@ -167,6 +196,13 @@ namespace Outlaws.WorldShift
 
         private void BuildCheckpoints()
         {
+            if (game.LevelMode)
+            {
+                // Ramps are the checkpoints; plain gates mark training steps and the finish.
+                var marks = new List<float>(game.Course.Gates) { game.RunLength };
+                foreach (float at in marks) CheckpointGate(at, at >= game.RunLength);
+                return;
+            }
             if (game.GetawayMode || game.TutorialLevel) return;
             for (int i = 0; i <= game.Checkpoints.Length; i++)
             {
@@ -183,10 +219,29 @@ namespace Outlaws.WorldShift
             }
         }
 
+        private void CheckpointGate(float at, bool finish)
+        {
+            RoadPathPoint p = route.Sample(at);
+            Transform root = new GameObject(finish ? "Finish gate" : "Checkpoint gate").transform;
+            root.SetParent(transform, false);
+            root.SetPositionAndRotation(p.Position, Quaternion.LookRotation(p.Forward, p.Up));
+            chunks.Add(new Chunk { Root = root.gameObject, At = at });
+            Material marker = WorldShiftLevelProps.Glow(finish ? Color.white : new Color(.25f, .93f, .7f), .5f);
+            foreach (float x in new[] { -5.8f, 5.8f }) Box(root, "Gate post", new Vector3(x, 2.5f, 0f), new Vector3(.18f, 5f, .18f), marker);
+            Box(root, "Gate lintel", new Vector3(0f, 5f, 0f), new Vector3(11.8f, .18f, .18f), marker);
+            if (!finish) return;
+            // A chequered strip across the road: no words needed.
+            Material black = RuntimeMaterials.Coloured(new Color(.03f, .03f, .03f));
+            for (int i = 0; i < 10; i++)
+                for (int row = 0; row < 2; row++)
+                    Box(root, "Finish chequer", new Vector3(-4.5f + i, .03f, row - .5f), new Vector3(1f, .04f, 1f), (i + row) % 2 == 0 ? marker : black);
+        }
+
         public void SetWorld(ShiftWorld next)
         {
             world = next;
             obstaclePalette.SetWorld(next);
+            moverPalette.SetWorld(next);
             bool day = world == ShiftWorld.Day;
             foreach (var item in palette) item.Renderer.sharedMaterial = day ? item.Day : item.Echo;
             RefreshHazards();
@@ -212,6 +267,7 @@ namespace Outlaws.WorldShift
             Color sky = day ? new Color(0.57f, 0.7f, 0.79f) : new Color(0.065f, 0.10f, 0.155f);
             if (game.Environment == ShiftLevel.Ocean) sky = day ? new Color(.48f, .72f, .8f) : new Color(.025f, .07f, .13f);
             if (game.Environment == ShiftLevel.Snow) sky = day ? new Color(.74f, .82f, .89f) : new Color(.08f, .14f, .23f);
+            if (game.Environment == ShiftLevel.Desert) sky = day ? new Color(.86f, .72f, .52f) : new Color(.07f, .07f, .13f);
             if (game.Environment == ShiftLevel.Mountain) sky = day ? new Color(.57f, .65f, .7f) : new Color(.06f, .09f, .13f);
             RenderSettings.fogColor = sky;
             view.clearFlags = CameraClearFlags.SolidColor;
@@ -292,7 +348,9 @@ namespace Outlaws.WorldShift
             }
         }
 
-        private bool ShouldPreview(HazardView hazard, float distance) => false;
+        // Level play shows every still obstacle of the other world as dashes, so a switch is never a surprise.
+        private bool ShouldPreview(HazardView hazard, float distance) => game.LevelMode && !hazard.Data.SharedAcrossWorlds
+            && hazard.Data.Kind != ShiftHazardKind.Gap && hazard.Data.World != world;
 
         private void BuildFuel()
         {

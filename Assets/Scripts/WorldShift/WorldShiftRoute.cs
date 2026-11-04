@@ -20,6 +20,8 @@ namespace Outlaws.WorldShift
         private ShiftRelay[] relays;
         public bool SharedWorldRules { get; set; }
         public ShiftLevel Environment { get; set; } = ShiftLevel.City;
+        /// <summary>Level play: the course supplies bends and terrain.</summary>
+        public LevelCourse Course { get; set; }
         public WorldShiftForkRoad Forks { get; private set; }
         private float forkEnvironmentEnd = float.NaN;
         public bool IsForkSurface(float distance) => Forks != null ? Forks.OwnsDistance(distance) : !float.IsNaN(forkEnvironmentEnd) && WorldShiftForkRoad.Owns(forkEnvironmentEnd, distance);
@@ -91,6 +93,7 @@ namespace Outlaws.WorldShift
                 - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(2580f, 2700f, d)));
         private float EscapeHeading(float d)
         {
+            if (Course != null) return Course.Heading(d);
             // Authored bends vary in severity between traversal sections. The fork and all
             // ramp approaches remain straight, with clear views of each choice.
             if (relays.Length == 0) return 0f;
@@ -149,6 +152,7 @@ namespace Outlaws.WorldShift
                 if (d >= jump.Ramp - 20f && d <= jump.End)
                     return d < jump.Takeoff || (d == jump.Takeoff && !afterEdge)
                         ? .28f * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(jump.Ramp, jump.Ramp + 24f, d)) : 0f;
+            if (Course != null) return Course.TerrainSlope(d);
             if (SharedWorldRules) return WorldShiftEscapeProfile.TerrainSlope(Environment, d, float.IsNaN(forkEnvironmentEnd) ? length - WorldShiftGetaway.ExitTail : forkEnvironmentEnd, relays);
             return d < 720f ? 0f : .025f * Mathf.Sin((d - 720f) / 190f)
                 * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(2640f, 2720f, d)));

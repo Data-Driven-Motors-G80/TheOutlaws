@@ -97,6 +97,7 @@ namespace Outlaws.WorldShift
         }
         private static void Load(ShiftLevel level)
         {
+            WorldShiftLevels.Leave();
             Time.timeScale = 1f;
             autoStart = level;
             SceneManager.LoadScene(SceneFor(level));
@@ -115,6 +116,6 @@ namespace Outlaws.WorldShift
             else Menu();
         }
         public static string TutorialDestination => afterTutorial == ShiftLevel.Desert ? "DESERT" : "CITY";
-        public static void Menu() { WorldShiftAnalytics.Abandon("menu"); Escape.Leave(); getawayAfterTutorial = false; autoStart = null; Time.timeScale = 1f; SceneManager.LoadScene(MenuScene); }
+        public static void Menu() { WorldShiftLevels.Leave(); WorldShiftAnalytics.Abandon("menu"); Escape.Leave(); getawayAfterTutorial = false; autoStart = null; Time.timeScale = 1f; SceneManager.LoadScene(MenuScene); }
     }
 }

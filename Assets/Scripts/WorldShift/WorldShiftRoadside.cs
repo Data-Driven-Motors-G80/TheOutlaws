@@ -37,7 +37,7 @@ namespace Outlaws.WorldShift
                 RuntimeMaterials.Coloured(new Color(.48f, .47f, .43f)),
                 RuntimeMaterials.Coloured(new Color(.065f, .075f, .085f))
             };
-            if (environment == ShiftLevel.Ocean || environment == ShiftLevel.Snow || environment == ShiftLevel.Mountain)
+            if (environment == ShiftLevel.Desert || environment == ShiftLevel.Ocean || environment == ShiftLevel.Snow || environment == ShiftLevel.Mountain)
             {
                 var groundDay = RuntimeMaterials.Coloured(WorldShiftEscapeProfile.Ground(environment, false));
                 var groundNight = RuntimeMaterials.Coloured(WorldShiftEscapeProfile.Ground(environment, true));

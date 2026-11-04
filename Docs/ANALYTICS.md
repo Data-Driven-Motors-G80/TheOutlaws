@@ -159,6 +159,16 @@ New run fields: `gun_rewards`, `backpack_replacements`, `discarded_bullets`, `ba
 
 Ocean Coast run summaries add `ocean_s` for active time spent on the coast; it is excluded from `city_s`. `end_scene` can be `Env_OceanCoast`, and `max_speed` includes the surf multiplier. Existing City/Snow keys remain available. Spreadsheet summaries need to consume `ocean_s` separately if displaying a complete environment time breakdown.
 
+## WorldShift levels (current game: level select, checkpoints, one-hit crashes)
+
+`WorldShiftLevelAnalytics` reports level play. Paste the updated `Docs/analytics/WeeWooAnalytics.gs` and deploy a new version before playtesting: the receiver only accepts listed tabs, so `ws_level_attempts` rows are dropped until then. The report tab **WS Level Play** summarises them.
+
+| Tab | One row per | Key columns |
+| --- | --- | --- |
+| `ws_level_attempts` | level attempt (load to complete, retry, next, menu or tab close) | `level`, `level_name`, `outcome` (complete/retry/menu/left/tab_closed), `from` (menu/retry/next), `unlock_all`, `drive_s`, `deaths`, `switch_deaths` (switched inside dashes), `checkpoints_reached`, `furthest_m`, `switches`, `air_switches`, `night_pct`, `death_causes` (`cause:hazard=count`), and per section `s_<i>`, `deaths_<i>`, `switches_<i>` |
+
+Events (context: `ws_mode`=level, `level`, `env`, `section`, `dist`, `world`, `drive_s`): `wl_menu`, `wl_level_pick` (`picked`, `unlocked`), `wl_unlock_all`, `wl_level_start` (`from`, `attempt`), `wl_switch` (`to`, `stayed_s`, `airborne`), `wl_checkpoint`, `wl_death` (`cause` crash/switched_into/fell/missed_landing, `hazard_kind`, `hazard_world` day/night/both, `moving`, `s_since_switch`, `after_switch`, `airborne`), `wl_pause`, `wl_level_complete`, `wl_level_end`.
+
 ## WorldShift (Day/Night escape, build tags `worldshift-1.0`, `worldshift-1.1` with the garage, `worldshift-1.2` with five environments)
 
 The WorldShift menu, tutorial and escape report through `Assets/Scripts/WorldShift/WorldShiftAnalytics.cs`, using the

@@ -7,24 +7,22 @@ using UnityEngine.UI;
 
 namespace Outlaws.WorldShift
 {
-    // Escape starts immediately; the optional tutorial teaches the controls separately.
+    // Home is the level select. Level 0 is training; each level unlocks the next.
     public sealed class WorldShiftMenu : MonoBehaviour
     {
         private static readonly Color Ink = new Color(.025f, .045f, .07f, .98f);
         private static readonly Color Accent = new Color(.35f, .85f, 1f);
-        private GameObject home, garage;
-        private TMP_Text savings, homeSavings, garageMessage;
-        private readonly TMP_Text[] upgradeDetails = new TMP_Text[3];
-        private readonly UnityEngine.UI.Button[] upgradeButtons = new UnityEngine.UI.Button[3];
-        private float nextPurchaseTime;
-
         private static readonly Color Cream = new Color(1f, .95f, .84f);
         private static readonly Color Gold = new Color(1f, .75f, .32f);
+        private static readonly Color Tile = new Color(.14f, .23f, .30f);
+        private static readonly Color LockedTile = new Color(.08f, .11f, .14f);
+        private RectTransform levels;
+        private GameObject testBadge;
 
         private void Awake()
         {
             Time.timeScale = 1f;
-            WorldShiftAnalytics.MenuShown();
+            WorldShiftLevelAnalytics.MenuShown();
             var root = CreateCanvas(transform, "WorldShift menu");
             Panel(root, "Plain background", Vector2.zero, Vector2.one, Ink);
             // Keep every action inside the display's usable area.
@@ -32,113 +30,76 @@ namespace Outlaws.WorldShift
             Rect area = Screen.safeArea;
             safe.anchorMin = new Vector2(area.xMin / Screen.width, area.yMin / Screen.height);
             safe.anchorMax = new Vector2(area.xMax / Screen.width, area.yMax / Screen.height);
-            home = Panel(safe, "Choose a mode", Vector2.zero, Vector2.one, Color.clear).gameObject;
-            var wordmark = Label(home.transform, "WorldShift", .20f, .73f, .80f, .87f, 52f);
+            var wordmark = Label(safe, "WorldShift", .20f, .74f, .80f, .88f, 52f);
             wordmark.fontStyle = FontStyles.Bold;
             wordmark.color = Cream;
             wordmark.alignment = TextAlignmentOptions.Center;
-            var start = MenuButton(home.transform, "Start run", new Vector2(.34f, .55f), new Vector2(.66f, .65f),
-                () => WorldShiftFlow.StartGetaway(false), true);
-            MenuButton(home.transform, "Tutorial", new Vector2(.34f, .42f), new Vector2(.66f, .52f),
-                () => WorldShiftFlow.StartGetaway(true), false);
-            MenuButton(home.transform, "Upgrade car", new Vector2(.34f, .29f), new Vector2(.66f, .39f),
-                () => ShowGarage(true), false);
-            homeSavings = Label(home.transform, "", .34f, .21f, .66f, .27f, 23f);
-            homeSavings.alignment = TextAlignmentOptions.Center;
-            BuildGarage(safe);
-            RefreshGarage();
-            if (WorldShiftFlow.ConsumeGarageRequest()) { ShowGarage(true); return; }
-            if (EventSystem.current != null)
-                EventSystem.current.SetSelectedGameObject(start.GetComponentInChildren<UnityEngine.UI.Button>().gameObject);
+            levels = Panel(safe, "Levels", new Vector2(.04f, .30f), new Vector2(.96f, .64f), Color.clear);
+            // Team testing: Shift+U opens every level. A small open lock shows it is on.
+            testBadge = Panel(safe, "All levels open (Shift+U)", new Vector2(.95f, .05f), new Vector2(.95f, .05f), Gold).gameObject;
+            ((RectTransform)testBadge.transform).sizeDelta = new Vector2(48f, 48f);
+            testBadge.GetComponent<Image>().sprite = WorldShiftIcons.Get(ShiftIcon.Unlocked);
+            BuildLevels();
         }
 
-        private void BuildGarage(Transform parent)
+        private void Update()
         {
-            garage = Panel(parent, "Garage screen", Vector2.zero, Vector2.one, Ink).gameObject;
-            Label(garage.transform, "Garage", .075f, .83f, .6f, .94f, 48f).fontStyle = FontStyles.Bold;
-            savings = Label(garage.transform, "", .65f, .85f, .93f, .93f, 26f);
-            savings.alignment = TextAlignmentOptions.Right;
-            Label(garage.transform, "Permanent upgrades for every escape. Spend only cash you have banked.",
-                .075f, .74f, .93f, .81f, 22f);
-            string[] names = { "Fuel tank", "Armor", "Headlights" };
-            for (int i = 0; i < 3; i++)
+            var keyboard = UnityEngine.InputSystem.Keyboard.current;
+            if (keyboard != null && keyboard.uKey.wasPressedThisFrame && keyboard.shiftKey.isPressed)
             {
-                int index = i;
-                float left = .075f + i * .29f;
-                var card = Panel(garage.transform, names[i], new Vector2(left, .30f),
-                    new Vector2(left + .27f, .70f), new Color(.075f, .105f, .145f));
-                Label(card, names[i], .07f, .77f, .93f, .94f, 28f).fontStyle = FontStyles.Bold;
-                upgradeDetails[i] = Label(card, "", .07f, .29f, .93f, .73f, 22f);
-                var button = MenuButton(card, "Upgrade " + names[i], new Vector2(.07f, .06f),
-                    new Vector2(.93f, .23f), () => Purchase(index), true);
-                upgradeButtons[i] = button.GetComponent<Button>();
-            }
-            garageMessage = Label(garage.transform, "Upgrades stay with you after a lost run.", .075f, .21f, .93f, .28f, 21f);
-            MenuButton(garage.transform, "Back", new Vector2(.075f, .07f), new Vector2(.32f, .17f),
-                () => ShowGarage(false), false);
-            MenuButton(garage.transform, "Start next run", new Vector2(.65f, .07f), new Vector2(.93f, .17f),
-                () => WorldShiftFlow.StartGetaway(false), true);
-            garage.SetActive(false);
-        }
-
-        private void Purchase(int index)
-        {
-            if (Time.unscaledTime < nextPurchaseTime) return;
-            nextPurchaseTime = Time.unscaledTime + .35f;
-            bool bought = WorldShiftFlow.BuyUpgrade((VehicleUpgrades.Part)index);
-            garageMessage.text = bought ? "Upgrade installed and saved. Ready for your next escape."
-                : "Not enough saved cash, or this upgrade is already maxed.";
-            RefreshGarage();
-        }
-
-        private void RefreshGarage()
-        {
-            var progress = WorldShiftFlow.Garage;
-            homeSavings.text = savings.text = "Saved: $" + progress.Banked.ToString("N0");
-            for (int i = 0; i < 3; i++)
-            {
-                var part = (VehicleUpgrades.Part)i;
-                int level = progress.Level(part);
-                string current = i == 0 ? (100 + level * 10) + " fuel capacity"
-                    : i == 1 ? (level * 5) + "% less collision penalty"
-                    : (74 + level * 15) + " m headlight range";
-                string next = i == 0 ? "+10 fuel capacity" : i == 1 ? "+5% collision protection" : "+15 m light range";
-                upgradeDetails[i].text = "Level " + level + " / 3\n" + current + "\n\n"
-                    + (level == 3 ? "Fully upgraded" : "Next: " + next);
-                bool affordable = level < 3 && progress.Banked >= progress.Price(part);
-                upgradeButtons[i].interactable = affordable;
-                upgradeButtons[i].GetComponentInChildren<TMP_Text>().text = level == 3 ? "Max level"
-                    : affordable ? "Upgrade: $" + progress.Price(part).ToString("N0")
-                    : "Need $" + progress.Price(part).ToString("N0");
+                WorldShiftLevels.UnlockAll = !WorldShiftLevels.UnlockAll;
+                WorldShiftLevelAnalytics.UnlockAllToggled(WorldShiftLevels.UnlockAll);
+                BuildLevels();
             }
         }
 
-        private void ShowGarage(bool show)
+        private void BuildLevels()
         {
-            RefreshGarage(); home.SetActive(!show); garage.SetActive(show);
-            if (show) WorldShiftAnalytics.GarageShown();
-            if (EventSystem.current != null)
-                EventSystem.current.SetSelectedGameObject((show ? garage : home)
-                    .GetComponentsInChildren<Button>()[show ? 3 : 0].gameObject);
+            for (int i = levels.childCount - 1; i >= 0; i--) Destroy(levels.GetChild(i).gameObject);
+            testBadge.SetActive(WorldShiftLevels.UnlockAll);
+            int count = WorldShiftLevels.Count;
+            GameObject first = null;
+            bool firstUnbeaten = false;
+            for (int i = 0; i < count; i++)
+            {
+                int level = i;
+                bool open = WorldShiftLevels.IsUnlocked(level);
+                float width = 1f / count;
+                var tile = Panel(levels, "Level " + level, new Vector2(i * width + .01f, 0f), new Vector2((i + 1) * width - .01f, 1f), open ? Tile : LockedTile);
+                var image = tile.GetComponent<Image>();
+                image.raycastTarget = true;
+                var button = tile.gameObject.AddComponent<Button>();
+                button.targetGraphic = image;
+                button.onClick.AddListener(() =>
+                {
+                    WorldShiftLevelAnalytics.LevelPicked(level, WorldShiftLevels.IsUnlocked(level));
+                    WorldShiftLevels.Play(level);
+                });
+                var colors = button.colors;
+                colors.highlightedColor = new Color(1.25f, 1.25f, 1.25f);
+                colors.selectedColor = colors.highlightedColor;
+                button.colors = colors;
+                // A locked tile shows its lock in place of the number.
+                var number = Label(tile, open ? level.ToString() : "", .05f, .38f, .95f, .92f, 96f);
+                number.fontStyle = FontStyles.Bold;
+                number.alignment = TextAlignmentOptions.Center;
+                number.color = open ? Cream : new Color(1f, 1f, 1f, .25f);
+                var name = Label(tile, WorldShiftLevels.Name(level), .05f, .10f, .95f, .30f, 24f);
+                name.alignment = TextAlignmentOptions.Center;
+                name.color = open ? Accent : new Color(1f, 1f, 1f, .25f);
+                if (!open) Badge(tile, ShiftIcon.Lock, new Color(1f, 1f, 1f, .7f), 84f, new Vector2(.5f, .64f));
+                else if (WorldShiftLevels.IsBeaten(level)) Badge(tile, ShiftIcon.Check, new Color(.4f, 1f, .6f), 40f, new Vector2(.84f, .88f));
+                // Focus the first open level not yet beaten: the one to play next.
+                if (open && (first == null || WorldShiftLevels.IsBeaten(level - 1) && !firstUnbeaten)) { first = tile.gameObject; firstUnbeaten = !WorldShiftLevels.IsBeaten(level); }
+            }
+            if (EventSystem.current != null && first != null) EventSystem.current.SetSelectedGameObject(first);
         }
 
-        private RectTransform MenuButton(Transform parent, string title, Vector2 min, Vector2 max, Action action, bool primary)
+        private static void Badge(RectTransform parent, ShiftIcon icon, Color colour, float size, Vector2 anchor)
         {
-            var rect = Button(parent, title, min, max, action);
-            var image = rect.GetComponent<Image>();
-            image.color = primary ? Gold : new Color(.14f, .23f, .30f);
-            var label = rect.GetComponentInChildren<TMP_Text>();
-            label.color = primary ? new Color(.12f, .10f, .07f) : Cream;
-            label.fontStyle = FontStyles.Bold;
-            label.fontSizeMin = label.fontSizeMax = 20f;
-            var button = rect.GetComponent<UnityEngine.UI.Button>();
-            var colors = button.colors;
-            colors.highlightedColor = new Color(1.12f, 1.12f, 1.12f);
-            colors.selectedColor = colors.highlightedColor;
-            colors.pressedColor = new Color(.8f, .8f, .8f);
-            colors.fadeDuration = .12f;
-            button.colors = colors;
-            return rect;
+            var badge = Panel(parent, icon + " badge", anchor, anchor, colour);
+            badge.sizeDelta = new Vector2(size, size);
+            badge.GetComponent<Image>().sprite = WorldShiftIcons.Get(icon);
         }
 
         public static RectTransform CreateCanvas(Transform parent, string name)

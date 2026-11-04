@@ -96,7 +96,6 @@ public sealed class WorldShiftEnvironmentFlowTests
         var upgrade = game.GetComponentsInChildren<UnityEngine.UI.Button>().Single(b => b.name == "Upgrade car");
         upgrade.onClick.Invoke(); yield return null; yield return null;
         Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo("WorldShift_Menu"));
-        Assert.That(UnityEngine.Object.FindObjectsByType<UnityEngine.UI.Button>(FindObjectsSortMode.None).Any(b => b.name == "Start next run"), Is.True);
     }
 
     [UnityTest]

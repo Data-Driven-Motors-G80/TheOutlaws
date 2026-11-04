@@ -50,52 +50,13 @@ public sealed class WorldShiftGetawayTests
     }
 
     [UnityTest]
-    public IEnumerator GarageBenefitsApplyInBothEnvironmentsAndPersistAfterLoss()
-    {
-        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
-        yield return new EnterPlayMode();
-        PlayerPrefs.SetInt("WorldShift.Getaway.Bank", 11000);
-        var garage = (VehicleUpgrades)FlowType.GetProperty("Garage").GetValue(null);
-        foreach (VehicleUpgrades.Part part in Enum.GetValues(typeof(VehicleUpgrades.Part)))
-            for (int i = 0; i < 3; i++) Assert.That(garage.Buy(part), Is.True);
-        Assert.That(garage.Banked, Is.EqualTo(500));
-        Flow("StartGetaway", false); yield return null; yield return null;
-        for (int leg = 0; leg < 2; leg++)
-        {
-            var game = Find(leg == 0 ? "WorldShiftCity" : "DesertShiftTrial"); game.enabled = false;
-            var fuel = (FuelState)game.GetType().GetField("fuel", Flags).GetValue(game);
-            Assert.That(fuel.Capacity, Is.EqualTo(130f));
-            Assert.That(fuel.CurrentFuel, Is.GreaterThan(129f));
-            Assert.That((bool)FlowType.GetMethod("BuyUpgrade").Invoke(null,
-                new object[] { VehicleUpgrades.Part.FuelTank }), Is.False);
-            float gap = (float)Get(game, "PursuitGap");
-            if (leg == 0) Call(game, "HitForkObstacle", 100f);
-            else Call(game, "Impact", "test-rock", "ROCK HIT");
-            Assert.That((float)Get(game, "PursuitGap"), Is.EqualTo(gap - 22.5f * .85f).Within(.02f));
-            Call(game, "TrySwitch");
-            var lamp = ((Transform)Get(game, "Player")).GetComponentsInChildren<Light>()
-                .Single(l => l.type == LightType.Spot);
-            Assert.That(lamp.range, Is.EqualTo(119f));
-            Assert.That(lamp.enabled, Is.True);
-            Capture(leg == 0 ? "garage-city-headlights" : "garage-desert-headlights");
-            Call(game, "TrySwitch"); Assert.That(lamp.enabled, Is.False);
-            if (leg == 0) { Flow("FinishGetawayLeg", true); yield return null; yield return null; }
-        }
-        Run.Lose("CAUGHT");
-        Flow("OpenGarage"); yield return null; yield return null;
-        var menu = Find("WorldShiftMenu");
-        Assert.That(menu.GetComponentsInChildren<TMP_Text>().Any(t => t.text == "Garage"), Is.True);
-        Assert.That(garage.Banked, Is.EqualTo(500));
-        Assert.That(garage.Level(VehicleUpgrades.Part.Armor), Is.EqualTo(3));
-    }
-
-    [UnityTest]
     public IEnumerator TutorialLootPauseBankAndDuplicateSettlement()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
         yield return new EnterPlayMode();
         Capture("menu");
-        UnityEngine.Object.FindObjectsByType<UnityEngine.UI.Button>(FindObjectsSortMode.None).Single(b => b.name == "Tutorial").onClick.Invoke();
+        // The home screen is now the level select; start the older tutorial-first escape directly.
+        Flow("StartGetaway", true);
         yield return null; yield return null;
         var tutorial = Find("WorldShiftCity"); tutorial.enabled = false;
         Assert.That(Get(tutorial, "TutorialLevel"), Is.True);
