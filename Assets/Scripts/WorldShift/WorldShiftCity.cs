@@ -99,6 +99,7 @@ namespace Outlaws.WorldShift
         private float checkpointFuel = FuelState.MaximumFuel;
         private float checkpointGap = RiskRunState.InitialPursuitGap;
         private int checkpointIndex;
+        public float CheckpointNoticeRemaining { get; private set; }
         private string lastFailure;
 
         public ShiftRunState State { get; private set; } = ShiftRunState.Ready;
@@ -162,6 +163,19 @@ namespace Outlaws.WorldShift
         public WorldShiftTutorialRewards TutorialRewards { get; private set; }
         public WorldShiftRoute Route { get; private set; }
         public Transform Player { get; private set; }
+
+        public Vector3 LevelRockPosition(WorldShiftLevelRock rock)
+        {
+            RoadPathPoint point = rock.Airborne ? relay.SampleFlight(rock.Flight, rock.Distance) : Route.Sample(rock.Distance);
+            return point.Position + point.Right * rock.Lateral + (rock.Airborne ? Vector3.up * .63f : point.Up * rock.Radius);
+        }
+
+        public Vector3 LevelGatePosition(WorldShiftSlidingGate gate)
+        {
+            RoadPathPoint point = gate.Airborne ? relay.SampleFlight(gate.Flight, gate.Distance) : Route.Sample(gate.Distance);
+            return point.Position + point.Right * gate.Lateral
+                + (gate.Airborne ? Vector3.up * .63f : point.Up * (gate.Size.y * .5f));
+        }
 
         private void Awake()
         {
@@ -330,6 +344,8 @@ namespace Outlaws.WorldShift
                     switchingIn = false;
                 }
             }
+            else if (LevelMode && environment == ShiftLevel.Desert)
+                ApplyImpact(FindCollision(next, Distance, Distance, Lateral, Lateral, true), Lateral);
             if (IsRelayAirborne) Notify(relay.Hint(Distance, World), 1.8f);
             return true;
         }
@@ -353,6 +369,7 @@ namespace Outlaws.WorldShift
                 return;
             }
             MessageRemaining = Mathf.Max(0f, MessageRemaining - delta);
+            CheckpointNoticeRemaining = Mathf.Max(0f, CheckpointNoticeRemaining - delta);
             hintRemaining = Mathf.Max(0f, hintRemaining - delta);
             if (switchPressed) TrySwitch();
             float simulatedTime = 0f;
@@ -362,7 +379,7 @@ namespace Outlaws.WorldShift
                 float dt = Mathf.Min(delta, 1f / 60f);
                 delta -= dt;
                 simulatedTime += dt;
-                float previous = Distance, previousLateral = Lateral;
+                float previous = Distance, previousLateral = Lateral, previousHeight = Player.position.y;
                 // Lesson waits are safe reading time; traffic must not approach a stopped learner.
                 if (!TutorialWaitingForLesson)
                     foreach (var hazard in Hazards)
@@ -383,11 +400,13 @@ namespace Outlaws.WorldShift
                 bool snowSlide = GetawayMode && WorldShiftEscapeProfile.SnowSlide(environment, previous, RelayLayout);
                 driver.EnvironmentReleaseGrip = snowSlide ? .6f : 1f;
                 driver.EnvironmentCountersteerGrip = snowSlide ? 1.25f : 1f;
-                driver.StepExternal(dt, (IsRelayAirborne ? steer * .4f : steer) * (JumpSequence ? 1f : Getaway?.Extras.SteeringMultiplier ?? 1f), speed);
+                float airSteering = LevelMode && environment == ShiftLevel.Desert ? .65f : .4f;
+                driver.StepExternal(dt, (IsRelayAirborne ? steer * airSteering : steer) * (JumpSequence ? 1f : Getaway?.Extras.SteeringMultiplier ?? 1f), speed);
                 Getaway?.FinishStep(driver.RoadPositionDistance, driver);
                 float nextLateral = driver.LateralOffset;
                 float next = Mathf.Min(RunLength, driver.RoadPositionDistance);
-                ShiftHazard hit = IsRelayAirborne ? null : FindCollision(World, previous, next, previousLateral, nextLateral, true);
+                ShiftHazard hit = IsRelayAirborne && !(LevelMode && environment == ShiftLevel.Desert) ? null
+                    : FindCollision(World, previous, next, previousLateral, nextLateral, true, previousHeight, Player.position.y);
                 Duration += dt;
                 if (!LevelMode && (!GetawayMode || !Getaway.InRecovery))
                 {
@@ -436,7 +455,11 @@ namespace Outlaws.WorldShift
                 {
                     checkpointIndex++;
                     if (tutorialLevel) WorldShiftAnalytics.TutorialStep(checkpointIndex, Checkpoints[checkpointIndex].Title);
-                    if (LevelMode) WorldShiftLevelAnalytics.Checkpoint(checkpointIndex);
+                    if (LevelMode)
+                    {
+                        WorldShiftLevelAnalytics.Checkpoint(checkpointIndex);
+                        CheckpointNoticeRemaining = 2.2f;
+                    }
                     tutorialHintCompleted = false;
                     tutorialCheckpointSwitches = Switches;
                     tutorialCheckpointLateral = Lateral;
@@ -585,7 +608,8 @@ namespace Outlaws.WorldShift
         }
 
         // Swept checks in the common road coordinate prevent tunnelling or switching inside a wall.
-        private ShiftHazard FindCollision(ShiftWorld world, float from, float to, float fromLateral, float toLateral, bool skipHandled = false)
+        private ShiftHazard FindCollision(ShiftWorld world, float from, float to, float fromLateral, float toLateral, bool skipHandled = false,
+            float fromHeight = float.NaN, float toHeight = float.NaN)
         {
             const float halfWidth = 0.8f;
             foreach (var hazard in Hazards)
@@ -593,6 +617,27 @@ namespace Outlaws.WorldShift
                 bool merged = IsJoinedDistance(hazard.Start);
                 if (!WorldShiftCombat.IsActive(Combat, hazard)) continue;
                 if ((!merged && !hazard.VisibleIn(world)) || (skipHandled && hitHazards.Contains(hazard))) continue;
+                if (hazard.Gate != null)
+                {
+                    if (hazard.Gate.Airborne != IsRelayAirborne) continue;
+                    float aHeight = float.IsNaN(fromHeight) ? Player.position.y : fromHeight;
+                    float bHeight = float.IsNaN(toHeight) ? Player.position.y : toHeight;
+                    if (hazard.Gate.Touches(from, to, fromLateral, toLateral, aHeight, bHeight,
+                        Mathf.Abs(to - from) < .00001f ? hazard.Gate.Lateral : hazard.PreviousLateralOffset,
+                        LevelGatePosition(hazard.Gate).y)) return hazard;
+                    continue;
+                }
+                if (hazard.Rock != null)
+                {
+                    if (hazard.Rock.Airborne != IsRelayAirborne) continue;
+                    float aHeight = float.IsNaN(fromHeight) ? Player.position.y : fromHeight;
+                    float bHeight = float.IsNaN(toHeight) ? Player.position.y : toHeight;
+                    if (hazard.Rock.Touches(from, to, fromLateral, toLateral, aHeight, bHeight,
+                        Mathf.Abs(to - from) < .00001f ? hazard.Rock.Lateral : hazard.PreviousLateralOffset,
+                        LevelRockPosition(hazard.Rock).y)) return hazard;
+                    continue;
+                }
+                if (IsRelayAirborne) continue;
                 // A missing deck drops the car when its centre crosses the lip.
                 float halfLength = hazard.Kind == ShiftHazardKind.Gap ? 0f : 1.5f;
                 hazard.BoundsAt(from, out float start, out float end);
@@ -668,6 +713,7 @@ namespace Outlaws.WorldShift
             tutorialHintCompleted = false;
             tutorialCheckpointSwitches = Switches;
             ShiftCheckpoint checkpoint = Checkpoints[checkpointIndex];
+            CheckpointNoticeRemaining = 0f;
             tutorialCheckpointLateral = checkpoint.Lateral;
             TutorialRewards?.Restore(checkpoint.Distance);
             Distance = checkpoint.Distance;

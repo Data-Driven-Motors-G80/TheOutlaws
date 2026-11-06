@@ -17,6 +17,7 @@ namespace Outlaws.WorldShift
         private WorldShiftCity game;
         private Image worldIcon, progressFill, crashFlash;
         private RectTransform carMarker;
+        private CanvasGroup checkpointNotice;
         private readonly List<Image> pips = new List<Image>();
         private GameObject driving, pause, complete;
         private bool completeShown;
@@ -54,6 +55,18 @@ namespace Outlaws.WorldShift
             carMarker = WorldShiftMenu.Panel(bar, "You", new Vector2(0f, .5f), new Vector2(0f, .5f), Cream);
             carMarker.sizeDelta = new Vector2(14f, 34f);
             IconButton(driving.transform, ShiftIcon.Pause, new Vector2(.93f, .87f), 72f, game.TogglePause);
+
+            var notice = WorldShiftMenu.Panel(driving.transform, "Checkpoint notice", new Vector2(.5f, .83f), new Vector2(.5f, .83f), Ink);
+            notice.sizeDelta = new Vector2(360f, 60f);
+            checkpointNotice = notice.gameObject.AddComponent<CanvasGroup>();
+            checkpointNotice.blocksRaycasts = false;
+            var saved = Icon(notice, ShiftIcon.Check, 40f);
+            saved.rectTransform.anchoredPosition = new Vector2(-145f, 0f);
+            saved.color = new Color(.3f, 1f, .6f);
+            var noticeText = WorldShiftMenu.Label(notice, "CHECKPOINT", .18f, 0f, .98f, 1f, 26f);
+            noticeText.color = Cream;
+            noticeText.fontStyle = FontStyles.Bold;
+            noticeText.alignment = TextAlignmentOptions.Center;
 
             pause = WorldShiftMenu.Panel(safe, "Paused", Vector2.zero, Vector2.one, new Color(.01f, .02f, .03f, .82f)).gameObject;
             IconButton(pause.transform, ShiftIcon.Play, new Vector2(.5f, .6f), 150f, game.TogglePause);
@@ -135,6 +148,7 @@ namespace Outlaws.WorldShift
             carMarker.anchorMin = carMarker.anchorMax = new Vector2(progress, .5f);
             for (int i = 0; i < pips.Count; i++) pips[i].color = i < game.CheckpointIndex ? Gold : new Color(1f, 1f, 1f, .55f);
             crashFlash.color = game.State == ShiftRunState.Retrying ? new Color(.8f, .05f, .03f, .22f) : Color.clear;
+            checkpointNotice.alpha = game.State == ShiftRunState.Running ? Mathf.Clamp01(game.CheckpointNoticeRemaining / .3f) : 0f;
             // Space is the switch key; a still-selected button would also receive it as "submit".
             if (game.State == ShiftRunState.Running && EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null)
                 EventSystem.current.SetSelectedGameObject(null);

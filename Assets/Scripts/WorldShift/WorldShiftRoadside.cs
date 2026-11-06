@@ -20,8 +20,11 @@ namespace Outlaws.WorldShift
         }
 
         private readonly List<Piece> pieces = new List<Piece>();
+        private sealed class Dune { public float At; public Transform Root; public Renderer Renderer; }
+        private readonly List<Dune> dunes = new List<Dune>();
         private Material[] day, echo;
         private Material dayEdge, echoEdge;
+        private Material dayDune, echoDune;
         private WorldShiftRoute route;
 
         public void Build(WorldShiftRoute route, ShiftLevel environment = ShiftLevel.City)
@@ -51,8 +54,48 @@ namespace Outlaws.WorldShift
             echoEdge.SetColor("_EmissionColor", new Color(.94f, .88f, .64f) * .045f);
             echoEdge.SetFloat("_Smoothness", .55f);
             route.VisitRoadPieces(BuildPiece);
+            if (environment == ShiftLevel.Desert && route.Course != null) BuildDesertDunes();
             SetWorld(ShiftWorld.Day);
             UpdateVisibility(0f);
+        }
+
+        private void BuildDesertDunes()
+        {
+            dayDune = RuntimeMaterials.Coloured(new Color(.76f, .61f, .38f));
+            echoDune = RuntimeMaterials.Coloured(new Color(.30f, .27f, .20f));
+            var roadPoints = new List<Vector3>();
+            for (float at = -60f; at <= route.Course.Length + 60f; at += 4f) roadPoints.Add(route.Sample(at).Position);
+            int variation = 0;
+            for (float at = 35f; at < route.Course.Length + 40f; at += 65f)
+                foreach (float side in new[] { -1f, 1f })
+                {
+                    float along = at + (side > 0f ? 24f : 0f);
+                    RoadPathPoint point = route.Sample(along);
+                    int form = variation++ % 4;
+                    Vector3 size = new Vector3(form == 0 ? 22f : form == 1 ? 28f : form == 2 ? 24f : 18f,
+                        form == 0 ? 6f : form == 1 ? 8f : form == 2 ? 5f : 7f,
+                        form == 0 ? 32f : form == 1 ? 38f : form == 2 ? 28f : 42f);
+                    Transform root = DesertPresentation.CreatePrototypeDune(transform, "Prototype desert dune " + variation, dayDune);
+                    Vector3 position = point.Position + point.Right * side * (30f + (form % 2) * 3f);
+                    position.y = point.Position.y + .2f;
+                    root.SetPositionAndRotation(position, Quaternion.LookRotation(Vector3.ProjectOnPlane(point.Forward, Vector3.up), Vector3.up));
+                    root.localScale = size;
+                    Renderer renderer = root.GetComponent<Renderer>();
+                    Bounds bounds = renderer.bounds;
+                    bounds.Expand(new Vector3(14f, 0f, 14f));
+                    bool overlaps = false;
+                    foreach (Vector3 road in roadPoints)
+                        if (road.x >= bounds.min.x && road.x <= bounds.max.x && road.z >= bounds.min.z && road.z <= bounds.max.z)
+                        { overlaps = true; break; }
+                    if (overlaps)
+                    {
+                        root.gameObject.SetActive(false);
+                        if (Application.isPlaying) Destroy(root.gameObject); else DestroyImmediate(root.gameObject);
+                        continue;
+                    }
+                    renderer.shadowCastingMode = ShadowCastingMode.On;
+                    dunes.Add(new Dune { At = along, Root = root, Renderer = renderer });
+                }
         }
 
         private void BuildPiece(RoadSegment segment, float start, float end)
@@ -149,6 +192,7 @@ namespace Outlaws.WorldShift
                 // edge lines floating over a bridge that does not exist here.
                 piece.EdgeRenderer.enabled = route.HasSurface((piece.Start + piece.End) * .5f, world);
             }
+            foreach (var dune in dunes) dune.Renderer.sharedMaterial = world == ShiftWorld.Day ? dayDune : echoDune;
         }
 
         public void UpdateVisibility(float distance)
@@ -157,6 +201,11 @@ namespace Outlaws.WorldShift
             {
                 bool visible = piece.End > distance - 110f && piece.Start < distance + 300f && !route.IsForkSurface((piece.Start + piece.End) * .5f);
                 if (piece.Root.activeSelf != visible) piece.Root.SetActive(visible);
+            }
+            foreach (var dune in dunes)
+            {
+                bool visible = dune.At > distance - 120f && dune.At < distance + 350f;
+                if (dune.Root.gameObject.activeSelf != visible) dune.Root.gameObject.SetActive(visible);
             }
         }
 

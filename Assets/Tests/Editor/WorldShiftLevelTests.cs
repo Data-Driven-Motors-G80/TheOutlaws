@@ -94,8 +94,8 @@ public sealed class WorldShiftLevelTests
             var hazards = ((Array)Field(course, "Hazards")).Cast<object>().ToArray();
             var checkpoints = ((Array)Field(course, "Checkpoints")).Cast<object>().ToArray();
             float length = (float)Field(course, "Length");
-            Assert.That(ramps.Length, Is.EqualTo(level == 0 ? 1 : 5), "level " + level);
-            Assert.That(checkpoints.Length, Is.EqualTo(5), "Four mid-level checkpoints plus the start, level " + level);
+            Assert.That(ramps.Length, Is.EqualTo(level == 0 ? 1 : level == 2 ? 6 : 5), "level " + level);
+            Assert.That(checkpoints.Length, Is.EqualTo(level == 2 ? 7 : 5), "Respawn positions, including the initial spawn, level " + level);
             for (int i = 1; i < checkpoints.Length; i++)
                 Assert.That((float)Field(checkpoints[i], "Distance"), Is.GreaterThan((float)Field(checkpoints[i - 1], "Distance")));
             foreach (var ramp in ramps)

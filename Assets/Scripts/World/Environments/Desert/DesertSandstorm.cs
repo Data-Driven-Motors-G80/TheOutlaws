@@ -59,18 +59,27 @@ public sealed class DesertSandstorm : MonoBehaviour
         if (game.PickupEffects != null) speed *= game.PickupEffects.RunState.ForwardSpeedMultiplier;
         // Fog is measured from the camera, not the bumper. Keep the car and near road readable.
         float cameraOffset = Camera.main != null ? Vector3.Distance(Camera.main.transform.position, car.transform.position) : 30f;
-        float visibility = Mathf.Max(minimumVisibility, speed * visibleTravelSeconds);
-        RenderSettings.fog = true;
-        RenderSettings.fogMode = FogMode.Linear;
-        RenderSettings.fogColor = Color.Lerp(originalColor, dustColor, strength);
         if (skyCamera == null)
         {
             skyCamera = Camera.main;
             if (skyCamera != null) originalSky = skyCamera.backgroundColor;
         }
-        if (skyCamera != null) skyCamera.backgroundColor = Color.Lerp(originalSky, dustColor, strength);
-        RenderSettings.fogStartDistance = Mathf.Lerp(originalStart, cameraOffset + 5f, strength);
-        RenderSettings.fogEndDistance = Mathf.Lerp(originalEnd, cameraOffset + visibility, strength);
+        ApplyVisibility(skyCamera, strength, speed, cameraOffset, originalColor, originalSky,
+            originalStart, originalEnd, dustColor, minimumVisibility, visibleTravelSeconds);
+    }
+
+    // Shared fog math for the legacy desert and the new authored level. No gameplay dependencies.
+    public static void ApplyVisibility(Camera camera, float strength, float speed, float cameraOffset,
+        Color baseFog, Color baseSky, float baseStart, float baseEnd, Color dust,
+        float minimumVisibility = 50f, float visibleTravelSeconds = 2f)
+    {
+        float visibility = Mathf.Max(minimumVisibility, speed * visibleTravelSeconds);
+        RenderSettings.fog = true;
+        RenderSettings.fogMode = FogMode.Linear;
+        RenderSettings.fogColor = Color.Lerp(baseFog, dust, strength);
+        if (camera != null) camera.backgroundColor = Color.Lerp(baseSky, dust, strength);
+        RenderSettings.fogStartDistance = Mathf.Lerp(baseStart, cameraOffset + 5f, strength);
+        RenderSettings.fogEndDistance = Mathf.Lerp(baseEnd, cameraOffset + visibility, strength);
     }
 
     private void Restore()

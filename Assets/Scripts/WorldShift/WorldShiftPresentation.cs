@@ -46,6 +46,8 @@ namespace Outlaws.WorldShift
         private readonly List<PedestrianView> pedestrians = new List<PedestrianView>();
         private readonly Dictionary<(Color, float), Material> glowMaterials = new Dictionary<(Color, float), Material>();
         private ShiftWorld world;
+        private Color normalFogColour;
+        private float normalFogStart, normalFogEnd;
 
         public void Build(WorldShiftCity controller, WorldShiftRoute sharedRoute, Transform player, Camera camera, Light directional)
         {
@@ -98,6 +100,12 @@ namespace Outlaws.WorldShift
                 var root = WorldShiftLevelProps.HighwaySign(transform, route, sign);
                 chunks.Add(new Chunk { Root = root.gameObject, At = sign.Distance, Tail = 10f });
             }
+            foreach (var zone in game.Course.DustZones)
+            {
+                float at = zone.x;
+                Transform root = WorldShiftLevelProps.StormRoadMark(transform, route, at);
+                chunks.Add(new Chunk { Root = root.gameObject, At = at, Tail = 15f });
+            }
         }
 
         private void BuildHazard(ShiftHazard data)
@@ -111,6 +119,20 @@ namespace Outlaws.WorldShift
             chunks.Add(chunk);
             var solid = new GameObject("Solid - collides in this world"); solid.transform.SetParent(root, false);
             var ghost = new GameObject("Outline - belongs to other world"); ghost.transform.SetParent(root, false);
+            if (data.Gate != null)
+            {
+                WorldShiftObstacleVisual.Build(solid.transform, Vector3.zero, data.Gate.Size, moverPalette);
+                WorldShiftLevelProps.SlidingGateHint(solid.transform);
+                hazards.Add(new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk });
+                return;
+            }
+            if (data.Rock != null)
+            {
+                Transform sphere = DesertRollingRock.CreateVisual(solid.transform, data.Rock.Radius);
+                sphere.GetComponent<Renderer>().sharedMaterial = WorldShiftLevelProps.Glow(WorldShiftLevelProps.MoverColour);
+                hazards.Add(new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk });
+                return;
+            }
             float depth = data.End - data.Start;
             var palette = game.LevelMode && data.SharedAcrossWorlds ? moverPalette : obstaclePalette;
             // The other world's still obstacles show as passable dashes in their own colour.
@@ -120,6 +142,8 @@ namespace Outlaws.WorldShift
             void Block(Transform frame, Transform ghostFrame, Vector3 centre, Vector3 size)
             {
                 WorldShiftObstacleVisual.Build(frame, centre, size, palette);
+                if (game.LevelMode && game.Environment == ShiftLevel.Desert && data.LateralMotion)
+                    WorldShiftLevelProps.SlidingGateHint(frame, size.z, smallBlock: true);
                 if (dashes != null) WorldShiftLevelProps.DashedOutline(ghostFrame, centre, size, dashes);
             }
             if (data.Kind == ShiftHazardKind.Gap)
@@ -198,8 +222,9 @@ namespace Outlaws.WorldShift
         {
             if (game.LevelMode)
             {
-                // Ramps are the checkpoints; plain gates mark training steps and the finish.
-                var marks = new List<float>(game.Course.Gates) { game.RunLength };
+                // Mark the actual retry locations too; Desert checkpoints precede its ramps.
+                var marks = new HashSet<float>(game.Course.Gates) { game.RunLength };
+                for (int i = 1; i < game.Checkpoints.Length; i++) marks.Add(game.Checkpoints[i].Distance);
                 foreach (float at in marks) CheckpointGate(at, at >= game.RunLength);
                 return;
             }
@@ -229,7 +254,7 @@ namespace Outlaws.WorldShift
             Material marker = WorldShiftLevelProps.Glow(finish ? Color.white : new Color(.25f, .93f, .7f), .5f);
             foreach (float x in new[] { -5.8f, 5.8f }) Box(root, "Gate post", new Vector3(x, 2.5f, 0f), new Vector3(.18f, 5f, .18f), marker);
             Box(root, "Gate lintel", new Vector3(0f, 5f, 0f), new Vector3(11.8f, .18f, .18f), marker);
-            if (!finish) return;
+            if (!finish) { WorldShiftLevelProps.CheckpointMark(root); return; }
             // A chequered strip across the road: no words needed.
             Material black = RuntimeMaterials.Coloured(new Color(.03f, .03f, .03f));
             for (int i = 0; i < 10; i++)
@@ -274,11 +299,16 @@ namespace Outlaws.WorldShift
             view.backgroundColor = sky;
             sun.color = day ? new Color(1f, 0.87f, 0.7f) : new Color(0.56f, 0.76f, 1f);
             sun.intensity = day ? 1.25f : 0.40f;
-
+            normalFogColour = sky;
+            normalFogStart = RenderSettings.fogStartDistance;
+            normalFogEnd = RenderSettings.fogEndDistance;
         }
 
         public void UpdateVisibility(float distance)
         {
+            if (game.LevelMode && game.Environment == ShiftLevel.Desert)
+                WorldShiftLevelSandstorm.Apply(game.Course, view, game.Player.position, distance, game.Speed,
+                    world, normalFogColour, normalFogStart, normalFogEnd);
             if (headlightHazeMaterial != null)
             {
                 float clearRoad = 54f * (playerHeadlight != null ? playerHeadlight.range / 74f : 1f);
@@ -298,6 +328,22 @@ namespace Outlaws.WorldShift
             if (relayVisuals != null) relayVisuals.Refresh(distance);
             foreach (var hazard in hazards)
             {
+                if (hazard.Data.Gate != null)
+                {
+                    var gate = hazard.Data.Gate;
+                    var gatePoint = gate.Airborne ? game.Route.Sample(gate.Flight.Takeoff) : route.Sample(gate.Distance);
+                    hazard.Root.SetPositionAndRotation(game.LevelGatePosition(gate), Quaternion.LookRotation(gatePoint.Forward, gatePoint.Up));
+                    continue;
+                }
+                if (hazard.Data.Rock != null)
+                {
+                    var rock = hazard.Data.Rock;
+                    hazard.Root.position = game.LevelRockPosition(rock);
+                    hazard.Solid.transform.localRotation = Quaternion.AngleAxis(
+                        -rock.Motion.DaySeconds * rock.Motion.MotionSpeed * rock.TravelScale * rock.Motion.Direction
+                        / rock.Radius * Mathf.Rad2Deg, Vector3.forward);
+                    continue;
+                }
                 if (hazard.Data.Kind != ShiftHazardKind.Oncoming && !hazard.Data.LateralMotion) continue;
                 hazard.Data.BoundsAt(distance, out float start, out float end);
                 RoadPathPoint point = route.Sample((start + end) * .5f);

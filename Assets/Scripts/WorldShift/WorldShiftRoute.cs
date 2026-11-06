@@ -47,6 +47,13 @@ namespace Outlaws.WorldShift
             foreach (var hazard in validation ? WorldShiftSplitView.Layout : WorldShiftLevel.Hazards)
                 if (hazard.Kind == ShiftHazardKind.Gap) { cuts.Add(hazard.Start); cuts.Add(hazard.End); }
             if (!validation) foreach (float boundary in WorldShiftLevel.MergeBounds) cuts.Add(boundary);
+            if (Course != null && Course.Environment == ShiftLevel.Desert)
+                foreach (var jump in relays)
+                {
+                    // End curve pieces exactly at the protected straight approaches/recoveries.
+                    cuts.Add(jump.Ramp - 80f);
+                    cuts.Add(jump.End + 45f);
+                }
             foreach (var jump in relays)
                 foreach (float cut in new[] { jump.Ramp - 20f, jump.Ramp, jump.Ramp + 24f, jump.Takeoff, jump.Landing, jump.End }) cuts.Add(cut);
             if (!float.IsNaN(forkEnvironmentEnd)) foreach (float cut in new[] { WorldShiftForkRoad.MainForkStart(forkEnvironmentEnd), WorldShiftForkRoad.MainForkStart(forkEnvironmentEnd) + 280f, forkEnvironmentEnd + 200f }) cuts.Add(cut);

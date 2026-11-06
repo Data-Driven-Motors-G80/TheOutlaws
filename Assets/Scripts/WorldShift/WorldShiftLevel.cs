@@ -17,7 +17,9 @@ namespace Outlaws.WorldShift
         Pedestrians,
         Oncoming,
         HalfBarrier,
-        SwitchWall
+        SwitchWall,
+        RollingRock,
+        SlidingGate
     }
 
     public sealed class ShiftHazard
@@ -33,18 +35,36 @@ namespace Outlaws.WorldShift
         public readonly bool SharedAcrossWorlds;
         public float MotionTravel { get; private set; }
         public readonly bool LateralMotion;
-        public float LateralOffset => LateralMotion ? -2.8f * (float)System.Math.Sin(MotionTravel) : 0f;
+        public readonly WorldShiftLevelRock Rock;
+        public readonly WorldShiftSlidingGate Gate;
+        public float LateralOffset => Gate != null ? Gate.Lateral : Rock != null ? Rock.Lateral : LateralMotion ? -2.8f * (float)System.Math.Sin(MotionTravel) : 0f;
         public float PreviousLateralOffset { get; private set; }
         public bool VisibleIn(ShiftWorld world) => SharedAcrossWorlds || World == world;
         public void Advance(float delta, float playerDistance, ShiftWorld world)
         {
             PreviousLateralOffset = LateralOffset;
+            if (Gate != null)
+            {
+                Gate.Advance(delta, playerDistance, world);
+                MotionTravel = Gate.DaySeconds * Gate.Speed;
+                return;
+            }
+            if (Rock != null)
+            {
+                // Flight spheres share the activation window, with individual lanes and phases.
+                float begin = Rock.Airborne ? Rock.Flight.Source == ShiftWorld.Echo
+                    ? Rock.Flight.Takeoff : Rock.Flight.Ramp - 90f : Start - 150f;
+                float finish = Rock.Airborne ? Rock.Flight.Landing + 20f : End + 20f;
+                if (playerDistance >= begin && playerDistance <= finish) Rock.Motion.Advance(delta, world);
+                MotionTravel = Rock.Motion.DaySeconds * MotionSpeed;
+                return;
+            }
             if (SharedAcrossWorlds && world == ShiftWorld.Day && playerDistance >= Start - 150f && playerDistance <= End + 20f)
                 MotionTravel += MotionSpeed * delta;
         }
-        public void ResetMotion() { MotionTravel = 0f; PreviousLateralOffset = LateralOffset; }
+        public void ResetMotion() { MotionTravel = 0f; Rock?.Motion.Restore(0f); Gate?.Reset(); PreviousLateralOffset = LateralOffset; }
 
-        public ShiftHazard(ShiftWorld world, ShiftHazardKind kind, float start, float end, int laneMask, float motionSpeed = 0f, int halfSide = 0, bool sharedAcrossWorlds = false, bool lateralMotion = false)
+        public ShiftHazard(ShiftWorld world, ShiftHazardKind kind, float start, float end, int laneMask, float motionSpeed = 0f, int halfSide = 0, bool sharedAcrossWorlds = false, bool lateralMotion = false, WorldShiftLevelRock rock = null, WorldShiftSlidingGate gate = null)
         {
             World = world;
             Kind = kind;
@@ -55,6 +75,8 @@ namespace Outlaws.WorldShift
             HalfSide = halfSide;
             SharedAcrossWorlds = sharedAcrossWorlds;
             LateralMotion = lateralMotion;
+            Rock = rock;
+            Gate = gate;
         }
 
         // Both collision and rendering sample the same deterministic road coordinates.
