@@ -65,14 +65,7 @@ public sealed class DesertPresentation : MonoBehaviour
                 string name = DuneNames[i];
                 Transform dune = segment.transform.Find(name);
                 if (dune == null)
-                {
-                    var shape = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                    shape.name = name;
-                    shape.transform.SetParent(segment.transform, false);
-                    var collider = shape.GetComponent<Collider>(); collider.enabled = false; Destroy(collider);
-                    shape.GetComponent<Renderer>().sharedMaterial = sandMaterial;
-                    dune = shape.transform;
-                }
+                    dune = CreatePrototypeDune(segment.transform, name, sandMaterial);
                 Vector3 dunePosition = middle.Position + middle.Right * side * (middle.Width * 0.5f + 25f);
                 dunePosition.y = height - 1.5f;
                 dune.position = dunePosition;
@@ -83,6 +76,19 @@ public sealed class DesertPresentation : MonoBehaviour
                 renderer.enabled = !OverlapsRoad(renderer.bounds);
             }
         }
+    }
+
+    // Shared with the finite WorldShift desert: the original low ellipsoid, without collision.
+    public static Transform CreatePrototypeDune(Transform parent, string name, Material material)
+    {
+        var shape = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        shape.name = name;
+        shape.transform.SetParent(parent, false);
+        var collider = shape.GetComponent<Collider>();
+        collider.enabled = false;
+        if (Application.isPlaying) Destroy(collider); else DestroyImmediate(collider);
+        shape.GetComponent<Renderer>().sharedMaterial = material;
+        return shape.transform;
     }
 
     private bool OverlapsRoad(Bounds bounds)

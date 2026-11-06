@@ -135,6 +135,31 @@ namespace Outlaws.WorldShift
                     Moon(face, new Vector3(2.4f, 0f, 0f), white, green);
                     Box(face, new Vector3(3.5f, 0f, 0f), new Vector3(1f, 1f, .05f), Glow(MoverColour, .5f));
                     break;
+                case LevelSignKind.AirFreeze:
+                    Arrow(face, new Vector3(-3.7f, .35f, 0f), -1f, white);
+                    Disc(face, new Vector3(-2.8f, .35f, 0f), .43f, Glow(MoverColour));
+                    Arrow(face, new Vector3(-1.8f, .35f, 0f), 1f, white);
+                    Key(face, "SPACE", new Vector3(.1f, .35f, 0f), white, 2.1f);
+                    Moon(face, new Vector3(2f, .35f, 0f), white, green);
+                    foreach (float x in new[] { 3.05f, 3.5f })
+                        Box(face, new Vector3(x, .35f, 0f), new Vector3(.16f, .7f, .05f), white);
+                    var words = new GameObject("Night freezes hint", typeof(TextMeshPro)).GetComponent<TextMeshPro>();
+                    words.transform.SetParent(face, false); words.transform.localPosition = new Vector3(0f, -.85f, -.08f);
+                    words.font = TMP_Settings.defaultFontAsset; words.text = "NIGHT FREEZES";
+                    words.fontSize = 4.5f; words.fontStyle = FontStyles.Bold; words.color = SignWhite;
+                    words.alignment = TextAlignmentOptions.Center; words.rectTransform.sizeDelta = new Vector2(7.5f, .6f);
+                    break;
+                case LevelSignKind.AirRelease:
+                    Box(face, new Vector3(-2.9f, .35f, 0f), new Vector3(1.9f, .55f, .05f), Glow(MoverColour));
+                    Key(face, "SPACE", new Vector3(-.15f, .35f, 0f), white, 2.1f);
+                    Arrow(face, new Vector3(1.45f, .35f, 0f), 1f, white);
+                    Sun(face, new Vector3(3f, .35f, 0f), day);
+                    var releaseWords = new GameObject("Day releases flight hint", typeof(TextMeshPro)).GetComponent<TextMeshPro>();
+                    releaseWords.transform.SetParent(face, false); releaseWords.transform.localPosition = new Vector3(0f, -.85f, -.08f);
+                    releaseWords.font = TMP_Settings.defaultFontAsset; releaseWords.text = "DAY MOVES";
+                    releaseWords.fontSize = 4.5f; releaseWords.fontStyle = FontStyles.Bold; releaseWords.color = SignWhite;
+                    releaseWords.alignment = TextAlignmentOptions.Center; releaseWords.rectTransform.sizeDelta = new Vector2(7.5f, .6f);
+                    break;
                 case LevelSignKind.Ramp:
                     var ramp = Box(face, new Vector3(-2.6f, -.6f, 0f), new Vector3(2.2f, .25f, .05f), white);
                     ramp.localRotation = Quaternion.Euler(0f, 0f, 20f);
@@ -163,6 +188,57 @@ namespace Outlaws.WorldShift
             text.color = new Color(.02f, .2f, .1f);
             text.alignment = TextAlignmentOptions.Center;
             text.rectTransform.sizeDelta = new Vector2(width, 1.1f);
+        }
+
+        public static void SlidingGateHint(Transform parent, float depth = 1.8f, bool smallBlock = false)
+        {
+            float y = smallBlock ? 2.4f : .05f;
+            float z = -depth * .5f - .04f;
+            float width = smallBlock ? 4.8f : 7.8f, height = smallBlock ? 1f : 1.25f;
+            Box(parent, new Vector3(0f, y, z), new Vector3(width, height, .05f),
+                Glow(new Color(.025f, .06f, .04f), .15f));
+            WorldLabel(parent, "DAY TO MOVE", new Vector3(0f, y, z - .05f),
+                new Vector2(width - .3f, height - .1f), smallBlock ? 4f : 6f);
+        }
+
+        public static Transform StormRoadMark(Transform parent, WorldShiftRoute route, float distance)
+        {
+            RoadPathPoint point = route.Sample(distance);
+            var root = new GameObject("STORM road marking").transform;
+            root.SetParent(parent, false);
+            root.SetPositionAndRotation(point.Position + point.Up * .065f, Quaternion.LookRotation(point.Forward, point.Up));
+            var label = WorldLabel(root, "STORM", Vector3.zero, new Vector2(8f, 2f), 12f);
+            label.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            label.transform.localScale = new Vector3(1f, 1.8f, 1f);
+            label.color = DayColour;
+            foreach (float z in new[] { -2.2f, 2.2f })
+                Box(root, new Vector3(0f, 0f, z), new Vector3(8.4f, .04f, .14f), Glow(DayColour, .5f));
+            return root;
+        }
+
+        public static void CheckpointMark(Transform parent)
+        {
+            Material green = Glow(new Color(.2f, .95f, .55f), .7f);
+            foreach (float z in new[] { -.7f, .7f })
+                Box(parent, new Vector3(0f, .045f, z), new Vector3(10f, .05f, .3f), green);
+            Box(parent, new Vector3(0f, 4.7f, 0f), new Vector3(9f, 1f, .1f), Glow(SignGreen, .3f));
+            WorldLabel(parent, "CHECKPOINT", new Vector3(0f, 4.7f, -.08f), new Vector2(8.6f, .9f), 5.5f);
+        }
+
+        private static TextMeshPro WorldLabel(Transform parent, string words, Vector3 at, Vector2 size, float fontSize)
+        {
+            var text = new GameObject(words + " cue", typeof(TextMeshPro)).GetComponent<TextMeshPro>();
+            text.transform.SetParent(parent, false);
+            text.transform.localPosition = at;
+            text.font = TMP_Settings.defaultFontAsset;
+            text.text = words;
+            text.fontSize = fontSize;
+            text.fontStyle = FontStyles.Bold;
+            text.color = SignWhite;
+            text.alignment = TextAlignmentOptions.Center;
+            text.rectTransform.sizeDelta = size;
+            text.GetComponent<Renderer>().shadowCastingMode = ShadowCastingMode.Off;
+            return text;
         }
 
         private static void Arrow(Transform parent, Vector3 at, float direction, Material material)
