@@ -19,8 +19,14 @@ namespace Outlaws.WorldShift
         private RectTransform carMarker;
         private CanvasGroup checkpointNotice;
         private readonly List<Image> pips = new List<Image>();
-        private GameObject driving, pause, complete;
+        private GameObject driving, pause, complete, trainingLesson;
         private bool completeShown;
+        private CanvasGroup lessonGroup;
+        private RectTransform signPreview;
+        private RawImage signImage;
+        private TMP_Text signFallback;
+        private float lessonFade;
+        private int shownLesson = -1;
 
         public void Bind(WorldShiftCity controller)
         {
@@ -62,9 +68,9 @@ namespace Outlaws.WorldShift
             checkpointNotice.blocksRaycasts = false;
             var saved = Icon(notice, ShiftIcon.Check, 40f);
             saved.rectTransform.anchoredPosition = new Vector2(-145f, 0f);
-            saved.color = new Color(.3f, 1f, .6f);
+            saved.color = WorldShiftLevelProps.CheckpointColour;
             var noticeText = WorldShiftMenu.Label(notice, "CHECKPOINT", .18f, 0f, .98f, 1f, 26f);
-            noticeText.color = Cream;
+            noticeText.color = WorldShiftLevelProps.CheckpointColour;
             noticeText.fontStyle = FontStyles.Bold;
             noticeText.alignment = TextAlignmentOptions.Center;
 
@@ -73,6 +79,33 @@ namespace Outlaws.WorldShift
             IconButton(pause.transform, ShiftIcon.Retry, new Vector2(.36f, .6f), 100f, WorldShiftLevels.Retry);
             IconButton(pause.transform, ShiftIcon.Home, new Vector2(.64f, .6f), 100f, WorldShiftLevels.Menu);
             Controls(pause.transform);
+
+            if (game.Course.Training)
+            {
+                var lessonRoot = WorldShiftMenu.Panel(safe, "Training sign preview", Vector2.zero, Vector2.one, Color.clear);
+                lessonGroup = lessonRoot.gameObject.AddComponent<CanvasGroup>();
+                lessonGroup.alpha = 0f;
+                lessonGroup.blocksRaycasts = false;
+                lessonGroup.interactable = false;
+                signPreview = WorldShiftMenu.Panel(lessonRoot, "Readable training sign", new Vector2(.06f, .25f),
+                    new Vector2(.94f, .87f), new Color(.015f, .025f, .035f, .94f));
+                var imageObject = new GameObject("Sign image", typeof(RectTransform), typeof(RawImage), typeof(AspectRatioFitter));
+                imageObject.transform.SetParent(signPreview, false);
+                signImage = imageObject.GetComponent<RawImage>();
+                signImage.raycastTarget = false;
+                imageObject.GetComponent<AspectRatioFitter>().aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+                signFallback = WorldShiftMenu.Label(signPreview, "RED X: ONCOMING\nDODGE LEFT OR RIGHT", .07f, .08f, .93f, .92f, 52f);
+                signFallback.fontStyle = FontStyles.Bold;
+                signFallback.alignment = TextAlignmentOptions.Center;
+                var card = WorldShiftMenu.Panel(lessonRoot, "Training lesson", new Vector2(.32f, .12f),
+                    new Vector2(.68f, .21f), new Color(.025f, .045f, .07f, .94f));
+                trainingLesson = card.gameObject;
+                var continueText = WorldShiftMenu.Label(card, "ENTER  TO CONTINUE", .04f, .08f, .96f, .92f, 25f);
+                continueText.color = WorldShiftLevelProps.CheckpointColour;
+                continueText.fontStyle = FontStyles.Bold;
+                continueText.alignment = TextAlignmentOptions.Center;
+
+            }
 
             complete = WorldShiftMenu.Panel(safe, "Level complete", Vector2.zero, Vector2.one, new Color(.01f, .02f, .03f, .82f)).gameObject;
             var check = WorldShiftMenu.Panel(complete.transform, "Done", new Vector2(.5f, .66f), new Vector2(.5f, .66f), new Color(.4f, 1f, .6f));
@@ -138,6 +171,33 @@ namespace Outlaws.WorldShift
             Refresh();
         }
 
+        private void RefreshLessonPreview()
+        {
+            if (lessonGroup == null) return;
+            bool showing = game.TrainingLessonPaused && game.State == ShiftRunState.Running;
+            if (showing && shownLesson != game.CheckpointIndex && game.CheckpointIndex < game.Course.Signs.Length)
+            {
+                shownLesson = game.CheckpointIndex;
+                bool hasArt = WorldShiftLevelProps.TryGetSignArtwork(game.Course.Signs[shownLesson].Kind,
+                    out Texture2D texture, out Rect uv);
+                signImage.gameObject.SetActive(hasArt);
+                signFallback.gameObject.SetActive(!hasArt);
+                if (hasArt)
+                {
+                    signImage.texture = texture;
+                    signImage.uvRect = uv;
+                    signImage.GetComponent<AspectRatioFitter>().aspectRatio = texture.width * uv.width / (texture.height * uv.height);
+                }
+            }
+            // Unscaled time keeps the transition smooth while the lesson stops driving.
+            lessonFade = game.State == ShiftRunState.Running
+                ? Mathf.MoveTowards(lessonFade, showing ? 1f : 0f, Time.unscaledDeltaTime / (showing ? .3f : .18f)) : 0f;
+            float eased = Mathf.SmoothStep(0f, 1f, lessonFade);
+            lessonGroup.alpha = eased;
+            signPreview.localScale = Vector3.one * Mathf.Lerp(.96f, 1f, eased);
+            lessonGroup.gameObject.SetActive(showing || lessonFade > 0f);
+        }
+
         private void Refresh()
         {
             bool day = game.World == ShiftWorld.Day;
@@ -146,14 +206,17 @@ namespace Outlaws.WorldShift
             float progress = game.Progress;
             progressFill.rectTransform.anchorMax = new Vector2(progress, 1f);
             carMarker.anchorMin = carMarker.anchorMax = new Vector2(progress, .5f);
-            for (int i = 0; i < pips.Count; i++) pips[i].color = i < game.CheckpointIndex ? Gold : new Color(1f, 1f, 1f, .55f);
+            for (int i = 0; i < pips.Count; i++) pips[i].color = i < game.CheckpointIndex
+                ? WorldShiftLevelProps.CheckpointColour : new Color(1f, 1f, 1f, .55f);
             crashFlash.color = game.State == ShiftRunState.Retrying ? new Color(.8f, .05f, .03f, .22f) : Color.clear;
-            checkpointNotice.alpha = game.State == ShiftRunState.Running ? Mathf.Clamp01(game.CheckpointNoticeRemaining / .3f) : 0f;
+            checkpointNotice.alpha = !game.Course.Training && game.State == ShiftRunState.Running
+                ? Mathf.Clamp01(game.CheckpointNoticeRemaining / .3f) : 0f;
             // Space is the switch key; a still-selected button would also receive it as "submit".
             if (game.State == ShiftRunState.Running && EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null)
                 EventSystem.current.SetSelectedGameObject(null);
             bool won = game.State == ShiftRunState.Won;
             driving.SetActive(!won && game.State != ShiftRunState.Paused);
+            RefreshLessonPreview();
             pause.SetActive(game.State == ShiftRunState.Paused);
             complete.SetActive(won);
             if (won && !completeShown && EventSystem.current != null)

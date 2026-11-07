@@ -42,6 +42,9 @@ namespace Outlaws.WorldShift
         private readonly WorldShiftObstacleVisual.Palette obstaclePalette = new WorldShiftObstacleVisual.Palette();
         // Level play: sliding and rolling hazards exist in both worlds and keep one colour.
         private readonly WorldShiftObstacleVisual.Palette moverPalette = new WorldShiftObstacleVisual.Palette(WorldShiftLevelProps.MoverColour, Color.white);
+        private readonly WorldShiftObstacleVisual.Palette sideMoverPalette = new WorldShiftObstacleVisual.Palette(WorldShiftLevelProps.SideMoverColour, new Color(.035f, .035f, .04f));
+        private readonly WorldShiftObstacleVisual.Palette switchPalette = new WorldShiftObstacleVisual.Palette(WorldShiftLevelProps.SwitchColour, new Color(.04f, .17f, .19f));
+        private readonly WorldShiftObstacleVisual.Palette permanentPalette = new WorldShiftObstacleVisual.Palette(WorldShiftLevelProps.PermanentColour, new Color(.06f, .09f, .18f));
         private readonly List<Material> ownedMaterials = new List<Material>();
         private readonly List<PedestrianView> pedestrians = new List<PedestrianView>();
         private readonly Dictionary<(Color, float), Material> glowMaterials = new Dictionary<(Color, float), Material>();
@@ -121,27 +124,31 @@ namespace Outlaws.WorldShift
             var ghost = new GameObject("Outline - belongs to other world"); ghost.transform.SetParent(root, false);
             if (data.Gate != null)
             {
-                WorldShiftObstacleVisual.Build(solid.transform, Vector3.zero, data.Gate.Size, moverPalette);
+                WorldShiftObstacleVisual.Build(solid.transform, Vector3.zero, data.Gate.Size, sideMoverPalette);
                 WorldShiftLevelProps.SlidingGateHint(solid.transform);
                 hazards.Add(new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk });
                 return;
             }
             if (data.Rock != null)
             {
-                Transform sphere = DesertRollingRock.CreateVisual(solid.transform, data.Rock.Radius);
-                sphere.GetComponent<Renderer>().sharedMaterial = WorldShiftLevelProps.Glow(WorldShiftLevelProps.MoverColour);
+                WorldShiftObstacleVisual.Build(solid.transform, Vector3.zero,
+                    Vector3.one * (data.Rock.Radius * 2f), sideMoverPalette);
                 hazards.Add(new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk });
                 return;
             }
             float depth = data.End - data.Start;
-            var palette = game.LevelMode && data.SharedAcrossWorlds ? moverPalette : obstaclePalette;
+            var palette = data.Kind == ShiftHazardKind.SwitchWall ? switchPalette
+                : data.LateralMotion ? sideMoverPalette
+                : data.Kind == ShiftHazardKind.Oncoming || data.MotionSpeed > 0f
+                    ? moverPalette : data.SharedAcrossWorlds ? permanentPalette : obstaclePalette;
             // The other world's still obstacles show as passable dashes in their own colour.
             Material dashes = game.LevelMode && !data.SharedAcrossWorlds
-                ? WorldShiftLevelProps.Glow(data.World == ShiftWorld.Day ? WorldShiftLevelProps.DayColour : WorldShiftLevelProps.NightColour,
+                ? WorldShiftLevelProps.Glow(data.World == ShiftWorld.Day ? WorldShiftLevelProps.SwitchColour : WorldShiftLevelProps.NightColour,
                     data.World == ShiftWorld.Day ? .8f : 0f) : null;
             void Block(Transform frame, Transform ghostFrame, Vector3 centre, Vector3 size)
             {
-                WorldShiftObstacleVisual.Build(frame, centre, size, palette);
+                WorldShiftObstacleVisual.Build(frame, centre, size, palette,
+                    data.Kind == ShiftHazardKind.SwitchWall, data.Kind == ShiftHazardKind.Oncoming && !data.LateralMotion);
                 if (game.LevelMode && game.Environment == ShiftLevel.Desert && data.LateralMotion)
                     WorldShiftLevelProps.SlidingGateHint(frame, size.z, smallBlock: true);
                 if (dashes != null) WorldShiftLevelProps.DashedOutline(ghostFrame, centre, size, dashes);
@@ -238,9 +245,7 @@ namespace Outlaws.WorldShift
                 root.SetParent(transform, false);
                 root.SetPositionAndRotation(p.Position, Quaternion.LookRotation(p.Forward, p.Up));
                 chunks.Add(new Chunk { Root = root.gameObject, At = at });
-                Material marker = RuntimeMaterials.Coloured(new Color(0.25f, 0.93f, 0.7f));
-                foreach (float x in new[] { -5.8f, 5.8f }) Box(root, "Checkpoint post", new Vector3(x, 2.5f, 0f), new Vector3(0.18f, 5f, 0.18f), marker);
-                Box(root, "Checkpoint lintel", new Vector3(0f, 5f, 0f), new Vector3(11.8f, 0.18f, 0.18f), marker);
+                WorldShiftLevelProps.CheckpointMark(root);
             }
         }
 
@@ -251,10 +256,10 @@ namespace Outlaws.WorldShift
             root.SetParent(transform, false);
             root.SetPositionAndRotation(p.Position, Quaternion.LookRotation(p.Forward, p.Up));
             chunks.Add(new Chunk { Root = root.gameObject, At = at });
-            Material marker = WorldShiftLevelProps.Glow(finish ? Color.white : new Color(.25f, .93f, .7f), .5f);
+            Material marker = WorldShiftLevelProps.Glow(finish ? Color.white : WorldShiftLevelProps.CheckpointColour, .5f);
+            if (!finish) { WorldShiftLevelProps.CheckpointMark(root); return; }
             foreach (float x in new[] { -5.8f, 5.8f }) Box(root, "Gate post", new Vector3(x, 2.5f, 0f), new Vector3(.18f, 5f, .18f), marker);
             Box(root, "Gate lintel", new Vector3(0f, 5f, 0f), new Vector3(11.8f, .18f, .18f), marker);
-            if (!finish) { WorldShiftLevelProps.CheckpointMark(root); return; }
             // A chequered strip across the road: no words needed.
             Material black = RuntimeMaterials.Coloured(new Color(.03f, .03f, .03f));
             for (int i = 0; i < 10; i++)
@@ -267,6 +272,9 @@ namespace Outlaws.WorldShift
             world = next;
             obstaclePalette.SetWorld(next);
             moverPalette.SetWorld(next);
+            sideMoverPalette.SetWorld(next);
+            switchPalette.SetWorld(next);
+            permanentPalette.SetWorld(next);
             bool day = world == ShiftWorld.Day;
             foreach (var item in palette) item.Renderer.sharedMaterial = day ? item.Day : item.Echo;
             RefreshHazards();

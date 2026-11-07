@@ -1,7 +1,7 @@
 # Level 2 desert
 
 Level 2 uses Drew's shared level controller, six ramp sections and
-one-hit retries. Day obstacles stay yellow, Night obstacles black with the other
+one-hit retries. Day-only obstacles stay teal, Night-only obstacles pale violet with the other
 world shown as passable dashes. All moving rocks are orange and solid in both
 worlds: Day moves them and Night freezes their exact current position.
 

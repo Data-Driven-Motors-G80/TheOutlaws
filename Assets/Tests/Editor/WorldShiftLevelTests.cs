@@ -95,7 +95,16 @@ public sealed class WorldShiftLevelTests
             var checkpoints = ((Array)Field(course, "Checkpoints")).Cast<object>().ToArray();
             float length = (float)Field(course, "Length");
             Assert.That(ramps.Length, Is.EqualTo(level == 0 ? 1 : level == 2 ? 6 : 5), "level " + level);
-            Assert.That(checkpoints.Length, Is.EqualTo(level == 2 ? 7 : 5), "Respawn positions, including the initial spawn, level " + level);
+            Assert.That(checkpoints.Length, Is.EqualTo(level == 2 ? 7 : level == 0 ? 6 : 5), "Respawn positions, including the initial spawn, level " + level);
+            if (level == 0)
+            {
+                Assert.That(hazards.Any(h => (float)Field(h, "Start") == 90f && (bool)Field(h, "SharedAcrossWorlds")), Is.True,
+                    "The white opening block teaches that permanent hazards survive a switch.");
+                Assert.That(hazards.Any(h => Field(h, "Kind").ToString() == "SwitchWall"), Is.True,
+                    "The tutorial has a real turquoise wall that clears after switching.");
+                Assert.That(hazards.Any(h => Field(h, "Kind").ToString() == "Oncoming" && (bool)Field(h, "SharedAcrossWorlds")), Is.True,
+                    "Oncoming traffic has a separate playable lesson.");
+            }
             for (int i = 1; i < checkpoints.Length; i++)
                 Assert.That((float)Field(checkpoints[i], "Distance"), Is.GreaterThan((float)Field(checkpoints[i - 1], "Distance")));
             foreach (var ramp in ramps)
@@ -172,6 +181,10 @@ public sealed class WorldShiftLevelTests
         Assert.That(Get(game, "Getaway"), Is.Null, "No cash, fuel pickups, power-ups or forks.");
         Assert.That(Get(game, "Environment").ToString(), Is.EqualTo("City"));
         Assert.That(Get(game, "State").ToString(), Is.EqualTo("Running"));
+        var firstBlock = ((IEnumerable)Get(game, "Hazards")).Cast<object>()
+            .Single(h => (float)Field(h, "Start") == 50f && (int)Field(h, "LaneMask") == 2);
+        Assert.That(Field(firstBlock, "SharedAcrossWorlds"), Is.True,
+            "The first center block remains solid when the player switches worlds.");
         Capture("city-start");
         for (int i = 0; i < 200 && Get(game, "State").ToString() == "Running"; i++) Call(game, "StepSimulation", .05f, 0f, false);
         Assert.That(Get(game, "State").ToString(), Is.EqualTo("Retrying"), "The first block in the middle lane ends the attempt.");
@@ -236,7 +249,45 @@ public sealed class WorldShiftLevelTests
         StartLevel(0); yield return null; yield return null;
         PlayerPrefs.SetInt(UnlockAllKey, 0);
         var game = Started();
-        Assert.That(game.GetComponentsInChildren<Transform>(true).Count(t => t.name.StartsWith("Highway sign")), Is.EqualTo(5));
+        Assert.That(Get(game, "TrainingLessonPaused"), Is.False);
+        Step(game, 1.1f);
+        Assert.That(Get(game, "TrainingLessonPaused"), Is.True, "Training stops with the road sign in view.");
+        float firstSignStop = (float)Get(game, "Distance");
+        Assert.That(firstSignStop, Is.GreaterThan(0f).And.LessThan(25f));
+        Step(game, 1f);
+        Assert.That((float)Get(game, "Distance"), Is.EqualTo(firstSignStop).Within(.001f));
+        Call(game, "ContinueTrainingLesson");
+        Step(game, .1f);
+        Assert.That((float)Get(game, "Distance"), Is.GreaterThan(0f));
+        Assert.That(game.GetComponentsInChildren<Transform>(true).Count(t => t.name.StartsWith("Highway sign")), Is.EqualTo(6));
+        foreach (string lesson in new[] { "Steer", "Switch", "Dashes", "Oncoming", "Freeze", "Ramp" })
+        {
+            var sign = game.GetComponentsInChildren<Transform>(true).Single(t => t.name == "Highway sign " + lesson);
+            var artwork = sign.Find("Sign face/Sign artwork");
+            Assert.That(artwork, Is.Not.Null, lesson + " uses the supplied road-sign artwork.");
+            Assert.That(artwork.GetComponent<Renderer>().sharedMaterial.mainTexture, Is.Not.Null);
+        }
+        Assert.That(game.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Obstacle lesson"), Is.False,
+            "The road signs teach with pictograms instead of sentences.");
+        Assert.That(game.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Oncoming direction" && t.localPosition.y > 1f), Is.True,
+            "The oncoming arrow is raised above the block and faces the driver.");
+        var gates = game.GetComponentsInChildren<Transform>(true).Where(t => t.name == "Checkpoint gate").ToArray();
+        Assert.That(gates.Length, Is.GreaterThan(0));
+        foreach (var gate in gates)
+        {
+            Assert.That(gate.Find("Gate lintel"), Is.Null, "Training checkpoints leave the view over the road open.");
+            Assert.That(gate.Find("Gate post"), Is.Null, "Checkpoints use one horizontal road stripe, without upright lines.");
+            Assert.That(gate.Find("CHECKPOINT cue"), Is.Null);
+            Assert.That(gate.GetComponentsInChildren<Transform>().Count(t => t.name == "Cube"), Is.EqualTo(1));
+        }
+        Pose(game, 177f, 0f);
+        Step(game, .2f);
+        Step(game, 1.1f);
+        Assert.That(Get(game, "TrainingLessonPaused"), Is.True, "The next instruction waits by its own road sign.");
+        float stoppedAt = (float)Get(game, "Distance");
+        Step(game, 1f);
+        Assert.That((float)Get(game, "Distance"), Is.EqualTo(stoppedAt).Within(.001f));
+        Call(game, "ContinueTrainingLesson");
         Pose(game, 20f, 0f);
         Call(game, "PresentWorldForCamera", World("Day"));
         Capture("training-steer-sign");
@@ -245,11 +296,19 @@ public sealed class WorldShiftLevelTests
         Pose(game, (float)Field(ramp, "Ramp") - 50f, 0f);
         Call(game, "PresentWorldForCamera", World("Day"));
         Capture("training-ramp");
+        Assert.That(game.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Ramp air cue"), Is.False);
+        bool attemptedLanding = false;
         for (int i = 0; i < 400 && Get(game, "State").ToString() == "Running"; i++)
         {
+            if ((bool)Get(game, "TrainingLessonPaused")) Call(game, "ContinueTrainingLesson");
             Call(game, "StepSimulation", .05f, 0f, false);
-            if ((bool)Get(game, "IsRelayAirborne") && Get(game, "World").ToString() == "Day") Call(game, "TrySwitch");
+            if ((bool)Get(game, "IsRelayAirborne") && Get(game, "World").ToString() == "Day")
+            {
+                attemptedLanding = true;
+                Call(game, "TrySwitch");
+            }
         }
+        Assert.That(attemptedLanding, Is.True);
         Assert.That(Get(game, "State").ToString(), Is.EqualTo("Won"), "Launch in Day, switch midair, land in Night, reach the finish.");
         Assert.That(StaticGet(Levels, "HighestBeaten"), Is.EqualTo(0));
         Assert.That(Static(Levels, "IsUnlocked", 1), Is.True);

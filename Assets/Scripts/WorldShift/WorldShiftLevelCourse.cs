@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Outlaws.WorldShift
 {
-    public enum LevelSignKind { Steer, Switch, Dashes, Freeze, Ramp, AirFreeze, AirRelease }
+    public enum LevelSignKind { Steer, Switch, Dashes, Freeze, Ramp, AirFreeze, AirRelease, Oncoming }
 
     public readonly struct LevelSign
     {
@@ -118,6 +118,10 @@ namespace Outlaws.WorldShift
 
             // Offsets are metres from the start of the current section.
             public Builder Day(float at, int lanes) => Add(new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.Barrier, start + at, start + at + 6f, lanes));
+            public Builder Permanent(float at, int lanes) => Add(new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.Barrier,
+                start + at, start + at + 6f, lanes, sharedAcrossWorlds: true));
+            public Builder SwitchWall(float at) => Add(new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.SwitchWall,
+                start + at, start + at + 6f, 7));
             public Builder Night(float at, int lanes) => Add(new ShiftHazard(ShiftWorld.Echo, ShiftHazardKind.Barrier, start + at, start + at + 6f, lanes));
             public Builder DayHalf(float at, int side) => Add(new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.HalfBarrier, start + at, start + at + 6f, side < 0 ? 3 : 6, halfSide: side));
             public Builder NightHalf(float at, int side) => Add(new ShiftHazard(ShiftWorld.Echo, ShiftHazardKind.HalfBarrier, start + at, start + at + 6f, side < 0 ? 3 : 6, halfSide: side));
@@ -242,15 +246,16 @@ namespace Outlaws.WorldShift
 
         // One idea per section, introduced by a highway sign.
         private static LevelCourse Training() => new Builder(ShiftLevel.City, true)
-            .Sign(25f, LevelSignKind.Steer).Day(90f, Middle).Day(140f, LeftMiddle).Gate(180f, D)
-            .Sign(25f, LevelSignKind.Switch).Day(110f, All).Gate(170f, N)
+            .Sign(25f, LevelSignKind.Steer).Permanent(90f, Middle).Permanent(140f, LeftMiddle).Gate(180f, D)
+            .Sign(25f, LevelSignKind.Switch).SwitchWall(110f).Gate(170f, N)
             .Sign(25f, LevelSignKind.Dashes).Day(70f, All).Night(120f, All).Gate(180f, D)
+            .Sign(25f, LevelSignKind.Oncoming).Rock(110f, Middle, 10f).Gate(170f, D)
             .Sign(25f, LevelSignKind.Freeze).Slider(110f, 1.1f).Slider(150f, -1.3f).Gate(210f, N)
             .Sign(25f, LevelSignKind.Ramp).Night(70f, All).Ramp(120f, D)
             .Build();
 
         private static LevelCourse City() => new Builder(ShiftLevel.City)
-            .Day(50f, Middle).Day(100f, All).Night(150f, LeftMiddle).Night(200f, All).Ramp(250f, D)
+            .Permanent(50f, Middle).Day(100f, All).Night(150f, LeftMiddle).Night(200f, All).Ramp(250f, D)
             .Night(50f, Right).Day(90f, All).Night(135f, All).Day(180f, LeftMiddle).Day(220f, All).Ramp(260f, N)
             .DayCar(60f, Middle).Night(60f, Sides).NightCar(130f, Left).Day(130f, All).Night(190f, All).Ramp(240f, D)
             .Slider(60f, 1f).Day(120f, All).Slider(170f, 1.25f).Day(220f, All).Ramp(260f, N)

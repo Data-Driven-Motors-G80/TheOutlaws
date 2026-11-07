@@ -11,8 +11,8 @@ A low-fidelity Unity driving playtest built around switching between Day and Nig
 ## How it plays
 
 - The home screen lists the levels: **0 Training, 1 City, 2 Desert, 3 Ocean, 4 Snow, 5 Mountain**. Beat a level to unlock the next.
-- Still obstacles belong to Day (yellow) or Night (black). The other world's obstacles show as dashed outlines: you can drive through dashes, but switching while inside one is a crash.
-- Anything that slides sideways or rolls toward you exists in both worlds (orange). It moves in Day and freezes in Night.
+- Level 0 introduces each obstacle through a short road encounter: warm white permanent blocks, teal Day-only blocks, pale violet Night-only blocks, red oncoming blocks and orange sideways movers. Teal blocks disappear in Nightshift regardless of their width; permanent blocks stay solid in both worlds. The other world's obstacles show as dashed outlines: you can drive through dashes, but switching while inside one is a crash.
+- Shared movers exist in both worlds: sideways movers are orange with black markings, and oncoming blocks are red with white X markings. It moves in Day and freezes in Night.
 - One hit and the police catch you; you restart at the last checkpoint.
 - Every section ends with a big ramp: launch in one world, switch in the air, land in the other. Each landing is a checkpoint.
 

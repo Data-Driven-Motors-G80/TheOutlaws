@@ -25,6 +25,8 @@ namespace Outlaws.WorldShift
         public bool LevelMode => course != null;
         public int LevelIndex { get; private set; } = -1;
         public int CheckpointIndex => checkpointIndex;
+        public bool TrainingLessonPaused { get; private set; }
+        private bool trainingLessonRead;
         // Police pull up to the crashed car before the checkpoint restart.
         public bool Capturing => LevelMode && State == ShiftRunState.Retrying && lastFailure != "NO ROAD" && lastFailure != "MISSED RELAY LANDING";
         public const float LevelPoliceGap = 6f;
@@ -262,7 +264,9 @@ namespace Outlaws.WorldShift
             if (keyboard != null)
             {
                 if (keyboard.escapeKey.wasPressedThisFrame) TogglePause();
-                if (State == ShiftRunState.Ready && keyboard.enterKey.wasPressedThisFrame) BeginRun();
+                if (State == ShiftRunState.Running && TrainingLessonPaused &&
+                    (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame)) ContinueTrainingLesson();
+                else if (State == ShiftRunState.Ready && keyboard.enterKey.wasPressedThisFrame) BeginRun();
                 else if (!GetawayMode && !LevelMode && State == ShiftRunState.Won && keyboard.enterKey.wasPressedThisFrame) WorldShiftFlow.Next(tutorialLevel ? ShiftLevel.Tutorial : environment);
                 else if (!GetawayMode && !LevelMode && State == ShiftRunState.Won && keyboard.rKey.wasPressedThisFrame) RestartRun();
                 else if ((State == ShiftRunState.Running || State == ShiftRunState.Paused) && keyboard.rKey.wasPressedThisFrame) RetryCheckpoint();
@@ -285,7 +289,18 @@ namespace Outlaws.WorldShift
         {
             if (State != ShiftRunState.Ready) return;
             State = ShiftRunState.Running;
+            TrainingLessonPaused = false;
+            trainingLessonRead = false;
             hintRemaining = 11f;
+        }
+
+        public void ContinueTrainingLesson()
+        {
+            if (State == ShiftRunState.Running && TrainingLessonPaused)
+            {
+                TrainingLessonPaused = false;
+                trainingLessonRead = true;
+            }
         }
 
         public void RestartRun()
@@ -317,7 +332,7 @@ namespace Outlaws.WorldShift
 
         public bool TrySwitch()
         {
-            if (State != ShiftRunState.Running) return false;
+            if (State != ShiftRunState.Running || TrainingLessonPaused) return false;
             if ((GetawayMode || tutorialLevel || LevelMode) && (relay?.HoldingLanding(Distance, World) ?? false)) return false;
             if (IsMerged)
             {
@@ -352,7 +367,7 @@ namespace Outlaws.WorldShift
 
         public void StepSimulation(float delta, float steer, bool switchPressed)
         {
-            if (State == ShiftRunState.Paused || State == ShiftRunState.Ready || State == ShiftRunState.Won || State == ShiftRunState.Lost) return;
+            if (TrainingLessonPaused || State == ShiftRunState.Paused || State == ShiftRunState.Ready || State == ShiftRunState.Won || State == ShiftRunState.Lost) return;
             delta = Mathf.Max(0f, delta);
             if (State == ShiftRunState.Retrying)
             {
@@ -374,7 +389,7 @@ namespace Outlaws.WorldShift
             if (switchPressed) TrySwitch();
             float simulatedTime = 0f;
             // Small substeps make held steering and collision checks stable even after a slow frame.
-            while (delta > 0.00001f && State == ShiftRunState.Running)
+            while (delta > 0.00001f && State == ShiftRunState.Running && !TrainingLessonPaused)
             {
                 float dt = Mathf.Min(delta, 1f / 60f);
                 delta -= dt;
@@ -440,6 +455,9 @@ namespace Outlaws.WorldShift
                 nextLateral = ResolveDividers(previous, next, previousLateral, nextLateral, steer);
                 Distance = next;
                 Lateral = nextLateral;
+                if (LevelMode && course.Training && !trainingLessonRead && checkpointIndex < course.Signs.Length
+                    && Distance >= course.Signs[checkpointIndex].Distance - 5f)
+                    TrainingLessonPaused = true;
                 CompleteTutorialHint();
                 UpdateMergeState();
                 presentation.StepPedestrians(dt);
@@ -454,6 +472,7 @@ namespace Outlaws.WorldShift
                 if (checkpointIndex + 1 < Checkpoints.Length && Distance >= Checkpoints[checkpointIndex + 1].Distance)
                 {
                     checkpointIndex++;
+                    trainingLessonRead = false;
                     if (tutorialLevel) WorldShiftAnalytics.TutorialStep(checkpointIndex, Checkpoints[checkpointIndex].Title);
                     if (LevelMode)
                     {
@@ -720,6 +739,8 @@ namespace Outlaws.WorldShift
             Lateral = checkpoint.Lateral;
             retryRemaining = 0f;
             State = ShiftRunState.Running;
+            TrainingLessonPaused = false;
+            trainingLessonRead = false;
             hintRemaining = 10f;
             fuel.Reset(checkpointFuel);
             pursuit.Restore(new RiskRunSnapshot(checkpointGap, false, 0, false, 0, 0, PickupEffectType.None, 0f, 0f, 0f));

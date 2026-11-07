@@ -33,11 +33,15 @@ namespace Outlaws.WorldShift
         private TMP_Text actionLabel;
         private WorldShiftRelayVisuals relayViews;
         private readonly WorldShiftObstacleVisual.Palette obstaclePalette = new WorldShiftObstacleVisual.Palette();
+        private readonly WorldShiftObstacleVisual.Palette movingPalette = new WorldShiftObstacleVisual.Palette(WorldShiftLevelProps.MoverColour, Color.white);
+        private readonly WorldShiftObstacleVisual.Palette sideMovingPalette = new WorldShiftObstacleVisual.Palette(WorldShiftLevelProps.SideMoverColour, new Color(.035f, .035f, .04f));
+        private readonly WorldShiftObstacleVisual.Palette switchPalette = new WorldShiftObstacleVisual.Palette(WorldShiftLevelProps.SwitchColour, new Color(.04f, .17f, .19f));
         private static readonly Color Gold = new Color(1f, .70f, .26f), Cyan = new Color(.32f, .84f, 1f);
 
         public void Build(DesertShiftTrial controller, Camera camera, Light directional, Material originalRoad, Material originalSand, GameObject obstacle)
         {
             game = controller; view = camera; sun = directional;
+            obstaclePalette.LevelColours = game.GetawayMode;
             obstaclePrefab = obstacle;
             if (game.GetawayMode)
             {
@@ -170,7 +174,7 @@ namespace Outlaws.WorldShift
         {
             var root = new GameObject("Shared rolling rock " + data.Distance).transform;
             root.SetParent(transform, false);
-            var sphere = WorldShiftObstacleVisual.Build(root, Vector3.zero, Vector3.one * (data.Radius * 2f), obstaclePalette).gameObject;
+            var sphere = WorldShiftObstacleVisual.Build(root, Vector3.zero, Vector3.one * (data.Radius * 2f), sideMovingPalette).gameObject;
             Renderer surface = sphere.transform.Find("Obstacle block").GetComponent<Renderer>();
             var frozen = new GameObject("Frozen pause pictogram");
             frozen.transform.SetParent(root, false);
@@ -198,7 +202,7 @@ namespace Outlaws.WorldShift
         {
             Transform root = RoadRoot("Freezeable oncoming police " + data.Start, data.Start);
             float x = data.Lane * WorldShiftLevel.RoadWidth / 3f;
-            WorldShiftObstacleVisual.Build(root, new Vector3(x, .9f, 0f), new Vector3(2.4f, 1.8f, 3.8f), obstaclePalette);
+            WorldShiftObstacleVisual.Build(root, new Vector3(x, .9f, 0f), new Vector3(2.4f, 1.8f, 3.8f), movingPalette, oncoming: true);
             var frozen = new GameObject("Frozen traffic pause pictogram"); frozen.transform.SetParent(root, false);
             foreach (float offset in new[] { -.2f, .2f })
                 Box(frozen.transform, "Pause bar", new Vector3(x + offset, 2.25f, 0f), new Vector3(.18f, .65f, .15f), Material(Cyan, .65f));
@@ -214,7 +218,7 @@ namespace Outlaws.WorldShift
             var solid = new GameObject("Active wall"); solid.transform.SetParent(root.transform, false);
             Color colour = data.World == ShiftWorld.Day ? Gold : Cyan;
             if (data.SwitchOnly)
-                WorldShiftObstacleVisual.Build(solid.transform, new Vector3(0f, .9f, 0f), new Vector3(WorldShiftLevel.RoadWidth, 1.8f, 8f), obstaclePalette);
+                WorldShiftObstacleVisual.Build(solid.transform, new Vector3(0f, .9f, 0f), new Vector3(WorldShiftLevel.RoadWidth, 1.8f, 8f), switchPalette, true);
             else if (data.HalfSide != 0)
             {
                 OriginalObstacle(solid.transform, new Vector3(data.HalfSide * 2.5f, .7f, 0f), new Vector3(5f, 1.4f, 8f), Material(colour * .55f, .1f));
@@ -229,6 +233,9 @@ namespace Outlaws.WorldShift
         public void Present(ShiftWorld world)
         {
             obstaclePalette.SetWorld(world);
+            movingPalette.SetWorld(world);
+            sideMovingPalette.SetWorld(world);
+            switchPalette.SetWorld(world);
             if (game == null) return;
             game.Getaway?.Present(world);
             bool day = world == ShiftWorld.Day;
