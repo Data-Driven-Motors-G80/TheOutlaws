@@ -118,11 +118,7 @@ namespace Outlaws.WorldShift
                 Line(parent, "Landing beacon - decorative", material, .18f,
                     lip.Position + lip.Right * side * 5.2f,
                     lip.Position + lip.Right * side * 5.2f + lip.Up * 3.5f);
-            var target = route.Sample(jump.Landing + 10f);
-            Vector3 tip = target.Position + target.Up * 1.8f;
-            Line(parent, "Downward landing target", material, .14f, tip + target.Up * 2.6f, tip);
-            Line(parent, "Landing arrowhead", material, .14f,
-                tip - target.Right + target.Up * 1.2f, tip, tip + target.Right + target.Up * 1.2f);
+
         }
 
         private static GameObject Child(Transform parent, string name)
