@@ -45,6 +45,7 @@ namespace Outlaws.WorldShift
         [SerializeField] private GameObject fuelPrefab;
         private WorldShiftPresentation presentation;
         private AutoDriveCar driver;
+        private WorldShiftRockets rockets;
         private WorldShiftRelay relay;
         public bool IsRelayAirborne => relay != null && relay.IsAirborne;
         private ShiftRelay[] escapeRelays;
@@ -241,7 +242,12 @@ namespace Outlaws.WorldShift
                 TutorialRewards = gameObject.AddComponent<WorldShiftTutorialRewards>(); TutorialRewards.Bind(this);
                 WorldShiftAnalytics.BeginTutorial(Checkpoints.Length, () => Distance, () => Duration, () => World);
             }
-            if (LevelMode) gameObject.AddComponent<WorldShiftLevelHud>().Bind(this);
+            if (LevelMode)
+            {
+                gameObject.AddComponent<WorldShiftLevelHud>().Bind(this);
+                if (!course.Training)
+                { rockets = gameObject.AddComponent<WorldShiftRockets>(); rockets.Bind(this, view); }
+            }
             else if (GetawayMode) { Getaway = gameObject.AddComponent<WorldShiftGetaway>(); Getaway.Bind(this); }
             else gameObject.AddComponent<WorldShiftHud>().Bind(this);
             if (splitViewValidation) gameObject.AddComponent<WorldShiftSplitView>().Initialize(this, view);
@@ -455,6 +461,8 @@ namespace Outlaws.WorldShift
                 nextLateral = ResolveDividers(previous, next, previousLateral, nextLateral, steer);
                 Distance = next;
                 Lateral = nextLateral;
+                rockets?.Step(dt, previous, previousLateral);
+                if (State != ShiftRunState.Running) break;
                 if (LevelMode && course.Training && !trainingLessonRead && checkpointIndex < course.Signs.Length
                     && Distance >= course.Signs[checkpointIndex].Distance - 5f)
                     TrainingLessonPaused = true;
@@ -574,6 +582,12 @@ namespace Outlaws.WorldShift
                 driver.ConstrainExternalLateral(lateral);
             }
             return lateral;
+        }
+
+        // Rockets are fatal even when ordinary impact protection is active.
+        internal void HitRocket()
+        {
+            if (State == ShiftRunState.Running) Fail("ROCKET HIT");
         }
 
         private void Fail(string reason)
@@ -736,6 +750,7 @@ namespace Outlaws.WorldShift
             tutorialCheckpointLateral = checkpoint.Lateral;
             TutorialRewards?.Restore(checkpoint.Distance);
             Distance = checkpoint.Distance;
+            rockets?.ResetAttacks();
             Lateral = checkpoint.Lateral;
             retryRemaining = 0f;
             State = ShiftRunState.Running;
@@ -772,6 +787,7 @@ namespace Outlaws.WorldShift
             presentation.UpdateVisibility(Distance);
             Getaway?.Present(world);
             TutorialRewards?.Present(world);
+            rockets?.Present(world);
         }
 
         // Rendering can visit both visual states without advancing simulation or
@@ -783,6 +799,7 @@ namespace Outlaws.WorldShift
             presentation.UpdateVisibility(Distance);
             Getaway?.Present(displayedWorld);
             TutorialRewards?.Present(displayedWorld);
+            rockets?.Present(displayedWorld);
         }
 
         private void UpdateCamera(bool immediate)
