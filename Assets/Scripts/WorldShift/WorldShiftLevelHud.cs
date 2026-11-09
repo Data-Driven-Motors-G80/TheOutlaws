@@ -22,6 +22,8 @@ namespace Outlaws.WorldShift
         private GameObject driving, pause, complete, trainingLesson;
         private bool completeShown;
         private GameObject freezePrompt;
+        private TMP_Text freezeAction, freezeState;
+        private Image freezeWorld, freezeMotion;
         private CanvasGroup lessonGroup;
         private RectTransform signPreview;
         private RawImage signImage;
@@ -124,13 +126,24 @@ namespace Outlaws.WorldShift
 
         private void BuildFreezePrompt(Transform parent)
         {
-            var border = FreezeBox(parent, "Freeze demonstration", new Vector2(.20f, .12f), new Vector2(.80f, .215f), FreezeTeal, true);
+            var border = FreezeBox(parent, "Freeze demonstration", new Vector2(.20f, .07f), new Vector2(.80f, .215f), FreezeTeal, true);
             freezePrompt = border.gameObject;
             var face = FreezeBox(border, "Dark face", Vector2.zero, Vector2.one, new Color(.025f, .045f, .06f, .98f), true);
             face.offsetMin = new Vector2(3f, 3f); face.offsetMax = new Vector2(-3f, -3f);
-            FreezeLabel(face, "PRESS", .025f, .13f);
-            FreezeKey(face, "SPACE", .135f, .29f);
-            FreezeLabel(face, "TO FREEZE", .30f, .49f);
+            freezeState = WorldShiftMenu.Label(face, "DAY: OBSTACLES MOVING", .04f, .75f, .96f, .98f, 23f);
+            freezeState.color = FreezeTeal;
+            freezeState.fontStyle = FontStyles.Bold;
+            freezeState.alignment = TextAlignmentOptions.Center;
+            face = WorldShiftMenu.Panel(face, "Freeze controls", Vector2.zero, new Vector2(1f, .72f), Color.clear);
+            FreezeLabel(face, "PRESS", .02f, .10f, 24f);
+            FreezeKey(face, "SPACE", .11f, .255f);
+            var moon = freezeWorld = Icon(face, ShiftIcon.Moon, 32f);
+            moon.rectTransform.anchorMin = moon.rectTransform.anchorMax = new Vector2(.28f, .5f);
+            moon.color = FreezeTeal;
+            var stopped = freezeMotion = Icon(face, ShiftIcon.Pause, 24f);
+            stopped.rectTransform.anchorMin = stopped.rectTransform.anchorMax = new Vector2(.31f, .5f);
+            stopped.color = FreezeTeal;
+            freezeAction = FreezeLabel(face, "TO FREEZE", .335f, .50f, 24f);
             var next = Icon(face, ShiftIcon.Next, 30f);
             next.rectTransform.anchorMin = next.rectTransform.anchorMax = new Vector2(.535f, .5f);
             next.color = FreezeTeal;
@@ -148,12 +161,13 @@ namespace Outlaws.WorldShift
             FreezeLabel(face, label, 0f, 1f);
         }
 
-        private static void FreezeLabel(RectTransform parent, string value, float left, float right)
+        private static TMP_Text FreezeLabel(RectTransform parent, string value, float left, float right, float fontSize = 28f)
         {
-            var label = WorldShiftMenu.Label(parent, value, left, .05f, right, .95f, 28f);
+            var label = WorldShiftMenu.Label(parent, value, left, .05f, right, .95f, fontSize);
             label.color = Color.white;
             label.fontStyle = FontStyles.Bold;
             label.alignment = TextAlignmentOptions.Center;
+            return label;
         }
 
         private static RectTransform FreezeBox(Transform parent, string name, Vector2 min, Vector2 max, Color color, bool pill)
@@ -273,6 +287,10 @@ namespace Outlaws.WorldShift
         {
             freezePrompt.SetActive(game.TrainingFreezeWaiting && !game.TrainingLessonPaused && game.State == ShiftRunState.Running);
             bool day = game.World == ShiftWorld.Day;
+            freezeState.text = day ? "DAY: OBSTACLES MOVING" : "NIGHT: OBSTACLES FROZEN";
+            freezeAction.text = game.TrainingFreezeStep == 1 ? "TO MOVE" : "TO FREEZE";
+            freezeWorld.sprite = WorldShiftIcons.Get(day ? ShiftIcon.Sun : ShiftIcon.Moon);
+            freezeMotion.sprite = WorldShiftIcons.Get(day ? ShiftIcon.Play : ShiftIcon.Pause);
             worldIcon.sprite = WorldShiftIcons.Get(day ? ShiftIcon.Sun : ShiftIcon.Moon);
             worldIcon.color = day ? Gold : Cream;
             float progress = game.Progress;

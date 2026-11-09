@@ -27,7 +27,8 @@ namespace Outlaws.WorldShift
         public int CheckpointIndex => checkpointIndex;
         public bool TrainingLessonPaused { get; private set; }
         private bool trainingLessonRead;
-        private bool trainingFreezeDemonstrated;
+        public int TrainingFreezeStep { get; private set; }
+        private bool trainingFreezeDemonstrated => TrainingFreezeStep >= 3;
         private bool InFreezeLesson => LevelMode && course.Training && checkpointIndex == 4;
         private float TrainingFreezeStop => Checkpoints[checkpointIndex].Distance + 70f;
         public bool TrainingFreezeWaiting => InFreezeLesson && !trainingFreezeDemonstrated
@@ -366,9 +367,11 @@ namespace Outlaws.WorldShift
             }
             else if (LevelMode && environment == ShiftLevel.Desert)
                 ApplyImpact(FindCollision(next, Distance, Distance, Lateral, Lateral, true), Lateral);
-            // Early correct input counts too, after the lesson sign has been read.
-            if (InFreezeLesson && trainingLessonRead && State == ShiftRunState.Running && next == ShiftWorld.Echo)
-                trainingFreezeDemonstrated = true;
+            // Demonstrate both directions before driving on: Night stops motion,
+            // Day restores it, then Night freezes the practice route again.
+            if (InFreezeLesson && trainingLessonRead && State == ShiftRunState.Running && TrainingFreezeStep < 3
+                && next == (TrainingFreezeStep == 1 ? ShiftWorld.Day : ShiftWorld.Echo))
+                TrainingFreezeStep++;
             if (IsRelayAirborne) Notify(relay.Hint(Distance, World), 1.8f);
             return true;
         }
@@ -744,7 +747,7 @@ namespace Outlaws.WorldShift
 
         private void RestoreCheckpoint()
         {
-            trainingFreezeDemonstrated = false;
+            TrainingFreezeStep = 0;
             if (LevelMode)
             {
                 WorldShiftLevelAnalytics.Respawned(Checkpoints[checkpointIndex].World);

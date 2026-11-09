@@ -273,6 +273,23 @@ public sealed class WorldShiftLevelTests
         Assert.That((float)Get(sliders[0], "MotionTravel"), Is.EqualTo(motion));
         Call(game, "TogglePause");
         Call(game, "TrySwitch");
+        Assert.That(Get(game, "TrainingFreezeStep"), Is.EqualTo(1));
+        Assert.That(Get(game, "TrainingFreezeWaiting"), Is.EqualTo(true), "The first press demonstrates freezing without releasing the car.");
+        Step(game, 1f);
+        Assert.That((float)Get(game, "Distance"), Is.EqualTo(distance).Within(.001f));
+        Assert.That((float)Get(sliders[0], "MotionTravel"), Is.EqualTo(motion));
+        Capture("training-freeze-night-stopped-1080");
+        Call(game, "TrySwitch");
+        Assert.That(Get(game, "TrainingFreezeStep"), Is.EqualTo(2));
+        Step(game, 1f);
+        Assert.That(Get(game, "TrainingFreezeWaiting"), Is.EqualTo(true));
+        Assert.That((float)Get(game, "Distance"), Is.EqualTo(distance).Within(.001f));
+        Assert.That((float)Get(game, "Duration"), Is.EqualTo(duration).Within(.001f));
+        Assert.That((float)Get(sliders[0], "MotionTravel"), Is.Not.EqualTo(motion), "Day visibly restores obstacle motion while the car waits.");
+        Capture("training-freeze-day-moving-1080");
+        motion = (float)Get(sliders[0], "MotionTravel");
+        Call(game, "TrySwitch");
+        Assert.That(Get(game, "TrainingFreezeStep"), Is.EqualTo(3));
         Assert.That(Get(game, "TrainingFreezeWaiting"), Is.EqualTo(false));
         Step(game, .25f);
         Assert.That((float)Get(game, "Distance"), Is.GreaterThan(distance));
@@ -285,14 +302,18 @@ public sealed class WorldShiftLevelTests
 
         game.GetType().GetField("checkpointIndex", Flags).SetValue(game, 4);
         Call(game, "RetryCheckpoint");
-        Assert.That(Field(game, "trainingFreezeDemonstrated"), Is.EqualTo(false));
+        Assert.That(Get(game, "TrainingFreezeStep"), Is.EqualTo(0));
         game.GetType().GetField("trainingLessonRead", Flags).SetValue(game, true);
         Pose(game, 740f, 4f);
         Call(game, "TrySwitch");
         Step(game, 2f);
-        Assert.That((float)Get(game, "Distance"), Is.GreaterThan(770f), "Early correct switching avoids the hold.");
-        Assert.That(Get(game, "TrainingFreezeWaiting"), Is.EqualTo(false));
-        Step(game, 10f);
+        Assert.That((float)Get(game, "Distance"), Is.EqualTo(770f).Within(.01f));
+        Assert.That(Get(game, "TrainingFreezeStep"), Is.EqualTo(1), "Early freezing counts, but both states must be demonstrated.");
+        Assert.That(Get(game, "TrainingFreezeWaiting"), Is.EqualTo(true));
+        Call(game, "TrySwitch");
+        Step(game, .25f);
+        Call(game, "TrySwitch");
+        Step(game, 11f);
         Assert.That(Get(game, "CheckpointIndex"), Is.EqualTo(5), "All three frozen sliders leave a navigable opening.");
         Assert.That(Get(game, "Deaths"), Is.EqualTo(0));
         game.GetType().GetField("checkpointIndex", Flags).SetValue(game, 4);
@@ -301,12 +322,14 @@ public sealed class WorldShiftLevelTests
         Pose(game, 768f, 0f);
         Step(game, .2f);
         Call(game, "TrySwitch");
+        Call(game, "TrySwitch");
+        Call(game, "TrySwitch");
         Pose(game, 809f, 0f);
         Step(game, .1f);
         Assert.That(Get(game, "State").ToString(), Is.EqualTo("Retrying"), "Frozen sliders remain solid.");
         Step(game, 3f);
         Assert.That(Get(game, "CheckpointIndex"), Is.EqualTo(4));
-        Assert.That(Field(game, "trainingFreezeDemonstrated"), Is.EqualTo(false));
+        Assert.That(Get(game, "TrainingFreezeStep"), Is.EqualTo(0));
     }
 
     [UnityTest]
