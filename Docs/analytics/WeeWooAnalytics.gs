@@ -607,8 +607,10 @@ function worldShiftReports(book) {
   var attempts = latest(table(book, 'ws_level_attempts'), function (r) { return r.attempt_id; });
   var LEVEL_NAMES = ['Training', 'City', 'Desert', 'Ocean', 'Snow', 'Mountain'];
   var played = attempts.filter(function (a) { return !truthy(a.unlock_all); });
+  var allAttemptCount = attempts.length;
+  attempts = played;
   var levelPlay = [['Level attempts', attempts.length], ['Players', unique(attempts, 'player_id').length],
-    ['Attempts with Unlock All on (team testing)', attempts.length - played.length],
+    ['Attempts with Unlock All on (team testing)', allAttemptCount - played.length],
     ['Outcomes', counts(attempts, 'outcome')], ['How attempts started', counts(attempts, 'from')],
     ['Highest level beaten by each player (no Unlock All)', counts(unique(played, 'player_id').map(function (p) {
       var beaten = filter(filter(played, 'player_id', p), 'outcome', 'complete');
@@ -621,8 +623,8 @@ function worldShiftReports(book) {
     levelPlay.push(['  Attempts / completed', here.length + ' / ' + done.length + ' (' + pct(done.length, here.length) + ')']);
     levelPlay.push(['  Median deaths in a completed attempt', med(done, 'deaths')]);
     levelPlay.push(['  Median driving time to complete (s)', med(done, 'drive_s')]);
-    levelPlay.push(['  Deaths by section (all attempts)', [0, 1, 2, 3, 4].map(function (s) { return 'S' + (s + 1) + ': ' + total(here, 'deaths_' + s); }).join(', ')]);
-    levelPlay.push(['  Median seconds per section', [0, 1, 2, 3, 4].map(function (s) {
+    levelPlay.push(['  Deaths by section (all attempts)', levelSectionIndices(here).map(function (s) { return 'S' + (s + 1) + ': ' + total(here, 'deaths_' + s); }).join(', ')]);
+    levelPlay.push(['  Median seconds per section', levelSectionIndices(here).map(function (s) {
       return 'S' + (s + 1) + ': ' + median(metricNumbers(here, 's_' + s).filter(function (v) { return v >= 0; })); }).join(', ')]);
     levelPlay.push(['  Deaths from switching into dashes', pct(total(here, 'switch_deaths'), total(here, 'deaths')) + ' of ' + total(here, 'deaths')]);
     var causes = {};
@@ -638,7 +640,7 @@ function worldShiftReports(book) {
     ['drive_s', 'Driving (s)'], ['deaths', 'Deaths'], ['switch_deaths', 'Switch deaths'], ['checkpoints_reached', 'Checkpoints'],
     ['furthest_m', 'Furthest (m)'], ['switches', 'Switches'], ['switches_per_min', 'Switches / min'], ['night_pct', 'Night %'],
     ['air_switches', 'Air switches'], ['pauses', 'Pauses'], ['death_causes', 'Death causes']];
-  [0, 1, 2, 3, 4].forEach(function (s) { attemptFields.push(['deaths_' + s, 'S' + (s + 1) + ' deaths'], ['s_' + s, 'S' + (s + 1) + ' (s)']); });
+  levelSectionIndices(attempts).forEach(function (s) { attemptFields.push(['deaths_' + s, 'S' + (s + 1) + ' deaths'], ['s_' + s, 'S' + (s + 1) + ' (s)']); });
 
   return [
     report('WS Level Play', 'Non-test level-play attempts (level select build). Sections end at ramps/checkpoints. ' +
@@ -705,4 +707,14 @@ function counts(rows, key) {
   var c = {};
   rows.forEach(function (r) { var k = r[key] === '' ? '(blank)' : r[key]; c[k] = (c[k] || 0) + 1; });
   return Object.keys(c).map(function (k) { return k + ': ' + c[k]; }).join(', ');
+}
+
+// Recorded sections are checkpoint intervals; Desert's checkpoints do not align one-to-one with ramps.
+function levelSectionIndices(rows) {
+  var count = 0;
+  rows.forEach(function (r) {
+    count = Math.max(count, Number(r.sections) || 0);
+    Object.keys(r).forEach(function (k) { var m = /^s_(\d+)$/.exec(k); if (m) count = Math.max(count, Number(m[1]) + 1); });
+  });
+  return Array.from({length: count}, function (_, i) { return i; });
 }

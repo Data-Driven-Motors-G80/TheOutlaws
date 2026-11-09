@@ -26,6 +26,27 @@ namespace Outlaws.WorldShift
         private static string attemptId, from;
         private static int level, sections, section, checkpointsReached, highestBefore;
         private static int deaths, switches, airSwitches, pauses, switchDeaths, sectionDeaths, sectionSwitches;
+        private static int activeRamp;
+        private static readonly Dictionary<int, int> rampStarts = new Dictionary<int, int>(), rampWins = new Dictionary<int, int>(), rampLosses = new Dictionary<int, int>(), rampAborts = new Dictionary<int, int>(), rampFirst = new Dictionary<int, int>();
+        private static void Increment(Dictionary<int, int> counts, int ramp) { counts[ramp] = counts.TryGetValue(ramp, out int count) ? count + 1 : 1; }
+        public static void RampStarted(int ramp)
+        {
+            if (!open) return;
+            RampEnded(false, "interrupted");
+            activeRamp = ramp;
+            Increment(rampStarts, ramp);
+            Event("wl_ramp_start", "ramp", ramp, "ramp_try", rampStarts[ramp]);
+        }
+        public static void RampEnded(bool landed, string reason)
+        {
+            if (!open || activeRamp == 0) return;
+            int ramp = activeRamp;
+            activeRamp = 0;
+            bool aborted = reason == "retry" || reason == "interrupted" || reason == "menu" || reason == "left" || reason == "tab_closed";
+            Increment(aborted ? rampAborts : landed ? rampWins : rampLosses, ramp);
+            if (rampStarts[ramp] == 1) rampFirst[ramp] = aborted ? -1 : landed ? 1 : 0;
+            Event("wl_ramp_result", "ramp", ramp, "ramp_try", rampStarts[ramp], "result", aborted ? "aborted" : landed ? "landed" : "failed", "cause", reason);
+        }
         private static float daySeconds, nightSeconds, worldSince, lastSwitch, sectionStart, furthest, realStart;
         private static List<float> sectionSeconds = new List<float>();
         private static List<int> sectionDeathCounts = new List<int>(), sectionSwitchCounts = new List<int>();
@@ -51,6 +72,7 @@ namespace Outlaws.WorldShift
             realStart = Time.realtimeSinceStartup;
             sectionSeconds = new List<float>(); sectionDeathCounts = new List<int>(); sectionSwitchCounts = new List<int>();
             deathCauses.Clear();
+            activeRamp = 0; rampStarts.Clear(); rampWins.Clear(); rampLosses.Clear(); rampAborts.Clear(); rampFirst.Clear();
             open = true;
             WeeWooAnalytics.EnsureStarted();
             WeeWooAnalytics.ContextProvider = Context;
@@ -82,6 +104,7 @@ namespace Outlaws.WorldShift
         public static void Died(string cause, ShiftHazard hazard, bool airborne)
         {
             if (!open) return;
+            RampEnded(false, cause);
             deaths++; sectionDeaths++;
             float since = Now - lastSwitch;
             if (cause == "switched_into") switchDeaths++;
@@ -117,6 +140,7 @@ namespace Outlaws.WorldShift
         public static void EndAttempt(string outcome)
         {
             if (!open) return;
+            RampEnded(false, outcome);
             var row = AttemptRow(outcome);
             open = false;
             Event("wl_level_end", "outcome", outcome, "deaths", deaths);
@@ -159,6 +183,15 @@ namespace Outlaws.WorldShift
                 row["s_" + i] = done ? Round(sectionSeconds[i]) : current ? Round(now - sectionStart) : -1f;
                 row["deaths_" + i] = done ? sectionDeathCounts[i] : current ? sectionDeaths : 0;
                 row["switches_" + i] = done ? sectionSwitchCounts[i] : current ? sectionSwitches : 0;
+            }
+            foreach (var pair in rampStarts)
+            {
+                int r = pair.Key;
+                row["ramp_attempts_" + r] = pair.Value;
+                row["ramp_success_" + r] = rampWins.TryGetValue(r, out int wins) ? wins : 0;
+                row["ramp_failed_" + r] = rampLosses.TryGetValue(r, out int losses) ? losses : 0;
+                row["ramp_aborted_" + r] = (rampAborts.TryGetValue(r, out int aborts) ? aborts : 0) + (activeRamp == r ? 1 : 0);
+                row["ramp_first_" + r] = rampFirst.TryGetValue(r, out int first) ? first : -1;
             }
             var causes = new List<string>();
             foreach (var pair in deathCauses) causes.Add(pair.Key + "=" + pair.Value);

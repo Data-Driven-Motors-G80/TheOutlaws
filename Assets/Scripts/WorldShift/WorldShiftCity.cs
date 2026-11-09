@@ -410,7 +410,10 @@ namespace Outlaws.WorldShift
                 {
                     driver.ExternalVerticalControl = relay.SectionAt(previous) != null || (Getaway?.Extras.Jump.Traversing ?? false);
                     if (relay.BeginStep(previous, previous + speed * dt, World))
+                    {
+                        if (LevelMode) WorldShiftLevelAnalytics.RampStarted(relay.Flight.Number);
                         Notify("SPACE  /  SWITCH TO LAND", 2.5f);
+                    }
                 }
                 bool snowSlide = GetawayMode && WorldShiftEscapeProfile.SnowSlide(environment, previous, RelayLayout);
                 driver.EnvironmentReleaseGrip = snowSlide ? .6f : 1f;
@@ -438,7 +441,11 @@ namespace Outlaws.WorldShift
                         Fail(!safe ? "MISSED RELAY LANDING" : "NO ROAD");
                         break;
                     }
-                    if (landed) Notify("LANDED", 1.2f);
+                    if (landed)
+                    {
+                        if (LevelMode) WorldShiftLevelAnalytics.RampEnded(true, "landed");
+                        Notify("LANDED", 1.2f);
+                    }
                 }
                 if (hit != null)
                 {
@@ -731,6 +738,7 @@ namespace Outlaws.WorldShift
             if (tutorialLevel) foreach (var hazard in Hazards) hazard.ResetMotion();
             tutorialHintCompleted = false;
             tutorialCheckpointSwitches = Switches;
+            if (LevelMode) WorldShiftLevelAnalytics.RampEnded(false, "retry");
             ShiftCheckpoint checkpoint = Checkpoints[checkpointIndex];
             CheckpointNoticeRemaining = 0f;
             tutorialCheckpointLateral = checkpoint.Lateral;

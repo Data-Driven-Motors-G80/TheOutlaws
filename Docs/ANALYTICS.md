@@ -222,3 +222,16 @@ refresh on every `ws_runs`/`ws_tutorials` upload and answer:
 - Where do players die? Per environment: death causes, progress at death and 250 m distance bins.
 - Do the Day-only rewards pull players out of Night? Night %, loot boxes, power-up picks and right-fork rate.
 - Does the tutorial teach the mechanic? Completion, where non-finishers stop, seconds and retries per lesson.
+
+## Beta level charts (Metrics 1-4)
+
+`Level Visualizations` reads only `ws_level_attempts`. It defaults to WebGL player builds, always excludes Unlock All testing, deduplicates attempt IDs, and prefers a resolved attempt over a tab-close snapshot. The existing date/build controls and five-minute refresh trigger also cover this dashboard.
+
+1. Training lesson time: median `s_i` for completed lessons, with unfinished lessons shown separately. A lesson is complete when `section_at_end > i` or the level outcome is `complete`. Sign-reading pauses are excluded by the game's driving clock.
+2. Deaths per reached checkpoint interval: sum of `deaths_i` divided by attempts with `s_i >= 0`. All recorded intervals are included. In Desert these are **seven checkpoint intervals, not its six ramp sections**; the chart labels them C1, C2, etc. Each level has its own graph.
+3. Unsafe switch rate: total `switch_deaths` / total `switches` × 100. The denominator includes airborne switches. Zero-switch samples have no rate.
+4. Ramp landing success: `ramp_success_n` / (`ramp_success_n` + `ramp_failed_n`) × 100, by level and ramp. A takeoff emits `wl_ramp_start`; landing or a flight-ending failure emits `wl_ramp_result`. Manual retry, menu exits and interrupted flights are marked aborted and excluded from the resolved-flight success rate. Legacy rows without ramp fields are not treated as failures. `ramp_first_n` is 1 for a successful first try, 0 for a failed first try, and -1 for an unresolved/aborted first try. The Training KPI uses the earliest instrumented ramp attempt per player in the selected date range; it cannot establish a player's first-ever attempt before instrumentation or outside that range.
+
+**Deploy:** Copy the complete current `WeeWooAnalytics.gs` and `Visualizations.gs` into the bound Apps Script project. Save, deploy a new version of the existing web app, and run `setupVisualizations` once. Keep the existing endpoint URL. Rebuild/publish the Unity WebGL game to record ramp data. Verify a failed jump, a successful jump and a menu exit in midair: check `ws_level_attempts`, `wl_ramp_*` events and `Level Visualizations`. A successful local calculation test does not confirm the live deployment.
+
+**Local chart calculation checks:** `node Docs/analytics/test_level_visualizations.cjs`.

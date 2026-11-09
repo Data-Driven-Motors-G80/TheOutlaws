@@ -27,11 +27,13 @@ var VIS_PALETTE = ['#2F6DA3', '#D8A35A', '#4C947B', '#C2553A', '#7B6BA8', '#3E9B
 var VIS_REPORT_TABS = ['Overview', 'Survival & Progression', 'Shooting & Ammo', 'Collisions & Police', 'Fuel',
   'Mystery Pickups', 'Tutorial Summary'];
 var VIS_RAW_TABS = ['runs', 'events', 'tutorials', 'sessions'];
+var WL_VIS_TAB = 'Level Visualizations';
 var WS_VIS_TAB = 'WS Visualizations';
 var WS_REPORT_TABS = ['WS Overview', 'WS Levels', 'WS Tutorial'];
 var WS_RAW_TABS = ['ws_runs', 'ws_legs', 'ws_tutorials'];
 // Each dashboard: its raw tabs, the tabs its default start date comes from, its default build filter and its metrics.
 var VIS_DASHBOARDS = {};
+VIS_DASHBOARDS[WL_VIS_TAB] = { title: 'Wee Woo Run · Current level metrics', raw: ['ws_level_attempts'], dated: ['ws_level_attempts'], builds: VIS_BUILDS[1], compute: wlVizCompute };
 VIS_DASHBOARDS[WS_VIS_TAB] = { title: 'Wee Woo Run  ·  WorldShift analytics', raw: WS_RAW_TABS,
   dated: ['ws_runs', 'ws_tutorials'], builds: VIS_BUILDS[1], compute: function (d, o, tz) { return wsVizCompute(d, o, tz); } };
 VIS_DASHBOARDS[VIS_TAB] = { title: 'Wee Woo Run  ·  Original endless runner', raw: VIS_RAW_TABS,
@@ -41,13 +43,14 @@ VIS_DASHBOARDS[VIS_TAB] = { title: 'Wee Woo Run  ·  Original endless runner', r
 
 function setupVisualizations() {
   var book = SpreadsheetApp.getActiveSpreadsheet();
-  [WS_VIS_TAB, VIS_TAB].forEach(function (name) {
+  [WL_VIS_TAB, WS_VIS_TAB, VIS_TAB].forEach(function (name) {
     var sheet = book.getSheetByName(name);
     if (sheet && sheet.getLastRow() && VIS_MARKERS.indexOf(sheet.getRange(1, 1).getNote()) < 0) {
       throw new Error('Rename the existing "' + name + '" tab to preserve it, then run setupVisualizations again.');
     }
   });
-  var first = vizSetupTab(book, WS_VIS_TAB);
+  var first = vizSetupTab(book, WL_VIS_TAB);
+  vizSetupTab(book, WS_VIS_TAB);
   vizSetupTab(book, VIS_TAB);
   vizInstallTriggers(book);
   vizStyleWorkbook(book);
@@ -300,7 +303,7 @@ function vizEnsureSize(sheet, rows, cols) {
 /** Orders and colours the tabs and styles raw-tab headers. Only formatting changes; no values. */
 function vizStyleWorkbook(book) {
   // The current WorldShift build comes first; the original runner's tabs follow, then raw data.
-  var order = [WS_VIS_TAB].concat(WS_REPORT_TABS, [VIS_TAB], VIS_REPORT_TABS, ['dashboard'], WS_RAW_TABS, VIS_RAW_TABS);
+  var order = [WL_VIS_TAB, 'WS Level Play', 'ws_level_attempts', WS_VIS_TAB].concat(WS_REPORT_TABS, [VIS_TAB], VIS_REPORT_TABS, ['dashboard'], WS_RAW_TABS, VIS_RAW_TABS);
   var position = 1;
   order.forEach(function (name) {
     var sheet = book.getSheetByName(name);
@@ -829,5 +832,75 @@ function wsVizCompute(data, opts, tz) {
     kpis: kpis,
     counts: { runs: runs.length, deaths: lost.length, label: runs.length + ' escape runs (' + lost.length + ' lost) and ' + tutorials.length + ' tutorial attempts' },
     sections: [progress, deaths, switching, pickups, choices, tutorial, garage, engagement]
+  };
+}
+
+/** Current game: four metrics from level attempts, never legacy escape rows. */
+function wlVizCompute(data, opts, tz) {
+  var byId = {}, names = ['Training', 'City', 'Desert', 'Ocean', 'Snow', 'Mountain'];
+  (data.ws_level_attempts || []).forEach(function (r) {
+    var t = vizTime(r.ts), editor = /editor|test|ignore/i.test(String(r.build || ''));
+    if (!r.attempt_id || truthy(r.unlock_all) || t === null ||
+        (opts.from && t < opts.from) || (opts.until && t > opts.until) ||
+        (opts.builds === VIS_BUILDS[1] && (!r.build || editor)) ||
+        (opts.builds === VIS_BUILDS[2] && !editor)) return;
+    var previous = byId[r.attempt_id];
+    if (!previous || (previous.outcome === 'tab_closed' && r.outcome !== 'tab_closed')) byId[r.attempt_id] = r;
+  });
+  var rows = Object.keys(byId).map(function (id) { return byId[id]; });
+  rows.sort(function (a,b) { return vizTime(a.ts) - vizTime(b.ts); });
+  function number(r, k) { return r[k] === '' || r[k] === undefined || r[k] === null ? null : Number(r[k]); }
+  function reached(r, i) { var n = number(r, 's_' + i); return n !== null && isFinite(n) && n >= 0; }
+  function cleared(r, i) { return reached(r, i) && (r.outcome === 'complete' || Number(r.section_at_end) > i); }
+  function chart(title, header, values) { return {title:title, type:'column', header:header, rows:values}; }
+  var training = rows.filter(function (r) { return Number(r.level) === 0; });
+  var lessons = ['Steer','Switch wall','Dashes','Oncoming','Freeze','Ramp'];
+  var lessonTime = [], incomplete = [], difficulty = [], unsafe = [], ramps = [], firstTraining = [], seen = {};
+  lessons.forEach(function (name, i) {
+    var done = training.filter(function (r) { return cleared(r, i); });
+    if (done.length) lessonTime.push([name + ' (n=' + done.length + ')', median(done.map(function (r) { return Number(r['s_' + i]); }))]);
+    var partial = training.filter(function (r) { return reached(r, i) && !cleared(r, i); });
+    if (partial.length) incomplete.push([name, partial.length]);
+  });
+  names.forEach(function (name, level) {
+    var here = rows.filter(function (r) { return Number(r.level) === level; });
+    levelSectionIndices(here).forEach(function (i) {
+      var exposed = here.filter(function (r) { return reached(r, i); });
+      if (exposed.length) difficulty.push([name + ' C' + (i + 1) + ' (n=' + exposed.length + ')',
+        Math.round(100 * vizSum(exposed, 'deaths_' + i) / exposed.length) / 100]);
+    });
+    var switches = vizSum(here, 'switches');
+    if (switches) unsafe.push([name + ' (' + switches + ' switches)', vizPct(vizSum(here, 'switch_deaths'), switches)]);
+    var rampIds = {};
+    here.forEach(function (r) { Object.keys(r).forEach(function (k) { var m = /^ramp_attempts_(\d+)$/.exec(k); if (m) rampIds[m[1]] = true; }); });
+    Object.keys(rampIds).sort(function(a,b) {return Number(a)-Number(b);}).forEach(function (id) {
+      var successes = vizSum(here, 'ramp_success_' + id), failures = vizSum(here, 'ramp_failed_' + id);
+      if (successes + failures) ramps.push([name + ' R' + id + ' (n=' + (successes+failures) + ')', vizPct(successes, successes + failures)]);
+    });
+  });
+  training.forEach(function (r) {
+    if (!r.player_id || seen[r.player_id] || number(r, 'ramp_attempts_1') === null) return;
+    seen[r.player_id] = true;
+    var result = number(r, 'ramp_first_1');
+    if (result === 0 || result === 1) firstTraining.push(result);
+  });
+  function byLevel(values, suffix, header) {
+    var charts = names.map(function (name) { return chart(name + suffix, header, values.filter(function (r) { return r[0].indexOf(name + ' ') === 0; })); })
+      .filter(function (spec) { return spec.rows.length; });
+    return charts.length ? charts : [chart('No recorded data in this selection', header, [])];
+  }
+  return {
+    counts: {label: rows.length + ' level attempts; Unlock All excluded'},
+    kpis: [['Level attempts', String(rows.length)], ['Training attempts', String(training.length)],
+      ['Training first ramp success', firstTraining.length ? vizPct(sum(firstTraining), firstTraining.length) + '% (n=' + firstTraining.length + ')' : 'No resolved first tries']],
+    sections: [
+      {title:'1. Training lesson time', subtitle:'completed lessons only; paused sign-reading excluded', charts:[
+        chart('Median active driving time by lesson', ['Lesson','Seconds'], lessonTime),
+        chart('Unfinished lessons (excluded from median)', ['Lesson','Attempts'], incomplete)]},
+      {title:'2. Deaths per reached checkpoint section', subtitle:'C = checkpoint interval; Desert intervals differ from its six ramp sections', charts: byLevel(difficulty, ': deaths per reached checkpoint interval', ['Checkpoint interval','Deaths per reached attempt'])},
+      {title:'3. Unsafe world-switch rate', subtitle:'switching inside dashes; all switches form the denominator', charts:[
+        chart('Unsafe-switch deaths per 100 switches', ['Level','Deaths per 100 switches'], unsafe)]},
+      {title:'4. Ramp landing success', subtitle:'resolved takeoffs only; aborted flights and old uninstrumented builds excluded', charts: byLevel(ramps, ': successful landings by ramp', ['Ramp','Success (%)'])}
+    ]
   };
 }
