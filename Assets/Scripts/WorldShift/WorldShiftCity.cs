@@ -27,6 +27,9 @@ namespace Outlaws.WorldShift
         public int CheckpointIndex => checkpointIndex;
         public bool TrainingLessonPaused { get; private set; }
         private bool trainingLessonRead;
+        private ShiftHazard trainingFreezeTarget;
+        private bool trainingFreezeComplete;
+        private bool InFreezeLesson => LevelMode && course.Training && checkpointIndex == 4;
         // Police pull up to the crashed car before the checkpoint restart.
         public bool Capturing => LevelMode && State == ShiftRunState.Retrying && lastFailure != "NO ROAD" && lastFailure != "MISSED RELAY LANDING";
         public const float LevelPoliceGap = 6f;
@@ -361,6 +364,16 @@ namespace Outlaws.WorldShift
             }
             else if (LevelMode && environment == ShiftLevel.Desert)
                 ApplyImpact(FindCollision(next, Distance, Distance, Lateral, Lateral, true), Lateral);
+            if (InFreezeLesson && State == ShiftRunState.Running)
+            {
+                trainingFreezeTarget = null;
+                if (next == ShiftWorld.Echo && !trainingFreezeComplete)
+                    foreach (var hazard in levelHazards)
+                        if (hazard.SharedAcrossWorlds && hazard.LateralMotion
+                            && hazard.Start > Distance + 2f
+                            && hazard.End < Checkpoints[checkpointIndex + 1].Distance)
+                        { trainingFreezeTarget = hazard; break; }
+            }
             if (IsRelayAirborne) Notify(relay.Hint(Distance, World), 1.8f);
             return true;
         }
@@ -462,6 +475,14 @@ namespace Outlaws.WorldShift
                 nextLateral = ResolveDividers(previous, next, previousLateral, nextLateral, steer);
                 Distance = next;
                 Lateral = nextLateral;
+                // Only safe passage counts: this runs after collision resolution.
+                if (InFreezeLesson && trainingFreezeTarget != null && World == ShiftWorld.Echo
+                    && Distance > trainingFreezeTarget.End + 2f)
+                {
+                    trainingFreezeComplete = true;
+                    trainingFreezeTarget = null;
+                    Notify("FREEZE COMPLETE", 1.8f);
+                }
                 if (LevelMode && course.Training && !trainingLessonRead && checkpointIndex < course.Signs.Length
                     && Distance >= course.Signs[checkpointIndex].Distance - 5f)
                     TrainingLessonPaused = true;
@@ -478,6 +499,12 @@ namespace Outlaws.WorldShift
                 { Fail("TRY THIS STEP AGAIN"); break; }
                 if (checkpointIndex + 1 < Checkpoints.Length && Distance >= Checkpoints[checkpointIndex + 1].Distance)
                 {
+                    if (InFreezeLesson && !trainingFreezeComplete)
+                    {
+                        RestoreCheckpoint();
+                        Notify("SWITCH TO NIGHT, THEN PASS A FROZEN SLIDER", 4f);
+                        break;
+                    }
                     checkpointIndex++;
                     trainingLessonRead = false;
                     if (tutorialLevel) WorldShiftAnalytics.TutorialStep(checkpointIndex, Checkpoints[checkpointIndex].Title);
@@ -728,6 +755,8 @@ namespace Outlaws.WorldShift
 
         private void RestoreCheckpoint()
         {
+            trainingFreezeTarget = null;
+            trainingFreezeComplete = false;
             if (LevelMode)
             {
                 WorldShiftLevelAnalytics.Respawned(Checkpoints[checkpointIndex].World);

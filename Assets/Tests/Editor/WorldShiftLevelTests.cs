@@ -242,6 +242,41 @@ public sealed class WorldShiftLevelTests
     }
 
     [UnityTest]
+    public IEnumerator TrainingFreezeRequiresPassingAFrozenSlider()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
+        StartLevel(0); yield return null; yield return null;
+        var game = Started();
+        game.GetType().GetField("checkpointIndex", Flags).SetValue(game, 4);
+        Call(game, "RetryCheckpoint");
+        game.GetType().GetField("trainingLessonRead", Flags).SetValue(game, true);
+        Pose(game, 909f, 4f);
+        Step(game, .1f);
+        Assert.That(Get(game, "CheckpointIndex"), Is.EqualTo(4), "Driving to the gate alone cannot pass.");
+        Assert.That((float)Get(game, "Distance"), Is.LessThan(710f));
+        Assert.That(Get(game, "Deaths"), Is.EqualTo(0), "An incomplete exercise is not a crash.");
+
+        game.GetType().GetField("trainingLessonRead", Flags).SetValue(game, true);
+        Pose(game, 790f, 4f);
+        Call(game, "TrySwitch");
+        Step(game, 2f);
+        Assert.That(Field(game, "trainingFreezeComplete"), Is.EqualTo(true), "Pass a slider while it stays frozen.");
+        Pose(game, 909f, 4f);
+        Step(game, .1f);
+        Assert.That(Get(game, "CheckpointIndex"), Is.EqualTo(5));
+
+        game.GetType().GetField("checkpointIndex", Flags).SetValue(game, 4);
+        Call(game, "RetryCheckpoint");
+        Assert.That(Field(game, "trainingFreezeComplete"), Is.EqualTo(false), "Retry resets the demonstration.");
+        game.GetType().GetField("trainingLessonRead", Flags).SetValue(game, true);
+        Pose(game, 790f, 4f);
+        Call(game, "TrySwitch");
+        Call(game, "TrySwitch");
+        Step(game, 2f);
+        Assert.That(Field(game, "trainingFreezeComplete"), Is.EqualTo(false), "Releasing before passage cannot pass.");
+    }
+
+    [UnityTest]
     public IEnumerator TrainingUsesSignsAndFinishingUnlocksLevelOne()
     {
         Static(Levels, "ResetProgress");
@@ -293,6 +328,8 @@ public sealed class WorldShiftLevelTests
         Capture("training-steer-sign");
         object course = Get(game, "Course");
         var ramp = ((Array)Field(course, "Ramps")).GetValue(0);
+        // This test isolates the ramp; freeze gating is covered separately.
+        game.GetType().GetField("checkpointIndex", Flags).SetValue(game, 5);
         Pose(game, (float)Field(ramp, "Ramp") - 50f, 0f);
         Call(game, "PresentWorldForCamera", World("Day"));
         Capture("training-ramp");
