@@ -250,7 +250,7 @@ namespace Outlaws.WorldShift
             .Sign(25f, LevelSignKind.Switch).SwitchWall(110f).Gate(170f, N)
             .Sign(25f, LevelSignKind.Dashes).Day(70f, All).Night(120f, All).Gate(180f, D)
             .Sign(25f, LevelSignKind.Oncoming).Rock(110f, Middle, 10f).Gate(170f, D)
-            .Sign(25f, LevelSignKind.Freeze).Slider(110f, 1.1f).Slider(150f, -1.3f).Gate(210f, N)
+            .Sign(25f, LevelSignKind.Freeze).Slider(110f, 1.1f).Slider(160f, -1.3f).Slider(210f, 1.1f).Gate(270f, N)
             .Sign(25f, LevelSignKind.Ramp).Night(70f, All).Ramp(120f, D)
             .Build();
 

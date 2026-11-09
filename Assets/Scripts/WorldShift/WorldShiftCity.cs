@@ -27,9 +27,11 @@ namespace Outlaws.WorldShift
         public int CheckpointIndex => checkpointIndex;
         public bool TrainingLessonPaused { get; private set; }
         private bool trainingLessonRead;
-        private ShiftHazard trainingFreezeTarget;
-        private bool trainingFreezeComplete;
+        private bool trainingFreezeDemonstrated;
         private bool InFreezeLesson => LevelMode && course.Training && checkpointIndex == 4;
+        private float TrainingFreezeStop => Checkpoints[checkpointIndex].Distance + 70f;
+        public bool TrainingFreezeWaiting => InFreezeLesson && !trainingFreezeDemonstrated
+            && Distance >= TrainingFreezeStop - .001f;
         // Police pull up to the crashed car before the checkpoint restart.
         public bool Capturing => LevelMode && State == ShiftRunState.Retrying && lastFailure != "NO ROAD" && lastFailure != "MISSED RELAY LANDING";
         public const float LevelPoliceGap = 6f;
@@ -144,7 +146,7 @@ namespace Outlaws.WorldShift
             || (Combat?.IsDestroyed(tutorialHazards[6]) ?? false) || (Combat?.IsDestroyed(tutorialHazards[7]) ?? false));
         public bool TutorialShootingActive => tutorialLevel && checkpointIndex == 3 && Distance >= 330f && Distance < WorldShiftTutorial.FinalLessonStart;
         private bool WaitingForTutorialShot => TutorialShootingActive && !TutorialShotComplete;
-        private float BaseSpeed => tutorialLevel ? TutorialWaitingForLesson || WaitingForTutorialShot && Distance >= 410f ? 0f : JumpSequence ? relay.SpeedAt(Distance) : 18f : JumpSequence ? relay?.SpeedAt(Distance) ?? WorldShiftLevel.Speed
+        private float BaseSpeed => TrainingFreezeWaiting ? 0f : tutorialLevel ? TutorialWaitingForLesson || WaitingForTutorialShot && Distance >= 410f ? 0f : JumpSequence ? relay.SpeedAt(Distance) : 18f : JumpSequence ? relay?.SpeedAt(Distance) ?? WorldShiftLevel.Speed
             : LevelMode && course.Training ? TrainingSpeed
             : WorldShiftLevel.Speed * (splitViewValidation ? 1f : WorldShiftLevel.CruiseSpeedMultiplier);
         public float Speed => BaseSpeed * (JumpSequence ? 1f : Getaway?.Extras.SpeedMultiplier ?? 1f);
@@ -364,16 +366,9 @@ namespace Outlaws.WorldShift
             }
             else if (LevelMode && environment == ShiftLevel.Desert)
                 ApplyImpact(FindCollision(next, Distance, Distance, Lateral, Lateral, true), Lateral);
-            if (InFreezeLesson && State == ShiftRunState.Running)
-            {
-                trainingFreezeTarget = null;
-                if (next == ShiftWorld.Echo && !trainingFreezeComplete)
-                    foreach (var hazard in levelHazards)
-                        if (hazard.SharedAcrossWorlds && hazard.LateralMotion
-                            && hazard.Start > Distance + 2f
-                            && hazard.End < Checkpoints[checkpointIndex + 1].Distance)
-                        { trainingFreezeTarget = hazard; break; }
-            }
+            // Early correct input counts too, after the lesson sign has been read.
+            if (InFreezeLesson && trainingLessonRead && State == ShiftRunState.Running && next == ShiftWorld.Echo)
+                trainingFreezeDemonstrated = true;
             if (IsRelayAirborne) Notify(relay.Hint(Distance, World), 1.8f);
             return true;
         }
@@ -406,7 +401,6 @@ namespace Outlaws.WorldShift
             {
                 float dt = Mathf.Min(delta, 1f / 60f);
                 delta -= dt;
-                simulatedTime += dt;
                 float previous = Distance, previousLateral = Lateral, previousHeight = Player.position.y;
                 // Lesson waits are safe reading time; traffic must not approach a stopped learner.
                 if (!TutorialWaitingForLesson)
@@ -417,7 +411,16 @@ namespace Outlaws.WorldShift
                         if (tutorialLevel && checkpointIndex == 0) continue;
                         hazard.Advance(dt, Distance, World);
                     }
+                // Keep the demonstration alive while the car waits safely. This is
+                // not driving time, and neither the car nor police advances.
+                if (TrainingFreezeWaiting) continue;
                 float speed = Speed;
+                if (InFreezeLesson && !trainingFreezeDemonstrated)
+                {
+                    float drivingDelta = Mathf.Min(dt, Mathf.Max(0f, TrainingFreezeStop - Distance) / speed);
+                    dt = drivingDelta;
+                }
+                simulatedTime += dt;
                 Getaway?.BeginStep(previous, previous + speed * dt, driver);
                 if (relay != null)
                 {
@@ -475,14 +478,6 @@ namespace Outlaws.WorldShift
                 nextLateral = ResolveDividers(previous, next, previousLateral, nextLateral, steer);
                 Distance = next;
                 Lateral = nextLateral;
-                // Only safe passage counts: this runs after collision resolution.
-                if (InFreezeLesson && trainingFreezeTarget != null && World == ShiftWorld.Echo
-                    && Distance > trainingFreezeTarget.End + 2f)
-                {
-                    trainingFreezeComplete = true;
-                    trainingFreezeTarget = null;
-                    Notify("FREEZE COMPLETE", 1.8f);
-                }
                 if (LevelMode && course.Training && !trainingLessonRead && checkpointIndex < course.Signs.Length
                     && Distance >= course.Signs[checkpointIndex].Distance - 5f)
                     TrainingLessonPaused = true;
@@ -499,12 +494,6 @@ namespace Outlaws.WorldShift
                 { Fail("TRY THIS STEP AGAIN"); break; }
                 if (checkpointIndex + 1 < Checkpoints.Length && Distance >= Checkpoints[checkpointIndex + 1].Distance)
                 {
-                    if (InFreezeLesson && !trainingFreezeComplete)
-                    {
-                        RestoreCheckpoint();
-                        Notify("SWITCH TO NIGHT, THEN PASS A FROZEN SLIDER", 4f);
-                        break;
-                    }
                     checkpointIndex++;
                     trainingLessonRead = false;
                     if (tutorialLevel) WorldShiftAnalytics.TutorialStep(checkpointIndex, Checkpoints[checkpointIndex].Title);
@@ -755,8 +744,7 @@ namespace Outlaws.WorldShift
 
         private void RestoreCheckpoint()
         {
-            trainingFreezeTarget = null;
-            trainingFreezeComplete = false;
+            trainingFreezeDemonstrated = false;
             if (LevelMode)
             {
                 WorldShiftLevelAnalytics.Respawned(Checkpoints[checkpointIndex].World);

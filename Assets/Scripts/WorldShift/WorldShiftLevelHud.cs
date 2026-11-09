@@ -21,6 +21,7 @@ namespace Outlaws.WorldShift
         private readonly List<Image> pips = new List<Image>();
         private GameObject driving, pause, complete, trainingLesson;
         private bool completeShown;
+        private GameObject freezePrompt;
         private CanvasGroup lessonGroup;
         private RectTransform signPreview;
         private RawImage signImage;
@@ -39,6 +40,12 @@ namespace Outlaws.WorldShift
 
             crashFlash = WorldShiftMenu.Panel(safe, "Crash flash", Vector2.zero, Vector2.one, Color.clear).GetComponent<Image>();
             driving = WorldShiftMenu.Panel(safe, "Driving", Vector2.zero, Vector2.one, Color.clear).gameObject;
+            var freezePanel = WorldShiftMenu.Panel(driving.transform, "Freeze demonstration", new Vector2(.18f, .16f), new Vector2(.82f, .26f), Ink);
+            freezePrompt = freezePanel.gameObject;
+            var freezeText = WorldShiftMenu.Label(freezePanel, "SPACE: Freeze the obstacles.\nThen steer through an opening.", .03f, .05f, .97f, .95f, 26f);
+            freezeText.alignment = TextAlignmentOptions.Center;
+            freezeText.color = Cream;
+            freezePrompt.SetActive(false);
             var worldBadge = WorldShiftMenu.Panel(driving.transform, "World badge", new Vector2(.02f, .86f), new Vector2(.02f, .86f), Ink);
             worldBadge.sizeDelta = new Vector2(84f, 84f);
             worldBadge.pivot = new Vector2(0f, 0f);
@@ -200,6 +207,7 @@ namespace Outlaws.WorldShift
 
         private void Refresh()
         {
+            freezePrompt.SetActive(game.TrainingFreezeWaiting && !game.TrainingLessonPaused && game.State == ShiftRunState.Running);
             bool day = game.World == ShiftWorld.Day;
             worldIcon.sprite = WorldShiftIcons.Get(day ? ShiftIcon.Sun : ShiftIcon.Moon);
             worldIcon.color = day ? Gold : Cream;
