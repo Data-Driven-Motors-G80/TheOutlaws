@@ -40,12 +40,7 @@ namespace Outlaws.WorldShift
 
             crashFlash = WorldShiftMenu.Panel(safe, "Crash flash", Vector2.zero, Vector2.one, Color.clear).GetComponent<Image>();
             driving = WorldShiftMenu.Panel(safe, "Driving", Vector2.zero, Vector2.one, Color.clear).gameObject;
-            var freezePanel = WorldShiftMenu.Panel(driving.transform, "Freeze demonstration", new Vector2(.18f, .16f), new Vector2(.82f, .26f), Ink);
-            freezePrompt = freezePanel.gameObject;
-            var freezeText = WorldShiftMenu.Label(freezePanel, "SPACE: Freeze the obstacles.\nThen steer through an opening.", .03f, .05f, .97f, .95f, 26f);
-            freezeText.alignment = TextAlignmentOptions.Center;
-            freezeText.color = Cream;
-            freezePrompt.SetActive(false);
+            BuildFreezePrompt(driving.transform);
             var worldBadge = WorldShiftMenu.Panel(driving.transform, "World badge", new Vector2(.02f, .86f), new Vector2(.02f, .86f), Ink);
             worldBadge.sizeDelta = new Vector2(84f, 84f);
             worldBadge.pivot = new Vector2(0f, 0f);
@@ -122,6 +117,80 @@ namespace Outlaws.WorldShift
             IconButton(complete.transform, ShiftIcon.Retry, new Vector2(.5f, .34f), 100f, WorldShiftLevels.Retry);
             if (WorldShiftLevels.HasNext) IconButton(complete.transform, ShiftIcon.Next, new Vector2(.64f, .34f), 130f, WorldShiftLevels.Next);
             Refresh();
+        }
+
+        private static readonly Color FreezeTeal = new Color(.06f, .88f, .81f);
+        private static Sprite freezePillSprite, freezeKeySprite;
+
+        private void BuildFreezePrompt(Transform parent)
+        {
+            var border = FreezeBox(parent, "Freeze demonstration", new Vector2(.20f, .12f), new Vector2(.80f, .215f), FreezeTeal, true);
+            freezePrompt = border.gameObject;
+            var face = FreezeBox(border, "Dark face", Vector2.zero, Vector2.one, new Color(.025f, .045f, .06f, .98f), true);
+            face.offsetMin = new Vector2(3f, 3f); face.offsetMax = new Vector2(-3f, -3f);
+            FreezeKey(face, "SPACE", .04f, .22f);
+            var moon = Icon(face, ShiftIcon.Moon, 36f);
+            moon.rectTransform.anchorMin = moon.rectTransform.anchorMax = new Vector2(.265f, .5f);
+            moon.color = FreezeTeal;
+            var stopped = Icon(face, ShiftIcon.Pause, 28f);
+            stopped.rectTransform.anchorMin = stopped.rectTransform.anchorMax = new Vector2(.30f, .5f);
+            stopped.color = FreezeTeal;
+            FreezeLabel(face, "Freeze", .33f, .49f);
+            var next = Icon(face, ShiftIcon.Next, 30f);
+            next.rectTransform.anchorMin = next.rectTransform.anchorMax = new Vector2(.535f, .5f);
+            next.color = FreezeTeal;
+            FreezeKey(face, "←", .59f, .67f);
+            FreezeKey(face, "→", .69f, .77f);
+            FreezeLabel(face, "Steer", .80f, .96f);
+            freezePrompt.SetActive(false);
+        }
+
+        private static void FreezeKey(RectTransform parent, string label, float left, float right)
+        {
+            var edge = FreezeBox(parent, "Freeze key " + label, new Vector2(left, .20f), new Vector2(right, .80f), FreezeTeal, false);
+            var face = FreezeBox(edge, "Key face", Vector2.zero, Vector2.one, Ink, false);
+            face.offsetMin = new Vector2(2f, 2f); face.offsetMax = new Vector2(-2f, -2f);
+            FreezeLabel(face, label, 0f, 1f);
+        }
+
+        private static void FreezeLabel(RectTransform parent, string value, float left, float right)
+        {
+            var label = WorldShiftMenu.Label(parent, value, left, .05f, right, .95f, 28f);
+            label.color = Color.white;
+            label.fontStyle = FontStyles.Bold;
+            label.alignment = TextAlignmentOptions.Center;
+        }
+
+        private static RectTransform FreezeBox(Transform parent, string name, Vector2 min, Vector2 max, Color color, bool pill)
+        {
+            var rect = WorldShiftMenu.Panel(parent, name, min, max, color);
+            var image = rect.GetComponent<Image>();
+            image.sprite = FreezeRoundedSprite(pill);
+            image.type = Image.Type.Sliced;
+            return rect;
+        }
+
+        private static Sprite FreezeRoundedSprite(bool pill)
+        {
+            var cached = pill ? freezePillSprite : freezeKeySprite;
+            if (cached != null) return cached;
+            const int size = 64;
+            float radius = pill ? 31f : 12f;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+                { name = "Freeze banner rounded mask", wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = Mathf.Max(Mathf.Abs(x + .5f - size / 2f) - (size / 2f - radius), 0f);
+                    float dy = Mathf.Max(Mathf.Abs(y + .5f - size / 2f) - (size / 2f - radius), 0f);
+                    pixels[y * size + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(radius + .5f - Mathf.Sqrt(dx * dx + dy * dy)));
+                }
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            cached = Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(.5f, .5f), 100f, 0,
+                SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
+            if (pill) freezePillSprite = cached; else freezeKeySprite = cached;
+            return cached;
         }
 
         // Key caps and the two world icons: the only controls the game needs.
