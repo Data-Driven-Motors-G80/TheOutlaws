@@ -13,7 +13,7 @@ namespace Outlaws.WorldShift
             private readonly List<Renderer> marks = new List<Renderer>();
             private ShiftWorld? displayed;
             private readonly Color? fixedBody, fixedInk;
-            /// <summary>Day-only blocks are teal, Night-only blocks are pale violet.</summary>
+            /// <summary>Day-only blocks are orange, Night-only blocks are pale violet.</summary>
             public bool LevelColours { get; set; }
 
             public Palette() { }

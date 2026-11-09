@@ -104,7 +104,7 @@ public sealed class WorldShiftLevelTests
                 Assert.That(hazards.Any(h => (float)Field(h, "Start") == 90f && (bool)Field(h, "SharedAcrossWorlds")), Is.True,
                     "The white opening block teaches that permanent hazards survive a switch.");
                 Assert.That(hazards.Any(h => Field(h, "Kind").ToString() == "SwitchWall"), Is.True,
-                    "The tutorial has a real turquoise wall that clears after switching.");
+                    "The tutorial has a real orange wall that clears after switching.");
                 Assert.That(hazards.Any(h => Field(h, "Kind").ToString() == "Oncoming" && (bool)Field(h, "SharedAcrossWorlds")), Is.True,
                     "Oncoming traffic has a separate playable lesson.");
             }

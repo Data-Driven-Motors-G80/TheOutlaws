@@ -1,5 +1,7 @@
 # Tutorial 5: Understanding Moving Hazards
 
+Horizontal moving obstacles are teal, Day-only obstacles are orange, and Night-only obstacles remain pale violet.
+
 The player encounters three shared sliders that move in Day and freeze in Night. After the lesson sign, the car waits safely before the first slider while the obstacles keep moving. A short prompt asks the player to press Space. Switching to Night freezes the obstacles and resumes driving, allowing the player to steer through the openings. An early switch after reading the sign also counts. Frozen obstacles remain solid, and ordinary collisions return the player to the lesson checkpoint. The ending checkpoint does not reset players for their choice of route or world.
 
 The required demonstration is the player changing moving hazards into stationary hazards with a Day-to-Night switch. The following three-slider section provides practice combining freezing with steering. Time spent stationary at the demonstration is excluded from median active driving time.

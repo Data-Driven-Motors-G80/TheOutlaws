@@ -10,9 +10,9 @@ namespace Outlaws.WorldShift
     {
         public static readonly Color DayColour = new Color(1f, .78f, .12f);
         public static readonly Color NightColour = new Color(.76f, .67f, .95f);
-        public static readonly Color SwitchColour = new Color(.15f, .85f, .77f);
+        public static readonly Color SwitchColour = new Color(1f, .48f, .12f);
         public static readonly Color MoverColour = new Color(.88f, .16f, .19f);
-        public static readonly Color SideMoverColour = new Color(1f, .48f, .12f);
+        public static readonly Color SideMoverColour = new Color(.06f, .88f, .81f);
         public static readonly Color PermanentColour = new Color(.96f, .94f, .86f);
         public static readonly Color CheckpointColour = new Color(.2f, .95f, .55f);
         private static readonly Color SignGreen = new Color(.02f, .38f, .2f);
@@ -162,7 +162,7 @@ namespace Outlaws.WorldShift
                         Box(face, new Vector3(x, .35f, 0f), new Vector3(.16f, .7f, .05f), white);
                     break;
                 case LevelSignKind.AirRelease:
-                    Box(face, new Vector3(-2.9f, .35f, 0f), new Vector3(1.9f, .55f, .05f), Glow(MoverColour));
+                    Box(face, new Vector3(-2.9f, .35f, 0f), new Vector3(1.9f, .55f, .05f), Glow(SideMoverColour));
                     Key(face, "SPACE", new Vector3(-.15f, .35f, 0f), white, 2.1f);
                     Arrow(face, new Vector3(1.45f, .35f, 0f), 1f, white);
                     Sun(face, new Vector3(3f, .35f, 0f), day);
