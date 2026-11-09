@@ -128,14 +128,9 @@ namespace Outlaws.WorldShift
             freezePrompt = border.gameObject;
             var face = FreezeBox(border, "Dark face", Vector2.zero, Vector2.one, new Color(.025f, .045f, .06f, .98f), true);
             face.offsetMin = new Vector2(3f, 3f); face.offsetMax = new Vector2(-3f, -3f);
-            FreezeKey(face, "SPACE", .04f, .22f);
-            var moon = Icon(face, ShiftIcon.Moon, 36f);
-            moon.rectTransform.anchorMin = moon.rectTransform.anchorMax = new Vector2(.265f, .5f);
-            moon.color = FreezeTeal;
-            var stopped = Icon(face, ShiftIcon.Pause, 28f);
-            stopped.rectTransform.anchorMin = stopped.rectTransform.anchorMax = new Vector2(.30f, .5f);
-            stopped.color = FreezeTeal;
-            FreezeLabel(face, "Freeze", .33f, .49f);
+            FreezeLabel(face, "PRESS", .025f, .13f);
+            FreezeKey(face, "SPACE", .135f, .29f);
+            FreezeLabel(face, "TO FREEZE", .30f, .49f);
             var next = Icon(face, ShiftIcon.Next, 30f);
             next.rectTransform.anchorMin = next.rectTransform.anchorMax = new Vector2(.535f, .5f);
             next.color = FreezeTeal;
