@@ -28,6 +28,8 @@ namespace Outlaws.WorldShift
         public ShiftCheckpoint[] Checkpoints;
         // Tutorial sections end at a plain gate instead of a ramp.
         public float[] Gates;
+        // Required Ocean items exist in both worlds and never act as hazards.
+        public Vector2[] RequiredItems = System.Array.Empty<Vector2>();
         public LevelSign[] Signs;
         public Vector2[] DustZones = System.Array.Empty<Vector2>();
 
@@ -104,6 +106,7 @@ namespace Outlaws.WorldShift
             private readonly List<ShiftCheckpoint> checkpoints = new List<ShiftCheckpoint>();
             private readonly List<float> gates = new List<float>();
             private readonly List<LevelSign> signs = new List<LevelSign>();
+            private readonly List<Vector2> items = new List<Vector2>();
             private readonly List<Vector2> dustZones = new List<Vector2>();
             private readonly bool landingCheckpoints;
             private float start;
@@ -143,6 +146,7 @@ namespace Outlaws.WorldShift
                 rock.Distance - rock.Radius, rock.Distance + rock.Radius, 2, rock.Motion.MotionSpeed,
                 sharedAcrossWorlds: true, lateralMotion: true, rock: rock));
             public Builder Sign(float at, LevelSignKind kind) { signs.Add(new LevelSign(start + at, kind)); return this; }
+            public Builder Item(float at, int lane) { items.Add(new Vector2(start + at, lane * WorldShiftLevel.RoadWidth / 3f)); return this; }
             public Builder Dust(float from, float to) { dustZones.Add(new Vector2(start + from, start + to)); return this; }
             public Builder Checkpoint(float at, ShiftWorld world, float lateral = 0f)
             { checkpoints.Add(new ShiftCheckpoint(start + at, world, lateral, "", "")); return this; }
@@ -223,6 +227,7 @@ namespace Outlaws.WorldShift
                 course.Gates = gates.ToArray();
                 course.Signs = signs.ToArray();
                 course.DustZones = dustZones.ToArray();
+                course.RequiredItems = items.ToArray();
                 course.Length = ramps.Count > 0 ? ramps[ramps.Count - 1].Landing + 40f : start;
                 return course;
             }
@@ -265,15 +270,14 @@ namespace Outlaws.WorldShift
         // Six freeze/release puzzles, including a separate dust-field checkpoint section.
         private static LevelCourse Desert() => new Builder(ShiftLevel.Desert, landingCheckpoints: false)
             // 1: crossing rocks, alternate worlds, then freeze the first aerial pair.
-            .Sign(25f, LevelSignKind.Freeze)
             .Crossing(60f, 4.1f, 1f, 3.4f).Day(105f, LeftMiddle).Night(150f, MiddleRight)
             .Crossing(195f, 4.1f, -1f, 3.8f).Day(240f, All).Night(285f, All).Slider(300f, 1.4f)
-            .Sign(275f, LevelSignKind.AirFreeze).Ramp(340f, D, 2)
+            .Ramp(340f, D, 2)
             // 2: release a badly frozen rock, then freeze the central Night opening.
             .Crossing(55f, 4.1f, -1f, 4f).Day(100f, All)
             .Day(145f, All).Crossing(175f, 0f, 1f, 4.2f).Night(175f, Sides)
             .Day(225f, LeftMiddle).SlidingGate(240f, -1f).Day(295f, All)
-            .Checkpoint(270f, N).Sign(275f, LevelSignKind.AirRelease).Ramp(340f, N, releaseGate: true)
+            .Checkpoint(270f, N).Ramp(340f, N, releaseGate: true)
             // 3: staggered opposing motion followed by another freeze window.
             .Day(55f, All).Crossing(105f, 4.1f, 1f, 4.5f).Night(105f, Sides)
             .Crossing(150f, 1.5f, -1f, 4.8f).Day(195f, All).SlidingGate(235f, 1f)
@@ -283,7 +287,7 @@ namespace Outlaws.WorldShift
             .Crossing(175f, 4.1f, 1f, 5f).Night(175f, LeftMiddle).Day(215f, All)
             .Slider(255f, -1.8f).Crossing(235f, 2.8f, -1f, 4.8f).Checkpoint(270f, N).Ramp(340f, N, 2, releaseGate: true)
             // 5: nineteen rocks, two shuttling blocks and clear windows to wake motion again.
-            .Checkpoint(0f, D).Sign(25f, LevelSignKind.Freeze).Dust(40f, 435f).Day(55f, All)
+            .Checkpoint(0f, D).Dust(40f, 435f).Day(55f, All)
             .NightHalf(72f, 1)
             .Crossing(85f, 3.5f, 1f, 4.4f).Crossing(96f, 3.2f, 1f, 4.5f).Crossing(108f, 2.2f, -1f, 4.5f)
             .Crossing(120f, 2.6f, -1f, 4.6f).Crossing(131f, .4f, 1f, 4.6f).NightHalf(140f, -1)
@@ -303,13 +307,25 @@ namespace Outlaws.WorldShift
             .SlidingGate(270f, -1f).Night(320f, All).Checkpoint(290f, D).Ramp(360f, D, 10, 196f)
             .Build();
 
-        // First-pass translations of the earlier Ocean/Snow/Mountain courses for the team to tune.
+        // Each landing banks a completed collection section. Items stay clear of jumps
+        // and give at least 35 m to read a hazard or steer toward the next target.
         private static LevelCourse Ocean() => new Builder(ShiftLevel.Ocean)
-            .Slider(60f, .75f).Slider(110f, .95f).Night(160f, All).Slider(210f, -1.15f).Ramp(250f, D)
-            .Day(50f, All).Night(100f, LeftMiddle).Day(150f, All).Night(190f, MiddleRight).Day(215f, All).Ramp(260f, N)
-            .Slider(60f, 1.25f).Slider(110f, -1.4f).Night(160f, All).DayCar(200f, Middle).Ramp(250f, D)
-            .Day(50f, LeftMiddle).Night(90f, MiddleRight).Day(130f, All).Night(180f, LeftMiddle).Day(220f, All).Ramp(260f, N)
-            .Night(50f, All).Day(100f, LeftMiddle).Day(150f, MiddleRight).Slider(195f, 1.3f).Night(235f, All).Ramp(280f, D)
+            // 1: learn the diamond on a clear approach, then reuse switching and freezing.
+            .Item(100f, 0)
+            .Day(155f, All).Slider(205f, .95f).Night(255f, All).Ramp(310f, D)
+            // 2: steer to both sides; the diamonds remain collectible in either world.
+            .Item(85f, -1).Day(135f, All)
+            .Item(190f, 1).Night(240f, LeftMiddle).Day(285f, All).Ramp(340f, N)
+            // 3: freeze the movers, then line up for each required item.
+            .Slider(55f, 1.25f).Item(110f, 1).Night(160f, All)
+            .Slider(210f, -1.4f).Item(265f, -1).Ramp(330f, D)
+            // 4: collect through alternating world closures with room to change lane.
+            .Item(65f, -1).Day(110f, All).Item(160f, 0)
+            .Night(210f, All).Item(260f, 1).Day(305f, All).Ramp(360f, N)
+            // 5: combine collection, world choice and freezing before the last jump.
+            .Night(50f, All).Item(100f, 1).Day(145f, LeftMiddle)
+            .Item(195f, -1).Slider(245f, 1.3f).Item(300f, 0)
+            .Night(350f, All).Ramp(405f, D)
             .Build();
 
         private static LevelCourse Snow() => new Builder(ShiftLevel.Snow)

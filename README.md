@@ -4,7 +4,7 @@ A low-fidelity Unity driving playtest built around switching between Day and Nig
 
 ## Run locally
 
-1. Install Unity **6000.3.22f1** through Unity Hub and add this repository as a project.
+1. Install Unity **6000.3.23f1** through Unity Hub and add this repository as a project.
 2. Open `Assets/Scenes/WorldShift_Menu.unity`, or choose **The Outlaws > Levels > Play From Home Screen**.
 3. Enter Play mode and pick a level.
 
@@ -39,9 +39,11 @@ The older endless escape (cash, garage, fuel, shooting, forks) is still in the c
 - [Gameplay and progression](Docs/WORLD_SHIFT_CAMPAIGN.md)
 - [Architecture and code map](Docs/ARCHITECTURE.md)
 - [Road geometry and tuning](Docs/CURVED_ROADS.md)
-- [Playable, validation and legacy scenes](Docs/SCENES.md)
+- [Current game scenes](Docs/SCENES.md)
 - [Working conventions](AGENTS.md)
 
-For missing scenes, use **The Outlaws > World Shift > Setup > Create Missing Campaign Scenes**. It preserves existing scenes and registers the five environments, menu and tutorial in the build list.
+For missing scenes, use **The Outlaws > Levels > Create Missing Game Scenes**. It preserves existing scenes and registers only the menu and shared gameplay scene.
 
-The older `Env_*` World game and prototype scenes are retained for reference and validation; they are not the current playtest entry points. See [legacy references](Docs/Legacy/README.md) and [historical notes](Docs/Archive/README.md). The project builds on Team 19's Money Heist and Team 21's Redline Run; [integration history](Docs/INTEGRATION.md) and [contribution records](Docs/TeamContribution.md) preserve that provenance.
+Obsolete campaign, environment and validation scenes have been removed. Their scene-dependent tests and editor tools are preserved outside Unity in [the retired-scene archive](Docs/Archive/RetiredScenes/README.md). Shared driving code, prefabs, materials and mechanic implementations remain available.
+
+The project builds on Team 19's Money Heist and Team 21's Redline Run; [integration history](Docs/INTEGRATION.md) and [contribution records](Docs/TeamContribution.md) preserve that provenance. See also [legacy references](Docs/Legacy/README.md) and [historical notes](Docs/Archive/README.md).

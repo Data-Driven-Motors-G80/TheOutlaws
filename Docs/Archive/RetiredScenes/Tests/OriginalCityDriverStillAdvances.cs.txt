@@ -1,0 +1,20 @@
+    [UnityTest]
+    public IEnumerator OriginalCityDriverStillAdvances()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/Env_City.unity");
+        yield return new EnterPlayMode();
+        var components = UnityEngine.Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None);
+        var analytics = components.FirstOrDefault(c => c.GetType().Name == "WeeWooAnalytics");
+        if (analytics != null) analytics.GetType().GetField("uploadsEnabled", Flags).SetValue(analytics, false);
+        var manager = components.Single(c => c.GetType().Name == "OutlawGameManager");
+        Call(manager, "SetTutorialSelected", false);
+        Call(manager, "BeginGame");
+        yield return null;
+        var driver = components.Single(c => c.GetType().Name == "AutoDriveCar");
+        float before = (float)Get(driver, "RoadPositionDistance");
+        for (int frame = 0; frame < 12; frame++) yield return null;
+        Assert.That((bool)Get(driver, "IsDriveReady"), Is.True);
+        Assert.That((float)Get(driver, "RoadPositionDistance"), Is.GreaterThan(before));
+        Assert.That(float.IsNaN(driver.transform.position.y), Is.False);
+        yield return new ExitPlayMode();
+    }

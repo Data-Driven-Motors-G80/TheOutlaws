@@ -7,7 +7,7 @@ using UnityEngine.SceneManagement;
 public sealed class EnvironmentSwitcher : MonoBehaviour
 {
     [Header("Environments")]
-    [SerializeField] private string[] environmentScenes = { "Env_City", "Env_Snow", "Env_OceanCoast", "Env_Desert" };
+    [SerializeField] private string[] environmentScenes = System.Array.Empty<string>();
 
     [Header("Transition")]
     [SerializeField, Min(0.1f)] private float slideSeconds = 0.6f;
@@ -35,7 +35,7 @@ public sealed class EnvironmentSwitcher : MonoBehaviour
 
     private void Update()
     {
-        if (game == null || switching || game.State != OutlawGameState.Running || game.IsTutorial)
+        if (environmentScenes == null || environmentScenes.Length == 0 || game == null || switching || game.State != OutlawGameState.Running || game.IsTutorial)
             return;
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD

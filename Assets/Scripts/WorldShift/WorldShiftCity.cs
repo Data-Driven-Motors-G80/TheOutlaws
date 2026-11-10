@@ -21,6 +21,8 @@ namespace Outlaws.WorldShift
         // Level play: authored Day/Night course, one-hit crashes, big-ramp checkpoints.
         private LevelCourse course;
         private ShiftHazard[] levelHazards;
+        public WorldShiftLevelCollection Collection { get; private set; }
+        public bool MissedRequiredItem => LevelMode && State == ShiftRunState.Retrying && lastFailure == "MISSED ITEM";
         public LevelCourse Course => course;
         public bool LevelMode => course != null;
         public int LevelIndex { get; private set; } = -1;
@@ -34,7 +36,7 @@ namespace Outlaws.WorldShift
         public bool TrainingFreezeWaiting => InFreezeLesson && !trainingFreezeDemonstrated
             && Distance >= TrainingFreezeStop - .001f;
         // Police pull up to the crashed car before the checkpoint restart.
-        public bool Capturing => LevelMode && State == ShiftRunState.Retrying && lastFailure != "NO ROAD" && lastFailure != "MISSED RELAY LANDING";
+        public bool Capturing => LevelMode && State == ShiftRunState.Retrying && lastFailure != "NO ROAD" && lastFailure != "MISSED RELAY LANDING" && lastFailure != "MISSED ITEM";
         public const float LevelPoliceGap = 6f;
         // First-timers get a little more reading time in Training.
         public const float TrainingSpeed = 20f;
@@ -195,6 +197,7 @@ namespace Outlaws.WorldShift
                 environment = course.Environment;
                 tutorialLevel = false;
                 levelHazards = course.CreateHazards();
+                Collection = new WorldShiftLevelCollection(course.RequiredItems);
             }
             GetawayMode = !LevelMode && !tutorialLevel && !splitViewValidation && WorldShiftFlow.Escape.Status == GetawayRunState.RunStatus.Running;
             if (GetawayMode) { fuel.SetCapacity(WorldShiftFlow.Garage.FuelCapacity); fuel.RefillToFull(); }
@@ -484,6 +487,8 @@ namespace Outlaws.WorldShift
                 if (LevelMode && course.Training && !trainingLessonRead && checkpointIndex < course.Signs.Length
                     && Distance >= course.Signs[checkpointIndex].Distance - 5f)
                     TrainingLessonPaused = true;
+                if (Collection != null && !Collection.Step(previous, next, previousLateral, nextLateral))
+                { Fail("MISSED ITEM"); break; }
                 CompleteTutorialHint();
                 UpdateMergeState();
                 presentation.StepPedestrians(dt);
@@ -763,6 +768,7 @@ namespace Outlaws.WorldShift
             CheckpointNoticeRemaining = 0f;
             tutorialCheckpointLateral = checkpoint.Lateral;
             TutorialRewards?.Restore(checkpoint.Distance);
+            Collection?.Restore(checkpoint.Distance);
             Distance = checkpoint.Distance;
             Lateral = checkpoint.Lateral;
             retryRemaining = 0f;

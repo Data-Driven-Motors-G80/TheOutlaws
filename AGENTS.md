@@ -14,12 +14,12 @@ Applies throughout this repository. Read before making changes. The user's lates
 - Desert scenery reuses the old low ellipsoid dunes with no colliders, clear of all road bends; retain the road-following sand/seam fix. Every Desert moving block, including the small sliders, says DAY TO MOVE. STORM is painted on the road before the dust field, which also has three alternating Night-only half-road barriers.
 - Desert ordinary driving uses alternating 80 m canyon bends (about 28–32 degrees), with a gentler S-bend in the storm. Jump approaches remain straight from ramp minus 80 m through recovery end plus 45 m; road-piece boundaries align there. Both worlds share the road geometry.
 - Removed from play: cash, garage/upgrades, shooting/ammo, road splitting (forks), cash-out exits, the optional bonus ramp. Disabled (code kept for later levels): fuel, power-ups, the rift.
-- Use as little text as possible. Training teaches with green highway signs (key caps + arrows/pictograms). Level checkpoints have green road stripes, a labeled gate and a brief CHECKPOINT confirmation above the car's sight line. The rest of the HUD uses sun/moon, progress and pause icons.
-- Levels 3–5 are first-pass translations of the earlier Ocean/Snow/Mountain courses; teammates own their tuning.
+- Use as little text as possible. Training teaches with green highway signs (key caps + arrows/pictograms). Instructional green highway signs are exclusive to Training; do not place them in regular levels. Level checkpoints have green road stripes, a labeled gate and a brief CHECKPOINT confirmation above the car's sight line. The rest of the HUD uses sun/moon, progress and pause icons.
+- Ocean (Level 3) has 11 required diamonds in both worlds; a miss retries the section. Completed sections retain their items. Snow and Mountain remain first-pass courses.
 - Analytics: `WorldShiftLevelAnalytics` writes one `ws_level_attempts` row per attempt and `wl_*` events (see Docs/ANALYTICS.md, "Levels").
 
 ## Legacy endless escape (not reachable from the menu)
-The rules below describe the older endless five-environment escape. Its code and tests are retained until the level game settles; do not extend it.
+The rules below describe the older endless five-environment escape. Shared runtime code is retained, but scene-dependent tests and editor tools are archived under `Docs/Archive/RetiredScenes`; do not extend it.
 
 - Escape advances automatically in this order: City → Desert → Ocean → Snow → Mountain → City. Ocean, Snow and Mountain use low-fidelity authored profiles on the shared finite driving controller.
 - On ordinary transitions, the optional bonus ramp starts 60 m before the environment boundary and lands at least 24 m before the finish. Keep its approach flat/straight and free of Snow coasting. Never transition mid-ramp or in flight.
@@ -68,13 +68,13 @@ The rules below describe the older endless five-environment escape. Its code and
 
 ## Where to look
 - `README.md` and `Docs/README.md` are the current entry points. `Docs/Archive` is historical, and `Docs/Legacy` describes the older World game. Do not treat historical mechanics as current requirements.
-- `Assets/Editor/WorldShiftCampaignSetup.cs` creates missing scenes and registers all five environments without overwriting existing scenes. Legacy and Validation tools are separately grouped; keep scene paths and `.meta` GUIDs stable.
+- `Assets/Editor/WorldShiftCampaignSetup.cs` creates only the menu and shared gameplay scene without overwriting existing scenes. Keep both scene paths and `.meta` GUIDs stable. Retired scene tools and tests live outside Assets in `Docs/Archive/RetiredScenes`.
 - `Assets/Scripts/WorldShift/WorldShiftCity.cs`, `DesertShiftTrial.cs`: simulation, controls, collisions, fuel and world switching.
 - `WorldShiftFlow.cs`: five-environment cycle and cash-out cadence. `WorldShiftEscapeProfile.cs`: Ocean/Snow/Mountain courses, fuel, relays and colours, plus City difficulty scaling. `WorldShiftGetaway.cs` in that directory: escape loop, cash and HUD rendering. `WorldShiftDrivingMessages.cs`: gameplay prompt priority, shooting hint pacing and Nightshift reminders.
 - `WorldShiftTutorial.cs`, `WorldShiftHud.cs`: tutorial lessons and presentation. `WorldShiftModeGuide.cs`: shared mode names/copy.
 - `WorldShiftRoute.cs`, `WorldShiftForkRoad.cs`, `WorldShiftRelay.cs`, `WorldShiftRelayVisuals.cs`: roads, choices, gaps and landings.
 - `WorldShiftCombat.cs`: shared obstacle active-state check for targeting, collision, steering and rendering. `WorldShiftGetawayExtras.cs`: shield, magnet, boost and optional bonus ramp. `WorldShiftObstacleVisual.cs`: consistent X blocks. `WorldShiftBlockVisuals.cs`: player and police blocks. `WorldShiftPickupVisual.cs`: shared labeled supply blocks.
 - `WorldShiftPresentation.cs`, `DesertShiftTrialView.cs`: environment and hazard visuals.
-- `Assets/Tests/Editor/WorldShiftEnvironmentFlowTests.cs`: automatic cycle, cash-out, resource persistence and new full-course runs. `Assets/Tests/Editor/WorldShiftCampaignTests.cs`: tutorial and scene flow. `WorldShiftCombatRoutesTests.cs`: modes, routes, combat and resources. `WorldShiftGetawayTests.cs`: escape and HUD. `WorldShiftRelayTests.cs`: jumps.
+- `Assets/Tests/Editor/WorldShiftSceneSetupTests.cs`: the two current scenes and build setup. `WorldShiftLevelTests.cs`: menu flow for every current level, Training, Ocean collection and shared level rules. `DesertLevelCourseTests.cs`: current Level 2. `WorldShiftRelayTests.cs`: shared jumps.
 - Level play: `WorldShiftLevels.cs` (unlocks, flow), `WorldShiftLevelCourse.cs` (all level layouts), `WorldShiftLevelHud.cs`, `WorldShiftLevelProps.cs` (dashes, highway signs), `WorldShiftIcons.cs`, `WorldShiftLevelAnalytics.cs`. Level-mode branches in `WorldShiftCity` are guarded by `LevelMode`. Tests: `Assets/Tests/Editor/WorldShiftLevelTests.cs`.
-- `ProjectSettings/EditorBuildSettings.asset`: scene list; `WorldShift_Menu` is first, followed by City, Desert, Ocean, Snow, Mountain and the tutorial.
+- `ProjectSettings/EditorBuildSettings.asset`: only `WorldShift_Menu`, followed by `City_WorldShift`. Training and all five levels share the latter scene.

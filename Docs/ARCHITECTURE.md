@@ -1,50 +1,61 @@
 # WorldShift architecture
 
-The playable game uses authored finite routes and one simulation clock per active scene. The older World game remains in the repository but is a separate entry point. See [gameplay rules](WORLD_SHIFT_CAMPAIGN.md) and [scene scopes](SCENES.md).
+The current game has a level-select menu and one shared gameplay scene. Training
+and all five levels load `City_WorldShift`; the selected course supplies the
+environment, obstacles, ramps and checkpoints. See [scene scopes](SCENES.md).
 
-## Ownership
+## Current ownership
 
 | File or system | Responsibility |
 | --- | --- |
-| `WorldShiftFlow` | Five-environment order, scene handoff, cash-out cadence, saved bank and Garage access |
-| `GetawayRunState` | Carried cash, ammo, shield and one-time settlement across environments |
-| `VehicleUpgrades` | Permanent local upgrades and prices |
-| `WorldShiftCity` | Finite simulation for City, Ocean, Snow and Mountain; its historical class name is retained |
-| `DesertShiftTrial` | Desert simulation and its separate short development trial |
-| `WorldShiftEscapeProfile` | Environment course data, curves, slopes, fuel, relays, grip and difficulty scaling |
-| `WorldShiftRoute`, `WorldShiftForkRoad` | Shared road sampling, physical branches, steering commitment and cash-out side exits |
-| `WorldShiftRelay`, `WorldShiftBonusJump` | Required cross-mode landings and the optional bonus ramp |
-| `WorldShiftCombat` | Ammo, targeting and authoritative destroyed-obstacle state |
-| `WorldShiftGetaway` | Cash collection, run HUD, pause/results and continuation handoff |
-| `WorldShiftDrivingMessages` | One prompt priority order, pacing and reminders |
-| `WorldShiftGetawayExtras` | Independent shield, magnet and boost pickups and active indicators |
-| `WorldShiftPresentation`, `DesertShiftTrialView` | Environment rendering, hazard visibility and camera presentation |
-| `WorldShiftObstacleVisual`, `WorldShiftPickupVisual`, `WorldShiftBlockVisuals` | Shared primitive visuals and meaningful labels |
-| `WorldShiftMenu`, `WorldShiftHud`, `WorldShiftTutorial` | Menu/Garage, tutorial presentation and authored lessons |
+| `WorldShiftMenu` | Level select, unlock display and testing controls |
+| `WorldShiftLevels` | Selected level, saved progress, retry, next level and menu flow |
+| `WorldShiftLevelCourse` | Training and City/Desert/Ocean/Snow/Mountain layouts, bends, slopes, ramps and checkpoints |
+| `WorldShiftCity` | Shared level simulation, controls, collisions, world switching and checkpoint retries |
+| `WorldShiftLevelCollection` | Required Ocean diamonds, misses and collection reset at checkpoints |
+| `WorldShiftLevelHud`, `WorldShiftLevelProps`, `WorldShiftIcons` | Level HUD, Training prompts, road signs and simple visual cues |
+| `WorldShiftLevelRock`, `WorldShiftSlidingGate`, `WorldShiftLevelSandstorm` | Desert motion, release gates and dust visibility |
+| `WorldShiftRoute`, `WorldShiftRelay` | Road sampling, cross-world jumps and landing protection |
+| `WorldShiftPresentation`, `WorldShiftRoadside` | Environment and hazard rendering |
+| `WorldShiftLevelAnalytics` | Current level attempts and events; see [analytics](ANALYTICS.md) |
 
-Most files above live in `Assets/Scripts/WorldShift`. Shared run/resource rules live in `Assets/Scripts/Core/Rules`; `AutoDriveCar` remains in `Player/Driving`.
+Most files above live in `Assets/Scripts/WorldShift`. `AutoDriveCar` remains in
+`Player/Driving` and supplies the shared driving foundation.
 
 ## Simulation boundaries
 
-The scene controller advances driving, obstacle motion, collision, resources and rewards in small substeps. Day advances moving hazards; Nightshift retains their current positions. Both modes use the same road coordinate. Collision, targeting, steering restrictions and rendering consult the shared obstacle active-state check so a destroyed block cannot retain invisible collisions.
+The controller advances driving, obstacle motion and collision in small substeps.
+Day advances shared movers; Night freezes their current positions. Still hazards
+belong to one world and show as passable dashed outlines in the other. Switching
+inside an outline causes a crash. One hit retries the last checkpoint.
 
-Presentation can temporarily render another mode without changing the player's world, clocks or resources. Prompts read simulation state; rendering must not collect cash, finish a leg or reset a Nightshift visit.
+Ramps launch in one world and land in the other. A successful landing retains
+brief protection against switching back before the road rejoins. Ocean collection
+runs in the same simulation steps, before checkpoint advancement or completion,
+so a missed diamond cannot be banked by crossing a checkpoint.
 
-A successful main relay landing retains a brief one-world deck. Returning too early is ignored rather than killing the run. At an ordinary environment boundary, continuation is automatic. At designated cash-out legs, only the explicit side exit settles the haul.
+Presentation may preview another world without changing simulation state.
+Rendering must not collect items or advance motion, checkpoints or progress.
 
-## Shared foundations and legacy scope
+## Retained foundations and retired scenes
 
-`AutoDriveCar`, `RoadSegment`, `RoadCurveMesh`, `RoadMarking`, `FuelState`, `RiskRunState` and runtime material helpers are still shared foundations. Do not remove them because they originated in the older game.
+`AutoDriveCar`, `RoadSegment`, `RoadCurveMesh`, `RoadMarking`, fuel/pursuit state
+and runtime material helpers remain shared foundations. They must not be deleted
+just because they originated in the older game.
 
-The legacy `Env_*` scenes use `OutlawGameManager`, `EnvironmentRoot`, `RunSession`, mystery rewards and their own portal/progression systems. Ocean surf and Snow slide controllers remain there; they are not attached to the current finite profiles. Their architecture is preserved in [Legacy/World architecture](Legacy/WORLD_ARCHITECTURE.md).
-
-The existing analytics documentation covers the legacy reporter. The WorldShift controllers currently do not invoke that reporter; its presence is not evidence that current Escape emits the old events.
+The original World game and endless escape retain runtime classes for reference
+and reuse. They are not current menu modes. Their extra scenes have been removed;
+scene-dependent test suites and editor builders are preserved outside Assets in
+[the retired-scene archive](Archive/RetiredScenes/README.md). Legacy WorldShift
+flow entry points now select current levels instead of loading deleted variants.
 
 ## Changes and verification
 
-- Course/road tuning: edit `WorldShiftEscapeProfile` or the Desert authored data, then use the closest course checks.
-- Prompt/copy changes: use `WorldShiftDrivingMessages` or tutorial copy, then inspect the diff; a full gameplay suite is unnecessary by default.
-- Shared collision/mode changes: check combat/routes, environment flow and relay coverage.
-- Scene setup: `Assets/Editor/WorldShiftCampaignSetup.cs` creates missing scenes without replacing existing assets. Current tools are grouped separately from Legacy and Validation menus.
+- Course tuning: edit `WorldShiftLevelCourse`, then use `WorldShiftLevelTests` and `DesertLevelCourseTests` where relevant.
+- Prompt changes: edit the level HUD/props, then inspect a representative render.
+- Shared driving and collision changes: use level, retained City-controller and relay checks.
+- Scene setup: `WorldShiftCampaignSetup` creates only missing menu/shared scenes, preserves existing scene contents and registers those two build entries.
 
-Relevant tests: `WorldShiftEnvironmentFlowTests`, `WorldShiftCombatRoutesTests`, `WorldShiftGetawayTests`, `WorldShiftCampaignTests`, `WorldShiftRelayTests` and `WorldShiftSceneSetupTests`. Retain focused checks; archived documents are historical records, not current passing-test guarantees.
+`WorldShiftLevelTests.MenuLoadsTrainingAndAllFiveLevelsFromTheSharedScene`
+checks every menu selection and return home. `WorldShiftSceneSetupTests` checks
+the build list and ensures obsolete scenes are not recreated.

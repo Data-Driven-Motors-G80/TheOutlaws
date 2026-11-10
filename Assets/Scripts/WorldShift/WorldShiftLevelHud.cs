@@ -22,7 +22,7 @@ namespace Outlaws.WorldShift
         private GameObject driving, pause, complete, trainingLesson;
         private bool completeShown;
         private GameObject freezePrompt;
-        private TMP_Text freezeAction, freezeState;
+        private TMP_Text freezeAction, freezeState, collectionStatus;
         private Image freezeWorld, freezeMotion;
         private CanvasGroup lessonGroup;
         private RectTransform signPreview;
@@ -43,6 +43,16 @@ namespace Outlaws.WorldShift
             crashFlash = WorldShiftMenu.Panel(safe, "Crash flash", Vector2.zero, Vector2.one, Color.clear).GetComponent<Image>();
             driving = WorldShiftMenu.Panel(safe, "Driving", Vector2.zero, Vector2.one, Color.clear).gameObject;
             BuildFreezePrompt(driving.transform);
+            RectTransform collectionPanel = null;
+            if (game.Course.RequiredItems.Length > 0)
+            {
+                var items = WorldShiftMenu.Panel(driving.transform, "Required diamonds", new Vector2(.34f, .85f), new Vector2(.66f, .90f), Ink);
+                collectionPanel = items;
+                collectionStatus = WorldShiftMenu.Label(items, "", .02f, 0f, .98f, 1f, 24f);
+                collectionStatus.color = WorldShiftLevelProps.CollectionColour;
+                collectionStatus.alignment = TextAlignmentOptions.Center;
+                collectionStatus.fontStyle = FontStyles.Bold;
+            }
             var worldBadge = WorldShiftMenu.Panel(driving.transform, "World badge", new Vector2(.02f, .86f), new Vector2(.02f, .86f), Ink);
             worldBadge.sizeDelta = new Vector2(84f, 84f);
             worldBadge.pivot = new Vector2(0f, 0f);
@@ -68,6 +78,13 @@ namespace Outlaws.WorldShift
 
             var notice = WorldShiftMenu.Panel(driving.transform, "Checkpoint notice", new Vector2(.5f, .83f), new Vector2(.5f, .83f), Ink);
             notice.sizeDelta = new Vector2(360f, 60f);
+            if (collectionPanel != null)
+            {
+                // Keep a fixed 12 px gap below the counter at every screen size.
+                notice.SetParent(collectionPanel, false);
+                notice.anchorMin = notice.anchorMax = new Vector2(.5f, 0f);
+                notice.anchoredPosition = new Vector2(0f, -42f);
+            }
             checkpointNotice = notice.gameObject.AddComponent<CanvasGroup>();
             checkpointNotice.blocksRaycasts = false;
             var saved = Icon(notice, ShiftIcon.Check, 40f);
@@ -126,7 +143,7 @@ namespace Outlaws.WorldShift
 
         private void BuildFreezePrompt(Transform parent)
         {
-            var border = FreezeBox(parent, "Freeze demonstration", new Vector2(.20f, .07f), new Vector2(.80f, .215f), FreezeTeal, true);
+            var border = FreezeBox(parent, "Freeze demonstration", new Vector2(.14f, .07f), new Vector2(.86f, .215f), FreezeTeal, true);
             freezePrompt = border.gameObject;
             var face = FreezeBox(border, "Dark face", Vector2.zero, Vector2.one, new Color(.025f, .045f, .06f, .98f), true);
             face.offsetMin = new Vector2(3f, 3f); face.offsetMax = new Vector2(-3f, -3f);
@@ -135,21 +152,21 @@ namespace Outlaws.WorldShift
             freezeState.fontStyle = FontStyles.Bold;
             freezeState.alignment = TextAlignmentOptions.Center;
             face = WorldShiftMenu.Panel(face, "Freeze controls", Vector2.zero, new Vector2(1f, .72f), Color.clear);
-            FreezeLabel(face, "PRESS", .02f, .10f, 24f);
-            FreezeKey(face, "SPACE", .11f, .255f);
+            FreezeLabel(face, "PRESS", .025f, .14f, 24f);
+            FreezeKey(face, "SPACE", .145f, .315f);
             var moon = freezeWorld = Icon(face, ShiftIcon.Moon, 32f);
-            moon.rectTransform.anchorMin = moon.rectTransform.anchorMax = new Vector2(.28f, .5f);
+            moon.rectTransform.anchorMin = moon.rectTransform.anchorMax = new Vector2(.35f, .5f);
             moon.color = FreezeTeal;
             var stopped = freezeMotion = Icon(face, ShiftIcon.Pause, 24f);
-            stopped.rectTransform.anchorMin = stopped.rectTransform.anchorMax = new Vector2(.31f, .5f);
+            stopped.rectTransform.anchorMin = stopped.rectTransform.anchorMax = new Vector2(.39f, .5f);
             stopped.color = FreezeTeal;
-            freezeAction = FreezeLabel(face, "TO FREEZE", .335f, .50f, 24f);
+            freezeAction = FreezeLabel(face, "TO FREEZE", .425f, .60f, 24f);
             var next = Icon(face, ShiftIcon.Next, 30f);
-            next.rectTransform.anchorMin = next.rectTransform.anchorMax = new Vector2(.535f, .5f);
+            next.rectTransform.anchorMin = next.rectTransform.anchorMax = new Vector2(.625f, .5f);
             next.color = FreezeTeal;
-            FreezeKey(face, "←", .59f, .67f);
-            FreezeKey(face, "→", .69f, .77f);
-            FreezeLabel(face, "Steer", .80f, .96f);
+            FreezeKey(face, "A", .66f, .73f);
+            FreezeKey(face, "D", .75f, .82f);
+            FreezeLabel(face, "STEER", .84f, .975f);
             freezePrompt.SetActive(false);
         }
 
@@ -167,6 +184,7 @@ namespace Outlaws.WorldShift
             label.color = Color.white;
             label.fontStyle = FontStyles.Bold;
             label.alignment = TextAlignmentOptions.Center;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
             return label;
         }
 
@@ -285,12 +303,15 @@ namespace Outlaws.WorldShift
 
         private void Refresh()
         {
+            if (collectionStatus != null)
+                collectionStatus.text = game.MissedRequiredItem ? "MISSED DIAMOND - RETRY"
+                    : "DIAMONDS " + game.Collection.Count + " / " + game.Course.RequiredItems.Length;
             freezePrompt.SetActive(game.TrainingFreezeWaiting && !game.TrainingLessonPaused && game.State == ShiftRunState.Running);
             bool day = game.World == ShiftWorld.Day;
             freezeState.text = day ? "DAY: OBSTACLES MOVING" : "NIGHT: OBSTACLES FROZEN";
             freezeAction.text = game.TrainingFreezeStep == 1 ? "TO MOVE" : "TO FREEZE";
-            freezeWorld.sprite = WorldShiftIcons.Get(day ? ShiftIcon.Sun : ShiftIcon.Moon);
-            freezeMotion.sprite = WorldShiftIcons.Get(day ? ShiftIcon.Play : ShiftIcon.Pause);
+            freezeWorld.sprite = WorldShiftIcons.Get(day ? ShiftIcon.Moon : ShiftIcon.Sun);
+            freezeMotion.sprite = WorldShiftIcons.Get(day ? ShiftIcon.Pause : ShiftIcon.Play);
             worldIcon.sprite = WorldShiftIcons.Get(day ? ShiftIcon.Sun : ShiftIcon.Moon);
             worldIcon.color = day ? Gold : Cream;
             float progress = game.Progress;
@@ -298,7 +319,7 @@ namespace Outlaws.WorldShift
             carMarker.anchorMin = carMarker.anchorMax = new Vector2(progress, .5f);
             for (int i = 0; i < pips.Count; i++) pips[i].color = i < game.CheckpointIndex
                 ? WorldShiftLevelProps.CheckpointColour : new Color(1f, 1f, 1f, .55f);
-            crashFlash.color = game.State == ShiftRunState.Retrying ? new Color(.8f, .05f, .03f, .22f) : Color.clear;
+            crashFlash.color = game.State == ShiftRunState.Retrying && !game.MissedRequiredItem ? new Color(.8f, .05f, .03f, .22f) : Color.clear;
             checkpointNotice.alpha = !game.Course.Training && game.State == ShiftRunState.Running
                 ? Mathf.Clamp01(game.CheckpointNoticeRemaining / .3f) : 0f;
             // Space is the switch key; a still-selected button would also receive it as "submit".
