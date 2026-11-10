@@ -235,3 +235,16 @@ refresh on every `ws_runs`/`ws_tutorials` upload and answer:
 **Deploy:** Copy the complete current `WeeWooAnalytics.gs` and `Visualizations.gs` into the bound Apps Script project. Save, deploy a new version of the existing web app, and run `setupVisualizations` once. Keep the existing endpoint URL. Rebuild/publish the Unity WebGL game to record ramp data. Verify a failed jump, a successful jump and a menu exit in midair: check `ws_level_attempts`, `wl_ramp_*` events and `Level Visualizations`. A successful local calculation test does not confirm the live deployment.
 
 **Local chart calculation checks:** `node Docs/analytics/test_level_visualizations.cjs`.
+
+## Training sign reading and failure locations (Beta, build `beta-1.0`)
+
+Question: **do players read the Training road signs, and does reading help?** Each Training sign card stops the car until the player presses **Space** (Enter also works but is not advertised). A press already in flight within 0.35 s of the card appearing is ignored and never switches worlds.
+
+New `ws_level_attempts` columns:
+
+- Every level, per checkpoint interval `i`: `tries_i` (first go + crashes + manual restarts), `retries_i` (R / pause Retry), `first_try_i` (1 cleared with no crash or restart, 0 needed another try, -1 not reached or unresolved), `fails_i` (up to 15 `metres:lane:cause` entries; lane L/M/R; cause crash, switched_into, fell, missed_landing, missed_item).
+- Training only: `read_i` (seconds the sign card was up on first view, pause menu excluded; -1 never shown), `read_total_i`, `reads_i` (views: the sign returns after each crash), `read_s` (all reading), `quit_on_sign` (lesson whose card was up when the attempt ended, else -1), `freeze_demo_s` (seconds stopped at the freeze demonstration until Night, Day, Night were shown). `real_s` remains total wall-clock time.
+
+New events: `wl_sign_shown` (lesson, view), `wl_sign_read` (lesson, view, read_s, how = continue/restart), `wl_checkpoint_retry`, `wl_freeze_demo` (demo_s). `wl_death` adds `lane` and `x`.
+
+`Level Visualizations` sections 5–6: median reading time per sign, share of first views under 2 s, first-try success for readers vs skippers, reading time vs tries scatter, mean tries per lesson, failure causes per lesson, the Training time split, failures by cause per checkpoint interval for every level, and the 12 deadliest 10 m / lane spots. **Deploy:** paste the updated `Visualizations.gs` into Apps Script and save (no web-app redeploy needed; `WeeWooAnalytics.gs` is unchanged). The next refresh draws the new sections.

@@ -407,6 +407,7 @@ public sealed class WorldShiftLevelTests
         Call(game, "TrySwitch");
         Assert.That(Get(game, "TrainingFreezeStep"), Is.EqualTo(3));
         Assert.That(Get(game, "TrainingFreezeWaiting"), Is.EqualTo(false));
+        Assert.That(analytics.Count(a => a.name == "wl_freeze_demo"), Is.EqualTo(1), "The demonstration time is recorded once.");
         Step(game, .25f);
         Assert.That((float)Get(game, "Distance"), Is.GreaterThan(distance));
         Assert.That((float)Get(sliders[0], "MotionTravel"), Is.EqualTo(motion));
@@ -527,5 +528,49 @@ public sealed class WorldShiftLevelTests
         var row = analytics.Single(a => a.sheet == "ws_level_attempts").data;
         Assert.That(row["outcome"], Is.EqualTo("complete"));
         Assert.That(row["level"], Is.EqualTo(0));
+    }
+
+    [UnityTest]
+    public IEnumerator TrainingRecordsSignReadingTriesAndWhereLessonsFail()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
+        StartLevel(0); yield return null; yield return null;
+        var game = Started();
+        Step(game, 1.1f);
+        Assert.That(Get(game, "TrainingLessonPaused"), Is.True);
+        Assert.That(analytics.Count(a => a.name == "wl_sign_shown"), Is.EqualTo(1));
+        yield return new WaitForSecondsRealtime(.5f);
+        Call(game, "ContinueTrainingLesson");
+        var read = analytics.Single(a => a.name == "wl_sign_read").data;
+        Assert.That(read["lesson"], Is.EqualTo(0));
+        Assert.That((float)read["read_s"], Is.GreaterThanOrEqualTo(.45f), "Reading time is the wall-clock time the card stayed up.");
+        Assert.That(read["how"], Is.EqualTo("continue"));
+
+        // Drive straight into the steering lesson's middle block.
+        Pose(game, 84f, 0f);
+        Step(game, 1f);
+        Assert.That(Get(game, "State").ToString(), Is.EqualTo("Retrying"));
+        Assert.That(analytics.Last(a => a.name == "wl_death").data["lane"], Is.EqualTo("M"));
+        for (int i = 0; i < 400 && !(bool)Get(game, "TrainingLessonPaused"); i++) Call(game, "StepSimulation", .05f, 0f, false);
+        Assert.That(Get(game, "TrainingLessonPaused"), Is.True, "The sign returns after a crash.");
+        Assert.That(analytics.Last(a => a.name == "wl_sign_shown").data["view"], Is.EqualTo(2));
+        // A manual restart while the sign is up closes that view and counts as another try.
+        Call(game, "RetryCheckpoint");
+        Assert.That(analytics.Last(a => a.name == "wl_sign_read").data["how"], Is.EqualTo("restart"));
+
+        Static(TypeFor("WorldShiftLevelAnalytics"), "EndAttempt", "menu");
+        var row = analytics.Single(a => a.sheet == "ws_level_attempts").data;
+        Assert.That(row["reads_0"], Is.EqualTo(2));
+        Assert.That((float)row["read_0"], Is.GreaterThanOrEqualTo(.45f), "First reading of the sign.");
+        Assert.That((float)row["read_total_0"], Is.GreaterThanOrEqualTo((float)row["read_0"]));
+        Assert.That((float)row["read_s"], Is.GreaterThanOrEqualTo(.45f));
+        Assert.That(row["retries_0"], Is.EqualTo(1));
+        Assert.That(row["tries_0"], Is.EqualTo(3), "First go + one crash + one manual restart.");
+        Assert.That(row["first_try_0"], Is.EqualTo(0));
+        Assert.That(row["first_try_1"], Is.EqualTo(-1));
+        StringAssert.IsMatch(@"^\d+:M:crash$", (string)row["fails_0"]);
+        Assert.That(row["quit_on_sign"], Is.EqualTo(-1));
+        Assert.That((float)row["freeze_demo_s"], Is.EqualTo(-1f));
+        yield return null;
     }
 }

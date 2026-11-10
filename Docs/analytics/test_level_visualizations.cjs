@@ -21,3 +21,25 @@ const empty=ctx.wlVizCompute({ws_level_attempts:[row('no-switch',{switches:0})]}
 assert.equal(empty.sections[2].charts[0].rows.length,0);
 assert.equal(empty.sections[3].charts[0].rows.length,0); // legacy rows aren't failed ramps
 console.log('PASS: filtering, duplicate uploads, completed lessons, seven checkpoint intervals, zero denominators, resolved ramp rate, first tries.');
+
+// Sign reading (section 5) and crash locations (section 6).
+const signs = [
+  row('reader',{outcome:'complete',section_at_end:5,s_0:8,read_0:6.5,tries_0:1,first_try_0:1,read_1:4,tries_1:2,first_try_1:0,fails_1:'210:M:switched_into',read_s:30,drive_s:90,real_s:140,freeze_demo_s:4}),
+  row('skipper',{outcome:'complete',section_at_end:5,s_0:9,read_0:0.6,tries_0:3,first_try_0:0,fails_0:'88:M:crash;89:L:crash',read_s:5,drive_s:120,real_s:130,freeze_demo_s:-1}),
+  row('quitter',{s_0:3,read_0:0.4,tries_0:2,first_try_0:0,fails_0:'88:M:crash'}),
+  row('city',{level:1,sections:5,s_0:20,tries_0:2,first_try_0:0,fails_0:'150:R:switched_into'})];
+const s5 = ctx.wlVizCompute({ws_level_attempts:signs},{builds:ctx.VIS_BUILDS[1]},'UTC');
+const sec5 = s5.sections[4], sec6 = s5.sections[5];
+assert.equal(sec5.charts[0].rows[0][1],0.6); // median first read of Steer: 0.4, 0.6, 6.5
+assert.equal(sec5.charts[1].rows[0][1],66.7); // 2 of 3 Steer views under 2 s
+assert.equal(JSON.stringify(sec5.charts[2].rows[0].slice(1)),JSON.stringify([100,0])); // reader cleared first try, skippers did not
+assert.equal(sec5.charts[3].rows.length,4); // one point per resolved lesson attempt with a reading time
+assert.equal(sec5.charts[4].rows[0][1],2); // mean tries among cleared Steer: (1+3)/2
+assert.equal(JSON.stringify(sec5.charts[5].rows[0]),JSON.stringify(['Steer',3,0,0,0,0]));
+assert.equal(JSON.stringify(sec5.charts[6].rows[0]),JSON.stringify(['Reading signs',17.5]));
+assert.equal(s5.kpis[3][1],'66.7% (2/3)');
+assert.equal(JSON.stringify(sec6.charts[0].rows[0]),JSON.stringify(['Training C1',3,0,0,0,0]));
+assert.ok(sec6.charts.some(c=>c.title.startsWith('City')));
+const hot = sec6.charts[sec6.charts.length-1].rows[0];
+assert.equal(JSON.stringify(hot),JSON.stringify(['Training C1 · 80 m · M lane · Hit obstacle',2]));
+console.log('PASS: sign reading time, skip share, read-vs-skip first tries, tries, failure causes, time split, crash hotspots.');

@@ -29,6 +29,9 @@ namespace Outlaws.WorldShift
         public int CheckpointIndex => checkpointIndex;
         public bool TrainingLessonPaused { get; private set; }
         private bool trainingLessonRead;
+        // Debounce only (the card's fade-in): a Space press already in flight is not a decision to continue.
+        private const float TrainingSignInputDelay = .35f;
+        private float trainingSignShownAt = float.NegativeInfinity;
         public int TrainingFreezeStep { get; private set; }
         private bool trainingFreezeDemonstrated => TrainingFreezeStep >= 3;
         private bool InFreezeLesson => LevelMode && course.Training && checkpointIndex == 4;
@@ -270,11 +273,19 @@ namespace Outlaws.WorldShift
         private void Update()
         {
             var keyboard = Keyboard.current;
+            bool switchPressed = keyboard != null && keyboard.spaceKey.wasPressedThisFrame;
             if (keyboard != null)
             {
                 if (keyboard.escapeKey.wasPressedThisFrame) TogglePause();
-                if (State == ShiftRunState.Running && TrainingLessonPaused &&
-                    (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame)) ContinueTrainingLesson();
+                if (State == ShiftRunState.Running && TrainingLessonPaused)
+                {
+                    // Space continues (no extra key to learn). A press already in flight as the card
+                    // appears is ignored, and the continuing press never also switches worlds.
+                    bool continuePressed = switchPressed || keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame;
+                    if (continuePressed && Time.realtimeSinceStartup - trainingSignShownAt >= TrainingSignInputDelay) ContinueTrainingLesson();
+                    else if (keyboard.rKey.wasPressedThisFrame) RetryCheckpoint();
+                    switchPressed = false;
+                }
                 else if (State == ShiftRunState.Ready && keyboard.enterKey.wasPressedThisFrame) BeginRun();
                 else if (!GetawayMode && !LevelMode && State == ShiftRunState.Won && keyboard.enterKey.wasPressedThisFrame) WorldShiftFlow.Next(tutorialLevel ? ShiftLevel.Tutorial : environment);
                 else if (!GetawayMode && !LevelMode && State == ShiftRunState.Won && keyboard.rKey.wasPressedThisFrame) RestartRun();
@@ -283,7 +294,7 @@ namespace Outlaws.WorldShift
             float steer = keyboard == null ? 0f :
                 ((keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed) ? 1f : 0f)
                 - ((keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed) ? 1f : 0f);
-            StepSimulation(Time.deltaTime, steer, keyboard != null && keyboard.spaceKey.wasPressedThisFrame);
+            StepSimulation(Time.deltaTime, steer, switchPressed);
             if ((keyboard != null && keyboard.fKey.wasPressedThisFrame) || (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame
                 && (UnityEngine.EventSystems.EventSystem.current == null || !UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject()))) Combat?.TryShoot();
         }
@@ -309,6 +320,7 @@ namespace Outlaws.WorldShift
             {
                 TrainingLessonPaused = false;
                 trainingLessonRead = true;
+                if (LevelMode) WorldShiftLevelAnalytics.SignRead();
             }
         }
 
@@ -330,12 +342,18 @@ namespace Outlaws.WorldShift
         {
             if (State == ShiftRunState.Running) { if (LevelMode) WorldShiftLevelAnalytics.Paused(); else WorldShiftAnalytics.Paused(); }
             if (State == ShiftRunState.Running) State = ShiftRunState.Paused;
-            else if (State == ShiftRunState.Paused) State = ShiftRunState.Running;
+            else if (State == ShiftRunState.Paused)
+            {
+                State = ShiftRunState.Running;
+                if (LevelMode) WorldShiftLevelAnalytics.Resumed();
+            }
         }
 
         public void RetryCheckpoint()
         {
             if (GetawayMode || State == ShiftRunState.Ready || State == ShiftRunState.Won || State == ShiftRunState.Lost) return;
+            // A restart during the crash animation is not a separate try.
+            if (LevelMode && State != ShiftRunState.Retrying) WorldShiftLevelAnalytics.CheckpointRetried();
             RestoreCheckpoint();
         }
 
@@ -374,7 +392,10 @@ namespace Outlaws.WorldShift
             // Day restores it, then Night freezes the practice route again.
             if (InFreezeLesson && trainingLessonRead && State == ShiftRunState.Running && TrainingFreezeStep < 3
                 && next == (TrainingFreezeStep == 1 ? ShiftWorld.Day : ShiftWorld.Echo))
+            {
                 TrainingFreezeStep++;
+                if (TrainingFreezeStep >= 3) WorldShiftLevelAnalytics.FreezeDemonstrated();
+            }
             if (IsRelayAirborne) Notify(relay.Hint(Distance, World), 1.8f);
             return true;
         }
@@ -419,7 +440,7 @@ namespace Outlaws.WorldShift
                     }
                 // Keep the demonstration alive while the car waits safely. This is
                 // not driving time, and neither the car nor police advances.
-                if (TrainingFreezeWaiting) continue;
+                if (TrainingFreezeWaiting) { WorldShiftLevelAnalytics.FreezeDemoWaiting(); continue; }
                 float speed = Speed;
                 if (InFreezeLesson && !trainingFreezeDemonstrated)
                 {
@@ -485,8 +506,12 @@ namespace Outlaws.WorldShift
                 Distance = next;
                 Lateral = nextLateral;
                 if (LevelMode && course.Training && !trainingLessonRead && checkpointIndex < course.Signs.Length
-                    && Distance >= course.Signs[checkpointIndex].Distance - 5f)
+                    && Distance >= course.Signs[checkpointIndex].Distance - 5f && !TrainingLessonPaused)
+                {
                     TrainingLessonPaused = true;
+                    trainingSignShownAt = Time.realtimeSinceStartup;
+                    WorldShiftLevelAnalytics.SignShown(checkpointIndex);
+                }
                 if (Collection != null && !Collection.Step(previous, next, previousLateral, nextLateral))
                 { Fail("MISSED ITEM"); break; }
                 CompleteTutorialHint();
@@ -611,8 +636,8 @@ namespace Outlaws.WorldShift
         {
             if (LevelMode)
             {
-                WorldShiftLevelAnalytics.Died(reason == "NO ROAD" ? "fell" : reason == "MISSED RELAY LANDING" ? "missed_landing" : reason,
-                    crashHazard, IsRelayAirborne);
+                WorldShiftLevelAnalytics.Died(reason == "NO ROAD" ? "fell" : reason == "MISSED RELAY LANDING" ? "missed_landing"
+                    : reason == "MISSED ITEM" ? "missed_item" : reason, crashHazard, IsRelayAirborne, Lateral);
                 crashHazard = null;
                 Deaths++;
                 State = ShiftRunState.Retrying;
@@ -773,6 +798,7 @@ namespace Outlaws.WorldShift
             Lateral = checkpoint.Lateral;
             retryRemaining = 0f;
             State = ShiftRunState.Running;
+            if (LevelMode && TrainingLessonPaused) WorldShiftLevelAnalytics.SignRead("restart");
             TrainingLessonPaused = false;
             trainingLessonRead = false;
             hintRemaining = 10f;

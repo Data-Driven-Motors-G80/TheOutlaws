@@ -884,6 +884,68 @@ function wlVizCompute(data, opts, tz) {
     var result = number(r, 'ramp_first_1');
     if (result === 0 || result === 1) firstTraining.push(result);
   });
+  // 5. Training sign reading: does reading the road sign help players clear the lesson first time?
+  var READ_S = 2, causeNames = {crash:'Hit obstacle', switched_into:'Switched into obstacle', fell:'Fell (no road)',
+    missed_landing:'Missed jump landing', missed_item:'Missed diamond'};
+  var causeOrder = ['crash','switched_into','fell','missed_landing','missed_item'];
+  function fails(r, i) {
+    return String(r['fails_' + i] || '').split(';').filter(Boolean).map(function (f) {
+      var p = f.split(':'); return {m: Number(p[0]), lane: p[1], cause: p.slice(2).join(':')};
+    });
+  }
+  var readTime = [], readVsSkip = [], tries = [], failHow = [], readScatter = [], skipShare = [];
+  var signRows = training.filter(function (r) { return number(r, 'read_0') !== null; });
+  lessons.forEach(function (name, i) {
+    var reads = signRows.map(function (r) { return number(r, 'read_' + i); }).filter(function (v) { return v !== null && v >= 0; });
+    if (reads.length) {
+      readTime.push([name + ' (n=' + reads.length + ')', median(reads)]);
+      skipShare.push([name, vizPct(reads.filter(function (v) { return v < READ_S; }).length, reads.length)]);
+    }
+    var read = [], skipped = [];
+    signRows.forEach(function (r) {
+      var first = number(r, 'first_try_' + i), seconds = number(r, 'read_' + i);
+      if ((first !== 0 && first !== 1) || seconds === null || seconds < 0) return;
+      (seconds >= READ_S ? read : skipped).push(first);
+      readScatter.push([seconds, number(r, 'tries_' + i) || 1]);
+    });
+    if (read.length || skipped.length) readVsSkip.push([name + ' (' + read.length + ' read / ' + skipped.length + ' skipped)',
+      read.length ? vizPct(sum(read), read.length) : 0, skipped.length ? vizPct(sum(skipped), skipped.length) : 0]);
+    var done = signRows.filter(function (r) { return cleared(r, i) && number(r, 'tries_' + i) > 0; });
+    if (done.length) tries.push([name + ' (n=' + done.length + ')', vizMean(done, 'tries_' + i)]);
+    var c = {}, any = false;
+    signRows.forEach(function (r) { fails(r, i).forEach(function (f) { c[f.cause] = (c[f.cause] || 0) + 1; any = true; }); });
+    if (any) failHow.push([name].concat(causeOrder.map(function (k) { return c[k] || 0; })));
+  });
+  var finished = signRows.filter(function (r) { return r.outcome === 'complete'; });
+  var timeSplit = finished.length ? [['Reading signs', median(vizNums(finished, 'read_s'))],
+    ['Freeze demo (car stopped)', median(vizNums(finished, 'freeze_demo_s').filter(function (v) { return v >= 0; })) || 0],
+    ['Driving', median(vizNums(finished, 'drive_s'))], ['Total (wall clock)', median(vizNums(finished, 'real_s'))]] : [];
+  var allReads = [];
+  signRows.forEach(function (r) { lessons.forEach(function (_, i) { var v = number(r, 'read_' + i); if (v !== null && v >= 0) allReads.push(v); }); });
+
+  // 6. Where and how players crash in every level: cause per checkpoint interval, then the deadliest spots.
+  var spots = {}, crashHow = [];
+  names.forEach(function (name, level) {
+    var here = rows.filter(function (r) { return Number(r.level) === level; });
+    levelSectionIndices(here).forEach(function (i) {
+      var c = {}, any = false;
+      here.forEach(function (r) { fails(r, i).forEach(function (f) {
+        c[f.cause] = (c[f.cause] || 0) + 1; any = true;
+        var key = name + ' C' + (i + 1) + ' · ' + Math.floor(f.m / 10) * 10 + ' m · ' + f.lane + ' lane · ' + (causeNames[f.cause] || f.cause);
+        spots[key] = (spots[key] || 0) + 1;
+      }); });
+      if (any) crashHow.push([name + ' C' + (i + 1)].concat(causeOrder.map(function (k) { return c[k] || 0; })));
+    });
+  });
+  var hotspots = Object.keys(spots).sort(function (a, b) { return spots[b] - spots[a]; }).slice(0, 12)
+    .map(function (k) { return [k, spots[k]]; });
+  var causeHeader = function (first) { return [first].concat(causeOrder.map(function (k) { return causeNames[k]; })); };
+  function stackedByLevel(values, suffix) {
+    var charts = names.map(function (name) { return {title: name + suffix, type: 'stacked', header: causeHeader('Checkpoint interval'),
+      rows: values.filter(function (r) { return r[0].indexOf(name + ' ') === 0; })}; }).filter(function (spec) { return spec.rows.length; });
+    return charts.length ? charts : [{title: 'No crashes recorded in this selection', type: 'stacked', header: causeHeader('Checkpoint interval'), rows: []}];
+  }
+
   function byLevel(values, suffix, header) {
     var charts = names.map(function (name) { return chart(name + suffix, header, values.filter(function (r) { return r[0].indexOf(name + ' ') === 0; })); })
       .filter(function (spec) { return spec.rows.length; });
@@ -892,7 +954,10 @@ function wlVizCompute(data, opts, tz) {
   return {
     counts: {label: rows.length + ' level attempts; Unlock All excluded'},
     kpis: [['Level attempts', String(rows.length)], ['Training attempts', String(training.length)],
-      ['Training first ramp success', firstTraining.length ? vizPct(sum(firstTraining), firstTraining.length) + '% (n=' + firstTraining.length + ')' : 'No resolved first tries']],
+      ['Training first ramp success', firstTraining.length ? vizPct(sum(firstTraining), firstTraining.length) + '% (n=' + firstTraining.length + ')' : 'No resolved first tries'],
+      ['Training completed', signRows.length ? vizPct(finished.length, signRows.length) + '% (' + finished.length + '/' + signRows.length + ')' : 'No data'],
+      ['Median Training time', finished.length ? median(vizNums(finished, 'real_s')) + ' s' : 'No completions'],
+      ['Sign views under ' + READ_S + ' s', allReads.length ? vizPct(allReads.filter(function (v) { return v < READ_S; }).length, allReads.length) + '% (n=' + allReads.length + ')' : 'No data']],
     sections: [
       {title:'1. Training lesson time', subtitle:'completed lessons only; paused sign-reading excluded', charts:[
         chart('Median active driving time by lesson', ['Lesson','Seconds'], lessonTime),
@@ -900,7 +965,17 @@ function wlVizCompute(data, opts, tz) {
       {title:'2. Deaths per reached checkpoint section', subtitle:'C = checkpoint interval; Desert intervals differ from its six ramp sections', charts: byLevel(difficulty, ': deaths per reached checkpoint interval', ['Checkpoint interval','Deaths per reached attempt'])},
       {title:'3. Unsafe world-switch rate', subtitle:'switching inside dashes; all switches form the denominator', charts:[
         chart('Unsafe-switch deaths per 100 switches', ['Level','Deaths per 100 switches'], unsafe)]},
-      {title:'4. Ramp landing success', subtitle:'resolved takeoffs only; aborted flights and old uninstrumented builds excluded', charts: byLevel(ramps, ': successful landings by ramp', ['Ramp','Success (%)'])}
+      {title:'4. Ramp landing success', subtitle:'resolved takeoffs only; aborted flights and old uninstrumented builds excluded', charts: byLevel(ramps, ': successful landings by ramp', ['Ramp','Success (%)'])},
+      {title:'5. Do players read the Training signs?', subtitle:'"read" = sign card up ' + READ_S + ' s or longer on first view; first try = cleared with no crash or restart', charts:[
+        chart('Median seconds reading each sign (first view)', ['Lesson','Seconds'], readTime),
+        chart('Sign skipped: first view under ' + READ_S + ' s (%)', ['Lesson','Skipped (%)'], skipShare),
+        {title:'First-try success: read the sign vs skipped it', type:'column', header:['Lesson','Read sign (%)','Skipped sign (%)'], rows:readVsSkip, yTitle:'Cleared first try (%)'},
+        {title:'Reading time vs tries needed (each lesson attempt)', type:'scatter', header:['Seconds reading','Tries to clear'], rows:readScatter, trend:true},
+        chart('Mean tries to clear each lesson', ['Lesson','Tries'], tries),
+        {title:'How players fail each lesson', type:'stacked', header:causeHeader('Lesson'), rows:failHow, yTitle:'Failures'},
+        chart('Where Training time goes (median, completed runs)', ['Part','Seconds'], timeSplit)]},
+      {title:'6. Where and how players crash', subtitle:'every level; C = checkpoint interval; spots grouped by 10 m and lane', charts:
+        stackedByLevel(crashHow, ': failures by cause').concat([{title:'Deadliest spots (top 12)', type:'bar', header:['Spot','Failures'], rows:hotspots}])}
     ]
   };
 }

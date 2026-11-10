@@ -51,6 +51,20 @@ namespace Outlaws.WorldShift
         private static List<float> sectionSeconds = new List<float>();
         private static List<int> sectionDeathCounts = new List<int>(), sectionSwitchCounts = new List<int>();
         private static readonly Dictionary<string, int> deathCauses = new Dictionary<string, int>();
+        // Per-section tries and failure log ("metres:lane:cause"), so every level shows where and how players fail.
+        private const int MaxFailsLogged = 15;
+        private static int sectionRetries;
+        private static List<int> sectionRetryCounts = new List<int>();
+        private static List<string> sectionFails = new List<string>();
+        private static List<string> sectionFailLogs = new List<string>();
+        // Training sign reading: seconds each road-sign card stays up before the player continues (wall clock, pauses excluded).
+        private static float[] readFirst = new float[0], readTotal = new float[0];
+        private static int[] readCount = new int[0];
+        private static bool signOpen;
+        private static int signLesson = -1;
+        private static float signStart = float.NaN, signElapsed;
+        // Training freeze demonstration: seconds the car waits at the stop until Night/Day/Night has been shown.
+        private static float freezeStart = float.NaN, freezeDemoSeconds = -1f;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics() { open = false; Sink = null; PendingStart = "menu"; distance = duration = null; world = null; }
@@ -73,6 +87,11 @@ namespace Outlaws.WorldShift
             sectionSeconds = new List<float>(); sectionDeathCounts = new List<int>(); sectionSwitchCounts = new List<int>();
             deathCauses.Clear();
             activeRamp = 0; rampStarts.Clear(); rampWins.Clear(); rampLosses.Clear(); rampAborts.Clear(); rampFirst.Clear();
+            sectionRetries = 0; sectionRetryCounts = new List<int>(); sectionFails = new List<string>(); sectionFailLogs = new List<string>();
+            readFirst = new float[sections]; readTotal = new float[sections]; readCount = new int[sections];
+            for (int i = 0; i < sections; i++) readFirst[i] = -1f;
+            signOpen = false; signLesson = -1; signStart = float.NaN; signElapsed = 0f;
+            freezeStart = float.NaN; freezeDemoSeconds = -1f;
             open = true;
             WeeWooAnalytics.EnsureStarted();
             WeeWooAnalytics.ContextProvider = Context;
@@ -101,7 +120,7 @@ namespace Outlaws.WorldShift
         }
 
         /// <summary>cause: crash, switched_into, fell or missed_landing.</summary>
-        public static void Died(string cause, ShiftHazard hazard, bool airborne)
+        public static void Died(string cause, ShiftHazard hazard, bool airborne, float lateral = float.NaN)
         {
             if (!open) return;
             RampEnded(false, cause);
@@ -111,11 +130,73 @@ namespace Outlaws.WorldShift
             string kind = hazard == null ? cause : hazard.Kind.ToString();
             string key = cause + ":" + kind;
             deathCauses[key] = deathCauses.TryGetValue(key, out int count) ? count + 1 : 1;
+            string lane = Lane(lateral);
+            int metres = distance != null ? Mathf.RoundToInt(distance()) : 0;
+            if (sectionFails.Count < MaxFailsLogged) sectionFails.Add(metres + ":" + lane + ":" + cause);
             Event("wl_death", "cause", cause, "hazard_kind", kind,
                 "hazard_world", hazard == null ? "" : hazard.SharedAcrossWorlds ? "both" : Name(hazard.World),
                 "moving", hazard != null && (hazard.LateralMotion || hazard.MotionSpeed != 0f),
                 "s_since_switch", float.IsInfinity(since) ? -1f : Round(since), "after_switch", since <= SwitchBlameSeconds,
-                "airborne", airborne, "deaths_this_section", sectionDeaths);
+                "airborne", airborne, "deaths_this_section", sectionDeaths,
+                "lane", lane, "x", float.IsNaN(lateral) ? 0f : Round(lateral));
+        }
+
+        /// <summary>Lane at the moment of failure: L, M or R (? when unknown).</summary>
+        public static string Lane(float lateral)
+        {
+            if (float.IsNaN(lateral)) return "?";
+            int lane = Mathf.Clamp(Mathf.RoundToInt(lateral / (WorldShiftLevel.RoadWidth / 3f)) + 1, 0, 2);
+            return lane == 0 ? "L" : lane == 1 ? "M" : "R";
+        }
+
+        /// <summary>The player pressed R (or Retry in pause) to restart the current checkpoint.</summary>
+        public static void CheckpointRetried()
+        {
+            if (!open) return;
+            sectionRetries++;
+            Event("wl_checkpoint_retry", "retries_this_section", sectionRetries);
+        }
+
+        /// <summary>A Training road-sign card appeared and stopped the car.</summary>
+        public static void SignShown(int lesson)
+        {
+            if (!open || signOpen) return;
+            signOpen = true;
+            signLesson = lesson;
+            signElapsed = 0f;
+            signStart = Time.realtimeSinceStartup;
+            Event("wl_sign_shown", "lesson", lesson, "view", lesson >= 0 && lesson < readCount.Length ? readCount[lesson] + 1 : 1);
+        }
+
+        /// <summary>The sign card closed: "continue" (Space) or "restart" (checkpoint restart while it was up).</summary>
+        public static void SignRead(string how = "continue")
+        {
+            if (!open || !signOpen) return;
+            float seconds = SignSeconds();
+            signOpen = false;
+            int i = signLesson;
+            signLesson = -1;
+            if (i < 0 || i >= readCount.Length) return;
+            readCount[i]++;
+            readTotal[i] += seconds;
+            if (readFirst[i] < 0f) readFirst[i] = seconds;
+            Event("wl_sign_read", "lesson", i, "view", readCount[i], "read_s", Round(seconds), "how", how);
+        }
+
+        private static float SignSeconds() => signElapsed + (float.IsNaN(signStart) ? 0f : Time.realtimeSinceStartup - signStart);
+
+        /// <summary>The car is waiting at the freeze demonstration stop. Safe to call every step.</summary>
+        public static void FreezeDemoWaiting()
+        {
+            if (open && float.IsNaN(freezeStart) && freezeDemoSeconds < 0f) freezeStart = Time.realtimeSinceStartup;
+        }
+
+        /// <summary>Night, Day and Night have all been shown, so the freeze lesson lets the car drive on.</summary>
+        public static void FreezeDemonstrated()
+        {
+            if (!open || freezeDemoSeconds >= 0f) return;
+            freezeDemoSeconds = float.IsNaN(freezeStart) ? 0f : Time.realtimeSinceStartup - freezeStart;
+            Event("wl_freeze_demo", "demo_s", Round(freezeDemoSeconds));
         }
 
         public static void Respawned(ShiftWorld into)
@@ -127,7 +208,19 @@ namespace Outlaws.WorldShift
             lastSwitch = float.NegativeInfinity;
         }
 
-        public static void Paused() { if (open) { pauses++; Event("wl_pause"); } }
+        public static void Paused()
+        {
+            if (!open) return;
+            pauses++;
+            // Reading time stops while the pause menu covers the sign.
+            if (signOpen && !float.IsNaN(signStart)) { signElapsed += Time.realtimeSinceStartup - signStart; signStart = float.NaN; }
+            Event("wl_pause");
+        }
+
+        public static void Resumed()
+        {
+            if (open && signOpen && float.IsNaN(signStart)) signStart = Time.realtimeSinceStartup;
+        }
 
         public static void Completed()
         {
@@ -155,7 +248,10 @@ namespace Outlaws.WorldShift
             sectionSeconds.Add(Now - sectionStart);
             sectionDeathCounts.Add(sectionDeaths);
             sectionSwitchCounts.Add(sectionSwitches);
-            sectionStart = Now; sectionDeaths = sectionSwitches = 0;
+            sectionRetryCounts.Add(sectionRetries);
+            sectionFailLogs.Add(string.Join(";", sectionFails));
+            sectionStart = Now; sectionDeaths = sectionSwitches = sectionRetries = 0;
+            sectionFails = new List<string>();
         }
 
         private static Dictionary<string, object> AttemptRow(string outcome)
@@ -183,6 +279,32 @@ namespace Outlaws.WorldShift
                 row["s_" + i] = done ? Round(sectionSeconds[i]) : current ? Round(now - sectionStart) : -1f;
                 row["deaths_" + i] = done ? sectionDeathCounts[i] : current ? sectionDeaths : 0;
                 row["switches_" + i] = done ? sectionSwitchCounts[i] : current ? sectionSwitches : 0;
+                int sectionDeathTotal = done ? sectionDeathCounts[i] : current ? sectionDeaths : 0;
+                int retries = done ? sectionRetryCounts[i] : current ? sectionRetries : 0;
+                row["retries_" + i] = retries;
+                // Tries: the first go plus every death or manual restart in this section.
+                row["tries_" + i] = done || current ? 1 + sectionDeathTotal + retries : 0;
+                // 1 = cleared without a death or restart, 0 = needed another try, -1 = not reached or still on the first try.
+                row["first_try_" + i] = done ? (sectionDeathTotal + retries == 0 ? 1 : 0)
+                    : current ? (sectionDeathTotal + retries > 0 ? 0 : -1) : -1;
+                row["fails_" + i] = done ? sectionFailLogs[i] : current ? string.Join(";", sectionFails) : "";
+            }
+            if (level == 0)
+            {
+                float readSum = 0f;
+                for (int i = 0; i < sections; i++)
+                {
+                    float total = readTotal[i];
+                    // A sign still on screen when the attempt ends counts toward reading time.
+                    if (signOpen && signLesson == i) total += SignSeconds();
+                    row["read_" + i] = Round(readFirst[i]);
+                    row["read_total_" + i] = Round(total);
+                    row["reads_" + i] = readCount[i];
+                    readSum += total;
+                }
+                row["read_s"] = Round(readSum);
+                row["quit_on_sign"] = signOpen ? signLesson : -1;
+                row["freeze_demo_s"] = Round(freezeDemoSeconds);
             }
             foreach (var pair in rampStarts)
             {

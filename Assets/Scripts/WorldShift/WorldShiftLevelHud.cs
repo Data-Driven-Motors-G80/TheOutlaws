@@ -121,7 +121,7 @@ namespace Outlaws.WorldShift
                 var card = WorldShiftMenu.Panel(lessonRoot, "Training lesson", new Vector2(.32f, .12f),
                     new Vector2(.68f, .21f), new Color(.025f, .045f, .07f, .94f));
                 trainingLesson = card.gameObject;
-                var continueText = WorldShiftMenu.Label(card, "ENTER  TO CONTINUE", .04f, .08f, .96f, .92f, 25f);
+                var continueText = WorldShiftMenu.Label(card, "SPACE  TO CONTINUE", .04f, .08f, .96f, .92f, 25f);
                 continueText.color = WorldShiftLevelProps.CheckpointColour;
                 continueText.fontStyle = FontStyles.Bold;
                 continueText.alignment = TextAlignmentOptions.Center;
