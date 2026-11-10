@@ -285,7 +285,9 @@ namespace Outlaws.WorldShift
                 // Tries: the first go plus every death or manual restart in this section.
                 row["tries_" + i] = done || current ? 1 + sectionDeathTotal + retries : 0;
                 // 1 = cleared without a death or restart, 0 = needed another try, -1 = not reached or still on the first try.
-                row["first_try_" + i] = done ? (sectionDeathTotal + retries == 0 ? 1 : 0)
+                // Finishing the level clears the final section, which has no checkpoint of its own to close it.
+                bool cleared = done || (current && outcome == "complete");
+                row["first_try_" + i] = cleared ? (sectionDeathTotal + retries == 0 ? 1 : 0)
                     : current ? (sectionDeathTotal + retries > 0 ? 0 : -1) : -1;
                 row["fails_" + i] = done ? sectionFailLogs[i] : current ? string.Join(";", sectionFails) : "";
             }

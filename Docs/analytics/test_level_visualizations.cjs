@@ -42,4 +42,6 @@ assert.equal(JSON.stringify(sec6.charts[0].rows[0]),JSON.stringify(['Training C1
 assert.ok(sec6.charts.some(c=>c.title.startsWith('City')));
 const hot = sec6.charts[sec6.charts.length-1].rows[0];
 assert.equal(JSON.stringify(hot),JSON.stringify(['Training C1 · 80 m · M lane · Hit obstacle',2]));
+const legacy = ctx.wlVizCompute({ws_level_attempts:[row('perfect',{outcome:'complete',section_at_end:5,read_0:3,read_5:5,tries_5:1,first_try_5:-1,s_5:10})]},{builds:ctx.VIS_BUILDS[1]},'UTC');
+assert.equal(JSON.stringify(legacy.sections[4].charts[2].rows[0].slice(1)),JSON.stringify([100,0])); // last lesson of a finished run counts as cleared
 console.log('PASS: sign reading time, skip share, read-vs-skip first tries, tries, failure causes, time split, crash hotspots.');

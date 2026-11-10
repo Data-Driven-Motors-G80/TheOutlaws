@@ -893,6 +893,11 @@ function wlVizCompute(data, opts, tz) {
       var p = f.split(':'); return {m: Number(p[0]), lane: p[1], cause: p.slice(2).join(':')};
     });
   }
+  // Builds before the fix left a completed level's last section at -1 although it was cleared.
+  function firstTry(r, i) {
+    var v = number(r, 'first_try_' + i);
+    return v === -1 && r.outcome === 'complete' && i === Number(r.sections) - 1 ? (number(r, 'tries_' + i) > 1 ? 0 : 1) : v;
+  }
   var readTime = [], readVsSkip = [], tries = [], failHow = [], readScatter = [], skipShare = [];
   var signRows = training.filter(function (r) { return number(r, 'read_0') !== null; });
   lessons.forEach(function (name, i) {
@@ -903,7 +908,7 @@ function wlVizCompute(data, opts, tz) {
     }
     var read = [], skipped = [];
     signRows.forEach(function (r) {
-      var first = number(r, 'first_try_' + i), seconds = number(r, 'read_' + i);
+      var first = firstTry(r, i), seconds = number(r, 'read_' + i);
       if ((first !== 0 && first !== 1) || seconds === null || seconds < 0) return;
       (seconds >= READ_S ? read : skipped).push(first);
       readScatter.push([seconds, number(r, 'tries_' + i) || 1]);

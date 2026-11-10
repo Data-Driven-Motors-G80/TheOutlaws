@@ -528,6 +528,8 @@ public sealed class WorldShiftLevelTests
         var row = analytics.Single(a => a.sheet == "ws_level_attempts").data;
         Assert.That(row["outcome"], Is.EqualTo("complete"));
         Assert.That(row["level"], Is.EqualTo(0));
+        // The test skips ahead by reflection, so check the section the player actually finished in.
+        Assert.That(row["first_try_" + row["section_at_end"]], Is.Not.EqualTo(-1), "Finishing the level resolves the final section's first try.");
     }
 
     [UnityTest]
