@@ -48,6 +48,7 @@ namespace Outlaws.WorldShift
         private readonly List<Material> ownedMaterials = new List<Material>();
         private readonly List<PedestrianView> pedestrians = new List<PedestrianView>();
         private readonly Dictionary<(Color, float), Material> glowMaterials = new Dictionary<(Color, float), Material>();
+        private readonly List<Transform> requiredItems = new List<Transform>();
         private ShiftWorld world;
         private Color normalFogColour;
         private float normalFogStart, normalFogEnd;
@@ -72,6 +73,9 @@ namespace Outlaws.WorldShift
             BuildCheckpoints();
             BuildCoastalBridge();
             BuildSigns();
+            if (game.Collection != null)
+                foreach (var item in game.Collection.Items)
+                    requiredItems.Add(WorldShiftLevelProps.RequiredItem(transform, route, item));
             UpdateVisibility(0f);
         }
 
@@ -98,7 +102,7 @@ namespace Outlaws.WorldShift
         private void BuildSigns()
         {
             if (!game.LevelMode) return;
-            foreach (var sign in game.Course.Signs)
+            foreach (var sign in game.Course.Training ? game.Course.Signs : System.Array.Empty<LevelSign>())
             {
                 var root = WorldShiftLevelProps.HighwaySign(transform, route, sign);
                 chunks.Add(new Chunk { Root = root.gameObject, At = sign.Distance, Tail = 10f });
@@ -314,6 +318,9 @@ namespace Outlaws.WorldShift
 
         public void UpdateVisibility(float distance)
         {
+            for (int i = 0; i < requiredItems.Count; i++)
+                requiredItems[i].gameObject.SetActive(!game.Collection.IsTaken(i)
+                    && game.Collection.Items[i].x >= distance - 10f && game.Collection.Items[i].x <= distance + 240f);
             if (game.LevelMode && game.Environment == ShiftLevel.Desert)
                 WorldShiftLevelSandstorm.Apply(game.Course, view, game.Player.position, distance, game.Speed,
                     world, normalFogColour, normalFogStart, normalFogEnd);

@@ -49,12 +49,8 @@ namespace Outlaws.WorldShift
 
         public static void StartGetaway(bool tutorialFirst)
         {
-            WorldShiftAnalytics.Abandon("restart");
-            Escape.Begin();
-            WorldShiftAnalytics.BeginRun(tutorialFirst);
-            afterTutorial = ShiftLevel.City;
-            getawayAfterTutorial = tutorialFirst;
-            Load(tutorialFirst ? ShiftLevel.Tutorial : ShiftLevel.City);
+            // Compatibility entry point: the old escape scenes have been retired.
+            Select(tutorialFirst ? ShiftLevel.Tutorial : ShiftLevel.City, false);
         }
 
         public static void FinishGetawayLeg(bool continueRun)
@@ -78,9 +74,8 @@ namespace Outlaws.WorldShift
             }
         }
 
-        public static string SceneFor(ShiftLevel level) => level == ShiftLevel.City ? "City_WorldShift"
-            : level == ShiftLevel.Desert ? "Desert_WorldShift" : level == ShiftLevel.Ocean ? "Ocean_WorldShift"
-            : level == ShiftLevel.Snow ? "Snow_WorldShift" : level == ShiftLevel.Mountain ? "Mountain_WorldShift" : "WorldShift_Tutorial";
+        // All current courses use the same scene; legacy callers must not load deleted variants.
+        public static string SceneFor(ShiftLevel level) => WorldShiftLevels.LevelScene;
         public static bool ConsumeAutoStart(ShiftLevel level)
         {
             if (autoStart != level) return false;
@@ -97,24 +92,17 @@ namespace Outlaws.WorldShift
         }
         private static void Load(ShiftLevel level)
         {
-            WorldShiftLevels.Leave();
-            Time.timeScale = 1f;
-            autoStart = level;
-            SceneManager.LoadScene(SceneFor(level));
+            Escape.Leave();
+            getawayAfterTutorial = false;
+            autoStart = null;
+            int index = System.Array.IndexOf(WorldShiftLevels.Environments, level);
+            WorldShiftLevels.Play(index);
         }
         public static void Next(ShiftLevel completed)
         {
-            if (completed == ShiftLevel.Tutorial)
-            {
-                WorldShiftAnalytics.EndTutorial("skipped");
-                TutorialFirst = false;
-                if (!getawayAfterTutorial) Escape.Leave();
-                getawayAfterTutorial = false;
-                Load(afterTutorial);
-            }
-            else if (completed == ShiftLevel.City) Load(ShiftLevel.Desert);
-            else Menu();
+            if (WorldShiftLevels.Active) WorldShiftLevels.Next(); else Menu();
         }
+
         public static string TutorialDestination => afterTutorial == ShiftLevel.Desert ? "DESERT" : "CITY";
         public static void Menu() { WorldShiftLevels.Leave(); WorldShiftAnalytics.Abandon("menu"); Escape.Leave(); getawayAfterTutorial = false; autoStart = null; Time.timeScale = 1f; SceneManager.LoadScene(MenuScene); }
     }

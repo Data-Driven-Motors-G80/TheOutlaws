@@ -31,7 +31,7 @@ public sealed class WorldShiftLevelTests
         // The simulation is stepped manually; bring the HUD up to date before the picture.
         var hud = UnityEngine.Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None).FirstOrDefault(c => c.GetType().Name == "WorldShiftLevelHud");
         if (hud != null) Call(hud, "Refresh");
-        typeof(WorldShiftCampaignTests).GetMethod("Capture", Flags).Invoke(null, new object[] { "level-" + name });
+        WorldShiftTestCapture.Capture("level-" + name);
     }
     private static void Pose(MonoBehaviour game, float distance, float x)
     {
@@ -86,6 +86,35 @@ public sealed class WorldShiftLevelTests
         return game;
     }
 
+    [UnityTest]
+    public IEnumerator MenuLoadsTrainingAndAllFiveLevelsFromTheSharedScene()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
+        yield return new EnterPlayMode();
+        PlayerPrefs.SetInt(UnlockAllKey, 1);
+        Static(Levels, "Menu"); yield return null; yield return null;
+        string[] environments = { "City", "City", "Desert", "Ocean", "Snow", "Mountain" };
+        for (int level = 0; level < environments.Length; level++)
+        {
+            var menu = Find("WorldShiftMenu");
+            menu.GetComponentsInChildren<Button>().Single(b => b.name == "Level " + level).onClick.Invoke();
+            yield return null; yield return null;
+            var game = Started();
+            Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo("City_WorldShift"));
+            Assert.That(Get(game, "LevelIndex"), Is.EqualTo(level));
+            Assert.That(Get(game, "Environment").ToString(), Is.EqualTo(environments[level]));
+            Assert.That((bool)Field(Get(game, "Course"), "Training"), Is.EqualTo(level == 0));
+            Assert.That(((Array)Get(game, "Checkpoints")).Length, Is.GreaterThan(0));
+            Assert.That(((Array)Get(game, "Hazards")).Length, Is.GreaterThan(0));
+            if (level == 3) Assert.That(((Vector2[])Field(Get(game, "Course"), "RequiredItems")).Length, Is.EqualTo(11));
+            Step(game, .1f);
+            Assert.That(Get(game, "State").ToString(), Is.EqualTo("Running"));
+            Assert.That((float)Get(game, "Distance"), Is.GreaterThan(0f));
+            Static(Levels, "Menu"); yield return null; yield return null;
+            Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo("WorldShift_Menu"));
+        }
+    }
+
     [Test]
     public void EveryCourseEndsSectionsOnRampsAndLeavesTimeToSwitch()
     {
@@ -97,6 +126,8 @@ public sealed class WorldShiftLevelTests
             var hazards = ((Array)Field(course, "Hazards")).Cast<object>().ToArray();
             var checkpoints = ((Array)Field(course, "Checkpoints")).Cast<object>().ToArray();
             float length = (float)Field(course, "Length");
+            Assert.That(((Array)Field(course, "Signs")).Length, Is.EqualTo(level == 0 ? 6 : 0),
+                "Only Training has instructional highway signs.");
             Assert.That(ramps.Length, Is.EqualTo(level == 0 ? 1 : level == 2 ? 6 : 5), "level " + level);
             Assert.That(checkpoints.Length, Is.EqualTo(level == 2 ? 7 : level == 0 ? 6 : 5), "Respawn positions, including the initial spawn, level " + level);
             if (level == 0)
@@ -131,6 +162,90 @@ public sealed class WorldShiftLevelTests
             }
             foreach (var h in hazards) Assert.That((float)Field(h, "End"), Is.LessThan(length));
         }
+    }
+
+    [Test]
+    public void OceanItemsAreRequiredSweptAndResetOnlyInTheRetriedSection()
+    {
+        var course = Static(TypeFor("WorldShiftLevelCourse"), "For", 3);
+        var items = (Vector2[])Field(course, "RequiredItems");
+        var ramps = ((Array)Field(course, "Ramps")).Cast<object>().ToArray();
+        var checkpoints = ((Array)Field(course, "Checkpoints")).Cast<object>().ToArray();
+        Assert.That(items.Length, Is.EqualTo(11));
+        for (int section = 0; section < 5; section++)
+        {
+            float start = (float)Field(checkpoints[section], "Distance");
+            float ramp = (float)Field(ramps[section], "Ramp");
+            var targets = items.Where(i => i.x >= start && i.x < ramp).ToArray();
+            Assert.That(targets.Length, Is.EqualTo(new[] { 1, 2, 2, 3, 3 }[section]));
+            Assert.That(targets.All(i => i.x >= start + 60f && i.x <= ramp - 60f), Is.True);
+        }
+        for (int level = 0; level < 6; level++)
+            if (level != 3) Assert.That(((Vector2[])Field(Static(TypeFor("WorldShiftLevelCourse"), "For", level), "RequiredItems")), Is.Empty);
+
+        var collection = Activator.CreateInstance(TypeFor("WorldShiftLevelCollection"), new object[] { items });
+        Assert.That(Call(collection, "Step", 90f, 110f, -2f, 2f), Is.True, "Swept contact at the target counts.");
+        Assert.That(Get(collection, "Count"), Is.EqualTo(1));
+        Call(collection, "Step", 90f, 110f, 0f, 0f);
+        Assert.That(Get(collection, "Count"), Is.EqualTo(1), "An item counts once.");
+        float checkpoint = (float)Field(checkpoints[1], "Distance");
+        Call(collection, "Restore", checkpoint);
+        var second = items[1];
+        Call(collection, "Step", second.x - 2f, second.x + 2f, second.y, second.y);
+        Assert.That(Get(collection, "Count"), Is.EqualTo(2));
+        Call(collection, "Restore", checkpoint);
+        Assert.That(Get(collection, "Count"), Is.EqualTo(1));
+        Assert.That(Call(collection, "IsTaken", 1), Is.False);
+        Assert.That(Call(collection, "Step", second.x - 2f, second.x + 6f, -second.y, -second.y), Is.False,
+            "Passing an uncollected item fails the section.");
+        Call(collection, "Restore", 0f);
+        Assert.That(Get(collection, "Count"), Is.EqualTo(0), "A full restart clears all collection.");
+    }
+
+    [UnityTest]
+    public IEnumerator OceanCollectionWorksInBothWorldsAndMissRetriesTheCheckpoint()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
+        StartLevel(3); yield return null; yield return null;
+        var game = Started();
+        var collection = Get(game, "Collection");
+        Pose(game, 70f, 0f);
+        Capture("ocean-required-diamond-day");
+        Step(game, 1.3f);
+        Assert.That(Get(collection, "Count"), Is.EqualTo(1));
+        Call(game, "RetryCheckpoint");
+        Assert.That(Get(collection, "Count"), Is.EqualTo(0));
+        Call(game, "TrySwitch");
+        Pose(game, 70f, 0f);
+        Capture("ocean-required-diamond-night");
+        Step(game, 1.3f);
+        Assert.That(Get(collection, "Count"), Is.EqualTo(1), "Night collects the same diamond.");
+        float checkpoint = (float)Field(((Array)Get(game, "Checkpoints")).GetValue(1), "Distance");
+        Pose(game, checkpoint - 1f, 0f);
+        Step(game, .1f);
+        Assert.That(Get(game, "CheckpointIndex"), Is.EqualTo(1));
+        Assert.That((float)Get(game, "CheckpointNoticeRemaining"), Is.GreaterThan(0f));
+        Capture("ocean-checkpoint-counter-1080");
+        var hud = Find("WorldShiftLevelHud");
+        var counter = (RectTransform)hud.GetComponentsInChildren<Transform>(true).Single(t => t.name == "Required diamonds");
+        var notice = (RectTransform)hud.GetComponentsInChildren<Transform>(true).Single(t => t.name == "Checkpoint notice");
+        var counterCorners = new Vector3[4]; var noticeCorners = new Vector3[4];
+        counter.GetWorldCorners(counterCorners); notice.GetWorldCorners(noticeCorners);
+        Assert.That(noticeCorners.Max(c => c.y), Is.LessThan(counterCorners.Min(c => c.y)),
+            "The checkpoint notice stays below the diamond counter.");
+        Call(game, "RetryCheckpoint");
+        var items = (Vector2[])Field(collection, "Items");
+        Pose(game, items[1].x - 3f, 3.3f);
+        Step(game, .45f);
+        Assert.That(Get(game, "MissedRequiredItem"), Is.True);
+        Assert.That(Get(game, "CheckpointIndex"), Is.EqualTo(1));
+        Capture("ocean-missed-diamond");
+        for (int i = 0; i < 40 && Get(game, "State").ToString() == "Retrying"; i++)
+            Call(game, "StepSimulation", .05f, 0f, false);
+        Assert.That(Get(game, "State").ToString(), Is.EqualTo("Running"));
+        Assert.That((float)Get(game, "Distance"), Is.EqualTo((float)Field(((Array)Get(game, "Checkpoints")).GetValue(1), "Distance")).Within(.01f));
+        Assert.That(Get(collection, "Count"), Is.EqualTo(1));
+        Assert.That(Call(collection, "IsTaken", 1), Is.False);
     }
 
     [Test]
@@ -204,7 +319,7 @@ public sealed class WorldShiftLevelTests
         Assert.That((float)Get(game, "Distance"), Is.EqualTo(0f).Within(.01f));
         var death = analytics.Single(a => a.name == "wl_death");
         Assert.That(death.data["cause"], Is.EqualTo("crash"));
-        Assert.That(death.data["hazard_world"], Is.EqualTo("day"));
+        Assert.That(death.data["hazard_world"], Is.EqualTo("both"), "The opening permanent block exists in both worlds.");
     }
 
     [UnityTest]
@@ -233,6 +348,7 @@ public sealed class WorldShiftLevelTests
         StartLevel(2); yield return null; yield return null;
         var game = Started();
         Assert.That(Get(game, "Environment").ToString(), Is.EqualTo("Desert"));
+        Assert.That(game.GetComponentsInChildren<Transform>(true).Any(t => t.name.StartsWith("Highway sign")), Is.False);
         var slider = ((Array)Get(game, "Hazards")).Cast<object>().First(h => (bool)Field(h, "LateralMotion"));
         Step(game, .6f);
         float moved = (float)Get(slider, "MotionTravel");

@@ -47,7 +47,7 @@ public sealed class DesertLevelCourseTests
     {
         var hud = UnityEngine.Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None).FirstOrDefault(c => c.GetType().Name == "WorldShiftLevelHud");
         if (hud != null) Call(hud, "Refresh");
-        typeof(WorldShiftCampaignTests).GetMethod("Capture", Flags).Invoke(null, new object[] { "desert-level-" + n });
+        WorldShiftTestCapture.Capture("desert-level-" + n);
     }
 
     [SetUp] public void Save() { savedProgress = PlayerPrefs.GetInt(Progress, -1); savedUnlock = PlayerPrefs.GetInt(Unlock); }
@@ -144,8 +144,7 @@ public sealed class DesertLevelCourseTests
                 foreach (var h in balls) Call(h, "ResetMotion");
             }
         }
-        Assert.That(Items(F(course, "Signs")).Count(s => F(s, "Kind").ToString() == "AirFreeze"), Is.EqualTo(1));
-        Assert.That(Items(F(course, "Signs")).Count(s => F(s, "Kind").ToString() == "AirRelease"), Is.EqualTo(1));
+        Assert.That(Items(F(course, "Signs")), Is.Empty, "Instruction signs are reserved for Training.");
         var gates = hazards.Where(h => F(h, "Gate") != null).ToArray();
         Assert.That(gates.Length, Is.EqualTo(8));
         Assert.That(gates.Count(h => (bool)P(F(h, "Gate"), "Airborne")), Is.EqualTo(2));

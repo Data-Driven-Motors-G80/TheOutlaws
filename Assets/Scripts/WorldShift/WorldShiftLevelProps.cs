@@ -15,6 +15,7 @@ namespace Outlaws.WorldShift
         public static readonly Color SideMoverColour = new Color(.06f, .88f, .81f);
         public static readonly Color PermanentColour = new Color(.96f, .94f, .86f);
         public static readonly Color CheckpointColour = new Color(.2f, .95f, .55f);
+        public static readonly Color CollectionColour = new Color(.15f, 1f, .9f);
         private static readonly Color SignGreen = new Color(.02f, .38f, .2f);
         private static readonly Color SignWhite = new Color(.95f, .97f, .95f);
         private static readonly Dictionary<(Color, float), Material> glowing = new Dictionary<(Color, float), Material>();
@@ -184,6 +185,18 @@ namespace Outlaws.WorldShift
                     break;
             }
             foreach (var renderer in root.GetComponentsInChildren<Renderer>()) renderer.shadowCastingMode = ShadowCastingMode.Off;
+            return root;
+        }
+
+        public static Transform RequiredItem(Transform parent, WorldShiftRoute route, Vector2 item)
+        {
+            var point = route.Sample(item.x);
+            var root = new GameObject("Required diamond").transform;
+            root.SetParent(parent, false);
+            root.SetPositionAndRotation(point.Position + point.Right * item.y, Quaternion.LookRotation(point.Forward, point.Up));
+            var diamond = Box(root, new Vector3(0f, 1.25f, 0f), new Vector3(1.2f, 1.2f, .65f), Glow(CollectionColour, .8f));
+            diamond.localRotation = Quaternion.Euler(0f, 0f, 45f);
+            WorldLabel(root, "COLLECT", new Vector3(0f, 2.8f, -.4f), new Vector2(4f, .7f), 2.8f);
             return root;
         }
 

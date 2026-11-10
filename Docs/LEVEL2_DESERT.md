@@ -44,8 +44,7 @@ about 1.2–2.7 m apart laterally instead of following a shallow curve. The two
 waves move in opposite directions. Night freezes the exact positions;
 each frozen wave leaves an outside bypass. The last rock centre
 is at least 20 m before landing; landings remain clear.
-The first two approaches reuse green highway boards with Space and simple symbols:
-**NIGHT FREEZES** before the first flight; **DAY MOVES** before the second.
+Instructional green highway signs appear only in Training.
 
 Six ground sliding blocks at 780, 1,315, 1,715, 2,385, 2,530 and 3,130 m use the
 same orange, shared-world rule. They start closed, activate within 40 m in Day
