@@ -298,15 +298,14 @@ public sealed class DesertLevelCourseTests
         RestoreAt(game, 2160f);
         var dunes = UnityEngine.Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None)
             .Where(t => t.name.StartsWith("Prototype desert dune ")).ToArray();
-        Assert.That(dunes.Length, Is.GreaterThan(20), "The finite desert reuses the old low prototype dunes.");
-        Assert.That(dunes.All(t => !t.GetComponents<Collider>().Any(c => c.enabled)), Is.True);
+        Assert.That(dunes.Length, Is.EqualTo(0), "No decorative scenery: the desert has no dunes.");
         var labels = UnityEngine.Object.FindObjectsByType<TMP_Text>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         int movingBlocks = Items(P(game, "Hazards")).Count(h => (bool)F(h, "LateralMotion") && F(h, "Rock") == null);
         Assert.That(labels.Count(t => t.text == "DAY TO MOVE"), Is.EqualTo(movingBlocks), "Every moving block uses the same cue.");
         var stormPaint = labels.Single(t => t.text == "STORM");
         Assert.That(Vector3.Dot(-stormPaint.transform.forward, Vector3.up), Is.GreaterThan(.99f), "STORM is painted facing upward on the road.");
-        Pose(game, 110f, 0f); Call(game, "ApplyWorld", World("Day")); Capture("low-dunes-day");
-        Pose(game, 2186f, 0f); Call(game, "ApplyWorld", World("Day")); Capture("dunes-storm-entry");
+        Pose(game, 110f, 0f); Call(game, "ApplyWorld", World("Day")); Capture("desert-plain-day");
+        Pose(game, 2186f, 0f); Call(game, "ApplyWorld", World("Day")); Capture("desert-storm-entry");
         Pose(game, 2265f, 3.3f); Call(game, "ApplyWorld", World("Echo")); Capture("storm-night-half");
         Pose(game, 2390f, -3.3f); Call(game, "UpdateCamera", true); Call(game, "ApplyWorld", World("Day"));
         Assert.That(RenderSettings.fogEndDistance, Is.InRange(70f, 90f)); Capture("sandstorm-day");

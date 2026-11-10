@@ -42,9 +42,15 @@ mergeInto(LibraryManager.library, {
       var bodies = state.queue.slice();
       if (state.exit) bodies.push(state.exit);
       for (var i = 0; i < bodies.length; i++) {
+        // Not sendBeacon: it always sends the browser's Google cookies, and Apps Script answers 503
+        // to signed-in (especially multi-account) players, so every tab-close row was lost.
+        // A keepalive fetch without credentials survives the page closing and is accepted.
         try {
-          navigator.sendBeacon(state.url, new Blob([bodies[i]], { type: "text/plain;charset=utf-8" }));
-        } catch (e) {}
+          fetch(state.url, { method: "POST", keepalive: true, credentials: "omit", mode: "no-cors",
+            headers: { "Content-Type": "text/plain;charset=utf-8" }, body: bodies[i] });
+        } catch (e) {
+          try { navigator.sendBeacon(state.url, new Blob([bodies[i]], { type: "text/plain;charset=utf-8" })); } catch (e2) {}
+        }
       }
       state.queue = [];
       state.exit = "";

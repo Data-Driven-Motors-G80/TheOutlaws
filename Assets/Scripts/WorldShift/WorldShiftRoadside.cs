@@ -40,13 +40,7 @@ namespace Outlaws.WorldShift
                 RuntimeMaterials.Coloured(new Color(.48f, .47f, .43f)),
                 RuntimeMaterials.Coloured(new Color(.065f, .075f, .085f))
             };
-            if (environment == ShiftLevel.Desert || environment == ShiftLevel.Ocean || environment == ShiftLevel.Snow || environment == ShiftLevel.Mountain)
-            {
-                var groundDay = RuntimeMaterials.Coloured(WorldShiftEscapeProfile.Ground(environment, false));
-                var groundNight = RuntimeMaterials.Coloured(WorldShiftEscapeProfile.Ground(environment, true));
-                day = new[] { groundDay, groundDay };
-                echo = new[] { groundNight, groundNight };
-            }
+            // No per-environment ground theming: every level uses the same neutral ground (no decorative art).
             dayEdge = RuntimeMaterials.Coloured(new Color(.83f, .82f, .73f));
             echoEdge = new Material(RuntimeMaterials.Coloured(new Color(.94f, .88f, .64f)));
             echoEdge.name = "Night cream road-edge paint";
@@ -54,7 +48,6 @@ namespace Outlaws.WorldShift
             echoEdge.SetColor("_EmissionColor", new Color(.94f, .88f, .64f) * .045f);
             echoEdge.SetFloat("_Smoothness", .55f);
             route.VisitRoadPieces(BuildPiece);
-            if (environment == ShiftLevel.Desert && route.Course != null) BuildDesertDunes();
             SetWorld(ShiftWorld.Day);
             UpdateVisibility(0f);
         }

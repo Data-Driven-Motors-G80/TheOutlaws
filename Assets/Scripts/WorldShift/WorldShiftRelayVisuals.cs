@@ -114,10 +114,6 @@ namespace Outlaws.WorldShift
             Line(parent, "Landing threshold", material, .17f,
                 lip.Position - lip.Right * 4.65f + lip.Up * .12f,
                 lip.Position + lip.Right * 4.65f + lip.Up * .12f);
-            foreach (float side in new[] { -1f, 1f })
-                Line(parent, "Landing beacon - decorative", material, .18f,
-                    lip.Position + lip.Right * side * 5.2f,
-                    lip.Position + lip.Right * side * 5.2f + lip.Up * 3.5f);
 
         }
 

@@ -35,9 +35,8 @@ namespace Outlaws.WorldShift
             Material depthMark = pit.Glow(new Color(1f, .62f, .19f), night ? .6f : .11f);
 
             pit.BuildShaft(rows, wall, farWall, bottom);
-            // Ramp pits omit signs, but still use the current world's hazard surface.
-            if (night) pit.BuildLava(route, gap, rows);
-            else pit.BuildSpikes(route, gap, rows);
+            // A flat red floor marks the opening as deadly in both worlds (no decorative lava/spike art).
+            pit.BuildSurface(rows, 3.4f, "Pit danger floor", pit.Glow(new Color(.85f, .12f, .08f), night ? .45f : .2f));
             if (!warnings) return pit;
             pit.BuildLip(route, gap.Start, true, yellow, dark);
             pit.BuildLip(route, gap.End, false, yellow, dark);

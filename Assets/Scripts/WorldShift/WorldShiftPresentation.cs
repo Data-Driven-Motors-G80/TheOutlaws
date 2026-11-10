@@ -302,10 +302,6 @@ namespace Outlaws.WorldShift
             RenderSettings.fogStartDistance = day ? 140f : 48f;
             RenderSettings.fogEndDistance = day ? 260f : 150f;
             Color sky = day ? new Color(0.57f, 0.7f, 0.79f) : new Color(0.065f, 0.10f, 0.155f);
-            if (game.Environment == ShiftLevel.Ocean) sky = day ? new Color(.48f, .72f, .8f) : new Color(.025f, .07f, .13f);
-            if (game.Environment == ShiftLevel.Snow) sky = day ? new Color(.74f, .82f, .89f) : new Color(.08f, .14f, .23f);
-            if (game.Environment == ShiftLevel.Desert) sky = day ? new Color(.86f, .72f, .52f) : new Color(.07f, .07f, .13f);
-            if (game.Environment == ShiftLevel.Mountain) sky = day ? new Color(.57f, .65f, .7f) : new Color(.06f, .09f, .13f);
             RenderSettings.fogColor = sky;
             view.clearFlags = CameraClearFlags.SolidColor;
             view.backgroundColor = sky;
