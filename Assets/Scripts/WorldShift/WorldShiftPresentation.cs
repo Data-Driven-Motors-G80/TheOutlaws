@@ -16,6 +16,7 @@ namespace Outlaws.WorldShift
             public GameObject Solid, Ghost;
             public Transform Root;
             public Chunk Chunk;
+            public readonly List<WorldShiftRoadVehicleArt> Traffic = new List<WorldShiftRoadVehicleArt>();
         }
         private sealed class PedestrianView
         {
@@ -37,6 +38,8 @@ namespace Outlaws.WorldShift
         private GameObject headlightHaze;
         private Material headlightHazeMaterial;
         private WorldShiftRoadside roadside;
+        private WorldShiftOceanPresentation ocean;
+        private int oceanHazardIndex;
         private WorldShiftConvergence convergence;
         private WorldShiftRelayVisuals relayVisuals;
         private readonly WorldShiftObstacleVisual.Palette obstaclePalette = new WorldShiftObstacleVisual.Palette();
@@ -59,8 +62,18 @@ namespace Outlaws.WorldShift
             route = sharedRoute; view = camera; sun = directional;
             obstaclePalette.LevelColours = game.LevelMode;
             BuildHeadlight(player);
-            roadside = gameObject.AddComponent<WorldShiftRoadside>();
-            roadside.Build(route, game.Environment);
+            if (game.LevelMode && game.Environment == ShiftLevel.Ocean)
+            {
+                var coast = new GameObject("Ocean coastal art");
+                coast.transform.SetParent(transform, false);
+                ocean = coast.AddComponent<WorldShiftOceanPresentation>();
+                ocean.Build(game, route, view);
+            }
+            else
+            {
+                roadside = gameObject.AddComponent<WorldShiftRoadside>();
+                roadside.Build(route, game.Environment);
+            }
             convergence = gameObject.AddComponent<WorldShiftConvergence>();
             convergence.BuildWallsOnly(route);
             if (!game.SplitViewValidation)
@@ -73,7 +86,7 @@ namespace Outlaws.WorldShift
             BuildCheckpoints();
             BuildCoastalBridge();
             BuildSigns();
-            if (game.Collection != null)
+            if (game.Collection != null && ocean == null)
                 foreach (var item in game.Collection.Items)
                     requiredItems.Add(WorldShiftLevelProps.RequiredItem(transform, route, item));
             UpdateVisibility(0f);
@@ -140,6 +153,22 @@ namespace Outlaws.WorldShift
                 hazards.Add(new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk });
                 return;
             }
+            if (game.LevelMode && data.Kind == ShiftHazardKind.Oncoming && !data.SharedAcrossWorlds && !data.LateralMotion)
+            {
+                var trafficView = new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk };
+                for (int lane = 0; lane < 3; lane++)
+                {
+                    if ((data.LaneMask & (1 << lane)) == 0) continue;
+                    Vector3 centre = new Vector3((lane - 1) * WorldShiftLevel.RoadWidth / 3f, .9f, 0f);
+                    Vector3 size = new Vector3(3.05f, 1.8f, data.End - data.Start);
+                    trafficView.Traffic.Add(WorldShiftRoadVehicleArt.Build(solid.transform, centre, size, moverPalette, game.Environment));
+                    WorldShiftLevelProps.DashedOutline(ghost.transform, centre, size,
+                        WorldShiftLevelProps.Glow(data.World == ShiftWorld.Day ? WorldShiftLevelProps.SwitchColour : WorldShiftLevelProps.NightColour,
+                            data.World == ShiftWorld.Day ? .8f : 0f));
+                }
+                hazards.Add(trafficView);
+                return;
+            }
             float depth = data.End - data.Start;
             var palette = data.Kind == ShiftHazardKind.SwitchWall ? switchPalette
                 : data.LateralMotion ? sideMoverPalette
@@ -149,10 +178,15 @@ namespace Outlaws.WorldShift
             Material dashes = game.LevelMode && !data.SharedAcrossWorlds
                 ? WorldShiftLevelProps.Glow(data.World == ShiftWorld.Day ? WorldShiftLevelProps.SwitchColour : WorldShiftLevelProps.NightColour,
                     data.World == ShiftWorld.Day ? .8f : 0f) : null;
+            int oceanVariant = oceanHazardIndex++;
+            if (ocean != null && data.LateralMotion) ocean.BuildTrolleyTrack(data);
             void Block(Transform frame, Transform ghostFrame, Vector3 centre, Vector3 size)
             {
-                WorldShiftObstacleVisual.Build(frame, centre, size, palette,
-                    data.Kind == ShiftHazardKind.SwitchWall, data.Kind == ShiftHazardKind.Oncoming && !data.LateralMotion);
+                if (ocean != null)
+                    ocean.BuildObstacle(frame, centre, size, palette, data, oceanVariant);
+                else
+                    WorldShiftObstacleVisual.Build(frame, centre, size, palette,
+                        data.Kind == ShiftHazardKind.SwitchWall, data.Kind == ShiftHazardKind.Oncoming && !data.LateralMotion);
                 if (game.LevelMode && game.Environment == ShiftLevel.Desert && data.LateralMotion)
                     WorldShiftLevelProps.SlidingGateHint(frame, size.z, smallBlock: true);
                 if (dashes != null) WorldShiftLevelProps.DashedOutline(ghostFrame, centre, size, dashes);
@@ -255,6 +289,7 @@ namespace Outlaws.WorldShift
 
         private void CheckpointGate(float at, bool finish)
         {
+            if (!finish && ocean != null) { ocean.BuildCheckpointGantry(at); return; }
             RoadPathPoint p = route.Sample(at);
             Transform root = new GameObject(finish ? "Finish gate" : "Checkpoint gate").transform;
             root.SetParent(transform, false);
@@ -307,7 +342,8 @@ namespace Outlaws.WorldShift
             view.backgroundColor = sky;
             sun.color = day ? new Color(1f, 0.87f, 0.7f) : new Color(0.56f, 0.76f, 1f);
             sun.intensity = day ? 1.25f : 0.40f;
-            normalFogColour = sky;
+            if (ocean != null) { ocean.SetWorld(next); ocean.ApplyCoastalLight(sun, next); }
+            normalFogColour = RenderSettings.fogColor;
             normalFogStart = RenderSettings.fogStartDistance;
             normalFogEnd = RenderSettings.fogEndDistance;
         }
@@ -336,6 +372,7 @@ namespace Outlaws.WorldShift
                 headlightHazeMaterial.SetFloat("_ClearRoadLength", clearRoad);
             }
             if (roadside != null) roadside.UpdateVisibility(distance);
+            if (ocean != null) ocean.Refresh(distance);
             if (relayVisuals != null) relayVisuals.Refresh(distance);
             foreach (var hazard in hazards)
             {
@@ -359,6 +396,7 @@ namespace Outlaws.WorldShift
                 hazard.Data.BoundsAt(distance, out float start, out float end);
                 RoadPathPoint point = route.Sample((start + end) * .5f);
                 hazard.Root.SetPositionAndRotation(point.Position + point.Right * hazard.Data.LateralOffset, Quaternion.LookRotation(point.Forward, point.Up));
+                foreach (var traffic in hazard.Traffic) traffic.SetTravel(hazard.Data.Start - start);
                 hazard.Chunk.At = start;
                 hazard.Chunk.End = end;
             }

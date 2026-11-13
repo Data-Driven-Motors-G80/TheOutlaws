@@ -14,6 +14,7 @@ namespace Outlaws.WorldShift
         }
 
         private readonly List<Piece> pieces = new List<Piece>();
+        private readonly HashSet<ShiftRelay> recoveredLandings = new HashSet<ShiftRelay>();
         private Material dayRoad, echoRoad;
         private bool validation, shortTransition;
         private float length;
@@ -173,11 +174,31 @@ namespace Outlaws.WorldShift
             return pieces[pieces.Count - 1].Segment.Sample(pieces[pieces.Count - 1].Segment.Length);
         }
 
+        // In level play, a correctly reached landing makes its short recovery deck shared.
+        // This lets a new Space press commit immediately without creating an invisible fall.
+        public void CompleteLanding(ShiftRelay jump)
+        {
+            if (Course != null && jump != null) recoveredLandings.Add(jump);
+        }
+
+        public bool IsLandingRecovered(ShiftRelay jump) => Course != null && recoveredLandings.Contains(jump);
+
+        public void RestoreLandingRecoveries(float checkpoint)
+        {
+            recoveredLandings.Clear();
+            if (Course == null) return;
+            foreach (var jump in relays)
+                if (jump.End <= checkpoint) recoveredLandings.Add(jump);
+        }
+
         public bool HasSurface(float distance, ShiftWorld world)
         {
             // Shared obstacle rules do not remove the authored jump/world-switch puzzle.
             foreach (var jump in relays)
+            {
+                if (IsLandingRecovered(jump) && distance >= jump.Landing && distance < jump.End) continue;
                 if (!jump.HasDeck(distance, world)) return false;
+            }
             if (SharedWorldRules) return true;
             foreach (var h in validation ? WorldShiftSplitView.Layout : WorldShiftLevel.Hazards)
                 if (h.World == world && h.Kind == ShiftHazardKind.Gap && distance >= h.Start && distance < h.End)

@@ -10,7 +10,7 @@ namespace Outlaws.WorldShift
         private sealed class View
         {
             public ShiftRelay Data;
-            public GameObject Root, Ramp, SourceVoid, DestinationVoid, Landing, Preview;
+            public GameObject Root, Ramp, SourceVoid, SourceRecoveryVoid, DestinationVoid, Landing, Preview;
         }
         private readonly List<View> views = new List<View>();
         private readonly List<Material> owned = new List<Material>();
@@ -18,9 +18,9 @@ namespace Outlaws.WorldShift
         private Material boost, white, amber, cyan, ghost;
 
         public void Build(WorldShiftCity controller, WorldShiftRoute sharedRoute)
-            => Build(sharedRoute, controller.RelayLayout);
+            => Build(sharedRoute, controller.RelayLayout, controller.LevelMode && controller.Environment == ShiftLevel.Ocean);
 
-        public void Build(WorldShiftRoute sharedRoute, ShiftRelay[] sections)
+        public void Build(WorldShiftRoute sharedRoute, ShiftRelay[] sections, bool openWater = false)
         {
             route = sharedRoute;
             boost = Unlit(new Color(.25f, 1f, .54f));
@@ -63,11 +63,18 @@ namespace Outlaws.WorldShift
                 }
                 view.SourceVoid = Child(view.Root.transform, "Launch world missing landing");
                 view.DestinationVoid = Child(view.Root.transform, "Landing world missing ramp");
-                // Reuse the existing real shaft geometry but not its danger lips/triangle/X markings.
-                WorldShiftPitVisuals.Build(view.SourceVoid.transform, route,
-                    new ShiftHazard(data.Source, ShiftHazardKind.Gap, data.Takeoff, data.End, 7), false);
-                WorldShiftPitVisuals.Build(view.DestinationVoid.transform, route,
-                    new ShiftHazard(data.Destination, ShiftHazardKind.Gap, data.Ramp, data.Landing, 7), false);
+                view.SourceRecoveryVoid = Child(view.Root.transform, "Launch world recovery before successful landing");
+                // Ocean jumps expose the sea below; other courses keep their existing shafts.
+                if (!openWater)
+                {
+                    WorldShiftPitVisuals.Build(view.SourceVoid.transform, route,
+                        new ShiftHazard(data.Source, ShiftHazardKind.Gap, data.Takeoff, route.Course != null ? data.Landing : data.End, 7), false);
+                    if (route.Course != null)
+                        WorldShiftPitVisuals.Build(view.SourceRecoveryVoid.transform, route,
+                            new ShiftHazard(data.Source, ShiftHazardKind.Gap, data.Landing, data.End, 7), false);
+                    WorldShiftPitVisuals.Build(view.DestinationVoid.transform, route,
+                        new ShiftHazard(data.Destination, ShiftHazardKind.Gap, data.Ramp, data.Landing, 7), false);
+                }
                 view.Landing = Child(view.Root.transform, "Solid landing markers");
                 view.Preview = Child(view.Root.transform, "Other-world landing outline - no road here yet");
                 Material targetMaterial = data.Destination == ShiftWorld.Day ? amber : cyan;
@@ -83,11 +90,13 @@ namespace Outlaws.WorldShift
             foreach (var view in views)
             {
                 bool launch = world == view.Data.Source;
+                bool recovered = route.IsLandingRecovered(view.Data);
                 view.Ramp.SetActive(launch);
                 view.SourceVoid.SetActive(launch);
+                view.SourceRecoveryVoid.SetActive(launch && !recovered);
                 view.DestinationVoid.SetActive(!launch);
-                view.Landing.SetActive(!launch);
-                view.Preview.SetActive(launch);
+                view.Landing.SetActive(!launch || recovered);
+                view.Preview.SetActive(launch && !recovered);
             }
         }
 

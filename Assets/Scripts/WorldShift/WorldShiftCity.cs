@@ -360,7 +360,9 @@ namespace Outlaws.WorldShift
         public bool TrySwitch()
         {
             if (State != ShiftRunState.Running || TrainingLessonPaused) return false;
-            if ((GetawayMode || tutorialLevel || LevelMode) && (relay?.HoldingLanding(Distance, World) ?? false)) return false;
+            // The retired escape/tutorial retain their one-world landing protection.
+            // Current levels share a recovery deck after a valid landing and never swallow Space there.
+            if ((GetawayMode || tutorialLevel) && (relay?.HoldingLanding(Distance, World) ?? false)) return false;
             if (IsMerged)
             {
                 Notify("A / D  CROSS WORLDS", 1.5f);
@@ -477,6 +479,7 @@ namespace Outlaws.WorldShift
                 if (relay != null)
                 {
                     bool safe = relay.FinishStep(next, World, out bool landed);
+                    if (landed && LevelMode) Route.CompleteLanding(relay.LastLanding);
                     if (!safe || (!IsRelayAirborne && !Route.HasSurface(next, World)))
                     {
                         Distance = next;
@@ -814,6 +817,7 @@ namespace Outlaws.WorldShift
                 if (fuelTaken[i]) FuelCollected++;
             }
             relay?.Reset(Distance);
+            Route.RestoreLandingRecoveries(Distance);
             driver.ExternalVerticalControl = false;
             driver.RestoreExternalPose(Distance, Lateral);
             wasMerged = IsMerged;
