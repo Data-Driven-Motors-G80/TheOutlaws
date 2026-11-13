@@ -68,7 +68,7 @@ namespace Outlaws.WorldShift
             BuildLandingFrames();
             BuildGems();
             BuildGulls();
-            BuildPlayerVehicle(game.Player.Find("Original driving body"));
+            BuildCarContact(game.Player.Find("Original driving body"),false);
             BuildAudio();
         }
 
@@ -561,48 +561,6 @@ namespace Outlaws.WorldShift
             Contact(root,new Vector3(0,-size.y*.5f+.025f,0),new Vector2(size.x*.99f,size.z*.99f),contact);
 
             return root;
-        }
-
-        private void BuildPlayerVehicle(Transform parent)
-        {
-            Transform placeholder = parent.Find("Player block");
-            if (placeholder != null) placeholder.gameObject.SetActive(false);
-            var g = new WorldShiftArtMesh(); var lamps = new WorldShiftArtMesh(); var windows = new WorldShiftArtMesh();
-            Color paint = new Color(.64f, .08f, .22f);
-            Color glass = new Color(.08f, .23f, .29f);
-            Color rubber = new Color(.035f, .055f, .065f);
-            g.ChamferBox(new Vector3(0, .46f, 0), new Vector3(1.58f, .48f, 3.05f), .075f, paint);
-            g.ChamferBox(new Vector3(0, .70f, .94f), new Vector3(1.48f, .12f, 1.05f), .035f, paint * 1.12f);
-            g.Box(new Vector3(0, .69f, -1.12f), new Vector3(1.48f, .12f, .72f), paint);
-            // A tapered cabin with sloped glass gives a recognisable sports-car silhouette.
-            Vector3 a = new Vector3(-.70f,.70f,-.77f), b = new Vector3(.70f,.70f,-.77f);
-            Vector3 c = new Vector3(.70f,.70f,.48f), d = new Vector3(-.70f,.70f,.48f);
-            Vector3 e = new Vector3(-.57f,1.13f,-.48f), f = new Vector3(.57f,1.13f,-.48f);
-            Vector3 h = new Vector3(-.57f,1.13f,.12f), j = new Vector3(.57f,1.13f,.12f);
-            windows.Quad(a,e,f,b,glass); windows.Quad(d,c,j,h,glass);
-            windows.Quad(b,f,j,c,glass); windows.Quad(d,h,e,a,glass);
-            g.Quad(e,h,j,f,paint);
-            foreach (float side in new[] {-1f,1f})
-            {
-                float x = side*.81f;
-                foreach (float z in new[] {-.95f,.96f})
-                {
-                    g.Wheel(new Vector3(x,.33f,z), .34f, .18f, rubber);
-                    g.Wheel(new Vector3(side*.915f,.33f,z), .18f, .025f, Cream);
-                }
-                g.Box(new Vector3(side*.83f,.81f,.2f), new Vector3(.20f,.12f,.24f), paint);
-                lamps.Box(new Vector3(side*.52f,.62f,1.535f), new Vector3(.38f,.13f,.035f), new Color(1f,.93f,.73f));
-                lamps.Box(new Vector3(side*.55f,.59f,-1.535f), new Vector3(.32f,.11f,.035f), new Color(1f,.16f,.14f));
-                g.Box(new Vector3(side*.23f,.77f,.95f), new Vector3(.12f,.02f,.98f), Cream);
-                g.Box(new Vector3(side*.23f,1.142f,-.18f), new Vector3(.12f,.02f,.58f), Cream);
-            }
-            g.Box(new Vector3(0,.35f,-1.55f), new Vector3(1.35f,.14f,.10f), rubber);
-            g.Box(new Vector3(0,.34f,1.55f), new Vector3(1.35f,.12f,.10f), rubber);
-            g.Box(new Vector3(0,.49f,-1.61f), new Vector3(.30f,.13f,.025f), Cream);
-            var body = Render("Coastal getaway coupe", g, vehicleFinish, parent);
-            Render("Coastal coupe glass",windows,glassFinish,body.transform);
-            Render("Headlights and tail lights", lamps, luminous, body.transform);
-            BuildCarContact(parent,false);
         }
 
         private void BuildAudio()

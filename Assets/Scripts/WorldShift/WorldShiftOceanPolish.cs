@@ -6,7 +6,7 @@ namespace Outlaws.WorldShift
 {
     public sealed partial class WorldShiftOceanPresentation
     {
-        private Material concrete, timber, metalFinish, paintedMetal, roadRubber, glassFinish, vehicleFinish, contact;
+        private Material concrete, timber, metalFinish, paintedMetal, roadRubber, contact;
         private readonly List<(Material material, Color tint)> finishes = new List<(Material, Color)>();
         private sealed class CarContact { public Transform Root, Target; public bool Police; public Material Material; }
         private readonly List<CarContact> carContacts = new List<CarContact>();
@@ -20,8 +20,6 @@ namespace Outlaws.WorldShift
             paintedMetal=Finish("Faded blue-grey working metal",new Color(.39f,.51f,.52f),0,.40f,.16f,.6f);
             roadRubber=Finish("Subtle tyre wear",new Color(.18f,.25f,.28f),4,.25f,.08f,0f);
             roadRubber.SetFloat("_Grain",1f);
-            glassFinish=Finish("Coastal car glazing",Color.white,5,.85f,.35f,.05f);
-            vehicleFinish=Finish("Coastal car paint and trim",Color.white,0,.60f,.23f,.18f);
             contact=Material("WorldShiftOceanContact","Soft grounded contacts");
             contact.SetFloat("_Opacity",.35f);
         }

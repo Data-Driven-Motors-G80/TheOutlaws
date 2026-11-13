@@ -94,6 +94,8 @@ public sealed class WorldShiftLevelTests
         PlayerPrefs.SetInt(UnlockAllKey, 1);
         Static(Levels, "Menu"); yield return null; yield return null;
         string[] environments = { "City", "City", "Desert", "Ocean", "Snow", "Mountain" };
+        Vector3[] playerShape=null,policeShape=null;
+        Color[] playerPaint=null,policePaint=null;
         for (int level = 0; level < environments.Length; level++)
         {
             var menu = Find("WorldShiftMenu");
@@ -107,9 +109,39 @@ public sealed class WorldShiftLevelTests
             Assert.That(((Array)Get(game, "Checkpoints")).Length, Is.GreaterThan(0));
             Assert.That(((Array)Get(game, "Hazards")).Length, Is.GreaterThan(0));
             if (level == 3) Assert.That(((Vector2[])Field(Get(game, "Course"), "RequiredItems")).Length, Is.EqualTo(11));
+            var playerArt=((Transform)Get(game,"Player")).GetComponentsInChildren<MonoBehaviour>(true).Where(c=>c.GetType().Name=="WorldShiftPlayerCarArt").ToArray();
+            var policeArt=((Component)Get(game,"Police")).GetComponentsInChildren<MonoBehaviour>(true).Where(c=>c.GetType().Name=="WorldShiftPoliceCarArt").ToArray();
+            Assert.That(playerArt.Length,Is.EqualTo(1),"Every level must use exactly one shared player coupe.");
+            Assert.That(policeArt.Length,Is.EqualTo(1),"Every level must use exactly one shared police cruiser.");
+            var pMeshes=playerArt[0].GetComponentsInChildren<MeshFilter>(true).OrderBy(m=>m.name).ToArray();
+            var cMeshes=policeArt[0].GetComponentsInChildren<MeshFilter>(true).OrderBy(m=>m.name).ToArray();
+            Vector3[] pShape=pMeshes.SelectMany(m=>m.sharedMesh.vertices).ToArray(),cShape=cMeshes.SelectMany(m=>m.sharedMesh.vertices).ToArray();
+            Color[] pPaint=pMeshes.SelectMany(m=>m.sharedMesh.colors).ToArray(),cPaint=cMeshes.SelectMany(m=>m.sharedMesh.colors).ToArray();
+            if(level==0) {playerShape=pShape;policeShape=cShape;playerPaint=pPaint;policePaint=cPaint;}
+            else
+            {
+                Assert.That(pShape,Is.EqualTo(playerShape),"Player geometry must match Training in level "+level);
+                Assert.That(cShape,Is.EqualTo(policeShape),"Police geometry must match Training in level "+level);
+                Assert.That(pPaint,Is.EqualTo(playerPaint),"Player livery must stay consistent in level "+level);
+                Assert.That(cPaint,Is.EqualTo(policePaint),"Police livery must stay consistent in level "+level);
+            }
+            Assert.That(playerArt[0].GetComponentsInChildren<Collider>(true),Is.Empty,"Vehicle art must not change driving collision rules.");
             Step(game, .1f);
             Assert.That(Get(game, "State").ToString(), Is.EqualTo("Running"));
             Assert.That((float)Get(game, "Distance"), Is.GreaterThan(0f));
+            if(level==1 || level==3)
+            {
+                Pose(game,70f,0f);
+                var point=Call(Get(game,"Route"),"Sample",71f);
+                var police=(Component)Get(game,"Police");
+                police.transform.position=(Vector3)Get(point,"Position")+(Vector3)Get(point,"Right")*2.6f;
+                police.transform.rotation=Quaternion.LookRotation((Vector3)Get(point,"Forward"),(Vector3)Get(point,"Up"));
+                foreach(string mode in new[] {"Day","Echo"})
+                {
+                    Call(game,"ApplyWorld",World(mode));
+                    Capture("shared-vehicles-"+environments[level].ToLowerInvariant()+"-"+(mode=="Day" ? "day" : "night"));
+                }
+            }
             Static(Levels, "Menu"); yield return null; yield return null;
             Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo("WorldShift_Menu"));
         }

@@ -34,7 +34,7 @@ beacons marking the jump approaches. Day uses a turquoise coast; Night uses a
 starry blue sky and turquoise bridge lighting. Jump gaps expose the sea and the
 bridge edges disappear with their world's deck.
 
-The Ocean car has a coupe silhouette, wheels, windows and lights. Diamonds bob
+The player coupe is shared across Training and all five levels, with the same silhouette, wheels, windows, lights and maroon livery. Diamonds bob
 and rotate, then play a short glass chime and expanding ripple when collected.
 Scenery has no colliders and stays outside the driving corridor. This art pass
 keeps the existing layout, steering, collision rules and 11 required diamonds.
@@ -87,3 +87,6 @@ landing stays missing and touching down in the wrong world still retries the
 section. Retrying before a ramp restores that puzzle; saved, completed sections
 retain their shared recovery decks. Checkpoint positions and driving speeds are
 unchanged.
+
+Ocean uses the same player and police model factories as the other levels; it
+adds its coastal lighting and contact shadows without creating vehicle overrides.
