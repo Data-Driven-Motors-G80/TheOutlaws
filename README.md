@@ -14,7 +14,7 @@ A low-fidelity Unity driving playtest built around switching between Day and Nig
 - Level 0 introduces each obstacle through a short road encounter: warm white permanent blocks, teal Day-only blocks, pale violet Night-only blocks, red oncoming blocks and orange sideways movers. Teal blocks disappear in Nightshift regardless of their width; permanent blocks stay solid in both worlds. The other world's obstacles show as dashed outlines: you can drive through dashes, but switching while inside one is a crash.
 - Shared movers exist in both worlds: sideways movers are orange with black markings, and oncoming blocks are red with white X markings. It moves in Day and freezes in Night.
 - One hit and the police catch you; you restart at the last checkpoint.
-- Every section ends with a big ramp: launch in one world, switch in the air, land in the other. Each landing is a checkpoint.
+- Every section ends with a big ramp: launch in one world, switch in the air, land in the other. After a successful landing, the recovery deck exists in both worlds and Space responds immediately. Checkpoint positions are unchanged.
 
 **Team testing:** press **Shift+U** on the home screen (or use **The Outlaws > Levels > Unlock All Levels (testing)** in the Editor) to open every level. An open-lock icon in the corner shows it is on. **Reset Level Progress** clears saved progress.
 

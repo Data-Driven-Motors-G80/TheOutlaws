@@ -9,7 +9,7 @@ using UnityEngine.UI;
 namespace Outlaws.WorldShift
 {
     /// <summary>Level play HUD: world icon, checkpoint progress, pause and finish. Icons, not sentences.</summary>
-    public sealed class WorldShiftLevelHud : MonoBehaviour
+    public sealed partial class WorldShiftLevelHud : MonoBehaviour
     {
         private static readonly Color Ink = new Color(.025f, .045f, .07f, .9f);
         private static readonly Color Cream = new Color(1f, .95f, .84f);
@@ -135,6 +135,7 @@ namespace Outlaws.WorldShift
             IconButton(complete.transform, ShiftIcon.Home, new Vector2(.36f, .34f), 100f, WorldShiftLevels.Menu);
             IconButton(complete.transform, ShiftIcon.Retry, new Vector2(.5f, .34f), 100f, WorldShiftLevels.Retry);
             if (WorldShiftLevels.HasNext) IconButton(complete.transform, ShiftIcon.Next, new Vector2(.64f, .34f), 130f, WorldShiftLevels.Next);
+            if (game.Environment == ShiftLevel.Ocean) PolishOceanHud();
             Refresh();
         }
 
@@ -304,8 +305,8 @@ namespace Outlaws.WorldShift
         private void Refresh()
         {
             if (collectionStatus != null)
-                collectionStatus.text = game.MissedRequiredItem ? "MISSED DIAMOND - RETRY"
-                    : "DIAMONDS " + game.Collection.Count + " / " + game.Course.RequiredItems.Length;
+                collectionStatus.text = game.MissedRequiredItem ? (oceanHud ? "MISS - RETRY" : "MISSED DIAMOND - RETRY")
+                    : (oceanHud ? "" : "DIAMONDS ") + game.Collection.Count + " / " + game.Course.RequiredItems.Length;
             freezePrompt.SetActive(game.TrainingFreezeWaiting && !game.TrainingLessonPaused && game.State == ShiftRunState.Running);
             bool day = game.World == ShiftWorld.Day;
             freezeState.text = day ? "DAY: OBSTACLES MOVING" : "NIGHT: OBSTACLES FROZEN";
@@ -322,6 +323,7 @@ namespace Outlaws.WorldShift
             crashFlash.color = game.State == ShiftRunState.Retrying && !game.MissedRequiredItem ? new Color(.8f, .05f, .03f, .22f) : Color.clear;
             checkpointNotice.alpha = !game.Course.Training && game.State == ShiftRunState.Running
                 ? Mathf.Clamp01(game.CheckpointNoticeRemaining / .3f) : 0f;
+            if (oceanHud) RefreshOceanHud();
             // Space is the switch key; a still-selected button would also receive it as "submit".
             if (game.State == ShiftRunState.Running && EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null)
                 EventSystem.current.SetSelectedGameObject(null);

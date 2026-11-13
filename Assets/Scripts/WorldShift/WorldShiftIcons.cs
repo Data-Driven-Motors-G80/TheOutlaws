@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Outlaws.WorldShift
 {
-    public enum ShiftIcon { Sun, Moon, Lock, Unlocked, Check, Play, Pause, Home, Retry, Next, Circle, Flag }
+    public enum ShiftIcon { Sun, Moon, Lock, Unlocked, Check, Play, Pause, Home, Retry, Next, Circle, Flag, Diamond }
 
     /// <summary>Small procedural UI icons so menus and HUD need no words.</summary>
     public static class WorldShiftIcons
@@ -36,6 +36,7 @@ namespace Outlaws.WorldShift
         {
             switch (icon)
             {
+                case ShiftIcon.Diamond: return (Mathf.Abs(p.x) + Mathf.Abs(p.y) - .82f) * .7071f;
                 case ShiftIcon.Sun:
                 {
                     float d = Circle(p, Vector2.zero, .42f);

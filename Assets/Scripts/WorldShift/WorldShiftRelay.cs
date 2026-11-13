@@ -37,7 +37,8 @@ namespace Outlaws.WorldShift
             new ShiftRelay(1, 980f, 1040f, 1124f, ShiftWorld.Day)
         };
         private ShiftRelay landedSection;
-        // A successful landing has a short one-world deck. Ignore a premature return switch there.
+        public ShiftRelay LastLanding => landedSection;
+        // Retained legacy escape/tutorial protection for their one-world recovery deck.
         public bool HoldingLanding(float distance, ShiftWorld world) => landedSection != null && !IsAirborne
             && world == landedSection.Destination && distance >= landedSection.Landing && distance < landedSection.End;
         private readonly WorldShiftRoute route;
@@ -108,6 +109,7 @@ namespace Outlaws.WorldShift
         public string Hint(float distance, ShiftWorld world)
         {
             var section = flying ?? SectionAt(distance);
+            if (section != null && route.IsLandingRecovered(section) && distance >= section.Landing) return "";
             if (section == null) return landedSection != null && distance >= landedSection.End && distance < landedSection.End + 48f
                 ? "Road rejoined. Switch freely." : "";
             string source = WorldShiftModeGuide.Name(section.Source);

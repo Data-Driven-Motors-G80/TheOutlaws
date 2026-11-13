@@ -7,7 +7,8 @@ namespace Outlaws.WorldShift
     {
         public static GameObject Vehicle(Transform parent, bool police)
         {
-            var root = new GameObject(police ? "Police block" : "Player block");
+            if (police) return WorldShiftPoliceCarArt.Build(parent);
+            var root = new GameObject("Player block");
             root.transform.SetParent(parent, false);
             Vector3 size = police ? new Vector3(1.8f, .85f, 3.6f) : new Vector3(1.6f, .85f, 3f);
             Box(root.transform, "Vehicle body", new Vector3(0f, .55f, 0f), size,

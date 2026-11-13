@@ -203,6 +203,311 @@ public sealed class WorldShiftLevelTests
     }
 
     [UnityTest]
+    public IEnumerator OceanArtKeepsWorldSwitchJumpGapsOpen()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
+        StartLevel(3); yield return null; yield return null;
+        var game = Started(); var coast = Find("WorldShiftOceanPresentation");
+        Assert.That(coast.GetComponentsInChildren<Collider>(true), Is.Empty,
+            "Coastal scenery must never add physical obstacles to the authored course.");
+        var landmarks=coast.GetComponentsInChildren<Transform>(true).Where(t=>t.name.StartsWith("Ocean landmark - ")).ToArray();
+        Assert.That(landmarks.Length,Is.EqualTo(5),"Each Ocean section should have its own authored landmark.");
+        Assert.That(coast.GetComponentsInChildren<Transform>(true).Any(t=>t.name=="Soft contact shadow"),Is.True);
+        var route = Get(game, "Route");
+        var jumps = (Array)Get(game, "RelayLayout");
+        foreach (object jump in jumps)
+        {
+            float takeoff = (float)Field(jump, "Takeoff");
+            float ramp = (float)Field(jump, "Ramp"), recovery = (float)Field(jump, "End");
+            Pose(game, takeoff - 20f, 0f);
+            foreach (string mode in new[] { "Day", "Echo" })
+            {
+                Call(game, "PresentWorldForCamera", World(mode));
+                bool checkedGap = false;
+                foreach (object chunk in (IEnumerable)Field(coast, "chunks"))
+                {
+                    if (!(bool)Field(chunk, "Deck")) continue;
+                    float start = (float)Field(chunk, "At"), end = (float)Field(chunk, "End");
+                    if (start < ramp || end > recovery) continue;
+                    bool surface = (bool)Call(route, "HasSurface", (start + end) * .5f, World(mode));
+                    Assert.That(((GameObject)Field(chunk, "Root")).activeSelf, Is.EqualTo(surface),
+                        "Bridge railings and supports must disappear with the jump deck.");
+                    checkedGap = true;
+                }
+                Assert.That(checkedGap, Is.True);
+                foreach(object chunk in (IEnumerable)Field(coast,"chunks"))
+                {
+                    object onlyWorld=Field(chunk,"OnlyWorld");
+                    if(onlyWorld==null || Mathf.Abs((float)Field(chunk,"At")-ramp)>.01f) continue;
+                    Assert.That(((GameObject)Field(chunk,"Root")).activeSelf,Is.EqualTo(onlyWorld.Equals(World(mode))),
+                        "Landing frames belong to the landing world and must not imply a solid source-world landing.");
+                }
+            }
+        }
+        for(int section=0;section<jumps.Length;section++)
+        {
+            float from=section==0 ? 0 : (float)Field(jumps.GetValue(section-1),"End");
+            Pose(game,from+65f,0f);Call(game,"PresentWorldForCamera",World("Day"));
+            Capture("ocean-region-"+(section+1));
+        }
+        // Representative sea-stack and final-jump views, beyond the opening cove.
+        var checkpoints = (Array)Get(game, "Checkpoints");
+        Pose(game, (float)Field(checkpoints.GetValue(2), "Distance") + 45f, 0f);
+        Call(game, "PresentWorldForCamera", World("Day")); Capture("ocean-sea-stacks-day");
+        var final = jumps.GetValue(jumps.Length - 1);
+        Pose(game, (float)Field(final, "Ramp") - 35f, 0f);
+        Call(game, "PresentWorldForCamera", World("Day")); Capture("ocean-final-jump-day");
+        Call(game, "PresentWorldForCamera", World("Echo")); Capture("ocean-final-jump-night");
+    }
+
+    [UnityTest]
+    public IEnumerator OceanObstacleArtFitsItsCollisionFootprintsAndSwitchesWithItsWorld()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
+        StartLevel(3); yield return null; yield return null;
+        var game = Started(); var presentation = Field(game, "presentation");
+        bool capturedContainer = false, capturedBarrier = false, capturedCargo = false, capturedTrolley = false, capturedVan = false;
+        foreach (object hazardView in (IEnumerable)Field(presentation, "hazards"))
+        {
+            var data = Field(hazardView, "Data");
+            var solid = (GameObject)Field(hazardView, "Solid");
+            var ghost = (GameObject)Field(hazardView, "Ghost");
+            Assert.That(solid.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Obstacle X"), Is.False,
+                "Ocean hazards should use coastal models instead of prototype X marks.");
+            bool moving = (bool)Field(data, "LateralMotion");
+            float width = moving ? 1.6f : (int)Field(data, "LaneMask") == 7 ? 10f : 3.05f;
+            float depth = (float)Field(data, "End") - (float)Field(data, "Start");
+            var extent = new Vector3(width, 1.8f, depth) * .5f + Vector3.one * .08f;
+            foreach (Transform model in solid.GetComponentsInChildren<Transform>(true)
+                .Where(t => t.name == "World-coloured coastal hazard").Select(t => t.parent))
+            {
+                foreach (var filter in model.GetComponentsInChildren<MeshFilter>(true))
+                    foreach (Vector3 vertex in filter.sharedMesh.vertices)
+                    {
+                        Vector3 p = model.InverseTransformPoint(filter.transform.TransformPoint(vertex));
+                        Assert.That(Mathf.Abs(p.x), Is.LessThanOrEqualTo(extent.x));
+                        Assert.That(Mathf.Abs(p.y), Is.LessThanOrEqualTo(extent.y));
+                        Assert.That(Mathf.Abs(p.z), Is.LessThanOrEqualTo(extent.z));
+                    }
+            }
+            float distance = (float)Field(data, "Start");
+            Pose(game, distance - 25f, 0f);
+            foreach (string mode in new[] {"Day", "Echo"})
+            {
+                object world = World(mode);
+                Call(game, "PresentWorldForCamera", world);
+                bool visible = (bool)Call(data, "VisibleIn", world);
+                Assert.That(solid.activeSelf, Is.EqualTo(visible));
+                Assert.That(ghost.activeSelf, Is.EqualTo(!moving && !visible));
+            }
+            Call(game, "PresentWorldForCamera", Field(data, "World"));
+            string label = null;
+            if (!capturedContainer && solid.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Shipping container"))
+            { label = "container"; capturedContainer = true; }
+            if (!capturedBarrier && solid.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Harbour wave barricade"))
+            { label = "barricade"; capturedBarrier = true; }
+            if (!capturedCargo && solid.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Fishing cargo stack"))
+            { label = "fishing-cargo"; capturedCargo = true; }
+            if (!capturedTrolley && moving) { label = "cargo-trolley"; capturedTrolley = true; }
+            if (!capturedVan && solid.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Parked coastal service van"))
+            { label = "service-van"; capturedVan = true; }
+            if (label != null)
+            {
+                Pose(game, distance - 12f, 0f);
+                Call(game, "PresentWorldForCamera", Field(data, "World"));
+                Capture("ocean-obstacle-" + label);
+            }
+        }
+        Assert.That(capturedContainer && capturedBarrier && capturedCargo && capturedTrolley, Is.True,
+            "The Ocean course should present all four coastal obstacle silhouettes.");
+    }
+
+    [UnityTest]
+    public IEnumerator OncomingTrafficHasApproachingHeadlightsAndWheelsThatFollowTravel()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
+        StartLevel(1); yield return null; yield return null;
+        var game=Started(); var presentation=Field(game,"presentation");
+        int count=0;
+        foreach(object hazardView in (IEnumerable)Field(presentation,"hazards"))
+        {
+            var data=Field(hazardView,"Data");
+            if(Field(data,"Kind").ToString()!="Oncoming" || (bool)Field(data,"SharedAcrossWorlds")) continue;
+            var root=(Transform)Field(hazardView,"Root");
+            var solid=(GameObject)Field(hazardView,"Solid");
+            var ghost=(GameObject)Field(hazardView,"Ghost");
+            var car=solid.GetComponentsInChildren<MonoBehaviour>(true).Single(c=>c.GetType().Name=="WorldShiftRoadVehicleArt");
+            Assert.That(Vector3.Dot(car.transform.forward,root.forward),Is.LessThan(-.99f),
+                "Oncoming vehicles must face the player, rather than showing their tail lights.");
+            var wheels=car.GetComponentsInChildren<Transform>(true).Where(t=>t.name=="Traffic wheel and six-spoke rim").ToArray();
+            Assert.That(wheels.Length,Is.EqualTo(4));
+            Assert.That(car.GetComponentsInChildren<Collider>(true),Is.Empty,
+                "Art must use the existing swept collision footprint, without new physics colliders.");
+            // Every visible vehicle part must stay inside the established road-space envelope.
+            foreach(var mesh in car.GetComponentsInChildren<MeshFilter>(true))
+                foreach(Vector3 vertex in mesh.sharedMesh.vertices)
+                {
+                    Vector3 p=car.transform.InverseTransformPoint(mesh.transform.TransformPoint(vertex));
+                    Assert.That(Mathf.Abs(p.x),Is.LessThanOrEqualTo(1.605f));
+                    Assert.That(Mathf.Abs(p.y),Is.LessThanOrEqualTo(.98f));
+                    Assert.That(Mathf.Abs(p.z),Is.LessThanOrEqualTo(2.83f));
+                }
+            float start=(float)Field(data,"Start");
+            Pose(game,start-85f,0f); Call(game,"PresentWorldForCamera",Field(data,"World"));
+            Vector3 before=root.position; Quaternion wheelBefore=wheels[0].localRotation;
+            Pose(game,start-65f,0f); Call(game,"PresentWorldForCamera",Field(data,"World"));
+            Assert.That(Vector3.Distance(before,root.position),Is.GreaterThan(1f));
+            Assert.That(Quaternion.Angle(wheelBefore,wheels[0].localRotation),Is.GreaterThan(1f));
+            Assert.That(solid.activeSelf,Is.True); Assert.That(ghost.activeSelf,Is.False);
+            if(count==0)
+            {
+                Capture("oncoming-vehicle-day");
+                Pose(game,start-55f,0f); Call(game,"PresentWorldForCamera",Field(data,"World"));
+                Capture("oncoming-vehicle-close");
+            }
+            object other=World(Field(data,"World").ToString()=="Day" ? "Echo" : "Day");
+            Call(game,"PresentWorldForCamera",other);
+            Assert.That(solid.activeSelf,Is.False); Assert.That(ghost.activeSelf,Is.True);
+            count++;
+        }
+        Assert.That(count,Is.GreaterThan(0));
+    }
+
+    [UnityTest]
+    public IEnumerator OceanPoliceCruiserKeepsItsIdentityInBothWorlds()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
+        StartLevel(3); yield return null; yield return null;
+        var game=Started();var police=(Component)Get(game,"Police");
+        var cruisers=police.GetComponentsInChildren<MonoBehaviour>(true).Where(c=>c.GetType().Name=="WorldShiftPoliceCarArt").ToArray();
+        Assert.That(cruisers.Length,Is.EqualTo(1),"Ocean must keep the shared marked cruiser, rather than replacing it with a coupe.");
+        var cruiser=cruisers[0];
+        Assert.That(cruiser.GetComponentsInChildren<Collider>(true),Is.Empty,"Police art must not alter catch-up collision behaviour.");
+        var body=cruiser.GetComponentsInChildren<MeshFilter>().Single(m=>m.name=="Black and white police body");
+        Assert.That(body.sharedMesh.colors.Any(c=>c.r>.85f&&c.g>.85f&&c.b>.85f),Is.True);
+        Assert.That(body.sharedMesh.colors.Any(c=>c.r<.1f&&c.g<.1f&&c.b<.1f),Is.True);
+        Assert.That(cruiser.GetComponentsInChildren<MeshFilter>().Single(m=>m.name=="POLICE livery and roof unit number").sharedMesh.vertexCount,Is.GreaterThan(0));
+        Pose(game,120f,0f);
+        for(int mode=0;mode<2;mode++)
+        {
+            if(mode==1) Assert.That(Call(game,"TrySwitch"),Is.True);
+            Assert.That(cruiser.gameObject.activeInHierarchy,Is.True);
+            var red=cruiser.GetComponentsInChildren<MeshFilter>().Single(m=>m.name=="Red roof light lens");
+            var blue=cruiser.GetComponentsInChildren<MeshFilter>().Single(m=>m.name=="Blue roof light lens");
+            Assert.That(red.sharedMesh.colors.All(c=>c.r>.8f&&c.b<.2f),Is.True);
+            Assert.That(blue.sharedMesh.colors.All(c=>c.b>.8f&&c.r<.2f),Is.True);
+            // Pull alongside for the review image, like the existing crash/capture animation.
+            var route=Get(game,"Route");var point=Call(route,"Sample",121f);
+            police.transform.position=(Vector3)Get(point,"Position")+(Vector3)Get(point,"Right")*2.6f;
+            police.transform.rotation=Quaternion.LookRotation((Vector3)Get(point,"Forward"),(Vector3)Get(point,"Up"));
+            Capture("ocean-police-cruiser-"+(mode==0 ? "day" : "night"));
+        }
+    }
+
+    [UnityTest]
+    public IEnumerator LevelSwitchesRespondImmediatelyInFlightAndAfterEveryLanding()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");yield return new EnterPlayMode();
+        for(int level=0;level<6;level++)
+        {
+            StartLevel(level);yield return null;yield return null;
+            var game=Started();var jump=((Array)Get(game,"RelayLayout")).GetValue(0);
+            float takeoff=(float)Field(jump,"Takeoff"),landing=(float)Field(jump,"Landing");
+            float lane=level==2 ? 3.3f : 0f; // The existing safe bypass of Desert's first aerial pair.
+            object source=Field(jump,"Source"),destination=Get(jump,"Destination");
+            var checkpoints=((IEnumerable)Get(game,"Checkpoints")).Cast<object>().ToArray();
+            int checkpoint=Array.FindLastIndex(checkpoints,c=>(float)Field(c,"Distance")<takeoff);
+            game.GetType().GetField("checkpointIndex",Flags).SetValue(game,checkpoint);
+            Call(game,"RetryCheckpoint");
+            game.GetType().GetField("trainingLessonRead",Flags).SetValue(game,true);
+            Call(Get(game,"Collection"),"Restore",takeoff-.5f);
+            Pose(game,takeoff-.5f,lane);Call(game,"ApplyWorld",source);
+            var route=Get(game,"Route");
+            Assert.That(Call(route,"HasSurface",landing+2f,source),Is.False,"The landing must stay missing in the launch world before a successful flight.");
+            Step(game,.03f);
+            Assert.That(Get(game,"IsRelayAirborne"),Is.True,"Level "+level+" should have taken off.");
+            float airborneAt=(float)Get(game,"Distance");
+            foreach(object expected in new[] {destination,source,destination})
+            {
+                Call(game,"StepSimulation",0f,0f,true);
+                Assert.That(Get(game,"World"),Is.EqualTo(expected),"Every separate Space press should commit in the current frame, even with no simulation time.");
+                Assert.That((float)Get(game,"Distance"),Is.EqualTo(airborneAt));
+            }
+            for(int frame=0;(float)Get(game,"Distance")<landing+.1f && frame<250;frame++)
+            {
+                Assert.That(Get(game,"State").ToString(),Is.EqualTo("Running"),"Level "+level+" at "+Get(game,"Distance")+": "+Field(game,"lastFailure"));Step(game,.05f);
+            }
+            Assert.That(Get(game,"IsRelayAirborne"),Is.False);
+            float landedAt=(float)Get(game,"Distance");
+            Call(game,"StepSimulation",0f,0f,true);
+            Assert.That(Get(game,"World"),Is.EqualTo(source),"Level "+level+" silently drops Space during the old 56-metre landing lock.");
+            Assert.That(Get(game,"State").ToString(),Is.EqualTo("Running"),"An immediate return switch after a valid landing must have a real recovery deck.");
+            Assert.That(Call(route,"HasSurface",landedAt,source),Is.True);
+            object roadPiece=((IEnumerable)Field(route,"pieces")).Cast<object>().First(p=>(float)Field(p,"Start")<=landedAt && (float)Field(p,"End")>landedAt);
+            Assert.That(((Renderer)Field(roadPiece,"Surface")).enabled,Is.True,"The shared collision deck must be visibly solid immediately.");
+            if(level==3) Capture("ocean-landed-return-switch");
+            Call(game,"StepSimulation",0f,0f,true);
+            Assert.That(Get(game,"World"),Is.EqualTo(destination));
+            Assert.That((float)Get(game,"Distance"),Is.EqualTo(landedAt));
+            // A retry before the ramp must restore the puzzle, not leave the recovered deck unlocked.
+            Call(game,"RetryCheckpoint");
+            Assert.That(Call(route,"HasSurface",landing+2f,source),Is.False);
+            game.GetType().GetField("trainingLessonRead",Flags).SetValue(game,true);
+            Call(Get(game,"Collection"),"Restore",takeoff-.5f);
+            Pose(game,takeoff-.5f,lane);Call(game,"ApplyWorld",source);
+            for(int frame=0;Get(game,"State").ToString()=="Running" && (float)Get(game,"Distance")<landing+2f && frame<250;frame++)
+                Step(game,.05f);
+            Assert.That(Get(game,"State").ToString(),Is.EqualTo("Retrying"),"Not switching in the air must still miss the landing.");
+            Assert.That((string)Field(game,"lastFailure"),Is.EqualTo("MISSED RELAY LANDING"),"Level "+level+" must still require the destination world at touchdown.");
+        }
+    }
+
+    [UnityTest]
+    public IEnumerator OceanCheckpointGantriesMatchSavesAndConfirmOnlyOnCrossing()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
+        StartLevel(3); yield return null; yield return null;
+        var game=Started();var coast=Find("WorldShiftOceanPresentation");
+        var checkpoints=(Array)Get(game,"Checkpoints");
+        var gates=((IEnumerable)Field(coast,"checkpointGates")).Cast<object>().OrderBy(g=>(int)Field(g,"Index")).ToArray();
+        Assert.That(gates.Length,Is.EqualTo(checkpoints.Length-1),"Every saved landing gets one gantry; the start and finish do not.");
+        for(int i=0;i<gates.Length;i++)
+        {
+            var gate=gates[i];float at=(float)Field(gate,"At");
+            Assert.That(at,Is.EqualTo((float)Field(checkpoints.GetValue(i+1),"Distance")).Within(.001f));
+            var root=(Transform)Field(gate,"Root");
+            Assert.That(root.GetComponentsInChildren<Collider>(true),Is.Empty);
+            Assert.That(root.GetComponentsInChildren<TMPro.TMP_Text>().Single().text,Is.EqualTo("CHECKPOINT"));
+            var structure=root.GetComponentsInChildren<MeshFilter>().Single(m=>m.name=="Coastal checkpoint structure");
+            foreach(Vector3 vertex in structure.sharedMesh.vertices)
+                if(vertex.y<5f) Assert.That(Mathf.Abs(vertex.x),Is.GreaterThan(5.5f),"All low supports must be outside the road.");
+        }
+        foreach(string mode in new[] {"Day","Echo"})
+        {
+            object matching=((IEnumerable)checkpoints).Cast<object>().Skip(1).First(c=>Field(c,"World").Equals(World(mode)));
+            Pose(game,(float)Field(matching,"Distance")-28f,0f);Call(game,"ApplyWorld",World(mode));
+            var nearby=gates.Single(g=>Mathf.Abs((float)Field(g,"At")-(float)Field(matching,"Distance"))<.01f);
+            Assert.That(((Transform)Field(nearby,"Root")).gameObject.activeInHierarchy,Is.True);
+            Assert.That(((Transform)Field(nearby,"Sweep")).gameObject.activeSelf,Is.False);
+            Capture("ocean-checkpoint-gantry-"+(mode=="Day" ? "day" : "night"));
+        }
+        float first=(float)Field(gates[0],"At");
+        Call(Get(game,"Collection"),"Restore",first-1f);
+        Pose(game,first-1f,0f);Call(game,"ApplyWorld",Field(checkpoints.GetValue(1),"World"));
+        Step(game,.1f);
+        Assert.That(Get(game,"CheckpointIndex"),Is.EqualTo(1));
+        float pulse=(float)Field(gates[0],"PulseAt");Assert.That(pulse,Is.GreaterThanOrEqualTo(0f));
+        Assert.That(((Transform)Field(gates[0],"Saved")).gameObject.activeSelf,Is.True);
+        coast.GetType().GetField("animationTime",Flags).SetValue(coast,pulse+.2f);
+        Call(game,"PresentWorldForCamera",Get(game,"World"));
+        Assert.That((float)Field(gates[0],"PulseAt"),Is.EqualTo(pulse),"Rendering or switching worlds must not replay confirmation.");
+        Capture("ocean-checkpoint-gantry-saved");
+        Call(game,"RetryCheckpoint");
+        Assert.That(((Transform)Field(gates[0],"Sweep")).gameObject.activeSelf,Is.False,"Retrying a saved checkpoint does not replay the light sweep.");
+        Assert.That(((Transform)Field(gates[0],"Saved")).gameObject.activeSelf,Is.True);
+    }
+
+    [UnityTest]
     public IEnumerator OceanCollectionWorksInBothWorldsAndMissRetriesTheCheckpoint()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
