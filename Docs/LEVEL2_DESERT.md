@@ -96,3 +96,15 @@ Geometry reuses `DesertRollingRock.CreateVisual`; motion reuses `DesertTrialRock
 authored flight arc. Contact uses a sphere against the swept car box, including
 height. Night and pause stop both translation and visible rotation. Checkpoint
 retries reset rock clocks, as they do for the existing sliders.
+
+## Environment presentation
+
+The current Desert uses low wind-shaped dune ridges and warm sandy shoulders. Small oases
+and curved coconut palms sit outside the driving corridor, away from jump approaches.
+Oases have gently rippling water, reeds and stones along their irregular shores.
+Day has a warm horizon; Night has a subdued blue sky and crescent moon.
+Scenery is decorative and has no collision. Both worlds retain identical road
+geometry; sand edges use the road mesh vertices, including curves and slopes.
+Night shifts scenery to a subdued blue palette while keeping road markings clear.
+The shared failure HUD reports BUSTED, MISSED LANDING or OFF THE ROAD and shows
+automatic checkpoint retry progress.

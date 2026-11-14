@@ -22,6 +22,7 @@ namespace Outlaws.WorldShift
         private readonly List<Piece> pieces = new List<Piece>();
         private sealed class Dune { public float At; public Transform Root; public Renderer Renderer; }
         private readonly List<Dune> dunes = new List<Dune>();
+        private readonly List<Mesh> duneMeshes = new List<Mesh>();
         private Material[] day, echo;
         private Material dayEdge, echoEdge;
         private Material dayDune, echoDune;
@@ -40,7 +41,11 @@ namespace Outlaws.WorldShift
                 RuntimeMaterials.Coloured(new Color(.48f, .47f, .43f)),
                 RuntimeMaterials.Coloured(new Color(.065f, .075f, .085f))
             };
-            // No per-environment ground theming: every level uses the same neutral ground (no decorative art).
+            if (environment == ShiftLevel.Desert && route.Course != null)
+            {
+                day = new[] { RuntimeMaterials.Coloured(new Color(.73f,.58f,.36f)), RuntimeMaterials.Coloured(new Color(.78f,.63f,.40f)) };
+                echo = new[] { RuntimeMaterials.Coloured(new Color(.27f,.29f,.29f)), RuntimeMaterials.Coloured(new Color(.25f,.27f,.29f)) };
+            }
             dayEdge = RuntimeMaterials.Coloured(new Color(.83f, .82f, .73f));
             echoEdge = new Material(RuntimeMaterials.Coloured(new Color(.94f, .88f, .64f)));
             echoEdge.name = "Night cream road-edge paint";
@@ -48,6 +53,7 @@ namespace Outlaws.WorldShift
             echoEdge.SetColor("_EmissionColor", new Color(.94f, .88f, .64f) * .045f);
             echoEdge.SetFloat("_Smoothness", .55f);
             route.VisitRoadPieces(BuildPiece);
+            if (environment == ShiftLevel.Desert && route.Course != null) BuildDesertDunes();
             SetWorld(ShiftWorld.Day);
             UpdateVisibility(0f);
         }
@@ -56,6 +62,7 @@ namespace Outlaws.WorldShift
         {
             dayDune = RuntimeMaterials.Coloured(new Color(.76f, .61f, .38f));
             echoDune = RuntimeMaterials.Coloured(new Color(.30f, .27f, .20f));
+            for (int form = 0; form < 4; form++) duneMeshes.Add(WorldShiftEnvironmentScenery.DuneMesh(form));
             var roadPoints = new List<Vector3>();
             for (float at = -60f; at <= route.Course.Length + 60f; at += 4f) roadPoints.Add(route.Sample(at).Position);
             int variation = 0;
@@ -66,10 +73,13 @@ namespace Outlaws.WorldShift
                     RoadPathPoint point = route.Sample(along);
                     int form = variation++ % 4;
                     Vector3 size = new Vector3(form == 0 ? 22f : form == 1 ? 28f : form == 2 ? 24f : 18f,
-                        form == 0 ? 6f : form == 1 ? 8f : form == 2 ? 5f : 7f,
-                        form == 0 ? 32f : form == 1 ? 38f : form == 2 ? 28f : 42f);
-                    Transform root = DesertPresentation.CreatePrototypeDune(transform, "Prototype desert dune " + variation, dayDune);
-                    Vector3 position = point.Position + point.Right * side * (30f + (form % 2) * 3f);
+                        form == 0 ? 11f : form == 1 ? 15f : form == 2 ? 10f : 13f,
+                        form == 0 ? 42f : form == 1 ? 56f : form == 2 ? 40f : 62f);
+                    var root = new GameObject("Prototype desert dune " + variation, typeof(MeshFilter), typeof(MeshRenderer)).transform;
+                    root.SetParent(transform,false);
+                    root.GetComponent<MeshFilter>().sharedMesh = duneMeshes[form];
+                    root.GetComponent<MeshRenderer>().sharedMaterial = dayDune;
+                    Vector3 position = point.Position + point.Right * side * (48f + (form % 2) * 3f);
                     position.y = point.Position.y + .2f;
                     root.SetPositionAndRotation(position, Quaternion.LookRotation(Vector3.ProjectOnPlane(point.Forward, Vector3.up), Vector3.up));
                     root.localScale = size;
@@ -99,6 +109,7 @@ namespace Outlaws.WorldShift
             // each bend with one long rectangular sidewalk.
             Vector3[] edges = road.sharedMesh.vertices;
             int rows = edges.Length / 2;
+            float groundWidth = route.Course != null && route.Course.Environment == ShiftLevel.Desert ? 75f : GroundWidth;
             var vertices = new List<Vector3>(rows * 6);
             var normals = new List<Vector3>(rows * 6);
             var sidewalks = new List<int>((rows - 1) * 12);
@@ -112,12 +123,12 @@ namespace Outlaws.WorldShift
                 Vector3 right = road.transform.TransformPoint(edges[row * 2 + 1]);
                 Vector3 across = (right - left).normalized;
                 Vector3 up = segment.Sample(segment.Length * row / (rows - 1)).Up;
-                Add(left - across * GroundWidth, up);
+                Add(left - across * groundWidth, up);
                 Add(left - across * SidewalkWidth, up);
                 Add(left, up);
                 Add(right, up);
                 Add(right + across * SidewalkWidth, up);
-                Add(right + across * GroundWidth, up);
+                Add(right + across * groundWidth, up);
                 // Paint stays just inside the actual carriageway edge, following
                 // exactly the same curved/sloped samples as the rendered road.
                 Edge(left + across * .10f + up * .035f, up);
@@ -215,6 +226,7 @@ namespace Outlaws.WorldShift
                 Release(piece.Mesh);
                 Release(piece.EdgeMesh);
             }
+            foreach (var mesh in duneMeshes) Release(mesh);
             Release(echoEdge);
         }
 

@@ -87,6 +87,69 @@ public sealed class WorldShiftLevelTests
     }
 
     [UnityTest]
+    public IEnumerator CityAndDesertSceneryMeetRoadEdgesAndFailureNoticeClearsOnRetry()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
+        yield return new EnterPlayMode();
+        for (int level = 1; level <= 2; level++)
+        {
+            StartLevel(level); yield return null; yield return null;
+            var game = Started();
+            var scenery = Find("WorldShiftEnvironmentScenery");
+            Assert.That(scenery.GetComponentsInChildren<Collider>(true).Any(c => c.enabled), Is.False);
+            var route = Get(game, "Route");
+            var side = Find("WorldShiftRoadside");
+            var roads = ((IEnumerable)Field(route, "pieces")).Cast<object>().ToArray();
+            var shoulders = ((IEnumerable)Field(side, "pieces")).Cast<object>().ToArray();
+            Assert.That(shoulders.Length, Is.EqualTo(roads.Length));
+            for (int i = 0; i < roads.Length; i++)
+            {
+                var roadRenderer = (Renderer)Field(roads[i], "Surface");
+                var roadMesh = roadRenderer.GetComponent<MeshFilter>().sharedMesh;
+                var sideMesh = (Mesh)Field(shoulders[i], "Mesh");
+                var edges = roadMesh.vertices; var vertices = sideMesh.vertices;
+                for (int j = 0; j < edges.Length / 2; j++)
+                {
+                    Assert.That(Vector3.Distance(roadRenderer.transform.TransformPoint(edges[j*2]),side.transform.TransformPoint(vertices[j*6+2])), Is.LessThan(.001f));
+                    Assert.That(Vector3.Distance(roadRenderer.transform.TransformPoint(edges[j*2+1]),side.transform.TransformPoint(vertices[j*6+3])), Is.LessThan(.001f));
+                }
+            }
+            if (level == 2)
+            {
+                int oases = 0, trees = 0;
+                foreach (Transform child in scenery.transform)
+                { if (child.name == "Desert oasis") oases++; if (child.name == "Roadside coconut palm") trees++; }
+                Assert.That(oases, Is.GreaterThan(2)); Assert.That(trees, Is.GreaterThan(5));
+            }
+            if (level == 1)
+                Assert.That(scenery.GetComponentsInChildren<Light>(true).Length, Is.GreaterThan(10), "Original streetlight prefabs should be present along the city.");
+            Pose(game, level == 1 ? 125f : 85f, 0);
+            Call(game, "ApplyWorld", World("Day"));
+            Capture(level == 1 ? "restored-city-day" : "desert-oasis-day");
+            Call(game, "ApplyWorld", World("Echo"));
+            Capture(level == 1 ? "restored-city-night" : "desert-oasis-night");
+            if (level == 2)
+            {
+                Pose(game, 1830f, 0); Call(game,"ApplyWorld",World("Day")); Capture("desert-late-bend");
+            }
+            var hud = Find("WorldShiftLevelHud");
+            Call(game, "Fail", "CRASH"); Call(hud,"Refresh");
+            Assert.That(((GameObject)Field(hud,"failurePanel")).activeSelf, Is.True);
+            Assert.That(((TMPro.TMP_Text)Field(hud,"failureTitle")).text, Is.EqualTo("BUSTED"));
+            Capture(level == 1 ? "city-busted" : "desert-busted");
+            Call(game,"StepSimulation",1.7f,0f,false); Call(hud,"Refresh");
+            Assert.That(Get(game,"State").ToString(), Is.EqualTo("Running"));
+            Assert.That(((GameObject)Field(hud,"failurePanel")).activeSelf, Is.False);
+            Call(game,"Fail","NO ROAD"); Call(hud,"Refresh");
+            Assert.That(((TMPro.TMP_Text)Field(hud,"failureTitle")).text, Is.EqualTo("OFF THE ROAD"));
+            Call(game,"RetryCheckpoint"); Call(hud,"Refresh");
+            Assert.That(((GameObject)Field(hud,"failurePanel")).activeSelf, Is.False);
+        }
+        yield return new ExitPlayMode();
+    }
+
+
+    [UnityTest]
     public IEnumerator MenuLoadsTrainingAndAllFiveLevelsFromTheSharedScene()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");

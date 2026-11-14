@@ -136,6 +136,7 @@ namespace Outlaws.WorldShift
             IconButton(complete.transform, ShiftIcon.Retry, new Vector2(.5f, .34f), 100f, WorldShiftLevels.Retry);
             if (WorldShiftLevels.HasNext) IconButton(complete.transform, ShiftIcon.Next, new Vector2(.64f, .34f), 130f, WorldShiftLevels.Next);
             if (game.Environment == ShiftLevel.Ocean) PolishOceanHud();
+            BuildFailurePanel(safe);
             Refresh();
         }
 
@@ -324,6 +325,7 @@ namespace Outlaws.WorldShift
             checkpointNotice.alpha = !game.Course.Training && game.State == ShiftRunState.Running
                 ? Mathf.Clamp01(game.CheckpointNoticeRemaining / .3f) : 0f;
             if (oceanHud) RefreshOceanHud();
+            RefreshFailurePanel();
             // Space is the switch key; a still-selected button would also receive it as "submit".
             if (game.State == ShiftRunState.Running && EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null)
                 EventSystem.current.SetSelectedGameObject(null);

@@ -22,6 +22,9 @@ namespace Outlaws.WorldShift
         private LevelCourse course;
         private ShiftHazard[] levelHazards;
         public WorldShiftLevelCollection Collection { get; private set; }
+        public string FailureReason => State == ShiftRunState.Retrying ? lastFailure : "";
+        public float CheckpointRetryProgress => Mathf.Clamp01(1f - retryRemaining / (Capturing ? 1.6f : 1.05f));
+        public GameObject StreetlightPrefab => streetlightPrefab;
         public bool MissedRequiredItem => LevelMode && State == ShiftRunState.Retrying && lastFailure == "MISSED ITEM";
         public LevelCourse Course => course;
         public bool LevelMode => course != null;

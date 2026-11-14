@@ -39,6 +39,7 @@ namespace Outlaws.WorldShift
         private Material headlightHazeMaterial;
         private WorldShiftRoadside roadside;
         private WorldShiftOceanPresentation ocean;
+        private WorldShiftEnvironmentScenery scenery;
         private int oceanHazardIndex;
         private WorldShiftConvergence convergence;
         private WorldShiftRelayVisuals relayVisuals;
@@ -73,6 +74,13 @@ namespace Outlaws.WorldShift
             {
                 roadside = gameObject.AddComponent<WorldShiftRoadside>();
                 roadside.Build(route, game.Environment);
+            }
+            if (game.LevelMode && !game.Course.Training && (game.Environment == ShiftLevel.City || game.Environment == ShiftLevel.Desert))
+            {
+                var root = new GameObject("City and desert scenery");
+                root.transform.SetParent(transform, false);
+                scenery = root.AddComponent<WorldShiftEnvironmentScenery>();
+                scenery.Build(route, game.StreetlightPrefab);
             }
             convergence = gameObject.AddComponent<WorldShiftConvergence>();
             convergence.BuildWallsOnly(route);
@@ -323,6 +331,7 @@ namespace Outlaws.WorldShift
             if (playerHeadlight != null) playerHeadlight.enabled = !day;
             if (headlightHaze != null) headlightHaze.SetActive(!day);
             if (roadside != null) roadside.SetWorld(next);
+            if (scenery != null) scenery.SetWorld(next);
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Flat;
             RenderSettings.ambientLight = day ? new Color(0.72f, 0.72f, 0.68f) : new Color(0.28f, 0.34f, 0.43f);
@@ -343,6 +352,7 @@ namespace Outlaws.WorldShift
             sun.color = day ? new Color(1f, 0.87f, 0.7f) : new Color(0.56f, 0.76f, 1f);
             sun.intensity = day ? 1.25f : 0.40f;
             if (ocean != null) { ocean.SetWorld(next); ocean.ApplyCoastalLight(sun, next); }
+            if (scenery != null) scenery.ApplyAtmosphere(view, sun);
             normalFogColour = RenderSettings.fogColor;
             normalFogStart = RenderSettings.fogStartDistance;
             normalFogEnd = RenderSettings.fogEndDistance;
@@ -411,6 +421,7 @@ namespace Outlaws.WorldShift
                 bool preview = ShouldPreview(hazard, distance);
                 hazard.Ghost.SetActive(preview);
             }
+            if (scenery != null) scenery.UpdateVisibility(distance);
             if (game.IsMerged) RefreshFuel();
         }
 

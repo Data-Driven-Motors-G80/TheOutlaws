@@ -298,7 +298,8 @@ public sealed class DesertLevelCourseTests
         RestoreAt(game, 2160f);
         var dunes = UnityEngine.Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None)
             .Where(t => t.name.StartsWith("Prototype desert dune ")).ToArray();
-        Assert.That(dunes.Length, Is.EqualTo(0), "No decorative scenery: the desert has no dunes.");
+        Assert.That(dunes.Length, Is.GreaterThan(20), "Desert scenery restores the low dunes.");
+        Assert.That(dunes.All(t => !t.GetComponents<Collider>().Any(c => c.enabled)), Is.True);
         var labels = UnityEngine.Object.FindObjectsByType<TMP_Text>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         int movingBlocks = Items(P(game, "Hazards")).Count(h => (bool)F(h, "LateralMotion") && F(h, "Rock") == null);
         Assert.That(labels.Count(t => t.text == "DAY TO MOVE"), Is.EqualTo(movingBlocks), "Every moving block uses the same cue.");
