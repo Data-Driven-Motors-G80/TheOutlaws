@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 namespace Outlaws.WorldShift
 {
-    /// <summary>City blocks and desert oases, anchored to the shared road. No gameplay colliders.</summary>
+    /// <summary>Environment art anchored to the shared road. No gameplay colliders.</summary>
     public sealed partial class WorldShiftEnvironmentScenery : MonoBehaviour
     {
         private sealed class Chunk { public float At; public GameObject Root; public bool Deck; }
@@ -30,7 +30,8 @@ namespace Outlaws.WorldShift
             surface.SetFloat("_Finish",3f); surface.SetFloat("_Wear",.15f);
             for (float at = -80; at <= route.Course.Length + 80; at += 3f) roadPoints.Add(route.Sample(at).Position);
             if (route.Course.Environment == ShiftLevel.City) { BuildCity(streetlight); route.VisitRoadPieces(StreetEdges); }
-            else BuildOases();
+            else if (route.Course.Environment == ShiftLevel.Desert) BuildOases();
+            else BuildAlpine();
             SetWorld(ShiftWorld.Day);
             UpdateVisibility(0f);
         }
@@ -176,6 +177,7 @@ namespace Outlaws.WorldShift
 
         public void ApplyAtmosphere(Camera camera, Light sun)
         {
+            if (IsAlpine) { ApplyAlpineAtmosphere(camera, sun); return; }
             bool desert=route.Course.Environment==ShiftLevel.Desert;
             Color horizon=night?new Color(.06f,.105f,.17f):desert?new Color(.84f,.74f,.57f):new Color(.73f,.80f,.82f);
             sky.SetFloat("_Night",night?1:0);

@@ -21,7 +21,18 @@ namespace Outlaws.WorldShift
         public static int Attempt { get; private set; }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetSession() { Current = -1; Attempt = 0; }
+        private static void ResetSession()
+        {
+            Current = -1;
+            Attempt = 0;
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // Open every level for development without changing completion progress.
+            UnlockAll = true;
+#else
+            UnlockAll = false;
+#endif
+        }
 
         public static string Name(int level) => level == 0 ? "Training" : Environments[level].ToString();
         public static int HighestBeaten => PlayerPrefs.GetInt(BeatenKey, -1);

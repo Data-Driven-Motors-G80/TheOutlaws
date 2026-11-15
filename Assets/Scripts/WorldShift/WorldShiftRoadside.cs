@@ -46,6 +46,16 @@ namespace Outlaws.WorldShift
                 day = new[] { RuntimeMaterials.Coloured(new Color(.73f,.58f,.36f)), RuntimeMaterials.Coloured(new Color(.78f,.63f,.40f)) };
                 echo = new[] { RuntimeMaterials.Coloured(new Color(.27f,.29f,.29f)), RuntimeMaterials.Coloured(new Color(.25f,.27f,.29f)) };
             }
+            if (environment == ShiftLevel.Snow)
+            {
+                day = new[] { RuntimeMaterials.Coloured(new Color(.82f,.90f,.94f)), RuntimeMaterials.Coloured(new Color(.91f,.95f,.98f)) };
+                echo = new[] { RuntimeMaterials.Coloured(new Color(.36f,.48f,.61f)), RuntimeMaterials.Coloured(new Color(.43f,.56f,.69f)) };
+            }
+            else if (environment == ShiftLevel.Mountain)
+            {
+                day = new[] { RuntimeMaterials.Coloured(new Color(.43f,.43f,.36f)), RuntimeMaterials.Coloured(new Color(.32f,.38f,.27f)) };
+                echo = new[] { RuntimeMaterials.Coloured(new Color(.22f,.26f,.29f)), RuntimeMaterials.Coloured(new Color(.15f,.22f,.22f)) };
+            }
             dayEdge = RuntimeMaterials.Coloured(new Color(.83f, .82f, .73f));
             echoEdge = new Material(RuntimeMaterials.Coloured(new Color(.94f, .88f, .64f)));
             echoEdge.name = "Night cream road-edge paint";

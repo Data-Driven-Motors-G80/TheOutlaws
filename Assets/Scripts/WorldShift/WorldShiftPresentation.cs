@@ -76,9 +76,10 @@ namespace Outlaws.WorldShift
                 roadside = gameObject.AddComponent<WorldShiftRoadside>();
                 roadside.Build(route, game.Environment);
             }
-            if (game.LevelMode && !game.Course.Training && (game.Environment == ShiftLevel.City || game.Environment == ShiftLevel.Desert))
+            if (game.LevelMode && !game.Course.Training && (game.Environment == ShiftLevel.City || game.Environment == ShiftLevel.Desert
+                || game.Environment == ShiftLevel.Snow || game.Environment == ShiftLevel.Mountain))
             {
-                var root = new GameObject("City and desert scenery");
+                var root = new GameObject("Environment scenery");
                 root.transform.SetParent(transform, false);
                 scenery = root.AddComponent<WorldShiftEnvironmentScenery>();
                 scenery.Build(route, game.StreetlightPrefab);
