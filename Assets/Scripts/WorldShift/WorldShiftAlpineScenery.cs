@@ -15,6 +15,7 @@ namespace Outlaws.WorldShift
 
         private void BuildAlpine()
         {
+            if (!IsSnow) { BuildMountainPass(); return; }
             // Every placement checks the entire path, so bends cannot enter the scenery.
             int seed = 0;
             for (float at = -35f; at < route.Course.Length + 70f; at += IsSnow ? 19f : 29f)
@@ -86,6 +87,161 @@ namespace Outlaws.WorldShift
             }
             route.VisitRoadPieces(AlpineEdges);
             if (IsSnow) BuildSnowfall();
+        }
+
+        private void BuildMountainPass()
+        {
+            // Three overlapping ranges give the pass a foreground, middle distance and skyline.
+            // Keep their roots alive; perspective, fog and Unity frustum culling handle visibility.
+            for (int tier = 0; tier < 3; tier++)
+            {
+                float step = tier == 0 ? 98f : tier == 1 ? 152f : 215f;
+                float width = tier == 0 ? 66f : tier == 1 ? 110f : 158f;
+                float span = tier == 0 ? 148f : tier == 1 ? 226f : 310f;
+                float radius = Mathf.Sqrt(width * width + span * span) * .5f + 3f;
+                for (float at = -140f; at < route.Course.Length + 180f; at += step)
+                    foreach (float side in new[] { -1f, 1f })
+                    {
+                        int seed = Mathf.RoundToInt((at + 140f) / step) + tier * 37;
+                        float along = at + (side > 0 ? step * .43f : 0f);
+                        float across = side * (tier == 0 ? 116f : tier == 1 ? 212f : 322f);
+                        // Move a massif outwards if another part of the road bends towards it.
+                        bool clear = false;
+                        for (int attempt = 0; attempt < 4; attempt++)
+                        {
+                            if (Clear(along, across, radius)) { clear = true; break; }
+                            across += side * 38f;
+                        }
+                        if (!clear) continue;
+                        var root = Root(tier == 0 ? "Towering granite mountain flank"
+                            : tier == 1 ? "High snow-capped range" : "Distant alpine skyline", along, across);
+                        var mesh = new WorldShiftArtMesh();
+                        float height = (tier == 0 ? 116f : tier == 1 ? 184f : 255f) + seed % 4 * 15f;
+                        MountainRidge(mesh, width, span, height, seed + (side > 0 ? 7 : 0));
+                        Render(root, "Crags, gullies and upper snowfields", mesh, surface);
+                    }
+            }
+
+            // A rock face on the uphill side, with open views across the downhill side.
+            for (float at = 8f; at < route.Course.Length + 20f; at += 31f)
+            {
+                int seed = Mathf.RoundToInt(at / 31f);
+                if (NearJump(at, 38f)) continue;
+                float cuttingOffset = -28f;
+                if (!Clear(at, cuttingOffset, 22f)) cuttingOffset = -36f;
+                if (!Clear(at, cuttingOffset, 22f)) continue;
+                var root = Root("Uphill rock cutting", at, cuttingOffset);
+                var mesh = new WorldShiftArtMesh();
+                MountainRidge(mesh, 17f, 38f, 34f + seed % 4 * 4f, seed + 23);
+                // Broken scree connects the cliff foot to the rough shoulder.
+                for (int i = 0; i < 9; i++)
+                {
+                    float z = -12f + i * 3f;
+                    mesh.Rock(new Vector3(9f + .5f * Mathf.Sin(i + seed), -.3f, z),
+                        new Vector3(1.1f + i % 3 * .4f, .7f + i % 4 * .35f, 1.6f),
+                        i % 2 == 0 ? Granite : new Color(.53f, .49f, .40f), seed + i);
+                }
+                Render(root, "Fractured rock cutting and scree apron", mesh, surface);
+            }
+
+            // Sparse wind-shaped fir clusters leave the large rock forms readable.
+            for (float at = 18f; at < route.Course.Length; at += 43f)
+            {
+                int seed = Mathf.RoundToInt(at / 43f);
+                float side = seed % 3 == 0 ? -1f : 1f;
+                float lateral = side * (16f + seed % 3 * 2f);
+                if (NearJump(at, 27f) || !Clear(at, lateral, 5.5f)) continue;
+                var root = Root("Wind-swept alpine firs", at, lateral);
+                var mesh = new WorldShiftArtMesh();
+                // Downhill roots follow the lowered visual terrain, not the road height.
+                float ground = MountainGroundHeight(Mathf.Abs(lateral) - WorldShiftLevel.RoadWidth * .5f, side);
+                Fir(mesh, new Vector3(0, ground - .3f, 0), 6.5f + seed % 4, false, seed);
+                Fir(mesh, new Vector3(side * 2f, ground - .7f, 2.5f), 4.4f + seed % 2, false, seed + 1);
+                for (int i = 0; i < 4; i++)
+                    mesh.Rock(new Vector3(i - 1.5f, ground - .3f, -2f),
+                        new Vector3(.65f, .45f + i * .12f, .85f), Granite, seed + i);
+                Render(root, "Alpine tree island", mesh, surface);
+            }
+            route.VisitRoadPieces(AlpineEdges);
+        }
+
+        // Same profile as the mountain roadside: a narrow shelf above a deep valley.
+        private static float MountainGroundHeight(float offsetFromEdge, float side)
+        {
+            float t = Mathf.Clamp01((offsetFromEdge - 2.6f) / (55f - 2.6f));
+            return (side > 0 ? -38f : 16f) * t;
+        }
+
+        private static void MountainRidge(WorldShiftArtMesh mesh, float width, float length, float height, int seed)
+        {
+            const int rows = 13, columns = 6;
+            var points = new Vector3[rows, columns];
+            for (int row = 0; row < rows; row++)
+            {
+                float t = row / (float)(rows - 1);
+                // Broad saddles and offset spires interrupt both silhouette and faces.
+                // Mathf.Sin(Mathf.PI) can be slightly negative: clamp before fractional powers.
+                // A NaN here corrupts mesh bounds and can make an entire ridge disappear.
+                float envelope = Mathf.Pow(Mathf.Max(0f, Mathf.Sin(t * Mathf.PI)), .34f);
+                float crest = height * envelope * (.68f + .25f * Mathf.PerlinNoise(row * .61f, seed * .37f)
+                    + .10f * Mathf.Sin(row * 1.91f + seed));
+                float shift = Mathf.Sin(row * 1.3f + seed) * .10f;
+                for (int col = 0; col < columns; col++)
+                {
+                    float across = col / (float)(columns - 1);
+                    float x = (across - .5f) * width;
+                    float ridge = Mathf.Clamp01(1f - Mathf.Abs(across - (.47f + shift)) * 2f);
+                    float baseY = width > 30f ? -60f : -8f;
+                    float y = baseY + (crest - baseY) * Mathf.Pow(ridge, .72f);
+                    y += col == 0 || col == columns - 1 ? 0f : Mathf.Sin(row * 3f + col * 4f + seed) * height * .045f;
+                    points[row, col] = new Vector3(x, y, (t - .5f) * length);
+                }
+            }
+            for (int row = 0; row < rows - 1; row++)
+                for (int col = 0; col < columns - 1; col++)
+                {
+                    Vector3 a = points[row, col], b = points[row + 1, col];
+                    Vector3 c = points[row + 1, col + 1], d = points[row, col + 1];
+                    Color rock = Color.Lerp(new Color(.29f, .34f, .36f), new Color(.59f, .55f, .46f),
+                        .25f + .65f * Mathf.Abs(Mathf.Sin(seed + row * 1.7f + col * .8f)));
+                    // Split every face at an uneven snow line, following the rock facets.
+                    float snowline = height * (.62f + .07f * Mathf.Sin(row * 1.8f + seed));
+                    SnowFace(mesh, a, b, c, rock, snowline);
+                    SnowFace(mesh, a, c, d, rock * .93f, snowline);
+                }
+            // Close range ends down to the valley floor; no hollow mountain silhouettes.
+            float floor = width > 30f ? -60f : -8f;
+            for (int col = 0; col < columns - 1; col++)
+                foreach (int row in new[] { 0, rows - 1 })
+                {
+                    Vector3 a = points[row, col], b = points[row, col + 1];
+                    Vector3 lowA = new Vector3(a.x, floor, a.z), lowB = new Vector3(b.x, floor, b.z);
+                    if (row == 0) mesh.Quad(lowB, lowA, a, b, Granite);
+                    else mesh.Quad(lowA, lowB, b, a, Granite);
+                }
+        }
+
+        private static void SnowFace(WorldShiftArtMesh mesh, Vector3 a, Vector3 b, Vector3 c, Color rock, float line)
+        {
+            // Clip the triangle into rock and snow so the boundary crosses the face naturally.
+            var triangle = new[] { a, b, c };
+            for (int region = 0; region < 2; region++)
+            {
+                var polygon = new System.Collections.Generic.List<Vector3>(4);
+                for (int i = 0; i < 3; i++)
+                {
+                    Vector3 p = triangle[i], q = triangle[(i + 1) % 3];
+                    bool inside = region == 0 ? p.y <= line : p.y >= line;
+                    bool nextInside = region == 0 ? q.y <= line : q.y >= line;
+                    if (inside) polygon.Add(p);
+                    if (inside != nextInside)
+                        polygon.Add(Vector3.Lerp(p, q, (line - p.y) / (q.y - p.y)));
+                }
+                Color colour = region == 0 ? rock : Powder;
+                colour.a = 1f;
+                for (int i = 1; i + 1 < polygon.Count; i++)
+                    mesh.Triangle(polygon[0], polygon[i], polygon[i + 1], colour);
+            }
         }
 
         private static void Fir(WorldShiftArtMesh mesh, Vector3 foot, float height, bool snowy, int seed)
@@ -249,8 +405,9 @@ namespace Outlaws.WorldShift
             RenderSettings.skybox = sky;
             camera.clearFlags = CameraClearFlags.Skybox;
             RenderSettings.fogColor = horizon;
-            RenderSettings.fogStartDistance = night ? 55f : IsSnow ? 110f : 155f;
-            RenderSettings.fogEndDistance = night ? 175f : IsSnow ? 260f : 295f;
+            RenderSettings.fogStartDistance = IsSnow ? (night ? 55f : 110f) : (night ? 120f : 240f);
+            RenderSettings.fogEndDistance = IsSnow ? (night ? 175f : 260f) : (night ? 780f : 1150f);
+            if (!IsSnow) camera.farClipPlane = Mathf.Max(camera.farClipPlane, 1400f);
             sun.color = night ? new Color(.56f, .74f, 1f)
                 : IsSnow ? new Color(.86f, .94f, 1f) : new Color(1f, .91f, .77f);
         }
