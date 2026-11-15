@@ -129,7 +129,7 @@ namespace Outlaws.WorldShift
             public Builder DayHalf(float at, int side) => Add(new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.HalfBarrier, start + at, start + at + 6f, side < 0 ? 3 : 6, halfSide: side));
             public Builder NightHalf(float at, int side) => Add(new ShiftHazard(ShiftWorld.Echo, ShiftHazardKind.HalfBarrier, start + at, start + at + 6f, side < 0 ? 3 : 6, halfSide: side));
             // Slides across the road in Day; freezes in place in Night.
-            public Builder Slider(float at, float speed) => Add(new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.Barrier, start + at, start + at + 6f, 2, speed,
+            public Builder Slider(float at, float speed) => Add(new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.Barrier, start + at + 2.2f, start + at + 3.8f, 2, speed,
                 sharedAcrossWorlds: true, lateralMotion: true));
             // Traffic in one world drives toward the player. "at" is roughly where they meet.
             public Builder DayCar(float at, int lane, float speed = 14f) => Add(Oncoming(ShiftWorld.Day, at, lane, speed, false));

@@ -35,8 +35,8 @@ namespace Outlaws.WorldShift
             Material depthMark = pit.Glow(new Color(1f, .62f, .19f), night ? .6f : .11f);
 
             pit.BuildShaft(rows, wall, farWall, bottom);
-            // A flat red floor marks the opening as deadly in both worlds (no decorative lava/spike art).
-            pit.BuildSurface(rows, 3.4f, "Pit danger floor", pit.Glow(new Color(.85f, .12f, .08f), night ? .45f : .2f));
+            // Molten texture, slow flow and basalt crust make the ramp hazard readable in either world.
+            pit.BuildLava(route, gap, rows);
             if (!warnings) return pit;
             pit.BuildLip(route, gap.Start, true, yellow, dark);
             pit.BuildLip(route, gap.End, false, yellow, dark);
@@ -128,7 +128,7 @@ namespace Outlaws.WorldShift
             mesh.SetVertices(vertices); mesh.SetUVs(0, uv); mesh.SetTriangles(indices, 0);
             mesh.RecalculateNormals(); mesh.RecalculateBounds();
             meshes.Add(mesh);
-            var surface = new GameObject("Flowing night lava", typeof(MeshFilter), typeof(MeshRenderer));
+            var surface = new GameObject("Flowing molten lava", typeof(MeshFilter), typeof(MeshRenderer));
             surface.transform.SetParent(transform, false);
             surface.GetComponent<MeshFilter>().sharedMesh = mesh;
             surface.GetComponent<MeshRenderer>().sharedMaterial = lavaMaterial;
@@ -193,9 +193,9 @@ namespace Outlaws.WorldShift
                     float fine = SeamlessNoise(a, b, 13f, 101f);
                     float detail = SeamlessNoise(a, b, 28f, 151f);
                     float rock = broad * .72f + fine * .22f + detail * .06f;
-                    float vein = 1f - Mathf.SmoothStep(.015f, .105f, Mathf.Abs(rock - .5f));
-                    Color baseColour = Color.Lerp(new Color(.7f, .065f, .003f), new Color(1f, .19f, .004f), broad);
-                    Color molten = Color.Lerp(new Color(1f, .18f, .003f), new Color(1f, .34f, .012f), vein * vein);
+                    float vein = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.012f, .075f, Mathf.Abs(rock - .5f)));
+                    Color baseColour = Color.Lerp(new Color(.025f, .012f, .008f), new Color(.16f, .035f, .008f), broad);
+                    Color molten = Color.Lerp(new Color(1f, .16f, .003f), new Color(1f, .78f, .12f), vein * vein);
                     pixels[y * size + x] = Color.Lerp(baseColour, molten, vein);
                 }
             texture.SetPixels(pixels);

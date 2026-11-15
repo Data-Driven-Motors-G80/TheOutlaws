@@ -26,6 +26,7 @@ namespace Outlaws.WorldShift
         }
         private readonly List<PaletteItem> palette = new List<PaletteItem>();
         private readonly List<Chunk> chunks = new List<Chunk>();
+        private readonly List<WorldShiftFrozenIce> frozenCues = new List<WorldShiftFrozenIce>();
         private readonly List<HazardView> hazards = new List<HazardView>();
         private readonly List<GameObject> nightLamps = new List<GameObject>();
         private readonly List<GameObject> fuelModels = new List<GameObject>();
@@ -149,8 +150,10 @@ namespace Outlaws.WorldShift
             var ghost = new GameObject("Outline - belongs to other world"); ghost.transform.SetParent(root, false);
             if (data.Gate != null)
             {
-                WorldShiftObstacleVisual.Build(solid.transform, Vector3.zero, data.Gate.Size, sideMoverPalette);
+                if (game.LevelMode) WorldShiftSpikePlatform.Build(solid.transform, Vector3.zero, data.Gate.Size);
+                else WorldShiftObstacleVisual.Build(solid.transform, Vector3.zero, data.Gate.Size, sideMoverPalette);
                 WorldShiftLevelProps.SlidingGateHint(solid.transform);
+                if (game.LevelMode) BuildFrozenCue(root, Vector3.zero, data.Gate.Size);
                 hazards.Add(new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk });
                 return;
             }
@@ -158,6 +161,7 @@ namespace Outlaws.WorldShift
             {
                 WorldShiftObstacleVisual.Build(solid.transform, Vector3.zero,
                     Vector3.one * (data.Rock.Radius * 2f), sideMoverPalette);
+                if (game.LevelMode) BuildFrozenCue(root, Vector3.zero, Vector3.one * (data.Rock.Radius * 2f));
                 hazards.Add(new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk });
                 return;
             }
@@ -190,13 +194,18 @@ namespace Outlaws.WorldShift
             if (ocean != null && data.LateralMotion) ocean.BuildTrolleyTrack(data);
             void Block(Transform frame, Transform ghostFrame, Vector3 centre, Vector3 size)
             {
-                if (ocean != null)
+                if (game.LevelMode && data.LateralMotion && data.SharedAcrossWorlds)
+                    WorldShiftSpikePlatform.Build(frame, centre, size);
+                else if (ocean != null)
                     ocean.BuildObstacle(frame, centre, size, palette, data, oceanVariant);
                 else
                     WorldShiftObstacleVisual.Build(frame, centre, size, palette,
                         data.Kind == ShiftHazardKind.SwitchWall, data.Kind == ShiftHazardKind.Oncoming && !data.LateralMotion);
                 if (game.LevelMode && game.Environment == ShiftLevel.Desert && data.LateralMotion)
                     WorldShiftLevelProps.SlidingGateHint(frame, size.z, smallBlock: true);
+                if (game.LevelMode && data.SharedAcrossWorlds
+                    && (data.LateralMotion || data.MotionSpeed > 0f))
+                    BuildFrozenCue(frame, centre, size);
                 if (dashes != null) WorldShiftLevelProps.DashedOutline(ghostFrame, centre, size, dashes);
             }
             if (data.Kind == ShiftHazardKind.Gap)
@@ -231,7 +240,7 @@ namespace Outlaws.WorldShift
                     {
                         if ((data.LaneMask & (1 << lane)) == 0) continue;
                         float x = (lane - 1) * WorldShiftLevel.RoadWidth / 3f;
-                        Block(frame, ghostFrame, new Vector3(x, .9f, 0f), new Vector3(data.LateralMotion ? 1.6f : 3.05f, 1.8f, length));
+                        Block(frame, ghostFrame, new Vector3(x, .9f, 0f), new Vector3(data.LateralMotion ? (game.LevelMode ? WorldShiftSpikePlatform.Width : 1.6f) : 3.05f, 1.8f, length));
                     }
                 }
             }
@@ -314,9 +323,17 @@ namespace Outlaws.WorldShift
                     Box(root, "Finish chequer", new Vector3(-4.5f + i, .03f, row - .5f), new Vector3(1f, .04f, 1f), (i + row) % 2 == 0 ? marker : black);
         }
 
+        private void BuildFrozenCue(Transform parent, Vector3 centre, Vector3 size)
+        {
+            var ice = WorldShiftFrozenIce.Build(parent, centre, size).GetComponent<WorldShiftFrozenIce>();
+            ice.SetFrozen(world == ShiftWorld.Echo, true);
+            frozenCues.Add(ice);
+        }
+
         public void SetWorld(ShiftWorld next)
         {
             world = next;
+            foreach (var cue in frozenCues) cue.SetFrozen(next == ShiftWorld.Echo);
             obstaclePalette.SetWorld(next);
             moverPalette.SetWorld(next);
             sideMoverPalette.SetWorld(next);
