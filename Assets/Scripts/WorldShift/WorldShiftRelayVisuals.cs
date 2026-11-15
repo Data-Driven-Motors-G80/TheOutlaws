@@ -10,12 +10,12 @@ namespace Outlaws.WorldShift
         private sealed class View
         {
             public ShiftRelay Data;
-            public GameObject Root, Ramp, SourceVoid, SourceRecoveryVoid, DestinationVoid, Landing, Preview;
+            public GameObject Root, Ramp, SourceVoid, SourceRecoveryVoid, DestinationVoid, Landing, Preview, RampPreview;
         }
         private readonly List<View> views = new List<View>();
         private readonly List<Material> owned = new List<Material>();
         private WorldShiftRoute route;
-        private Material boost, white, amber, cyan, ghost;
+        private Material boost, white, dark;
 
         public void Build(WorldShiftCity controller, WorldShiftRoute sharedRoute)
             => Build(sharedRoute, controller.RelayLayout, controller.LevelMode && controller.Environment == ShiftLevel.Ocean);
@@ -25,9 +25,7 @@ namespace Outlaws.WorldShift
             route = sharedRoute;
             boost = Unlit(new Color(.25f, 1f, .54f));
             white = Unlit(new Color(.9f, 1f, .96f));
-            amber = Unlit(new Color(1f, .7f, .25f));
-            cyan = Unlit(new Color(.25f, .8f, 1f));
-            ghost = Unlit(new Color(.48f, .6f, .66f));
+            dark = Unlit(new Color(.025f, .04f, .07f));
             foreach (var data in sections)
             {
                 var view = new View { Data = data, Root = Child(transform, "Relay " + data.Number + " - launch and landing") };
@@ -45,22 +43,14 @@ namespace Outlaws.WorldShift
                             p.Position + p.Right * x + p.Up * .10f + p.Forward * .4f,
                             p.Position + p.Right * (x + .65f) + p.Up * .10f - p.Forward * .8f);
                 }
-                var signPoint = route.Sample(data.Ramp - 22f);
-                foreach (float side in new[] { -1f, 1f })
-                {
-                    Vector3 at = signPoint.Position + signPoint.Right * side * 5.75f;
-                    Box(view.Root.transform, "Ramp sign support", at + signPoint.Up * 1.2f,
-                        Quaternion.LookRotation(signPoint.Forward, signPoint.Up), new Vector3(.12f, 2.4f, .12f), white);
-                    // Side-view ramp and flight arc pictogram, not the triangle/X used for ordinary pits.
-                    Line(view.Root.transform, "Ramp and takeoff pictogram", boost, .14f,
-                        at + signPoint.Up * 2.6f - signPoint.Right * .7f,
-                        at + signPoint.Up * 3.15f + signPoint.Right * .45f,
-                        at + signPoint.Up * 2.6f + signPoint.Right * .45f);
-                    Line(view.Root.transform, "Flight arc pictogram", white, .10f,
-                        at + signPoint.Up * 3.25f + signPoint.Right * .5f,
-                        at + signPoint.Up * 3.65f + signPoint.Right * 1f,
-                        at + signPoint.Up * 3.5f + signPoint.Right * 1.5f);
-                }
+                view.RampPreview = Child(view.Root.transform, "Missing ramp dashed outline");
+                EdgeFrame(view.Ramp.transform, data.Ramp, data.Takeoff, false, "Ramp");
+                EdgeFrame(view.RampPreview.transform, data.Ramp, data.Takeoff, true, "Missing ramp");
+                Threshold(view.Ramp.transform, data.Takeoff, false, "Takeoff edge");
+                Threshold(view.RampPreview.transform, data.Takeoff, true, "Missing takeoff edge");
+                BuildSign(view.Root.transform, route.Sample(data.Ramp - 22f), data.Source, data.Destination, true);
+                // The destination marker belongs to the touchdown threshold, never the approach ramp.
+                BuildSign(view.Root.transform, route.Sample(data.Landing), data.Destination, data.Destination, false);
                 view.SourceVoid = Child(view.Root.transform, "Launch world missing landing");
                 view.DestinationVoid = Child(view.Root.transform, "Landing world missing ramp");
                 view.SourceRecoveryVoid = Child(view.Root.transform, "Launch world recovery before successful landing");
@@ -77,9 +67,8 @@ namespace Outlaws.WorldShift
                 }
                 view.Landing = Child(view.Root.transform, "Solid landing markers");
                 view.Preview = Child(view.Root.transform, "Other-world landing outline - no road here yet");
-                Material targetMaterial = data.Destination == ShiftWorld.Day ? amber : cyan;
-                LandingFrame(view.Landing.transform, data, targetMaterial, false);
-                LandingFrame(view.Preview.transform, data, ghost, true);
+                LandingFrame(view.Landing.transform, data, false);
+                LandingFrame(view.Preview.transform, data, true);
             }
             SetWorld(ShiftWorld.Day);
             Refresh(0f);
@@ -92,6 +81,7 @@ namespace Outlaws.WorldShift
                 bool launch = world == view.Data.Source;
                 bool recovered = route.IsLandingRecovered(view.Data);
                 view.Ramp.SetActive(launch);
+                view.RampPreview.SetActive(!launch);
                 view.SourceVoid.SetActive(launch);
                 view.SourceRecoveryVoid.SetActive(launch && !recovered);
                 view.DestinationVoid.SetActive(!launch);
@@ -109,29 +99,109 @@ namespace Outlaws.WorldShift
             }
         }
 
-        private void LandingFrame(Transform parent, ShiftRelay jump, Material material, bool dashed)
+        private void LandingFrame(Transform parent, ShiftRelay jump, bool dashed)
         {
-            for (float d = jump.Landing; d < jump.Landing + 24f; d += 4f)
-                foreach (float side in new[] { -1f, 1f })
-                {
-                    var a = route.Sample(d); var b = route.Sample(d + (dashed ? 2f : 4f));
-                    Line(parent, "Landing edge", material, .15f,
-                        a.Position + a.Right * side * 4.65f + a.Up * .12f,
-                        b.Position + b.Right * side * 4.65f + b.Up * .12f);
-                }
-            var lip = route.Sample(jump.Landing);
-            Line(parent, "Landing threshold", material, .17f,
-                lip.Position - lip.Right * 4.65f + lip.Up * .12f,
-                lip.Position + lip.Right * 4.65f + lip.Up * .12f);
+            EdgeFrame(parent, jump.Landing, Mathf.Min(jump.Landing + 24f, jump.End), dashed, "Landing");
+            Threshold(parent, jump.Landing, dashed, "Landing threshold");
+            LandingCornerMarkers(parent, jump, dashed);
+            if (dashed) return;
+            // Runway bars exist only when the landing deck really exists.
+            for (int i = 0; i < 8; i++)
+            {
+                var p = route.Sample(jump.Landing + 2f);
+                float available = p.Width - 1.2f;
+                float x = ((i + .5f) / 8f - .5f) * available;
+                Box(parent, "Touchdown runway bar", p.Position + p.Right*x + p.Up*.07f,
+                    Quaternion.LookRotation(p.Forward,p.Up), new Vector3(available/8f*.55f,.035f,2.4f), white);
+            }
+        }
 
+        private void EdgeFrame(Transform parent, float start, float end, bool dashed, string label)
+        {
+            for(float d=start;d<end;d+=4f)
+                foreach(float side in new[]{-1f,1f})
+                {
+                    var a=route.Sample(d);var b=route.Sample(Mathf.Min(end,d+(dashed?2f:4f)));
+                    BorderedLine(parent,label+" edge",a.Position+a.Right*side*(a.Width*.5f-.25f)+a.Up*.13f,
+                        b.Position+b.Right*side*(b.Width*.5f-.25f)+b.Up*.13f);
+                }
+        }
+        private void Threshold(Transform parent,float at,bool dashed,string label)
+        {
+            var p=route.Sample(at);float half=p.Width*.5f-.25f;
+            if(!dashed) BorderedLine(parent,label,p.Position-p.Right*half+p.Up*.13f,p.Position+p.Right*half+p.Up*.13f);
+            else for(float x=-half;x<half;x+=1.4f)
+                BorderedLine(parent,label,p.Position+p.Right*x+p.Up*.13f,
+                    p.Position+p.Right*Mathf.Min(x+.8f,half)+p.Up*.13f);
+        }
+        private void BorderedLine(Transform parent,string label,Vector3 a,Vector3 b, Vector3? faceOffset = null)
+        {
+            float width = label.StartsWith("Landing") ? .55f : .30f;
+            Line(parent,label+" dark backing",dark,width+.34f,a,b);
+            Vector3 offset = faceOffset ?? Vector3.up*.035f;
+            Line(parent,label,white,width,a+offset,b+offset);
+        }
+
+        // Upright corner brackets give the touchdown edge a silhouette against busy lava.
+        // Keep the middle open and every marker outside the drivable road width.
+        private void LandingCornerMarkers(Transform parent, ShiftRelay jump, bool dashed)
+        {
+            var p = route.Sample(jump.Landing);
+            foreach (float side in new[] { -1f, 1f })
+            {
+                Vector3 foot = p.Position + p.Right * side * (p.Width * .5f + .32f);
+                if (dashed)
+                {
+                    for (float y = .15f; y < 2.1f; y += .75f)
+                        BorderedLine(parent, "Landing corner dash", foot+p.Up*y, foot+p.Up*(y+.45f), -p.Forward*.04f);
+                }
+                else BorderedLine(parent, "Landing corner", foot+p.Up*.15f, foot+p.Up*2.1f, -p.Forward*.04f);
+                // Outward caps never cover the landing surface or imply an overhead barrier.
+                BorderedLine(parent, "Landing corner cap", foot+p.Up*2.1f, foot+p.Up*2.1f+p.Right*side*.8f);
+            }
+        }
+
+        private void BuildSign(Transform parent,RoadPathPoint point,ShiftWorld source,ShiftWorld destination,bool sequence)
+        {
+            var root=Child(parent,sequence?"Launch and landing icon sign":"Destination icon at touchdown").transform;
+            root.SetPositionAndRotation(point.Position+point.Right*(point.Width*.5f+2f),Quaternion.LookRotation(point.Forward,point.Up));
+            float width=3.4f, height=sequence?2f:3.4f;
+            float faceHeight=sequence?2.7f:3.5f;
+            Vector3 W(float x,float y,float z=0f)=>root.TransformPoint(new Vector3(x,y,z));
+            Box(root,"Sign post",W(0,1.25f),root.rotation,new Vector3(.12f,2.5f,.12f),dark);
+            Box(root,"Sign border",W(0,faceHeight),root.rotation,new Vector3(width+.12f,height+.12f,.12f),white);
+            Box(root,"Sign dark face",W(0,faceHeight,-.075f),root.rotation,new Vector3(width,height,.04f),dark);
+            // World-space UI reuses the same sun/moon artwork as the HUD, without text or input.
+            var canvasObject=new GameObject("World symbols",typeof(RectTransform),typeof(Canvas));
+            canvasObject.transform.SetParent(root,false);
+            canvasObject.transform.localPosition=new Vector3(0,faceHeight,-.11f);
+            canvasObject.transform.localScale=Vector3.one*.01f;
+            canvasObject.GetComponent<Canvas>().renderMode=RenderMode.WorldSpace;
+            ((RectTransform)canvasObject.transform).sizeDelta=new Vector2(width*100f,height*100f);
+            void Icon(ShiftWorld world,float x,float y,float size)
+            {
+                var obj=new GameObject(world+" symbol",typeof(RectTransform),typeof(UnityEngine.UI.Image));
+                var rect=(RectTransform)obj.transform;rect.SetParent(canvasObject.transform,false);
+                rect.anchorMin=rect.anchorMax=new Vector2(.5f,.5f);rect.anchoredPosition=new Vector2(x,y);rect.sizeDelta=Vector2.one*size;
+                var image=obj.GetComponent<UnityEngine.UI.Image>();image.sprite=WorldShiftIcons.Get(world==ShiftWorld.Day?ShiftIcon.Sun:ShiftIcon.Moon);
+                image.color=world==ShiftWorld.Day?new Color(1f,.84f,.3f):Color.white;image.raycastTarget=false;
+            }
+            if(!sequence){Icon(destination,0,0,285f);return;}
+            Icon(source,-100,32,85);Icon(destination,100,32,85);
+            Line(root,"Takeoff pictogram",white,.09f,W(-1.48f,2.08f,-.13f),W(-.68f,2.45f,-.13f),W(-.68f,2.08f,-.13f));
+            Line(root,"Landing pictogram",white,.09f,W(.6f,2.18f,-.13f),W(1.4f,2.18f,-.13f));
+            Line(root,"Sequence arrow",white,.09f,W(-.28f,2.75f,-.13f),W(.28f,2.75f,-.13f));
+            Line(root,"Sequence arrowhead",white,.09f,W(.08f,2.92f,-.13f),W(.28f,2.75f,-.13f),W(.08f,2.58f,-.13f));
         }
 
         private static GameObject Child(Transform parent, string name)
         { var obj = new GameObject(name); obj.transform.SetParent(parent, false); return obj; }
         private Material Unlit(Color color)
         {
-            var material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            var shader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color");
+            var material = new Material(shader);
             material.SetColor("_BaseColor", color);
+            material.SetColor("_Color", color);
             owned.Add(material);
             return material;
         }

@@ -7,8 +7,8 @@ namespace Outlaws.WorldShift
     public sealed class WorldShiftSpikePlatform : MonoBehaviour
     {
         public const float Width = 3.2f;
-        private Mesh spikes;
-        private static Material teal, steel, white, dark;
+        private Mesh spikes, arrowMesh;
+        private static Material teal, steel, white, dark, arrowWhite;
         public static void Build(Transform parent, Vector3 centre, Vector3 size)
         {
             var root = new GameObject("Sliding police spikes");
@@ -21,6 +21,13 @@ namespace Outlaws.WorldShift
                 steel = Material(new Color(.3f, .35f, .4f), .65f);
                 white = Material(new Color(.92f, .95f, .96f), .2f);
                 dark = Material(new Color(.035f, .045f, .055f), .05f);
+            }
+            if (arrowWhite == null)
+            {
+                var shader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color");
+                arrowWhite = new Material(shader) { name = "Always readable white direction arrows" };
+                arrowWhite.SetColor("_BaseColor", Color.white);
+                arrowWhite.SetColor("_Color", Color.white);
             }
             float deck = size.y * .42f;
             Box(root.transform, new Vector3(0, deck * .5f + .22f, 0), new Vector3(size.x, deck, size.z), teal);
@@ -37,6 +44,14 @@ namespace Outlaws.WorldShift
                     stripe.localRotation = Quaternion.Euler(0, 0, -30);
                 }
             }
+            // One filled silhouette: unmistakable triangular heads and a narrower connecting shaft.
+            float half = Mathf.Min(size.x * .38f, 1.8f);
+            owner.arrowMesh = BuildArrowMesh(half);
+            foreach (float face in new[] { -1f, 1f })
+                Arrow(root.transform, owner.arrowMesh, new Vector3(0f, deck+.06f, face*(size.z*.5f+.04f)),
+                    Quaternion.identity, Vector3.forward*face);
+            Arrow(root.transform, owner.arrowMesh, new Vector3(0f,deck+.25f,-size.z*.5f+.27f),
+                Quaternion.Euler(90f,0f,0f),Vector3.up);
             // Wheels roll sideways: axles run along the road, with visible hubs on approach faces.
             foreach (float x in new[] { -.32f, .32f })
                 foreach (float z in new[] { -.5f, .5f })
@@ -73,6 +88,34 @@ namespace Outlaws.WorldShift
             root.AddComponent<MeshFilter>().sharedMesh=owner.spikes;
             root.AddComponent<MeshRenderer>().sharedMaterial=steel;
         }
+        private static Mesh BuildArrowMesh(float half)
+        {
+            float neck = half - .43f;
+            var vertices = new[] {
+                new Vector3(-neck,-.055f,0),new Vector3(-neck,.055f,0),
+                new Vector3(neck,.055f,0),new Vector3(neck,-.055f,0),
+                new Vector3(-half,0,0),new Vector3(-neck,.19f,0),new Vector3(-neck,-.19f,0),
+                new Vector3(half,0,0),new Vector3(neck,-.19f,0),new Vector3(neck,.19f,0)
+            };
+            int[] front={0,1,2,0,2,3,4,5,6,7,8,9};
+            var triangles=new List<int>(front);
+            for(int i=0;i<front.Length;i+=3){triangles.Add(front[i+2]);triangles.Add(front[i+1]);triangles.Add(front[i]);}
+            var mesh=new Mesh {name="Filled left right arrow"};mesh.vertices=vertices;
+            mesh.SetTriangles(triangles,0);mesh.RecalculateNormals();mesh.RecalculateBounds();return mesh;
+        }
+        private static void Arrow(Transform parent,Mesh mesh,Vector3 position,Quaternion rotation,Vector3 outward)
+        {
+            for(int layer=0;layer<2;layer++)
+            {
+                var obj=new GameObject(layer==0?"Direction arrow outline":"White triangular direction arrow",typeof(MeshFilter),typeof(MeshRenderer));
+                obj.transform.SetParent(parent,false);obj.transform.localPosition=position+outward*(layer*.012f);
+                obj.transform.localRotation=rotation;
+                obj.transform.localScale=layer==0?new Vector3(1.045f,1.22f,1f):Vector3.one;
+                obj.GetComponent<MeshFilter>().sharedMesh=mesh;
+                obj.GetComponent<MeshRenderer>().sharedMaterial=layer==0?dark:arrowWhite;
+                obj.GetComponent<MeshRenderer>().shadowCastingMode=UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+        }
         private static Transform Box(Transform parent, Vector3 at, Vector3 size, Material material)
         {
             var box=GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -89,6 +132,6 @@ namespace Outlaws.WorldShift
             material.SetFloat("_Metallic",metal);material.SetFloat("_Smoothness",.55f);material.SetFloat("_Glossiness",.55f);
             material.EnableKeyword("_EMISSION");material.SetColor("_EmissionColor",color*.18f);return material;
         }
-        private void OnDestroy(){if(spikes!=null)Destroy(spikes);}
+        private void OnDestroy(){if(spikes!=null)Destroy(spikes);if(arrowMesh!=null)Destroy(arrowMesh);}
     }
 }

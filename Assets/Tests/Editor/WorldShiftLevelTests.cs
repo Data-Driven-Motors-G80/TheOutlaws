@@ -819,7 +819,13 @@ public sealed class WorldShiftLevelTests
 
         game.GetType().GetField("checkpointIndex", Flags).SetValue(game, 4);
         Call(game, "RetryCheckpoint");
+        Assert.That(Get(game, "TrainingFreezeStep"), Is.EqualTo(3), "Completed demo survives checkpoint retry.");
+        Assert.That(Get(game, "TrainingFreezeWaiting"), Is.False);
+        // A new run must teach the demonstration again.
+        Call(game, "RestartRun");
         Assert.That(Get(game, "TrainingFreezeStep"), Is.EqualTo(0));
+        game.GetType().GetField("checkpointIndex", Flags).SetValue(game, 4);
+        Call(game, "RetryCheckpoint");
         game.GetType().GetField("trainingLessonRead", Flags).SetValue(game, true);
         Pose(game, 740f, 4f);
         Call(game, "TrySwitch");
@@ -846,7 +852,7 @@ public sealed class WorldShiftLevelTests
         Assert.That(Get(game, "State").ToString(), Is.EqualTo("Retrying"), "Frozen sliders remain solid.");
         Step(game, 3f);
         Assert.That(Get(game, "CheckpointIndex"), Is.EqualTo(4));
-        Assert.That(Get(game, "TrainingFreezeStep"), Is.EqualTo(0));
+        Assert.That(Get(game, "TrainingFreezeStep"), Is.EqualTo(3), "A crash does not erase the completed freeze lesson.");
     }
 
     [UnityTest]
@@ -953,16 +959,17 @@ public sealed class WorldShiftLevelTests
         Step(game, 1f);
         Assert.That(Get(game, "State").ToString(), Is.EqualTo("Retrying"));
         Assert.That(analytics.Last(a => a.name == "wl_death").data["lane"], Is.EqualTo("M"));
-        for (int i = 0; i < 400 && !(bool)Get(game, "TrainingLessonPaused"); i++) Call(game, "StepSimulation", .05f, 0f, false);
-        Assert.That(Get(game, "TrainingLessonPaused"), Is.True, "The sign returns after a crash.");
-        Assert.That(analytics.Last(a => a.name == "wl_sign_shown").data["view"], Is.EqualTo(2));
-        // A manual restart while the sign is up closes that view and counts as another try.
+        Step(game, 3f); // Finish the capture and restore the checkpoint.
+        Step(game, 1.1f); // Pass the already-read sign again.
+        Assert.That(Get(game, "TrainingLessonPaused"), Is.False, "Acknowledged instructions stay dismissed after a crash.");
+        Assert.That(analytics.Count(a => a.name == "wl_sign_shown"), Is.EqualTo(1));
         Call(game, "RetryCheckpoint");
-        Assert.That(analytics.Last(a => a.name == "wl_sign_read").data["how"], Is.EqualTo("restart"));
+        Step(game, 1.1f);
+        Assert.That(Get(game, "TrainingLessonPaused"), Is.False, "Manual checkpoint retry also remembers read signs.");
 
         Static(TypeFor("WorldShiftLevelAnalytics"), "EndAttempt", "menu");
         var row = analytics.Single(a => a.sheet == "ws_level_attempts").data;
-        Assert.That(row["reads_0"], Is.EqualTo(2));
+        Assert.That(row["reads_0"], Is.EqualTo(1));
         Assert.That((float)row["read_0"], Is.GreaterThanOrEqualTo(.45f), "First reading of the sign.");
         Assert.That((float)row["read_total_0"], Is.GreaterThanOrEqualTo((float)row["read_0"]));
         Assert.That((float)row["read_s"], Is.GreaterThanOrEqualTo(.45f));
@@ -973,6 +980,12 @@ public sealed class WorldShiftLevelTests
         StringAssert.IsMatch(@"^\d+:M:crash$", (string)row["fails_0"]);
         Assert.That(row["quit_on_sign"], Is.EqualTo(-1));
         Assert.That((float)row["freeze_demo_s"], Is.EqualTo(-1f));
+        Call(game, "RestartRun");
+        Step(game, 1.1f);
+        Assert.That(Get(game, "TrainingLessonPaused"), Is.True, "A fresh run shows instructions again.");
+        Call(game, "RetryCheckpoint");
+        Step(game, 1.1f);
+        Assert.That(Get(game, "TrainingLessonPaused"), Is.True, "An instruction not acknowledged with Enter must still show.");
         yield return null;
     }
 }

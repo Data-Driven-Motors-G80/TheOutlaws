@@ -32,7 +32,8 @@ namespace Outlaws.WorldShift
         public int CheckpointIndex => checkpointIndex;
         public bool TrainingLessonPaused { get; private set; }
         private bool trainingLessonRead;
-        // Debounce only (the card's fade-in): a Space press already in flight is not a decision to continue.
+        private readonly System.Collections.Generic.HashSet<int> completedTrainingSigns = new System.Collections.Generic.HashSet<int>();
+        // Debounce the card fade-in; Enter acknowledges instructions.
         private const float TrainingSignInputDelay = .35f;
         private float trainingSignShownAt = float.NegativeInfinity;
         public int TrainingFreezeStep { get; private set; }
@@ -322,6 +323,7 @@ namespace Outlaws.WorldShift
             {
                 TrainingLessonPaused = false;
                 trainingLessonRead = true;
+                if (LevelMode && course.Training) completedTrainingSigns.Add(checkpointIndex);
                 if (LevelMode) WorldShiftLevelAnalytics.SignRead();
             }
         }
@@ -329,6 +331,8 @@ namespace Outlaws.WorldShift
         public void RestartRun()
         {
             if (GetawayMode) { WorldShiftFlow.StartGetaway(false); return; }
+            completedTrainingSigns.Clear();
+            TrainingFreezeStep = 0;
             checkpointIndex = 0;
             Deaths = Switches = 0;
             Hits = 0;
@@ -533,7 +537,7 @@ namespace Outlaws.WorldShift
                 if (checkpointIndex + 1 < Checkpoints.Length && Distance >= Checkpoints[checkpointIndex + 1].Distance)
                 {
                     checkpointIndex++;
-                    trainingLessonRead = false;
+                    trainingLessonRead = completedTrainingSigns.Contains(checkpointIndex);
                     if (tutorialLevel) WorldShiftAnalytics.TutorialStep(checkpointIndex, Checkpoints[checkpointIndex].Title);
                     if (LevelMode)
                     {
@@ -608,14 +612,78 @@ namespace Outlaws.WorldShift
             if (pursuit.IsGameOver) Fail("CAUGHT");
         }
 
+        private bool policeReady, policeCapturing;
+        private float policeCaptureTime, policeCaptureStart, policeCaptureX;
+        private readonly WorldShiftPolicePursuit policePursuit = new WorldShiftPolicePursuit();
+        private readonly System.Collections.Generic.List<WorldShiftPolicePursuit.Obstacle> policeObstacles = new System.Collections.Generic.List<WorldShiftPolicePursuit.Obstacle>();
+        public float PoliceRoadDistance => LevelMode ? policePursuit.Distance : Distance - 9.3f;
+        private bool PoliceAirborne(float at)
+        {
+            foreach(var section in RelayLayout)
+                if(at>=section.Takeoff && at<section.Landing) return true;
+            return false;
+        }
+        private void CollectPoliceObstacles()
+        {
+            policeObstacles.Clear();
+            foreach(var h in Hazards)
+            {
+                if(!WorldShiftCombat.IsActive(Combat,h) || !h.VisibleIn(World) || h.Kind==ShiftHazardKind.Gap) continue;
+                void Add(float start,float end,float left,float right)
+                { policeObstacles.Add(new WorldShiftPolicePursuit.Obstacle(h,start,end,left,right)); }
+                if(h.Gate!=null)
+                {
+                    if(!h.Gate.Airborne) Add(h.Gate.Distance-h.Gate.Size.z*.5f,h.Gate.Distance+h.Gate.Size.z*.5f,
+                        h.Gate.Lateral-h.Gate.Size.x*.5f,h.Gate.Lateral+h.Gate.Size.x*.5f);
+                    continue;
+                }
+                if(h.Rock!=null)
+                {
+                    if(!h.Rock.Airborne) Add(h.Rock.Distance-h.Rock.Radius,h.Rock.Distance+h.Rock.Radius,
+                        h.Rock.Lateral-h.Rock.Radius,h.Rock.Lateral+h.Rock.Radius);
+                    continue;
+                }
+                // Bounds are evaluated at PLAYER progress, exactly as the rendered oncoming traffic.
+                h.BoundsAt(Distance,out float start,out float end);
+                if(h.LateralMotion) Add(start,end,h.LateralOffset-WorldShiftSpikePlatform.Width*.5f,h.LateralOffset+WorldShiftSpikePlatform.Width*.5f);
+                else if(h.Kind==ShiftHazardKind.HalfBarrier) Add(start,end,h.HalfSide<0?-5f:0f,h.HalfSide<0?0f:5f);
+                else for(int lane=0;lane<3;lane++)
+                {
+                    if((h.LaneMask & (1<<lane))==0) continue;
+                    float x=(lane-1)*WorldShiftLevel.RoadWidth/3f;
+                    Add(start,end,x-WorldShiftLevel.RoadWidth/6f,x+WorldShiftLevel.RoadWidth/6f);
+                }
+            }
+        }
+
         private void UpdatePolice(float deltaTime)
         {
             if (Police == null) return;
             if (LevelMode)
             {
-                // The cruiser trails at a fixed distance and only closes in after a crash.
-                bool capture = Capturing;
-                Police.StepFinite(deltaTime, Distance, capture ? Lateral + (Lateral > 0f ? -2.6f : 2.6f) : Lateral, capture ? 0f : LevelPoliceGap);
+                if(!policeReady) { policePursuit.Reset(Distance,Lateral); policeReady=true; }
+                if(Capturing)
+                {
+                    // Capture remains scripted: a player crash always retries the checkpoint.
+                    if(!policeCapturing)
+                    {
+                        policeCaptureTime=0f; policeCaptureStart=policePursuit.Distance; policeCaptureX=policePursuit.Lateral;
+                    }
+                    policeCapturing=true;
+                    policeCaptureTime+=deltaTime;
+                    float t=Mathf.Clamp01(policeCaptureTime/1.2f);
+                    t=1f-Mathf.Pow(1f-t,3f);
+                    Police.PresentFinitePose(deltaTime,Mathf.Lerp(policeCaptureStart,Distance-3.3f,t),
+                        Mathf.Lerp(policeCaptureX,Lateral+(Lateral>0f?-2.6f:2.6f),t),Distance,0f);
+                }
+                else
+                {
+                    policeCapturing=false;
+                    CollectPoliceObstacles();
+                    float limit=Mathf.Max(0f,Route.Sample(policePursuit.Distance).Width*.5f-1f);
+                    policePursuit.Step(deltaTime,Distance,Lateral,Speed,limit,policeObstacles,PoliceAirborne);
+                    Police.PresentFinitePose(deltaTime,policePursuit.Distance,policePursuit.Lateral,Distance,policePursuit.Jolt);
+                }
                 return;
             }
             // Like the original chase, compress logical distance into a readable mirror gap.
@@ -783,7 +851,9 @@ namespace Outlaws.WorldShift
 
         private void RestoreCheckpoint()
         {
-            TrainingFreezeStep = 0;
+            // Preserve finished demonstrations for this run; incomplete sequences start fresh
+            // because retry restores the checkpoint world and mover positions.
+            if (!trainingFreezeDemonstrated) TrainingFreezeStep = 0;
             if (LevelMode)
             {
                 WorldShiftLevelAnalytics.Respawned(Checkpoints[checkpointIndex].World);
@@ -806,7 +876,7 @@ namespace Outlaws.WorldShift
             State = ShiftRunState.Running;
             if (LevelMode && TrainingLessonPaused) WorldShiftLevelAnalytics.SignRead("restart");
             TrainingLessonPaused = false;
-            trainingLessonRead = false;
+            trainingLessonRead = completedTrainingSigns.Contains(checkpointIndex);
             hintRemaining = 10f;
             fuel.Reset(checkpointFuel);
             pursuit.Restore(new RiskRunSnapshot(checkpointGap, false, 0, false, 0, 0, PickupEffectType.None, 0f, 0f, 0f));
@@ -826,6 +896,7 @@ namespace Outlaws.WorldShift
             wasMerged = IsMerged;
             riftEntryWorld = checkpoint.World;
             ApplyWorld(IsMerged ? WorldShiftLevel.WorldAt(Lateral) : checkpoint.World);
+            policeReady=false; policeCapturing=false;
             UpdatePolice(0f);
             UpdateCamera(true);
             Notify("CHECKPOINT " + (checkpointIndex + 1), 2f);

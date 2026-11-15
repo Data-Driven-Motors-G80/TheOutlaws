@@ -153,7 +153,7 @@ namespace Outlaws.WorldShift
                 if (game.LevelMode) WorldShiftSpikePlatform.Build(solid.transform, Vector3.zero, data.Gate.Size);
                 else WorldShiftObstacleVisual.Build(solid.transform, Vector3.zero, data.Gate.Size, sideMoverPalette);
                 WorldShiftLevelProps.SlidingGateHint(solid.transform);
-                if (game.LevelMode) BuildFrozenCue(root, Vector3.zero, data.Gate.Size);
+                if (game.LevelMode) BuildFrozenCue(root, Vector3.zero, data.Gate.Size, true);
                 hazards.Add(new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk });
                 return;
             }
@@ -205,7 +205,7 @@ namespace Outlaws.WorldShift
                     WorldShiftLevelProps.SlidingGateHint(frame, size.z, smallBlock: true);
                 if (game.LevelMode && data.SharedAcrossWorlds
                     && (data.LateralMotion || data.MotionSpeed > 0f))
-                    BuildFrozenCue(frame, centre, size);
+                    BuildFrozenCue(frame, centre, size, data.LateralMotion);
                 if (dashes != null) WorldShiftLevelProps.DashedOutline(ghostFrame, centre, size, dashes);
             }
             if (data.Kind == ShiftHazardKind.Gap)
@@ -323,9 +323,9 @@ namespace Outlaws.WorldShift
                     Box(root, "Finish chequer", new Vector3(-4.5f + i, .03f, row - .5f), new Vector3(1f, .04f, 1f), (i + row) % 2 == 0 ? marker : black);
         }
 
-        private void BuildFrozenCue(Transform parent, Vector3 centre, Vector3 size)
+        private void BuildFrozenCue(Transform parent, Vector3 centre, Vector3 size, bool spikePlatform = false)
         {
-            var ice = WorldShiftFrozenIce.Build(parent, centre, size).GetComponent<WorldShiftFrozenIce>();
+            var ice = WorldShiftFrozenIce.Build(parent, centre, size, spikePlatform ? size.y * .34f : float.PositiveInfinity).GetComponent<WorldShiftFrozenIce>();
             ice.SetFrozen(world == ShiftWorld.Echo, true);
             frozenCues.Add(ice);
         }
@@ -429,7 +429,8 @@ namespace Outlaws.WorldShift
             }
             foreach (var chunk in chunks)
             {
-                bool visible = Mathf.Max(chunk.At, chunk.End) > distance - chunk.Tail && chunk.At < distance + 270f
+                float trailingDistance = game.LevelMode ? Mathf.Min(distance, game.PoliceRoadDistance) : distance;
+                bool visible = Mathf.Max(chunk.At, chunk.End) > trailingDistance - chunk.Tail && chunk.At < distance + 270f
                     && (!chunk.CityBlock || !route.IsForkScenery(chunk.At));
                 if (chunk.Root.activeSelf != visible) chunk.Root.SetActive(visible);
             }

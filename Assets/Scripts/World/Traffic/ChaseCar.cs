@@ -78,6 +78,22 @@ public sealed class ChaseCar : MonoBehaviour
         finitePoseReady = true;
     }
 
+    /// <summary>Render the level AI pose without adding a second steering filter.</summary>
+    public void PresentFinitePose(float delta, float distance, float lateral, float playerDistance, float jolt)
+    {
+        if (finiteRoute == null) return;
+        var point = finiteRoute(distance);
+        bool snap = !finitePoseReady || delta <= 0f;
+        float velocity = snap ? 0f : (lateral - previousLateralOffset) / delta;
+        transform.position = point.Position + point.Right * lateral + point.Up * .08f;
+        TurnAlong(point, velocity, delta, snap);
+        if (jolt > 0f) transform.rotation *= Quaternion.Euler(0f, 0f, Mathf.Sin(jolt * 55f) * 4f);
+        previousLateralOffset = lateral;
+        displayedBumperGap = Mathf.Max(0f, playerDistance - distance - 3.3f);
+        DistanceToPlayer = displayedBumperGap;
+        finitePoseReady = true;
+    }
+
     public void HitByShot()
     {
         if (player != null)

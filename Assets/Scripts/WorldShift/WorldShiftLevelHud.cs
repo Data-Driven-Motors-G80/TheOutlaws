@@ -23,6 +23,9 @@ namespace Outlaws.WorldShift
         private bool completeShown;
         private GameObject freezePrompt;
         private TMP_Text freezeAction, freezeState, collectionStatus;
+        private readonly List<Image> freezeProgressDots = new List<Image>();
+        private int previousFreezeStep;
+        private float freezeCompleteRemaining;
         private CanvasGroup lessonGroup;
         private RectTransform signPreview;
         private RawImage signImage;
@@ -166,7 +169,7 @@ namespace Outlaws.WorldShift
 
         private void BuildFreezePrompt(Transform parent)
         {
-            var border = FreezeBox(parent, "Freeze demonstration", new Vector2(.30f, .045f), new Vector2(.70f, .185f), FreezeTeal, true);
+            var border = FreezeBox(parent, "Freeze demonstration", new Vector2(.26f, .045f), new Vector2(.74f, .195f), FreezeTeal, true);
             freezePrompt = border.gameObject;
             var face = FreezeBox(border, "Dark face", Vector2.zero, Vector2.one, new Color(.025f, .045f, .06f, .98f), true);
             face.offsetMin = new Vector2(3f, 3f); face.offsetMax = new Vector2(-3f, -3f);
@@ -174,9 +177,24 @@ namespace Outlaws.WorldShift
             freezeState.color = FreezeTeal;
             freezeState.fontStyle = FontStyles.Bold;
             freezeState.alignment = TextAlignmentOptions.Center;
-            face = WorldShiftMenu.Panel(face, "Freeze controls", Vector2.zero, new Vector2(1f, .72f), Color.clear);
-            FreezeKey(face, "SPACE", .10f, .48f);
-            freezeAction = FreezeLabel(face, "FREEZE", .53f, .93f, 28f);
+            freezeAction = WorldShiftMenu.Label(face, "SPACE: FREEZE SPIKES", .04f, .29f, .96f, .70f, 28f);
+            freezeAction.color = Color.white;
+            freezeAction.fontStyle = FontStyles.Bold;
+            freezeAction.alignment = TextAlignmentOptions.Center;
+            freezeAction.textWrappingMode = TextWrappingModes.NoWrap;
+            freezeAction.fontSizeMin = 14f;
+            for (int i = 0; i < 3; i++)
+            {
+                var rim = WorldShiftMenu.Panel(face, "Freeze step " + (i+1), new Vector2(.5f,.15f),new Vector2(.5f,.15f),FreezeTeal);
+                rim.anchoredPosition = new Vector2((i-1)*30f,0f);
+                rim.sizeDelta = new Vector2(18f,18f);
+                rim.GetComponent<Image>().sprite = WorldShiftIcons.Get(ShiftIcon.Circle);
+                rim.GetComponent<Image>().raycastTarget = false;
+                var fill = WorldShiftMenu.Panel(rim,"Progress fill",new Vector2(.18f,.18f),new Vector2(.82f,.82f),Ink).GetComponent<Image>();
+                fill.sprite = WorldShiftIcons.Get(ShiftIcon.Circle);
+                fill.raycastTarget = false;
+                freezeProgressDots.Add(fill);
+            }
             freezePrompt.SetActive(false);
         }
 
@@ -316,10 +334,17 @@ namespace Outlaws.WorldShift
             if (collectionStatus != null)
                 collectionStatus.text = game.MissedRequiredItem ? (oceanHud ? "MISS - RETRY" : "MISSED DIAMOND - RETRY")
                     : (oceanHud ? "" : "DIAMONDS ") + game.Collection.Count + " / " + game.Course.RequiredItems.Length;
-            freezePrompt.SetActive(game.TrainingFreezeWaiting && !game.TrainingLessonPaused && game.State == ShiftRunState.Running);
+            int freezeStep = Mathf.Clamp(game.TrainingFreezeStep,0,3);
+            if (freezeStep == 3 && previousFreezeStep < 3) freezeCompleteRemaining = .65f;
+            if (freezeStep < 3) freezeCompleteRemaining = 0f;
+            previousFreezeStep = freezeStep;
+            if (game.State == ShiftRunState.Running) freezeCompleteRemaining = Mathf.Max(0f,freezeCompleteRemaining-Time.unscaledDeltaTime);
+            bool showCompletion = game.Course.Training && game.CheckpointIndex == 4 && freezeCompleteRemaining > 0f;
+            freezePrompt.SetActive((game.TrainingFreezeWaiting || showCompletion) && !game.TrainingLessonPaused && game.State == ShiftRunState.Running);
+            for (int i=0;i<freezeProgressDots.Count;i++) freezeProgressDots[i].color = i<freezeStep ? FreezeTeal : Ink;
             bool day = game.World == ShiftWorld.Day;
             freezeState.text = day ? "DAY - MOVING" : "NIGHT - FROZEN";
-            freezeAction.text = day ? "FREEZE" : "RELEASE";
+            freezeAction.text = freezeStep == 3 ? "COMPLETE" : day ? "SPACE: FREEZE SPIKES" : "SPACE: MOVE SPIKES";
             if (freezeEdges != null)
             {
                 if (previousFeedbackWorld != game.World && game.World == ShiftWorld.Echo

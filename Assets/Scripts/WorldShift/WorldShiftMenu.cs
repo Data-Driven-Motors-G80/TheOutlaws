@@ -30,7 +30,7 @@ namespace Outlaws.WorldShift
             Rect area = Screen.safeArea;
             safe.anchorMin = new Vector2(area.xMin / Screen.width, area.yMin / Screen.height);
             safe.anchorMax = new Vector2(area.xMax / Screen.width, area.yMax / Screen.height);
-            var wordmark = Label(safe, "WorldShift", .20f, .74f, .80f, .88f, 52f);
+            var wordmark = Label(safe, "Wee Woo Run", .20f, .74f, .80f, .88f, 52f);
             wordmark.fontStyle = FontStyles.Bold;
             wordmark.color = Cream;
             wordmark.alignment = TextAlignmentOptions.Center;

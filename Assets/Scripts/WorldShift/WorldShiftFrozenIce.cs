@@ -32,7 +32,7 @@ namespace Outlaws.WorldShift
             transform.localScale = new Vector3(1f, Mathf.Max(.025f, growth), 1f);
         }
         private static Material clearIce, frost;
-        public static GameObject Build(Transform parent, Vector3 centre, Vector3 size)
+        public static GameObject Build(Transform parent, Vector3 centre, Vector3 size, float maxHeight = float.PositiveInfinity)
         {
             var root = new GameObject("Frozen ice base");
             root.transform.SetParent(parent, false);
@@ -46,7 +46,7 @@ namespace Outlaws.WorldShift
             const int stride = count + 1;
             var body = new List<int>();
             var rims = new List<int>();
-            float height = Mathf.Min(1.15f, size.y * .58f);
+            float height = Mathf.Min(1.15f, size.y * .58f, maxHeight);
             Vector3 Point(int i, float spread, float y)
             {
                 float a = i * Mathf.PI * 2f / count;
