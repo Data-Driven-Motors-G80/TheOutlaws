@@ -244,6 +244,11 @@ namespace Outlaws.WorldShift
             presentation.Build(this, Route, visual, view, sun);
             ApplyWorld(ShiftWorld.Day);
             Police = ChaseCar.CreateForFiniteRoute(policePrefab, transform, Player, d => Route.SampleDriver(d, relay != null ? relay.SamplePolice(d) : Route.Sample(d), Lateral));
+            if (LevelMode)
+            {
+                var policeArt=Police.GetComponentInChildren<WorldShiftPoliceCarArt>();
+                policeArt.gameObject.AddComponent<WorldShiftPoliceEmergencyEffects>().Bind(this);
+            }
             UpdatePolice(0f);
             if (!GetawayMode && !tutorialLevel && !LevelMode)
             {
@@ -257,7 +262,11 @@ namespace Outlaws.WorldShift
                 TutorialRewards = gameObject.AddComponent<WorldShiftTutorialRewards>(); TutorialRewards.Bind(this);
                 WorldShiftAnalytics.BeginTutorial(Checkpoints.Length, () => Distance, () => Duration, () => World);
             }
-            if (LevelMode) gameObject.AddComponent<WorldShiftLevelHud>().Bind(this);
+            if (LevelMode)
+            {
+                gameObject.AddComponent<WorldShiftLevelAudio>().Bind(this);
+                gameObject.AddComponent<WorldShiftLevelHud>().Bind(this);
+            }
             else if (GetawayMode) { Getaway = gameObject.AddComponent<WorldShiftGetaway>(); Getaway.Bind(this); }
             else gameObject.AddComponent<WorldShiftHud>().Bind(this);
             if (splitViewValidation) gameObject.AddComponent<WorldShiftSplitView>().Initialize(this, view);

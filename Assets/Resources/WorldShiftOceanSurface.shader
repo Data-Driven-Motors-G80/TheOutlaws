@@ -26,6 +26,15 @@ Shader "The Outlaws/Ocean Coast Surface"
                 half4 _BaseColor;
                 half _Emission, _Grain, _Smoothness, _Specular, _Finish, _Wear;
             CBUFFER_END
+            float4 _PoliceBeaconRed, _PoliceBeaconBlue;
+            half3 PoliceLight(float3 position,half3 normal,float4 beacon,half3 colour)
+            {
+                float3 offset=beacon.xyz-position;
+                float distanceSquared=dot(offset,offset);
+                half attenuation=saturate(1-distanceSquared/81.0);
+                attenuation=attenuation*attenuation/(1+distanceSquared*.32);
+                return colour*beacon.w*attenuation*saturate(dot(normal,SafeNormalize(offset)));
+            }
             struct A { float4 p:POSITION; float3 n:NORMAL; half4 c:COLOR; };
             struct V { float4 p:SV_POSITION; float3 world:TEXCOORD0; half3 n:TEXCOORD1; half4 c:COLOR; half fog:TEXCOORD2; };
             V Vert(A i)
@@ -65,6 +74,8 @@ Shader "The Outlaws/Ocean Coast Surface"
                     half fresnel=pow(1-saturate(dot(n,viewDirection)),4);
                     c=lerp(c,half3(.24,.43,.52)*_BaseColor.rgb,fresnel*.48);
                 }
+                c+=albedo*(PoliceLight(i.world,n,_PoliceBeaconRed,half3(1,.055,.075))
+                    +PoliceLight(i.world,n,_PoliceBeaconBlue,half3(.055,.25,1)))*(1-_Emission);
                 return half4(MixFog(c,i.fog),1);
             }
             ENDHLSL

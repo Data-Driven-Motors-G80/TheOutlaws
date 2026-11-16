@@ -1,0 +1,23 @@
+fileFormatVersion: 2
+guid: 4587ba41b8d741be93823ecb33c98f9d
+AudioImporter:
+  externalObjects: {}
+  serializedVersion: 7
+  defaultSettings:
+    serializedVersion: 2
+    loadType: 0
+    sampleRateSetting: 0
+    sampleRateOverride: 22050
+    compressionFormat: 1
+    quality: 0.8
+    conversionMode: 0
+  platformSettingOverrides: {}
+  forceToMono: 1
+  normalize: 0
+  preloadAudioData: 1
+  loadInBackground: 0
+  ambisonic: 0
+  3D: 1
+  userData: Original synthesized seamless police wail, 3.2 seconds, 570-1040 Hz.
+  assetBundleName:
+  assetBundleVariant:

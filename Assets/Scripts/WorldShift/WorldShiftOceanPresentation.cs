@@ -579,6 +579,7 @@ namespace Outlaws.WorldShift
             chime.SetData(samples, 0);
             audioSource = gameObject.AddComponent<AudioSource>();
             audioSource.playOnAwake = false; audioSource.spatialBlend = 0f; audioSource.volume = .3f;
+            WorldShiftAudioGain.Bind(audioSource, game, .3f);
         }
 
         public void SetWorld(ShiftWorld next)

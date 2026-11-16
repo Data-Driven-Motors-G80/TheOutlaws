@@ -68,8 +68,8 @@ checkpoint notice animate smoothly. The checkpoint notice remains below the
 counter, above the driving sight line; missed-item retries retain clear feedback.
 
 The pursuing police use the shared black-and-white patrol cruiser, with POLICE
-livery on the doors, bonnet and rear, a roof unit number and steady red/blue
-light-bar lenses. Ocean retains that marked model in both worlds, alongside its
+livery on the doors, bonnet and rear, a roof unit number and alternating red/blue
+roof beacons. Ocean retains that marked model in both worlds, alongside its
 existing contact shadow. Catch-up timing and checkpoint retries are unchanged.
 
 The four saved checkpoints use coastal road gantries at the exact respawn
@@ -90,3 +90,38 @@ unchanged.
 
 Ocean uses the same player and police model factories as the other levels; it
 adds its coastal lighting and contact shadows without creating vehicle overrides.
+
+The shared cruiser has a looping, distance-attenuated police wail and alternating
+red/blue lights with local spill on nearby surfaces in both worlds. Audio fades
+in and grows louder as the cruiser approaches the player, reaching full volume
+within 8 m and fading out by 70 m. Distance is measured from the player car,
+with stereo positioning preserved independently of the chase camera. Pausing
+or a stopped Training lesson suspends the sound and light cycle; resuming keeps
+their phase. Completion, non-capture retries and scene cleanup stop the effects.
+The siren is an original locally synthesized 3.2-second mono loop (570–1040 Hz),
+not an external recording. Police AI, collision rules and retry timing are unchanged.
+
+### Driving audio
+
+All current levels have a speed-responsive engine, tyre squeal during sharp ground
+steering, ramp takeoff, landing, collision and completion sounds. Airborne engine
+volume drops and the engine free-revs slightly. Ocean adds coastal wind/waves,
+sparse daytime gull calls and the full licensed instrumental song "Surf Shimmy" by Kevin MacLeod. All five
+environments have a distinct licensed song; Training stays quiet. Night smoothly
+softens the same recording over .75 s without changing its playback position.
+Ocean ambience remains exclusive to Ocean.
+
+Pause has separate Music and Effects sliders, saved in `ws_audio_music` and
+`ws_audio_effects`. Effects includes the engine, ambience, cues, existing diamond
+and checkpoint chimes, traffic warning horns and the police siren. Sound playback
+pauses with gameplay and stopped Training lessons. Music ducks on retry and
+makes room for a short completion sting on success. Existing collection chimes
+are reused rather than doubled. Gameplay and level unlocks are unchanged.
+
+The effects WAVs are original synthetic audio. Rebuild them with
+`python3 Tools/Audio/generate_game_audio.py` from the repository root; this uses
+only the Python standard library and preserves existing asset GUIDs. Licensed
+songs are separate full recordings under `Assets/Resources/WorldShiftMusic`, with
+source URLs, hashes and CC BY 4.0 attribution in `CREDITS.txt`. Pause has Music
+credits with links to the composer and license. The police siren is capped at .04
+instead of .15 and low-pass filtered at 1600 Hz to leave space for the soundtrack.

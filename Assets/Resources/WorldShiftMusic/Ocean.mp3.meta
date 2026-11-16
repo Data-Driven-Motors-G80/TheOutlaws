@@ -1,0 +1,23 @@
+fileFormatVersion: 2
+guid: 2cbd6a914c9a46908d48aa83fce00778
+AudioImporter:
+  externalObjects: {}
+  serializedVersion: 7
+  defaultSettings:
+    serializedVersion: 2
+    loadType: 1
+    sampleRateSetting: 0
+    sampleRateOverride: 22050
+    compressionFormat: 1
+    quality: 0.65
+    conversionMode: 0
+  platformSettingOverrides: {}
+  forceToMono: 0
+  normalize: 0
+  preloadAudioData: 1
+  loadInBackground: 0
+  ambisonic: 0
+  3D: 1
+  userData: Surf Shimmy - Kevin MacLeod. CC BY 4.0; see CREDITS.txt.
+  assetBundleName:
+  assetBundleVariant:
