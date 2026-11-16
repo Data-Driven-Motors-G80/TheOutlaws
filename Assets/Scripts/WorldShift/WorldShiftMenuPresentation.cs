@@ -27,7 +27,7 @@ namespace Outlaws.WorldShift
             menuSafe.anchorMin=new Vector2(area.xMin/Screen.width,area.yMin/Screen.height);
             menuSafe.anchorMax=new Vector2(area.xMax/Screen.width,area.yMax/Screen.height);
             var stripe=Panel(menuSafe,"Brand accent",new Vector2(.05f,.955f),new Vector2(.10f,.961f),RouteTeal);RoundCard(stripe);
-            var wordmark=MenuText(menuSafe,"WORLDSHIFT",.05f,.86f,.70f,.94f,50,Cream,FontStyles.Bold);wordmark.characterSpacing=3;
+            var wordmark=MenuText(menuSafe,"WEE WOO RUN",.05f,.86f,.70f,.94f,50,Cream,FontStyles.Bold);wordmark.characterSpacing=3;
             MenuText(menuSafe,"Choose your escape",.05f,.795f,.70f,.85f,22,Muted);
             completedLabel=MenuText(menuSafe,"00 / 06",.75f,.82f,.95f,.90f,30,RouteTeal,FontStyles.Bold);
             completedLabel.alignment=TextAlignmentOptions.Right;

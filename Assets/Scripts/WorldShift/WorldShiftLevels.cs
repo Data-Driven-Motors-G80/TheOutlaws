@@ -90,7 +90,7 @@ namespace Outlaws.WorldShift
             Current = -1;
             StartWithStory = false;
             Time.timeScale = 1f;
-            WorldShiftSceneLoading.Load(WorldShiftFlow.MenuScene, "Worldshift");
+            WorldShiftSceneLoading.Load(WorldShiftFlow.MenuScene, "Wee Woo Run");
         }
     }
 }
