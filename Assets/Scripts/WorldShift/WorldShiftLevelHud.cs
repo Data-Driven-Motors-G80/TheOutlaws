@@ -17,7 +17,6 @@ namespace Outlaws.WorldShift
         private WorldShiftCity game;
         private Image worldIcon, progressFill, crashFlash;
         private RectTransform carMarker;
-        private CanvasGroup checkpointNotice;
         private readonly List<Image> pips = new List<Image>();
         private GameObject driving, pause, complete, trainingLesson;
         private bool completeShown;
@@ -102,24 +101,6 @@ namespace Outlaws.WorldShift
             carMarker.sizeDelta = new Vector2(14f, 34f);
             IconButton(driving.transform, ShiftIcon.Pause, new Vector2(.93f, .87f), 72f, () => { if (game.State == ShiftRunState.Running) game.TogglePause(); });
 
-            var notice = WorldShiftMenu.Panel(driving.transform, "Checkpoint notice", new Vector2(.5f, .83f), new Vector2(.5f, .83f), Ink);
-            notice.sizeDelta = new Vector2(360f, 60f);
-            if (collectionPanel != null)
-            {
-                // Keep a fixed 12 px gap below the counter at every screen size.
-                notice.SetParent(collectionPanel, false);
-                notice.anchorMin = notice.anchorMax = new Vector2(.5f, 0f);
-                notice.anchoredPosition = new Vector2(0f, -42f);
-            }
-            checkpointNotice = notice.gameObject.AddComponent<CanvasGroup>();
-            checkpointNotice.blocksRaycasts = false;
-            var saved = Icon(notice, ShiftIcon.Check, 40f);
-            saved.rectTransform.anchoredPosition = new Vector2(-145f, 0f);
-            saved.color = WorldShiftLevelProps.CheckpointColour;
-            var noticeText = WorldShiftMenu.Label(notice, "CHECKPOINT", .18f, 0f, .98f, 1f, 26f);
-            noticeText.color = WorldShiftLevelProps.CheckpointColour;
-            noticeText.fontStyle = FontStyles.Bold;
-            noticeText.alignment = TextAlignmentOptions.Center;
 
             BuildPauseScreen(safe);
 
@@ -325,9 +306,7 @@ namespace Outlaws.WorldShift
             carMarker.anchorMin = carMarker.anchorMax = new Vector2(progress, .5f);
             for (int i = 0; i < pips.Count; i++) pips[i].color = i < game.CheckpointIndex
                 ? WorldShiftLevelProps.CheckpointColour : new Color(1f, 1f, 1f, .55f);
-            crashFlash.color = game.State == ShiftRunState.Retrying && !game.MissedRequiredItem ? new Color(.8f, .05f, .03f, .22f) : Color.clear;
-            checkpointNotice.alpha = !game.Course.Training && game.State == ShiftRunState.Running
-                ? Mathf.Clamp01(game.CheckpointNoticeRemaining / .3f) : 0f;
+            crashFlash.color = Color.clear; // the crash vignette in WorldShiftFailureHud replaces the flat red flash
             if (oceanHud) RefreshOceanHud();
             RefreshFailurePanel();
             // Space is the switch key; a still-selected button would also receive it as "submit".

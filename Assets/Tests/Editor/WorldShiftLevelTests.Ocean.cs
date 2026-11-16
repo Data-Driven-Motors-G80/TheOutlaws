@@ -56,7 +56,7 @@ public sealed partial class WorldShiftLevelTests
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
         StartLevel(3); yield return WaitForNavigation();
-        var game=Started();var coast=Find("WorldShiftOceanPresentation");
+        var game=Started();var coast=Find("WorldShiftCheckpointGantries");
         var checkpoints=(Array)Get(game,"Checkpoints");
         var gates=((IEnumerable)Field(coast,"checkpointGates")).Cast<object>().OrderBy(g=>(int)Field(g,"Index")).ToArray();
         Assert.That(gates.Length,Is.EqualTo(checkpoints.Length-1),"Every saved landing gets one gantry; the start and finish do not.");
@@ -67,7 +67,7 @@ public sealed partial class WorldShiftLevelTests
             var root=(Transform)Field(gate,"Root");
             Assert.That(root.GetComponentsInChildren<Collider>(true),Is.Empty);
             Assert.That(root.GetComponentsInChildren<TMPro.TMP_Text>().Single().text,Is.EqualTo("CHECKPOINT"));
-            var structure=root.GetComponentsInChildren<MeshFilter>().Single(m=>m.name=="Coastal checkpoint structure");
+            var structure=root.GetComponentsInChildren<MeshFilter>().Single(m=>m.name=="Checkpoint gantry structure");
             foreach(Vector3 vertex in structure.sharedMesh.vertices)
                 if(vertex.y<5f) Assert.That(Mathf.Abs(vertex.x),Is.GreaterThan(5.5f),"All low supports must be outside the road.");
         }
@@ -122,11 +122,9 @@ public sealed partial class WorldShiftLevelTests
         Capture("ocean-checkpoint-counter-1080");
         var hud = Find("WorldShiftLevelHud");
         var counter = (RectTransform)hud.GetComponentsInChildren<Transform>(true).Single(t => t.name == "Required diamonds");
-        var notice = (RectTransform)hud.GetComponentsInChildren<Transform>(true).Single(t => t.name == "Checkpoint notice");
-        var counterCorners = new Vector3[4]; var noticeCorners = new Vector3[4];
-        counter.GetWorldCorners(counterCorners); notice.GetWorldCorners(noticeCorners);
-        Assert.That(noticeCorners.Max(c => c.y), Is.LessThan(counterCorners.Min(c => c.y)),
-            "The checkpoint notice stays below the diamond counter.");
+        Assert.That(counter, Is.Not.Null);
+        Assert.That(hud.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Checkpoint notice"), Is.False,
+            "The checkpoint gantry confirms saves; the HUD has no checkpoint pop-up.");
         Call(game, "RetryCheckpoint");
         var items = (Vector2[])Field(collection, "Items");
         Pose(game, items[1].x - 3f, 3.3f);

@@ -42,16 +42,6 @@ namespace Outlaws.WorldShift
                 diamond.rectTransform.anchoredPosition=new Vector2(-52,0);
                 lastCollection=game.Collection.Count;
             }
-            var notice=(RectTransform)checkpointNotice.transform;
-            notice.sizeDelta=new Vector2(240,40);notice.anchoredPosition=new Vector2(0,-32);
-            Round(notice,panel);
-            foreach(var text in notice.GetComponentsInChildren<TMPro.TMP_Text>()) text.fontSize=18;
-            foreach(var image in notice.GetComponentsInChildren<Image>())
-                if(image.transform!=notice)
-                {
-                    image.rectTransform.sizeDelta=new Vector2(25,25);
-                    image.rectTransform.anchoredPosition=new Vector2(-95,0);
-                }
         }
 
         private static void Round(RectTransform panel,Color colour)
@@ -78,11 +68,6 @@ namespace Outlaws.WorldShift
                 oceanCounter.localScale=Vector3.one*(1+Mathf.Sin(collectionPulse/.32f*Mathf.PI)*.07f);
                 collectionStatus.color=game.MissedRequiredItem ? new Color(1,.62f,.43f) : WorldShiftLevelProps.CollectionColour;
             }
-            float remaining=game.CheckpointNoticeRemaining;
-            float arrival=Mathf.Clamp01((2.2f-remaining)/.16f);
-            checkpointNotice.alpha=game.State==ShiftRunState.Running && remaining>0
-                ? Mathf.SmoothStep(0,1,arrival)*Mathf.Clamp01(remaining/.40f) : 0;
-            checkpointNotice.transform.localScale=Vector3.one*Mathf.Lerp(.97f,1,Mathf.SmoothStep(0,1,arrival));
         }
     }
 }

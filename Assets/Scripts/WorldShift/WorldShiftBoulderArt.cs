@@ -9,9 +9,9 @@ namespace Outlaws.WorldShift
         private Material rockMaterial, arrowMaterial;
         private GameObject arrow;
 
-        public static void Build(Transform rollingParent, Transform cueParent, float radius, bool tumbleweed = false)
+        public static void Build(Transform rollingParent, Transform cueParent, float radius, bool tumbleweed = false, bool oilDrum = false)
         {
-            var root = new GameObject(tumbleweed ? "Desert tumbleweed" : "Teal-banded desert boulder");
+            var root = new GameObject(oilDrum ? "Harbour oil drum" : tumbleweed ? "Desert tumbleweed" : "Teal-banded desert boulder");
             root.transform.SetParent(rollingParent, false);
             var owner = root.AddComponent<WorldShiftBoulderArt>();
             var rock = new WorldShiftArtMesh();
@@ -25,7 +25,8 @@ namespace Outlaws.WorldShift
                 return new Vector3(Mathf.Cos(latitude)*Mathf.Cos(longitude), Mathf.Sin(latitude),
                     Mathf.Cos(latitude)*Mathf.Sin(longitude)) * radius * variation;
             }
-            if (tumbleweed) Tumbleweed(rock, radius);
+            if (oilDrum) OilDrum(rock, radius);
+            else if (tumbleweed) Tumbleweed(rock, radius);
             else for (int ring=0; ring<rings; ring++)
                 for (int segment=0; segment<segments; segment++)
                 {
@@ -93,6 +94,41 @@ namespace Outlaws.WorldShift
                     if (R() < .3f) art.Beam(next, Vector3.ClampMagnitude(next + OnSphere(.18f), radius), width * .7f, width * .7f, colour);
                     prev = next;
                 }
+            }
+        }
+
+        // An orange oil drum lying along the road, so it rolls sideways like the Desert rocks.
+        // Body radius and half-length stay inside the gameplay sphere.
+        private static void OilDrum(WorldShiftArtMesh art, float radius)
+        {
+            const int sides = 20;
+            float r = radius * .86f, half = radius * .48f;
+            Color body = WorldShiftLevelProps.SideMoverColour, rib = body * .72f, lid = new Color(.12f, .12f, .13f);
+            rib.a = 1f;
+            Vector3 P(float a, float z, float scale) => new Vector3(Mathf.Cos(a) * r * scale, Mathf.Sin(a) * r * scale, z);
+            for (int i = 0; i < sides; i++)
+            {
+                float a = i * Mathf.PI * 2f / sides, b = (i + 1) * Mathf.PI * 2f / sides;
+                float shade = .86f + .14f * Mathf.Sin(a * 3f);
+                Color c = body * shade; c.a = 1f;
+                art.Quad(P(a, -half, 1f), P(b, -half, 1f), P(b, half, 1f), P(a, half, 1f), c);
+                // Two raised rolling ribs.
+                foreach (float z in new[] { -half * .45f, half * .45f })
+                    art.Quad(P(a, z - .05f, 1.03f), P(b, z - .05f, 1.03f), P(b, z + .05f, 1.03f), P(a, z + .05f, 1.03f), rib);
+                // Dark lids with a rim.
+                foreach (float z in new[] { -half, half })
+                {
+                    art.Triangle(new Vector3(0, 0, z), P(a, z, .97f), P(b, z, .97f), lid, true);
+                    art.Quad(P(a, z, 1f), P(b, z, 1f), P(b, z, .9f), P(a, z, .9f), rib);
+                }
+            }
+            // A pale hazard diamond on each side of the drum.
+            foreach (float a in new[] { Mathf.PI * .5f, Mathf.PI * 1.5f })
+            {
+                Vector3 n = new Vector3(Mathf.Cos(a), Mathf.Sin(a), 0f), t = new Vector3(-n.y, n.x, 0f);
+                Vector3 c = n * r * 1.005f; float s = half * .35f;
+                art.Quad(c + Vector3.forward * s, c + t * s, c - Vector3.forward * s, c - t * s, new Color(.96f, .93f, .82f));
+                art.Quad(c - t * s, c - Vector3.forward * s, c + t * s, c + Vector3.forward * s, new Color(.96f, .93f, .82f));
             }
         }
 
