@@ -30,7 +30,8 @@ namespace Outlaws.WorldShift
             if (data.Rock != null)
             {
                 WorldShiftBoulderArt.Build(solid.transform, root, data.Rock.Radius,
-                    game.LevelMode && game.Environment == ShiftLevel.Desert);
+                    game.LevelMode && game.Environment == ShiftLevel.Desert,
+                    game.LevelMode && game.Environment == ShiftLevel.Ocean);
                 if (game.LevelMode) BuildFrozenCue(root, Vector3.zero, Vector3.one * (data.Rock.Radius * 2f));
                 hazards.Add(new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk });
                 return;
@@ -43,7 +44,8 @@ namespace Outlaws.WorldShift
                     if ((data.LaneMask & (1 << lane)) == 0) continue;
                     Vector3 centre = new Vector3((lane - 1) * WorldShiftLevel.RoadWidth / 3f, .9f, 0f);
                     Vector3 size = new Vector3(3.05f, 1.8f, data.End - data.Start);
-                    var vehicle=WorldShiftRoadVehicleArt.Build(solid.transform, centre, size, moverPalette, game.Environment);
+                    var vehicle=WorldShiftRoadVehicleArt.Build(solid.transform, centre, size, moverPalette, game.Environment,
+                        Mathf.RoundToInt(data.Start * 7f) + lane * 3, data.SharedAcrossWorlds);
                     vehicle.ConfigureWarning(game,data);
                     trafficView.Traffic.Add(vehicle);
                     if (data.SharedAcrossWorlds) BuildFrozenCue(solid.transform, centre, size, true);

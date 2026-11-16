@@ -12,7 +12,7 @@ namespace Outlaws.WorldShift
         {
             if (!hazard.LateralMotion && size.x < 6f && variation % 2 == 0)
             {
-                var van=WorldShiftRoadVehicleArt.Build(parent,centre,size,palette,ShiftLevel.Ocean);
+                var van=WorldShiftRoadVehicleArt.Build(parent,centre,size,palette,ShiftLevel.Ocean,3+5*variation);
                 van.name="Parked coastal service van";
                 Contact(van.transform,new Vector3(0,-.9f+.025f,0),new Vector2(3.05f,5.5f),contact);
                 return van.transform;

@@ -72,69 +72,94 @@ namespace Outlaws.WorldShift
         private static readonly int TintId = Shader.PropertyToID("_BaseColor");
 
         public static WorldShiftRoadVehicleArt Build(Transform parent, Vector3 centre, Vector3 size,
-            WorldShiftObstacleVisual.Palette palette, ShiftLevel environment)
+            WorldShiftObstacleVisual.Palette palette, ShiftLevel environment, int variant = 0, bool shared = false)
         {
             var root = new GameObject("Oncoming traffic vehicle");
             root.transform.SetParent(parent, false);
             root.transform.localPosition = centre + Vector3.up * size.y * .175f;
             root.transform.localRotation = Quaternion.Euler(0,180,0);
             var art = root.AddComponent<WorldShiftRoadVehicleArt>();
-            art.Create(size,palette,environment);
+            art.Create(size,palette,environment,variant,shared);
             art.SetHeadlightPulse(Time.time);
             return art;
         }
 
-        private void Create(Vector3 size, WorldShiftObstacleVisual.Palette palette, ShiftLevel environment)
+        // Civilian traffic colours: never the player's red, the mover colour, the Day yellow or police black/white.
+        private static readonly Color[] CivilianPaint =
+        {
+            new Color(.16f,.36f,.62f), new Color(.13f,.45f,.33f), new Color(.72f,.74f,.76f), new Color(.92f,.92f,.88f),
+            new Color(.40f,.27f,.55f), new Color(.45f,.66f,.82f), new Color(.30f,.33f,.37f), new Color(.62f,.52f,.38f)
+        };
+
+        private void Create(Vector3 size, WorldShiftObstacleVisual.Palette palette, ShiftLevel environment, int variant, bool shared)
         {
             // Taller warning silhouette; horizontal gameplay footprint remains unchanged.
             transform.localScale = new Vector3(size.x/3.05f,size.y/1.8f*1.35f,size.z/5.5f);
             var paint=new WorldShiftArtMesh();
             var trim=new WorldShiftArtMesh();
-            var markings=new WorldShiftArtMesh();
-            Color red=WorldShiftLevelProps.MoverColour, rubber=new Color(.035f,.045f,.052f);
+            Color rubber=new Color(.035f,.045f,.052f);
             Color glass=new Color(.055f,.10f,.14f), steel=new Color(.27f,.30f,.33f);
-            paint.ChamferBox(new Vector3(0,-.22f,0),new Vector3(2.72f,.64f,5.2f),.1f,red);
-            paint.ChamferBox(new Vector3(0,.42f,-.65f),new Vector3(2.5f,.94f,3.85f),.12f,red);
-            // Broad hood, plain red roof, armored cabin and dark front windscreen.
-            paint.ChamferBox(new Vector3(0,.05f,1.94f),new Vector3(2.62f,.35f,1.26f),.08f,red);
-            trim.Box(new Vector3(0,.49f,1.289f),new Vector3(2.13f,.58f,.035f),glass);
-            trim.Box(new Vector3(0,.49f,1.315f),new Vector3(.07f,.58f,.025f),rubber);
+            int style = shared ? 3 : ((variant % 5) + 5) % 5;
+            Color body = shared ? WorldShiftLevelProps.SideMoverColour : CivilianPaint[((variant / 5) % CivilianPaint.Length + CivilianPaint.Length) % CivilianPaint.Length];
+            Color dark = body*.82f; dark.a=1f;
+            // Lower body and bumpers are shared by every style; the cabin shape gives each its silhouette.
+            paint.ChamferBox(new Vector3(0,-.22f,0),new Vector3(2.62f,.58f,5.2f),.1f,body);
+            switch (style)
+            {
+                case 0: // Sedan: long hood and boot, low cabin in the middle.
+                    paint.ChamferBox(new Vector3(0,.3f,-.2f),new Vector3(2.3f,.6f,2.4f),.14f,body);
+                    trim.Box(new Vector3(0,.32f,1.01f),new Vector3(2.0f,.44f,.035f),glass);
+                    break;
+                case 1: // Hatchback: short nose, tall rounded cabin to the back.
+                    paint.ChamferBox(new Vector3(0,.38f,-.75f),new Vector3(2.35f,.76f,3.4f),.2f,body);
+                    trim.Box(new Vector3(0,.42f,.96f),new Vector3(2.05f,.52f,.035f),glass);
+                    break;
+                case 2: // Pickup: cab up front, open bed with low walls behind.
+                    paint.ChamferBox(new Vector3(0,.36f,.75f),new Vector3(2.4f,.72f,1.7f),.14f,body);
+                    trim.Box(new Vector3(0,.4f,1.61f),new Vector3(2.05f,.5f,.035f),glass);
+                    foreach(float side in new[] {-1f,1f})
+                        paint.Box(new Vector3(side*1.22f,.18f,-1.25f),new Vector3(.12f,.32f,2.5f),dark);
+                    paint.Box(new Vector3(0,.18f,-2.48f),new Vector3(2.5f,.32f,.12f),dark);
+                    trim.Box(new Vector3(0,.04f,-1.25f),new Vector3(2.3f,.04f,2.4f),rubber);
+                    break;
+                case 3: // Box van: tall load box behind a short cab.
+                    paint.ChamferBox(new Vector3(0,.42f,-.65f),new Vector3(2.5f,.94f,3.85f),.12f,body);
+                    paint.ChamferBox(new Vector3(0,.05f,1.94f),new Vector3(2.52f,.35f,1.26f),.08f,body);
+                    trim.Box(new Vector3(0,.49f,1.289f),new Vector3(2.13f,.58f,.035f),glass);
+                    break;
+                default: // SUV: tall, squared cabin with roof rails.
+                    paint.ChamferBox(new Vector3(0,.4f,-.35f),new Vector3(2.45f,.84f,3.3f),.12f,body);
+                    trim.Box(new Vector3(0,.44f,1.31f),new Vector3(2.1f,.56f,.035f),glass);
+                    foreach(float side in new[] {-1f,1f})
+                        trim.Box(new Vector3(side*.95f,.86f,-.35f),new Vector3(.06f,.06f,2.8f),steel);
+                    break;
+            }
             foreach(float side in new[] {-1f,1f})
             {
-                trim.Box(new Vector3(side*1.31f,.4f,.85f),new Vector3(.08f,.45f,.65f),glass);
-                trim.ChamferBox(new Vector3(side*1.43f,.32f,1.13f),new Vector3(.17f,.29f,.35f),.035f,rubber);
-                foreach(float z in new[] {-1.7f,-.6f})
-                {
-                    paint.ChamferBox(new Vector3(side*1.26f,.38f,z),new Vector3(.12f,.65f,.9f),.04f,red*.85f);
-                    trim.Box(new Vector3(side*1.335f,.42f,z),new Vector3(.035f,.08f,.36f),steel);
-                }
+                // Side windows along whichever cabin the style uses.
+                trim.Box(new Vector3(side*1.2f,.38f,style==2?.75f:style==0?-.2f:-.5f),new Vector3(.05f,.32f,style==2?1.2f:2.0f),glass);
+                trim.ChamferBox(new Vector3(side*1.36f,.24f,style==2?1.4f:.9f),new Vector3(.15f,.2f,.26f),.03f,rubber);
                 foreach(float z in new[] {-1.7f,1.7f})
                 {
-                    trim.Box(new Vector3(side*1.33f,-.23f,z),new Vector3(.2f,.16f,1.04f),rubber);
+                    trim.Box(new Vector3(side*1.3f,-.23f,z),new Vector3(.18f,.16f,1.04f),rubber);
                     BuildWheel(new Vector3(side*1.37f,-.51f,z),side,rubber,steel,new Color(.6f,.63f,.65f));
                 }
-                trim.Box(new Vector3(side*.94f,-.06f,2.61f),new Vector3(.88f,.50f,.1f),rubber);
+                trim.Box(new Vector3(side*.94f,-.06f,2.61f),new Vector3(.88f,.40f,.1f),rubber);
                 // Large white front lenses remain readable at the game's low rendering resolution.
                 var lens = new WorldShiftArtMesh();
-                lens.ChamferBox(new Vector3(side*.94f,-.04f,2.68f),
-                    new Vector3(.78f,.42f,.035f),.025f,Color.white);
+                lens.ChamferBox(new Vector3(side*.94f,-.06f,2.68f),new Vector3(.7f,.32f,.035f),.025f,Color.white);
                 var lamp = OwnMaterial(side < 0 ? "Left flashing headlight" : "Right flashing headlight",true);
                 Draw(side < 0 ? "Left warning headlight" : "Right warning headlight",lens,lamp);
                 if(side < 0) leftHeadlight=lamp; else rightHeadlight=lamp;
-                trim.Box(new Vector3(side*.59f,-.27f,2.68f),new Vector3(.14f,.62f,.12f),steel);
             }
-            trim.Box(new Vector3(0,-.41f,2.66f),new Vector3(2.72f,.23f,.15f),rubber);
-            trim.Box(new Vector3(0,-.1f,2.62f),new Vector3(.95f,.4f,.07f),rubber);
+            trim.Box(new Vector3(0,-.41f,2.66f),new Vector3(2.62f,.23f,.15f),rubber);
+            trim.Box(new Vector3(0,-.1f,2.62f),new Vector3(.95f,.3f,.07f),rubber);
             for(int i=0;i<3;i++)
-                trim.Box(new Vector3(0,-.22f+i*.12f,2.67f),new Vector3(.85f,.035f,.045f),steel);
-            // Only the hood carries an X. The roof stays plain behind the direction cue.
-            markings.Beam(new Vector3(-.83f,.235f,1.48f),new Vector3(.83f,.235f,2.4f),.19f,.018f,Color.white);
-            markings.Beam(new Vector3(.83f,.235f,1.48f),new Vector3(-.83f,.235f,2.4f),.19f,.018f,Color.white);
-            var bodyFinish=OwnMaterial("Red armored van paint",false);
-            bodyFinish.SetFloat("_Emission",.35f);
-            Draw("Red armored body",paint,bodyFinish);
-            Draw("Armored glass, bumper and trim",trim,OwnMaterial("Armored trim",false));
-            Draw("White hood X",markings,OwnMaterial("Reflective van markings",true));
+                trim.Box(new Vector3(0,-.2f+i*.1f,2.67f),new Vector3(.85f,.03f,.045f),steel);
+            var bodyFinish=OwnMaterial(shared ? "Shared mover van paint" : "Traffic car paint",false);
+            bodyFinish.SetFloat("_Emission",shared ? .35f : .12f);
+            Draw(shared ? "Shared mover van body" : "Traffic car body",paint,bodyFinish);
+            Draw("Traffic glass, bumper and trim",trim,OwnMaterial("Traffic trim",false));
             // Large road chevrons point along local +Z (toward the approaching player).
             // No hovering marker: keep the skyline and tutorial signs unobstructed.
             var warning = new WorldShiftArtMesh();

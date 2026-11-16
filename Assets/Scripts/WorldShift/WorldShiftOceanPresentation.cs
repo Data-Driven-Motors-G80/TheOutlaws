@@ -64,6 +64,8 @@ namespace Outlaws.WorldShift
             sea.position = new Vector3(0, SeaHeight, 0);
             route.VisitRoadPieces(BuildBridge);
             BuildCoast();
+            BuildHarbour();
+            BuildSpray();
             BuildSectionLandmarks();
             BuildLandingFrames();
             BuildGems();
@@ -226,6 +228,7 @@ namespace Outlaws.WorldShift
             RenderSettings.fogStartDistance = day ? 180f : 125f;
             RenderSettings.fogEndDistance = day ? 540f : 400f;
             SetFinishWorld(day);
+            SetHarbourWorld(day);
         }
 
         public void Refresh(float distance)
@@ -236,7 +239,6 @@ namespace Outlaws.WorldShift
                 policeStyled = true;
             }
             RefreshCarContacts(distance);
-            RefreshCheckpointGantries(distance);
             foreach(var roller in rollers)
                 roller.Root.localRotation=Quaternion.Euler(0,90,0)*Quaternion.AngleAxis(roller.Data.LateralOffset/.25f*Mathf.Rad2Deg,Vector3.right);
             water.SetFloat("_OceanTime", animationTime);
@@ -273,6 +275,8 @@ namespace Outlaws.WorldShift
             if (Time.timeScale == 0f || game.State != ShiftRunState.Running) return;
             animationTime += Time.deltaTime;
             AnimateGulls();
+            AnimateHarbour(Time.deltaTime);
+            AnimateSpray(Time.deltaTime);
             for (int i = 0; i < gems.Count; i++)
             {
                 var gem = gems[i];
@@ -288,7 +292,7 @@ namespace Outlaws.WorldShift
             foreach (var mesh in meshes) Release(mesh);
             foreach (var material in materials) Release(material);
             Release(chime);
-            Release(checkpointChime);
+            ClearSpray();
         }
         private static void Release(Object obj)
         {

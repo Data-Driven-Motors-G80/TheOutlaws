@@ -319,23 +319,26 @@ namespace Outlaws.WorldShift
 
         // Each landing banks a completed collection section. Items stay clear of jumps
         // and give at least 35 m to read a hazard or steer toward the next target.
+        // Harbour obstacles reuse familiar mechanics: container walls (Day/Night), dock traffic (one world),
+        // cargo trolleys (sliders) and rolling oil drums (Desert-style crossing rocks). Nothing new sits
+        // within 25 m of a diamond, and each diamond's lane stays open in at least one world.
         private static LevelCourse Ocean() => new Builder(ShiftLevel.Ocean)
-            // 1: learn the diamond on a clear approach, then reuse switching and freezing.
+            // 1: learn the diamond on a clear approach, then a lane wall, a drum and dock traffic.
             .Item(100f, 0)
-            .Day(155f, All).Slider(205f, .95f).Night(255f, All).Ramp(310f, D)
+            .Day(150f, Sides).Crossing(195f, 4.1f, 1f, 3.6f).DayCar(225f, Left).Night(255f, All).Ramp(310f, D)
             // 2: steer to both sides; the diamonds remain collectible in either world.
-            .Item(85f, -1).Day(135f, All)
-            .Item(190f, 1).Night(240f, LeftMiddle).Day(285f, All).Ramp(340f, N)
+            .Item(85f, -1).Day(135f, MiddleRight).NightCar(160f, Middle)
+            .Item(190f, 1).Night(240f, LeftMiddle).Crossing(262f, 0f, -1f, 3.8f).Day(295f, All).Ramp(340f, N)
             // 3: freeze the movers, then line up for each required item.
-            .Slider(55f, 1.25f).Item(110f, 1).Night(160f, All)
-            .Slider(210f, -1.4f).Item(265f, -1).Ramp(330f, D)
-            // 4: collect through alternating world closures with room to change lane.
-            .Item(65f, -1).Day(110f, All).Item(160f, 0)
-            .Night(210f, All).Item(260f, 1).Day(305f, All).Ramp(360f, N)
-            // 5: combine collection, world choice and freezing before the last jump.
-            .Night(50f, All).Item(100f, 1).Day(145f, LeftMiddle)
-            .Item(195f, -1).Slider(245f, 1.3f).Item(300f, 0)
-            .Night(350f, All).Ramp(405f, D)
+            .Slider(55f, 1.25f).Item(110f, 1).Night(160f, All).DayCar(190f, Right)
+            .Slider(210f, -1.4f).Item(265f, -1).NightHalf(290f, 1).Ramp(330f, D)
+            // 4: collect through alternating closures, with a drum between the diamonds.
+            .Item(65f, -1).Day(110f, All).Item(160f, 0).Crossing(195f, 2f, 1f, 4f)
+            .Night(220f, Sides).Item(260f, 1).Day(305f, All).Ramp(360f, N)
+            // 5: combine collection, world choice, traffic and freezing before the last jump.
+            .Night(50f, All).Item(100f, 1).Day(145f, LeftMiddle).DayCar(170f, Middle)
+            .Item(195f, -1).Slider(245f, 1.3f).NightCar(262f, Right)
+            .Item(300f, 0).Night(350f, All).Ramp(405f, D)
             .Build();
 
         private static LevelCourse Snow() => new Builder(ShiftLevel.Snow)

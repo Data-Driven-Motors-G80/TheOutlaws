@@ -9,6 +9,9 @@ Shader "The Outlaws/Ocean Coast Water"
         _WaveSpeed ("Wave Speed", Float) = 0.8
         _FoamAmount ("Foam Amount", Range(0, 1)) = 0.18
         _SkyColor ("Sky Reflection", Color) = (0.73, 0.88, 0.85, 1)
+        _MoonColor ("Moon Path", Color) = (0.75, 0.85, 1, 1)
+        [HideInInspector] _MoonPath ("Moon Path Strength", Float) = 0
+        [HideInInspector] _MoonDir ("Moon Direction XZ", Vector) = (0, 1, 0, 0)
         [HideInInspector] _OceanTime ("Ocean Time", Float) = 0
         [HideInInspector] _ChannelMask ("Navigable Channel", Float) = 1
     }
@@ -38,6 +41,9 @@ Shader "The Outlaws/Ocean Coast Water"
                 float _OceanTime;
                 float _ChannelMask;
                 half4 _SkyColor;
+                half4 _MoonColor;
+                float _MoonPath;
+                float4 _MoonDir;
             CBUFFER_END
 
             struct Attributes { float4 positionOS : POSITION; float2 uv : TEXCOORD0; };
@@ -83,11 +89,18 @@ Shader "The Outlaws/Ocean Coast Water"
                 half fresnel = pow(1 - saturate(dot(normalWS, view)), 5);
                 half3 color = lerp(_DeepColor.rgb, _ShallowColor.rgb, saturate(0.48 + swell * 0.17));
                 color *= 0.78 + saturate(dot(normalWS, sun.direction)) * 0.22;
+                // Open water deepens with distance, so the coast reads shallow and the horizon deep.
+                float distanceXZ = distance(_WorldSpaceCameraPos.xz, input.positionWS.xz);
+                color = lerp(color, _DeepColor.rgb * 0.85, saturate((distanceXZ - 60.0) / 520.0) * 0.55);
                 // Grazing angles reflect the sky so the sea melts into the horizon.
                 color = lerp(color, _SkyColor.rgb, saturate(0.08 + fresnel * 0.85));
                 half glint = pow(saturate(dot(normalWS, SafeNormalize(sun.direction + view))), 180);
                 half sparkle = step(0.93, frac(sin(dot(floor(input.positionWS.xz * 1.5), float2(12.9898, 78.233))) * 43758.5) + sin(t * 3 + swell * 6) * 0.04);
                 color += sun.color * (glint * 1.1 + glint * sparkle * 2.0);
+                // Night: a glittering moon path on the water toward the moon.
+                float2 toPoint = normalize(input.positionWS.xz - _WorldSpaceCameraPos.xz);
+                half path = pow(saturate(dot(toPoint, normalize(_MoonDir.xy))), 48) * _MoonPath;
+                color += _MoonColor.rgb * path * (0.18 + sparkle * 2.4 + saturate(swell) * 0.7);
                 float foam = smoothstep(0.72, 0.91, swell) * _FoamAmount;
                 color = lerp(color, _FoamColor.rgb, foam);
                 // A soft turquoise edge marks the driving channel without painted lane stripes.

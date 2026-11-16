@@ -9,6 +9,7 @@ namespace Outlaws.WorldShift
     public sealed partial class WorldShiftPresentation : MonoBehaviour
     {
         private WorldShiftPlayerCarArt playerCar;
+        private WorldShiftCheckpointGantries gantries;
         private sealed class PaletteItem { public Renderer Renderer; public Material Day, Echo; }
         private sealed class Chunk { public GameObject Root; public float At, End; public float Tail = 90f; public bool CityBlock; }
         private sealed class HazardView
@@ -145,6 +146,8 @@ namespace Outlaws.WorldShift
             if (game.LevelMode)
             {
                 // Mark the actual retry locations too; Desert checkpoints precede its ramps.
+                gantries = gameObject.AddComponent<WorldShiftCheckpointGantries>();
+                gantries.Bind(game, route);
                 var marks = new HashSet<float>(game.Course.Gates) { game.RunLength };
                 for (int i = 1; i < game.Checkpoints.Length; i++) marks.Add(game.Checkpoints[i].Distance);
                 foreach (float at in marks) CheckpointGate(at, at >= game.RunLength);
@@ -166,7 +169,12 @@ namespace Outlaws.WorldShift
 
         private void CheckpointGate(float at, bool finish)
         {
-            if (!finish && ocean != null) { ocean.BuildCheckpointGantry(at); return; }
+            if (!finish && gantries != null)
+            {
+                // Same gantry in every level; it is the save confirmation, so the HUD has no pop-up.
+                chunks.Add(new Chunk { Root = gantries.Build(at).gameObject, At = at });
+                return;
+            }
             RoadPathPoint p = route.Sample(at);
             Transform root = new GameObject(finish ? "Finish gate" : "Checkpoint gate").transform;
             root.SetParent(transform, false);
@@ -255,6 +263,7 @@ namespace Outlaws.WorldShift
             }
             if (roadside != null) roadside.UpdateVisibility(distance);
             if (ocean != null) ocean.Refresh(distance);
+            gantries?.Refresh();
             if (relayVisuals != null) relayVisuals.Refresh(distance);
             foreach (var hazard in hazards)
             {

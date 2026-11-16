@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Outlaws.WorldShift
 {
-    public enum ShiftIcon { Sun, Moon, Lock, Unlocked, Check, Play, Pause, Home, Retry, Next, Circle, Flag, Diamond }
+    public enum ShiftIcon { Sun, Moon, Lock, Unlocked, Check, Play, Pause, Home, Retry, Next, Circle, Flag, Diamond, Siren, Fall }
 
     /// <summary>Small procedural UI icons so menus and HUD need no words.</summary>
     public static class WorldShiftIcons
@@ -76,6 +76,27 @@ namespace Outlaws.WorldShift
                     Triangle(p, new Vector2(0f, .55f), new Vector2(0f, -.55f), new Vector2(.8f, 0f)));
                 case ShiftIcon.Flag: return Mathf.Min(Box(p, new Vector2(-.55f, 0f), new Vector2(.07f, .8f)),
                     Box(p, new Vector2(.05f, .38f), new Vector2(.55f, .38f)));
+                case ShiftIcon.Siren:
+                {
+                    // Police beacon: a dome on a base, with short light rays.
+                    float dome = Mathf.Max(Circle(p, new Vector2(0f, -.12f), .42f), -p.y - .12f);
+                    float bar = Box(p, new Vector2(0f, -.24f), new Vector2(.6f, .12f));
+                    float d = Mathf.Min(dome, bar);
+                    foreach (float a in new[] { .35f, .7f, -.35f, -.7f, 0f })
+                    {
+                        var dir = new Vector2(Mathf.Sin(a), Mathf.Cos(a));
+                        d = Mathf.Min(d, Segment(p, new Vector2(0f, -.12f) + dir * .58f, new Vector2(0f, -.12f) + dir * .82f) - .07f);
+                    }
+                    return d;
+                }
+                case ShiftIcon.Fall:
+                {
+                    // A road edge with a downward arrow off it.
+                    float ledge = Box(p, new Vector2(-.45f, .55f), new Vector2(.4f, .1f));
+                    float shaft = Box(p, new Vector2(.3f, .1f), new Vector2(.1f, .38f));
+                    float head = Triangle(p, new Vector2(-.05f, -.25f), new Vector2(.65f, -.25f), new Vector2(.3f, -.75f));
+                    return Mathf.Min(ledge, Mathf.Min(shaft, head));
+                }
                 default: return Circle(p, Vector2.zero, .9f);
             }
         }

@@ -161,10 +161,10 @@ public sealed partial class WorldShiftLevelTests
         Assert.That(gates.Length, Is.GreaterThan(0));
         foreach (var gate in gates)
         {
-            Assert.That(gate.Find("Gate lintel"), Is.Null, "Training checkpoints leave the view over the road open.");
-            Assert.That(gate.Find("Gate post"), Is.Null, "Checkpoints use one horizontal road stripe, without upright lines.");
-            Assert.That(gate.Find("CHECKPOINT cue"), Is.Null);
-            Assert.That(gate.GetComponentsInChildren<Transform>().Count(t => t.name == "Cube"), Is.EqualTo(1));
+            // Training uses the same checkpoint gantry as every level.
+            Assert.That(gate.GetComponentsInChildren<TMPro.TMP_Text>(true).Single().text, Is.EqualTo("CHECKPOINT"));
+            Assert.That(gate.Find("Actual checkpoint road stripe"), Is.Not.Null);
+            Assert.That(gate.GetComponentsInChildren<Collider>(true), Is.Empty);
         }
         Pose(game, 177f, 0f);
         Step(game, .2f);

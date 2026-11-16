@@ -50,7 +50,7 @@ namespace Outlaws.WorldShift
                 g.Rock(top - Vector3.up * 1.8f, new Vector3(15f, 2.5f, 21f), Sand, index + 3);
                 int section = 0;
                 foreach (var relay in game.RelayLayout) if (at > relay.End) section++;
-                if ((section == 3 && index % 3 == 0) || (section == 4 && index % 5 == 0)) Lighthouse(g, top, index);
+                if ((section == 3 && index % 3 == 0) || (section == 4 && index % 5 == 0)) { Lighthouse(g, top, index); lighthouseTops.Add(top); }
                 else if (section == 0)
                 {
                     House(g, top + new Vector3(-4f, 0f, 0f), index);
