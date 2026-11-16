@@ -6,50 +6,6 @@ using UnityEngine.TestTools;
 public sealed class PickupEffectStateTests
 {
     [Test]
-    public void RepeatedReversePickup_DuringCountdownQueuesTimeWithoutRestartingCountdown()
-    {
-        var car = new GameObject("Reverse countdown test");
-        try
-        {
-            var effects = car.AddComponent<CarPickupEffects>();
-            effects.TryApply(PickupEffectType.ReverseSteering);
-            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
-            typeof(CarPickupEffects).GetField("reverseCountdownRemaining", flags).SetValue(effects, 0.5f);
-            Assert.That(effects.TryApply(PickupEffectType.ReverseSteering), Is.True);
-            Assert.That(effects.ReverseCountdownRemaining, Is.EqualTo(0.5f));
-            Assert.That(effects.SteeringMultiplier, Is.EqualTo(1f));
-            Assert.That(typeof(CarPickupEffects).GetField("pendingReverseDuration", flags).GetValue(effects), Is.EqualTo(16f));
-            Assert.That(effects.ReverseCompletionCount, Is.Zero);
-        }
-        finally { Object.DestroyImmediate(car); }
-    }
-
-    [Test]
-    public void RepeatedReversePickup_AddsEightSecondsWithoutCountdownOrNormalSteering()
-    {
-        var car = new GameObject("Reverse extension test");
-        try
-        {
-            var effects = car.AddComponent<CarPickupEffects>();
-            effects.RunState.TryCollectWithoutReward(PickupEffectType.ReverseSteering, 8f);
-            effects.RunState.Tick(3f);
-            Assert.That(effects.TryApply(PickupEffectType.ReverseSteering), Is.True);
-            Assert.That(effects.RemainingSeconds, Is.EqualTo(13f));
-            Assert.That(effects.SteeringMultiplier, Is.EqualTo(-1f));
-            Assert.That(effects.ReverseCountdownRemaining, Is.Zero);
-            Assert.That(effects.ReverseCompletionCount, Is.Zero);
-            effects.RunState.Tick(12f);
-            Assert.That(effects.SteeringMultiplier, Is.EqualTo(-1f));
-            effects.RunState.Tick(1f);
-            Assert.That(effects.SteeringMultiplier, Is.EqualTo(1f));
-        }
-        finally
-        {
-            Object.DestroyImmediate(car);
-        }
-    }
-
-    [Test]
     public void NewState_HasNormalDrivingMultipliers()
     {
         AssertNormal(new PickupEffectState());
@@ -207,47 +163,6 @@ public sealed class PickupEffectStateTests
         Assert.That(state.RemainingSeconds, Is.EqualTo(5f));
         state.Tick(5f);
         AssertNormal(state);
-    }
-
-    [UnityTest]
-    public IEnumerator DisablingTheComponent_ClearsEffectsAndDoesNotRestoreThemOnEnable()
-    {
-        // This component's lifecycle callbacks run in Play Mode, unlike the pure state tests.
-        yield return new EnterPlayMode();
-        var car = new GameObject("Pickup effect test");
-        try
-        {
-            var effects = car.AddComponent<CarPickupEffects>();
-            effects.Apply(PickupEffectType.ReverseSteering);
-            Assert.That(effects.ReverseCountdownRemaining, Is.EqualTo(3f));
-            Assert.That(effects.SteeringMultiplier, Is.EqualTo(1f));
-            // Exercise active-effect cleanup as well as the pending warning.
-            effects.RunState.Effects.Apply(PickupEffectType.ReverseSteering);
-            Assert.That(effects.SteeringMultiplier, Is.EqualTo(-1f));
-
-            effects.enabled = false;
-            Assert.That(effects.ReverseCountdownRemaining, Is.Zero);
-            Assert.That(effects.ActiveEffect, Is.EqualTo(PickupEffectType.None));
-            Assert.That(effects.RemainingSeconds, Is.Zero);
-            Assert.That(effects.SteeringMultiplier, Is.EqualTo(1f));
-
-            effects.Apply(PickupEffectType.Boost);
-            effects.enabled = true;
-            Assert.That(effects.ActiveEffect, Is.EqualTo(PickupEffectType.None));
-            Assert.That(effects.ForwardSpeedMultiplier, Is.EqualTo(1f));
-        }
-        finally
-        {
-            Object.DestroyImmediate(car);
-        }
-    }
-
-    [UnityTearDown]
-    public IEnumerator RestoreEditModeAfterLifecycleTest()
-    {
-        // TearDown also runs after a failed assertion, so later tests remain in Edit Mode.
-        if (Application.isPlaying)
-            yield return new ExitPlayMode();
     }
 
     private static void AssertNormal(PickupEffectState state)

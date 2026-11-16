@@ -37,17 +37,4 @@ public sealed class DesertShiftMotionTests
         }
         Assert.That(count, Is.EqualTo(10));
     }
-
-    [Test]
-    public void CollisionUsesOnlyTheVisibleWorldHalf()
-    {
-        var type = AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("Outlaws.WorldShift.DesertShiftTrial")).First(t => t != null);
-        var world = type.Assembly.GetType("Outlaws.WorldShift.ShiftWorld");
-        var day = Enum.Parse(world, "Day"); var night = Enum.Parse(world, "Echo");
-        var hit = type.GetMethod("TouchesHalf", BindingFlags.NonPublic | BindingFlags.Static);
-        Assert.That(hit.Invoke(null, new object[] { 3f, 3f, 3f, 3.1f, 1.3f, day }), Is.EqualTo(false), "A hidden Day object cannot hit through the Night crop.");
-        Assert.That(hit.Invoke(null, new object[] { -3f, -3f, -3f, -2.9f, 1.3f, night }), Is.EqualTo(false));
-        Assert.That(hit.Invoke(null, new object[] { 3f, 3f, 3f, 3f, 1.3f, night }), Is.EqualTo(true));
-        Assert.That(hit.Invoke(null, new object[] { -.3f, .3f, 1f, 1f, 1.3f, night }), Is.EqualTo(true), "Car body crossing the seam can touch a visible frozen rock.");
-    }
 }

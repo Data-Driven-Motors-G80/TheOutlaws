@@ -17,9 +17,10 @@ namespace Outlaws.WorldShift
 
         public WorldShiftSlidingGate Copy() => new WorldShiftSlidingGate(Distance, Direction, Flight);
         public void Reset() => DaySeconds = 0f;
-        public void Advance(float delta, float distance, ShiftWorld world)
+        public void Advance(float delta, float distance, ShiftWorld world) => Advance(delta, distance, world, float.NegativeInfinity);
+        public void Advance(float delta, float distance, ShiftWorld world, float wakeFloor)
         {
-            float begin = Airborne ? Flight.Takeoff : Distance - 40f;
+            float begin = Mathf.Max(Airborne ? Flight.Takeoff : Distance - 40f, wakeFloor);
             float end = Distance + 100f; // Keep the return leg moving while the block is still visible behind the car.
             if (world == ShiftWorld.Day && distance >= begin && distance <= end) DaySeconds += delta;
         }

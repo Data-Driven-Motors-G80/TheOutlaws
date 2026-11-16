@@ -3,13 +3,15 @@ using UnityEngine;
 
 namespace Outlaws.WorldShift
 {
-    public enum LevelSignKind { Steer, Switch, Dashes, Freeze, Ramp, AirFreeze, AirRelease, Oncoming }
+    public enum LevelSignKind { Steer, Switch, Freeze = 3, Ramp, AirFreeze, AirRelease, Oncoming }
 
     public readonly struct LevelSign
     {
         public readonly float Distance;
         public readonly LevelSignKind Kind;
-        public LevelSign(float distance, LevelSignKind kind) { Distance = distance; Kind = kind; }
+        public readonly int CheckpointIndex;
+        public LevelSign(float distance, LevelSignKind kind, int checkpointIndex = 0)
+        { Distance = distance; Kind = kind; CheckpointIndex = checkpointIndex; }
     }
 
     /// <summary>
@@ -32,6 +34,14 @@ namespace Outlaws.WorldShift
         public Vector2[] RequiredItems = System.Array.Empty<Vector2>();
         public LevelSign[] Signs;
         public Vector2[] DustZones = System.Array.Empty<Vector2>();
+
+        // Practice sections can keep their course/checkpoint without another instruction stop.
+        public int SignIndexForCheckpoint(int checkpoint)
+        {
+            for (int i = 0; i < Signs.Length; i++)
+                if (Signs[i].CheckpointIndex == checkpoint) return i;
+            return -1;
+        }
 
         public ShiftHazard[] CreateHazards()
         {
@@ -145,7 +155,7 @@ namespace Outlaws.WorldShift
             private Builder AddRock(WorldShiftLevelRock rock) => Add(new ShiftHazard(ShiftWorld.Day, ShiftHazardKind.RollingRock,
                 rock.Distance - rock.Radius, rock.Distance + rock.Radius, 2, rock.Motion.MotionSpeed,
                 sharedAcrossWorlds: true, lateralMotion: true, rock: rock));
-            public Builder Sign(float at, LevelSignKind kind) { signs.Add(new LevelSign(start + at, kind)); return this; }
+            public Builder Sign(float at, LevelSignKind kind) { signs.Add(new LevelSign(start + at, kind, checkpoints.Count - 1)); return this; }
             public Builder Item(float at, int lane) { items.Add(new Vector2(start + at, lane * WorldShiftLevel.RoadWidth / 3f)); return this; }
             public Builder Dust(float from, float to) { dustZones.Add(new Vector2(start + from, start + to)); return this; }
             public Builder Checkpoint(float at, ShiftWorld world, float lateral = 0f)
@@ -249,11 +259,11 @@ namespace Outlaws.WorldShift
             }
         }
 
-        // One idea per section, introduced by a highway sign.
+        // Introduce each new idea once; the third section practices switching without another stop.
         private static LevelCourse Training() => new Builder(ShiftLevel.City, true)
             .Sign(25f, LevelSignKind.Steer).Permanent(90f, Middle).Permanent(140f, LeftMiddle).Gate(180f, D)
             .Sign(25f, LevelSignKind.Switch).SwitchWall(110f).Gate(170f, N)
-            .Sign(25f, LevelSignKind.Dashes).Day(70f, All).Night(120f, All).Gate(180f, D)
+            .Day(70f, All).Night(120f, All).Gate(180f, D)
             .Sign(25f, LevelSignKind.Oncoming).Rock(110f, Middle, 10f).Gate(170f, D)
             .Sign(25f, LevelSignKind.Freeze).Slider(110f, 1.1f).Slider(160f, -1.3f).Slider(210f, 1.1f).Gate(270f, N)
             .Sign(25f, LevelSignKind.Ramp).Night(70f, All).Ramp(120f, D)

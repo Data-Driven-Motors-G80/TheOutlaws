@@ -24,7 +24,7 @@ Tune `Assets/Scripts/WorldShift/WorldShiftEscapeProfile.cs` for City, Ocean, Sno
 
 Keep forks and relay approaches clear and readable. Flatten terrain around those sections. Fully separated branches retain the main road width; Ocean's bridge cues do not narrow the actual steering space. Place Day supplies after mode encounters, not inside Day-only barriers or required gaps. Approaching Mountain rocks must not move back into an unfinished fork merge.
 
-Main relays require switching in the air. Landing protection ignores premature return switches until both roads rejoin. The optional bonus ramp keeps a ground bypass. On short transitions it starts before the environment boundary, with a flat, straight approach and at least 24 m of recovery after landing before the scene changes. Exact mode and resource rules belong in the [campaign guide](WORLD_SHIFT_CAMPAIGN.md).
+Main relays require switching in the air. Landing protection ignores premature return switches until both roads rejoin. The optional bonus ramp keeps a ground bypass. On short transitions it starts before the environment boundary, with a flat, straight approach and at least 24 m of recovery after landing before the scene changes. These describe the legacy endless escape; see the [archived guide](Archive/LEGACY_ENDLESS_ESCAPE.md).
 
 ## Legacy streamed roads
 

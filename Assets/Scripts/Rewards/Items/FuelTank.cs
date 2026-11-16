@@ -36,7 +36,6 @@ public class FuelTank : MonoBehaviour
 
     private void Start()
     {
-        PickupPlacement.EnsureClear(transform);
         Renderer box = visual != null ? visual.GetComponent<Renderer>() : null;
         if (box == null) box = GetComponentInChildren<Renderer>();
         if (box != null) WorldLabel.Attach(box, "F", Color.white);

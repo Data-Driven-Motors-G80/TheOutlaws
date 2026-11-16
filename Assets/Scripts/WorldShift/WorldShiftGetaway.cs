@@ -15,8 +15,7 @@ namespace Outlaws.WorldShift
         private WorldShiftDrivingMessages messages;
         public void OnWorldChanged() => messages?.OnWorldChanged();
         internal int CurrentLeg => currentLeg;
-        internal string JumpHint => IsCity
-            ? city.RelayHint : desert.Relay?.Hint(Distance, World) ?? "";
+        internal string JumpHint => city.RelayHint;
         internal string SwitchWallHint
         {
             get
@@ -28,9 +27,6 @@ namespace Outlaws.WorldShift
                             && Distance >= hazard.Start - 100f && Distance <= hazard.End + 4f)
                             return World == ShiftWorld.Day ? "Space: clear the Day barrier." : "Stay in Nightshift until past the barrier.";
                 }
-                else foreach (var gate in desert.ActiveGates)
-                    if (gate.SwitchOnly && !Combat.IsDestroyed(gate) && Distance >= gate.Start - 100f && Distance <= gate.End + 4f)
-                        return World == ShiftWorld.Day ? "Space: clear the Day barrier." : "Stay in Nightshift until past the barrier.";
                 return "";
             }
         }
@@ -41,7 +37,6 @@ namespace Outlaws.WorldShift
             public Transform Visual;
         }
         private WorldShiftCity city;
-        private DesertShiftTrial desert;
         private readonly List<Loot> loot = new List<Loot>();
         private readonly List<Material> materials = new List<Material>();
         private TMP_Text haul, guidance, resultTitle, resultValue, resultNote;
@@ -55,7 +50,7 @@ namespace Outlaws.WorldShift
         private float lootFeedbackUntil = float.NegativeInfinity;
         private int currentLeg, bestBefore;
         public WorldShiftForkRoad Routing { get; private set; }
-        public WorldShiftCombat Combat => IsCity ? city.Combat : desert.Combat;
+        public WorldShiftCombat Combat => city.Combat;
         private static readonly Color Gold = new Color(1f, .77f, .25f);
         private static readonly Color Cyan = new Color(.3f, .85f, 1f);
         private static readonly Color Green = new Color(.4f, 1f, .68f);
@@ -67,19 +62,18 @@ namespace Outlaws.WorldShift
         public bool InExit => Distance >= environmentEnd + (CashOutAvailable ? 180f : 0f);
         public WorldShiftGetawayExtras Extras { get; private set; }
         private bool IsCity => city != null;
-        internal float Distance => IsCity ? city.Distance : desert.Distance;
-        private float Lateral => IsCity ? city.Lateral : desert.Lateral;
-        internal float Duration => IsCity ? city.Duration : desert.Duration;
+        internal float Distance => city.Distance;
+        private float Lateral => city.Lateral;
+        internal float Duration => city.Duration;
         private float Length => environmentEnd + (CashOutAvailable ? ExitTail : TransitionTail);
-        private float Fuel => IsCity ? city.FuelFraction : desert.FuelFraction;
-        private float Gap => IsCity ? city.PursuitGap : desert.PursuitGap;
-        internal ShiftWorld World => IsCity ? city.World : desert.World;
-        internal ShiftRunState State => IsCity ? city.State : desert.State;
-        private WorldShiftRoute Route => IsCity ? city.Route : desert.Route;
-        private RearViewCamera RearView => IsCity ? city.RearView : desert.RearView;
+        private float Fuel => city.FuelFraction;
+        private float Gap => city.PursuitGap;
+        internal ShiftWorld World => city.World;
+        internal ShiftRunState State => city.State;
+        private WorldShiftRoute Route => city.Route;
+        private RearViewCamera RearView => city.RearView;
 
         public void Bind(WorldShiftCity controller) { city = controller; Initialize(); }
-        public void Bind(DesertShiftTrial controller) { desert = controller; Initialize(); }
 
         private void Initialize()
         {
@@ -107,12 +101,6 @@ namespace Outlaws.WorldShift
                     AddLoot(pickup.Distance, pickup.Lane == 0 ? -3.2f : 0f, gold, handle);
                 }
             }
-            else
-            {
-                // Cash alongside fuel on safe central stretches.
-                for (int i = 0; i < 10; i++)
-                    AddLoot(desert.FuelDistance(i), -3.2f, gold, handle);
-            }
             foreach (var reward in WorldShiftEscapeProfile.PacingRewards(Environment))
                 AddLoot(reward.x, reward.y, gold, handle);
             Routing = gameObject.AddComponent<WorldShiftForkRoad>();
@@ -121,7 +109,7 @@ namespace Outlaws.WorldShift
             foreach (float offset in new[] { 112f, 128f, 146f, 202f, 216f, 230f })
                 AddLoot(Routing.ForkStart + offset, Routing.RightLootLane, gold, handle);
             Extras = gameObject.AddComponent<WorldShiftGetawayExtras>();
-            Extras.Bind(this, Route, IsCity ? city.Player : desert.Player, environmentEnd, MakeMaterial);
+            Extras.Bind(this, Route, city.Player, environmentEnd, MakeMaterial);
             foreach (float at in new[] { Extras.Jump.Start + 8f, Extras.Jump.Start + 22f, Extras.Jump.Takeoff + 8f,
                 Extras.Jump.Takeoff + 24f, Extras.Jump.Takeoff + 42f, Extras.Jump.Landing - 8f })
                 AddLoot(at, WorldShiftBonusJump.Lane, gold, handle, Extras.Jump.HeightAt(at), true);
@@ -253,7 +241,7 @@ namespace Outlaws.WorldShift
         }
         public void FinishStep(float distance, AutoDriveCar driver)
         { Routing.Constrain(distance, driver); Extras.FinishStep(distance, driver); }
-        public void HitForkObstacle(float at) { if (IsCity) city.HitForkObstacle(at); else desert.HitForkObstacle(at); }
+        public void HitForkObstacle(float at) => city.HitForkObstacle(at);
 
         private void BuildExit()
         {
@@ -362,7 +350,7 @@ namespace Outlaws.WorldShift
         private static TMP_Text Label(Transform parent, string value, float x0, float y0, float x1, float y1, float size)
             => WorldShiftMenu.Label(parent, value, x0, y0, x1, y1, size);
 
-        private void TogglePause() { if (IsCity) city.TogglePause(); else desert.TogglePause(); }
+        private void TogglePause() => city.TogglePause();
 
         private void Update()
         {

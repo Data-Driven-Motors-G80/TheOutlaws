@@ -43,8 +43,11 @@ Rendering must not collect items or advance motion, checkpoints or progress.
 and runtime material helpers remain shared foundations. They must not be deleted
 just because they originated in the older game.
 
-The original World game and endless escape retain runtime classes for reference
-and reuse. They are not current menu modes. Their extra scenes have been removed;
+The original World game and endless escape retain shared or tested runtime classes
+for reference and reuse. Unreferenced legacy spawners, portal transitions, scenery
+effects, the disconnected rift visual and the retired pickup smoke runner have
+been removed after checking source, tests and serialized asset references.
+The older modes are not current menu options. Their extra scenes have been removed;
 scene-dependent test suites and editor builders are preserved outside Assets in
 [the retired-scene archive](Archive/RetiredScenes/README.md). Legacy WorldShift
 flow entry points now select current levels instead of loading deleted variants.

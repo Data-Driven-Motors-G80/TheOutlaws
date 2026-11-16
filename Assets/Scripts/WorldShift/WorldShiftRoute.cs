@@ -32,7 +32,7 @@ namespace Outlaws.WorldShift
         public RoadPathPoint SampleDriver(float distance, RoadPathPoint ground, float lateral)
             => Forks != null ? Forks.SampleDriver(distance, ground, lateral) : ground;
 
-        public void Build(RoadSegment template, bool straightValidation = false, float validationLength = WorldShiftSplitView.Length, bool desertProfile = false, ShiftRelay[] relayLayout = null, float extraLength = 0f)
+        public void Build(RoadSegment template, bool straightValidation = false, float validationLength = 560f, bool desertProfile = false, ShiftRelay[] relayLayout = null, float extraLength = 0f)
         {
             validation = straightValidation;
             shortTransition = extraLength > 0f && extraLength < WorldShiftGetaway.ExitTail;
@@ -45,7 +45,7 @@ namespace Outlaws.WorldShift
             var cuts = new SortedSet<float> { -80f, 0f, length + 80f };
             float pieceLength = SharedWorldRules && extraLength > 0f ? 20f : 40f;
             for (float d = -pieceLength; d < length + 80f; d += pieceLength) cuts.Add(d);
-            foreach (var hazard in validation ? WorldShiftSplitView.Layout : WorldShiftLevel.Hazards)
+            foreach (var hazard in validation ? System.Array.Empty<ShiftHazard>() : WorldShiftLevel.Hazards)
                 if (hazard.Kind == ShiftHazardKind.Gap) { cuts.Add(hazard.Start); cuts.Add(hazard.End); }
             if (!validation) foreach (float boundary in WorldShiftLevel.MergeBounds) cuts.Add(boundary);
             if (Course != null && Course.Environment == ShiftLevel.Desert)
@@ -200,7 +200,7 @@ namespace Outlaws.WorldShift
                 if (!jump.HasDeck(distance, world)) return false;
             }
             if (SharedWorldRules) return true;
-            foreach (var h in validation ? WorldShiftSplitView.Layout : WorldShiftLevel.Hazards)
+            foreach (var h in validation ? System.Array.Empty<ShiftHazard>() : WorldShiftLevel.Hazards)
                 if (h.World == world && h.Kind == ShiftHazardKind.Gap && distance >= h.Start && distance < h.End)
                     return false;
             return true;

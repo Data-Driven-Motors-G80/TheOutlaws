@@ -6,7 +6,7 @@ using UnityEngine.Rendering;
 namespace Outlaws.WorldShift
 {
     /// <summary>Primitive city geometry. Only the current world has visible hazards.</summary>
-    public sealed class WorldShiftPresentation : MonoBehaviour
+    public sealed partial class WorldShiftPresentation : MonoBehaviour
     {
         private sealed class PaletteItem { public Renderer Renderer; public Material Day, Echo; }
         private sealed class Chunk { public GameObject Root; public float At, End; public float Tail = 90f; public bool CityBlock; }
@@ -77,7 +77,7 @@ namespace Outlaws.WorldShift
                 roadside = gameObject.AddComponent<WorldShiftRoadside>();
                 roadside.Build(route, game.Environment);
             }
-            if (game.LevelMode && !game.Course.Training && (game.Environment == ShiftLevel.City || game.Environment == ShiftLevel.Desert))
+            if (game.LevelMode && (game.Environment == ShiftLevel.City || game.Environment == ShiftLevel.Desert))
             {
                 var root = new GameObject("City and desert scenery");
                 root.transform.SetParent(transform, false);
@@ -138,160 +138,6 @@ namespace Outlaws.WorldShift
             }
         }
 
-        private void BuildHazard(ShiftHazard data)
-        {
-            RoadPathPoint point = route.Sample((data.Start + data.End) * 0.5f);
-            Transform root = new GameObject(data.World + " " + data.Kind + " " + data.Start).transform;
-            root.SetParent(transform, false);
-            root.SetPositionAndRotation(point.Position, Quaternion.LookRotation(point.Forward, point.Up));
-            var chunk = new Chunk { Root = root.gameObject, At = data.Start, End = data.End,
-                Tail = data.Kind == ShiftHazardKind.Oncoming ? 8f : 90f };
-            chunks.Add(chunk);
-            var solid = new GameObject("Solid - collides in this world"); solid.transform.SetParent(root, false);
-            var ghost = new GameObject("Outline - belongs to other world"); ghost.transform.SetParent(root, false);
-            if (data.Gate != null)
-            {
-                if (game.LevelMode) WorldShiftSpikePlatform.Build(solid.transform, Vector3.zero, data.Gate.Size);
-                else WorldShiftObstacleVisual.Build(solid.transform, Vector3.zero, data.Gate.Size, sideMoverPalette);
-                WorldShiftLevelProps.SlidingGateHint(solid.transform);
-                if (game.LevelMode) BuildFrozenCue(root, Vector3.zero, data.Gate.Size, true);
-                hazards.Add(new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk });
-                return;
-            }
-            if (data.Rock != null)
-            {
-                WorldShiftBoulderArt.Build(solid.transform, root, data.Rock.Radius);
-                if (game.LevelMode) BuildFrozenCue(root, Vector3.zero, Vector3.one * (data.Rock.Radius * 2f));
-                hazards.Add(new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk });
-                return;
-            }
-            if (game.LevelMode && data.Kind == ShiftHazardKind.Oncoming && !data.LateralMotion)
-            {
-                var trafficView = new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk };
-                for (int lane = 0; lane < 3; lane++)
-                {
-                    if ((data.LaneMask & (1 << lane)) == 0) continue;
-                    Vector3 centre = new Vector3((lane - 1) * WorldShiftLevel.RoadWidth / 3f, .9f, 0f);
-                    Vector3 size = new Vector3(3.05f, 1.8f, data.End - data.Start);
-                    var vehicle=WorldShiftRoadVehicleArt.Build(solid.transform, centre, size, moverPalette, game.Environment);
-                    vehicle.ConfigureWarning(game,data);
-                    trafficView.Traffic.Add(vehicle);
-                    if (data.SharedAcrossWorlds) BuildFrozenCue(solid.transform, centre, size, true);
-                    else WorldShiftLevelProps.DashedOutline(ghost.transform, centre, size,
-                        WorldShiftLevelProps.Glow(data.World == ShiftWorld.Day ? WorldShiftLevelProps.SwitchColour : WorldShiftLevelProps.NightColour,
-                            data.World == ShiftWorld.Day ? .8f : 0f));
-                }
-                hazards.Add(trafficView);
-                return;
-            }
-            float depth = data.End - data.Start;
-            var palette = data.Kind == ShiftHazardKind.SwitchWall ? switchPalette
-                : data.LateralMotion ? sideMoverPalette
-                : data.Kind == ShiftHazardKind.Oncoming || data.MotionSpeed > 0f
-                    ? moverPalette : data.SharedAcrossWorlds ? permanentPalette : obstaclePalette;
-            // The other world's still obstacles show as passable dashes in their own colour.
-            Material dashes = game.LevelMode && !data.SharedAcrossWorlds
-                ? WorldShiftLevelProps.Glow(data.World == ShiftWorld.Day ? WorldShiftLevelProps.SwitchColour : WorldShiftLevelProps.NightColour,
-                    data.World == ShiftWorld.Day ? .8f : 0f) : null;
-            var retractable = new List<WorldShiftRetractableBarrier>();
-            int oceanVariant = oceanHazardIndex++;
-            if (ocean != null && data.LateralMotion) ocean.BuildTrolleyTrack(data);
-            void Block(Transform frame, Transform ghostFrame, Vector3 centre, Vector3 size)
-            {
-                if (game.LevelMode && data.LateralMotion && data.SharedAcrossWorlds)
-                    WorldShiftSpikePlatform.Build(frame, centre, size);
-                else if (game.LevelMode && data.Kind == ShiftHazardKind.Barrier
-                    && data.SharedAcrossWorlds && !data.LateralMotion && data.MotionSpeed == 0f)
-                    WorldShiftPoliceBarricade.Build(frame, centre, size);
-                else if (game.LevelMode && WorldShiftRetractableBarrier.Supports(data))
-                    retractable.Add(WorldShiftRetractableBarrier.Build(frame, centre, size, data.World));
-                else if (ocean != null)
-                    ocean.BuildObstacle(frame, centre, size, palette, data, oceanVariant);
-                else
-                    WorldShiftObstacleVisual.Build(frame, centre, size, palette,
-                        data.Kind == ShiftHazardKind.SwitchWall, data.Kind == ShiftHazardKind.Oncoming && !data.LateralMotion);
-                if (game.LevelMode && game.Environment == ShiftLevel.Desert && data.LateralMotion)
-                    WorldShiftLevelProps.SlidingGateHint(frame, size.z, smallBlock: true);
-                if (game.LevelMode && data.SharedAcrossWorlds
-                    && (data.LateralMotion || data.MotionSpeed > 0f))
-                    BuildFrozenCue(frame, centre, size, data.LateralMotion);
-                if (dashes != null && !(game.LevelMode && WorldShiftRetractableBarrier.Supports(data)))
-                    WorldShiftLevelProps.DashedOutline(ghostFrame, centre, size, dashes);
-            }
-            if (data.Kind == ShiftHazardKind.Gap)
-            {
-                WorldShiftRoadSigns.BuildGapWarnings(solid.transform, route, data.Start, data.World == ShiftWorld.Echo);
-                BuildPitLighting(solid.transform, data);
-                WorldShiftPitVisuals.Build(solid.transform, route, data);
-            }
-            else
-            {
-                // Fit repeated blocks to the existing lane masks and curved collision footprint.
-                for (float offset = 0f; offset < depth; offset += 8f)
-                {
-                    float length = Mathf.Min(8f, depth - offset);
-                    float at = data.Start + offset + length * .5f;
-                    var frame = new GameObject("Obstacle footprint section").transform;
-                    frame.SetParent(solid.transform, false);
-                    var sample = route.Sample(at);
-                    frame.SetPositionAndRotation(sample.Position, Quaternion.LookRotation(sample.Forward, sample.Up));
-                    var ghostFrame = new GameObject("Other-world footprint section").transform;
-                    ghostFrame.SetParent(ghost.transform, false);
-                    ghostFrame.SetPositionAndRotation(frame.position, frame.rotation);
-                    if (data.Kind == ShiftHazardKind.SwitchWall)
-                        Block(frame, ghostFrame, new Vector3(0f, .9f, 0f), new Vector3(WorldShiftLevel.RoadWidth, 1.8f, length));
-                    else if (data.Kind == ShiftHazardKind.HalfBarrier)
-                        Block(frame, ghostFrame, new Vector3(data.HalfSide * 2.5f, .9f, 0f), new Vector3(5f, 1.8f, length));
-                    else if (data.Kind == ShiftHazardKind.Divider)
-                        Block(frame, ghostFrame, new Vector3(0f, .9f, 0f), new Vector3(3.05f, 1.8f, length));
-                    else if (game.LevelMode && data.LaneMask == 7 && !data.LateralMotion)
-                        Block(frame, ghostFrame, new Vector3(0f, .9f, 0f), new Vector3(WorldShiftLevel.RoadWidth, 1.8f, length));
-                    else for (int lane = 0; lane < 3; lane++)
-                    {
-                        if ((data.LaneMask & (1 << lane)) == 0) continue;
-                        float x = (lane - 1) * WorldShiftLevel.RoadWidth / 3f;
-                        Block(frame, ghostFrame, new Vector3(x, .9f, 0f), new Vector3(data.LateralMotion ? (game.LevelMode ? WorldShiftSpikePlatform.Width : 1.6f) : 3.05f, 1.8f, length));
-                    }
-                }
-            }
-            var view = new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk };
-            view.Barriers.AddRange(retractable);
-            hazards.Add(view);
-        }
-
-        private void BuildPitLighting(Transform parent, ShiftHazard gap)
-        {
-            Material housing = RuntimeMaterials.Coloured(new Color(.13f, .14f, .15f));
-            Material lens = Reflective(new Color(1f, .65f, .22f), .65f);
-            foreach (bool entrance in new[] { true, false })
-            {
-                float edge = entrance ? gap.Start : gap.End;
-                RoadPathPoint point = route.Sample(edge + (entrance ? 1.5f : -1.5f));
-                foreach (float side in new[] { -1f, 1f })
-                {
-                    var fixture = new GameObject("Pit edge floodlight");
-                    fixture.transform.SetParent(parent, false);
-                    fixture.transform.SetPositionAndRotation(point.Position + point.Right * side * 5.5f + point.Up * 1.8f,
-                        Quaternion.LookRotation(point.Forward, point.Up));
-                    Box(fixture.transform, "Pit lamp support", Vector3.down * .9f, new Vector3(.12f, 1.8f, .12f), housing);
-                    Box(fixture.transform, "Pit lamp overhang", new Vector3(-side * .55f, 0f, 0f), new Vector3(1.1f, .09f, .09f), housing);
-                    Vector3 overOpening = new Vector3(-side * 1.1f, 0f, 0f);
-                    Box(fixture.transform, "Pit warning lamp lens", overOpening, new Vector3(.36f, .22f, .32f), lens);
-                    var source = new GameObject("Pit lip and inner wall light");
-                    source.transform.SetParent(fixture.transform, false);
-                    // Overhang the opening so the light reaches the visible inner
-                    // faces, rather than only the outside of the exposed deck.
-                    source.transform.localPosition = overOpening;
-                    Light light = source.AddComponent<Light>();
-                    light.type = LightType.Point;
-                    light.color = new Color(1f, .72f, .38f);
-                    light.intensity = 18f;
-                    light.range = 22f;
-                    light.shadows = LightShadows.None;
-                }
-            }
-        }
-
         private void BuildCheckpoints()
         {
             if (game.LevelMode)
@@ -333,13 +179,6 @@ namespace Outlaws.WorldShift
             for (int i = 0; i < 10; i++)
                 for (int row = 0; row < 2; row++)
                     Box(root, "Finish chequer", new Vector3(-4.5f + i, .03f, row - .5f), new Vector3(1f, .04f, 1f), (i + row) % 2 == 0 ? marker : black);
-        }
-
-        private void BuildFrozenCue(Transform parent, Vector3 centre, Vector3 size, bool spikePlatform = false)
-        {
-            var ice = WorldShiftFrozenIce.Build(parent, centre, size, spikePlatform ? size.y * .34f : float.PositiveInfinity).GetComponent<WorldShiftFrozenIce>();
-            ice.SetFrozen(world == ShiftWorld.Echo, true);
-            frozenCues.Add(ice);
         }
 
         public void SetWorld(ShiftWorld next)
@@ -515,85 +354,6 @@ namespace Outlaws.WorldShift
         {
             for (int i = 0; i < fuelModels.Count; i++)
                 fuelModels[i].SetActive((game.GetawayMode ? world == ShiftWorld.Day : game.Pickups[i].World == world) && !game.IsFuelCollected(i));
-        }
-
-        private void BuildHeadlight(Transform player)
-        {
-            var lamp = new GameObject("Player forward cone headlight");
-            // Attach to the stable car root, not the swaying visual body. The beam
-            // follows road pitch and steering without flickering with suspension.
-            lamp.transform.SetParent(player.parent, false);
-            lamp.transform.localPosition = new Vector3(0f, 1.15f, 1.6f);
-            lamp.transform.localRotation = Quaternion.Euler(1f, 0f, 0f);
-            playerHeadlight = lamp.AddComponent<Light>();
-            playerHeadlight.type = LightType.Spot;
-            playerHeadlight.color = new Color(.88f, .94f, 1f);
-            playerHeadlight.range = game.GetawayMode ? WorldShiftFlow.Garage.HeadlightRange : 74f;
-            playerHeadlight.spotAngle = 36f;
-            playerHeadlight.innerSpotAngle = 22f;
-            playerHeadlight.intensity = 900f * Mathf.Pow(playerHeadlight.range / 74f, 2f);
-            playerHeadlight.renderMode = LightRenderMode.ForcePixel;
-            playerHeadlight.shadows = LightShadows.Soft;
-            playerHeadlight.shadowStrength = .85f;
-            playerHeadlight.shadowBias = .035f;
-            playerHeadlight.shadowNormalBias = .1f;
-            playerHeadlight.shadowNearPlane = .15f;
-            BuildHeadlightHaze(lamp.transform);
-        }
-
-        private void BuildHeadlightHaze(Transform lamp)
-        {
-            Shader shader = Resources.Load<Shader>("WorldShiftHeadlight");
-            if (shader == null) return; // The physical spotlight is still usable without haze.
-            var material = new Material(shader);
-            headlightHazeMaterial = material;
-            ownedMaterials.Add(material);
-            var vertices = new List<Vector3>();
-            var colours = new List<Color>();
-            var triangles = new List<int>();
-            const int columns = 8, rows = 24;
-            // A faint horizontal slice of haze makes the expanding spotlight
-            // legible from the chase camera without a bright tunnel in the view.
-            // Both side edges and the far end fade completely to transparent.
-            for (int row = 0; row <= rows; row++)
-            {
-                float t = row / (float)rows;
-                float z = t * 54f * (playerHeadlight.range / 74f);
-                float radius = .12f + z * Mathf.Tan(16f * Mathf.Deg2Rad);
-                for (int column = 0; column <= columns; column++)
-                {
-                    float across = column / (float)columns * 2f - 1f;
-                    vertices.Add(new Vector3(across * radius, 0f, z));
-                    float fade = Mathf.Sin(t * Mathf.PI) * (1f - across * across);
-                    colours.Add(new Color(.58f, .73f, 1f, .065f * fade));
-                    if (row == 0 || column == 0) continue;
-                    int b = row * (columns + 1) + column, a = b - columns - 1;
-                    triangles.Add(a - 1); triangles.Add(b - 1); triangles.Add(b);
-                    triangles.Add(a - 1); triangles.Add(b); triangles.Add(a);
-                }
-            }
-            var mesh = new Mesh { name = "Soft prototype headlight cone" };
-            mesh.SetVertices(vertices); mesh.SetColors(colours); mesh.SetTriangles(triangles, 0); mesh.RecalculateBounds();
-            generatedMeshes.Add(mesh);
-            headlightHaze = new GameObject("Headlight atmosphere", typeof(MeshFilter), typeof(MeshRenderer));
-            headlightHaze.transform.SetParent(lamp, false);
-            headlightHaze.GetComponent<MeshFilter>().sharedMesh = mesh;
-            Renderer renderer = headlightHaze.GetComponent<Renderer>();
-            renderer.sharedMaterial = material;
-            renderer.shadowCastingMode = ShadowCastingMode.Off;
-            renderer.receiveShadows = false;
-        }
-
-        private Material Reflective(Color colour, float glow)
-        {
-            var key = (colour, glow);
-            if (glowMaterials.TryGetValue(key, out Material shared)) return shared;
-            var material = new Material(RuntimeMaterials.Coloured(colour));
-            material.EnableKeyword("_EMISSION");
-            material.SetColor("_EmissionColor", colour * glow);
-            ownedMaterials.Add(material);
-            glowMaterials.Add(key, material);
-            return material;
         }
 
         private void OnDestroy()

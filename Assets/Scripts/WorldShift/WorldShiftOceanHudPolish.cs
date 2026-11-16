@@ -19,13 +19,7 @@ namespace Outlaws.WorldShift
             badge.anchorMin=badge.anchorMax=new Vector2(.045f,.945f);
             badge.pivot=new Vector2(.5f,.5f);badge.anchoredPosition=Vector2.zero;badge.sizeDelta=new Vector2(58,58);
             Round(badge,panel);worldIcon.rectTransform.sizeDelta=new Vector2(38,38);
-            var bar=(RectTransform)progressFill.transform.parent;
-            bar.anchorMin=new Vector2(.30f,.950f);bar.anchorMax=new Vector2(.70f,.960f);
-            Round(bar,new Color(.035f,.09f,.12f,.68f));
-            progressFill.color=new Color(.67f,.91f,.86f);
-            foreach(var pip in pips) pip.rectTransform.sizeDelta=new Vector2(10,10);
-            var flag=(RectTransform)bar.Find("Finish");flag.sizeDelta=new Vector2(21,21);
-            carMarker.sizeDelta=new Vector2(5,16);
+            // Keep the shared progress bar and marker sizes identical in every level.
             var pauseButton=(RectTransform)driving.transform.Find("Pause button");
             pauseButton.anchorMin=pauseButton.anchorMax=new Vector2(.955f,.945f);
             pauseButton.anchoredPosition=Vector2.zero;pauseButton.sizeDelta=new Vector2(52,52);
@@ -34,7 +28,7 @@ namespace Outlaws.WorldShift
             if(collectionStatus!=null)
             {
                 oceanCounter=(RectTransform)collectionStatus.transform.parent;
-                oceanCounter.anchorMin=oceanCounter.anchorMax=new Vector2(.5f,.895f);
+                oceanCounter.anchorMin=oceanCounter.anchorMax=new Vector2(.5f,.88f);
                 oceanCounter.anchoredPosition=Vector2.zero;oceanCounter.sizeDelta=new Vector2(166,38);
                 Round(oceanCounter,panel);
                 collectionStatus.fontSize=20;collectionStatus.enableAutoSizing=true;

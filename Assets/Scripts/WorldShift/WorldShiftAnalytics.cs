@@ -6,7 +6,7 @@ using UnityEngine.SceneManagement;
 namespace Outlaws.WorldShift
 {
     /// <summary>
-    /// Playtest analytics for the WorldShift escape and tutorial (Docs/ANALYTICS.md, "WorldShift").
+    /// Playtest analytics for the WorldShift escape (Docs/ANALYTICS.md, "WorldShift").
     /// Gameplay code reports moments here; this class keeps the per-leg and per-run tallies and
     /// writes ws_runs, ws_legs and ws_tutorials rows plus ws_* events through WeeWooAnalytics.
     /// </summary>
@@ -91,11 +91,6 @@ namespace Outlaws.WorldShift
         private static string legPowerUp = "", lastImpactKind = "";
         private static Death death;
 
-        private static bool tutorialOpen;
-        private static int tutorialStep, tutorialAttempt;
-        private static float stepStarted, tutorialStartRealtime;
-        private static float[] stepSeconds;
-        private static int[] stepRetries;
 
         /// <summary>Test seam: receives every event and row instead of the uploader when set.</summary>
         internal static Action<string, string, Dictionary<string, object>> Sink;
@@ -104,7 +99,7 @@ namespace Outlaws.WorldShift
         private static void ResetStatics()
         {
             distance = duration = fuel = gap = null; world = null; mode = environment = "";
-            runId = null; runNumber = tutorialAttempt = 0; legOpen = tutorialOpen = false; Sink = null;
+            runId = null; runNumber = 0; legOpen = false; Sink = null;
         }
 
         public static void MenuShown() => Event("ws_menu", "banked_total", WorldShiftFlow.Banked, "best_haul", WorldShiftFlow.BestHaul);
@@ -170,7 +165,6 @@ namespace Outlaws.WorldShift
         /// <summary>Closes whatever is open without a result: restart, back to menu.</summary>
         public static void Abandon(string why)
         {
-            if (tutorialOpen) EndTutorial(why);
             if (runId != null) EndRun(why, "", WorldShiftFlow.Escape.Carried);
         }
 
@@ -254,40 +248,8 @@ namespace Outlaws.WorldShift
                 SinceSwitch = Since(lastSwitch), SinceImpact = Since(lastImpact), LastImpact = lastImpactKind,
                 FuelPct = fuel != null ? Mathf.Round(100f * fuel()) : -1f, Gap = gap != null ? Round(gap()) : -1f
             };
-            if (tutorialOpen && tutorialStep < stepRetries.Length) stepRetries[tutorialStep]++;
             Event("ws_death", "reason", reason, "s_since_switch", death.SinceSwitch, "s_since_impact", death.SinceImpact,
                 "after_switch", death.SinceSwitch >= 0f && death.SinceSwitch <= SwitchBlameSeconds);
-        }
-
-        // ----- Tutorial -----
-
-        public static void BeginTutorial(int steps, Func<float> getDistance, Func<float> getDuration, Func<ShiftWorld> getWorld)
-        {
-            if (tutorialOpen) EndTutorial("restarted");
-            Attach("tutorial", "Tutorial", getDistance, getDuration, getWorld);
-            tutorialOpen = true; tutorialAttempt++; tutorialStep = 0; stepStarted = 0f;
-            tutorialStartRealtime = Time.realtimeSinceStartup;
-            stepSeconds = new float[steps]; stepRetries = new int[steps];
-            current = new Tally(); worldSince = 0f; lastSwitch = lastImpact = float.NegativeInfinity; lastImpactKind = "";
-            Event("ws_tutorial_start", "attempt", tutorialAttempt, "then_escape", runId != null);
-        }
-
-        public static void TutorialStep(int step, string title)
-        {
-            if (!tutorialOpen || step <= tutorialStep || step >= stepSeconds.Length) return;
-            stepSeconds[tutorialStep] += Now - stepStarted;
-            Event("ws_tutorial_step", "step", step, "title", title, "prev_step_s", Round(stepSeconds[tutorialStep]), "prev_step_retries", stepRetries[tutorialStep]);
-            tutorialStep = step; stepStarted = Now;
-        }
-
-        public static void EndTutorial(string status)
-        {
-            if (!tutorialOpen) return;
-            Row("ws_tutorials", TutorialRow(status));
-            Event("ws_tutorial_end", "status", status, "step", tutorialStep);
-            tutorialOpen = false;
-            if (mode == "tutorial") Detach();
-            WeeWooAnalytics.Flush();
         }
 
         // ----- Rows -----
@@ -349,26 +311,6 @@ namespace Outlaws.WorldShift
             return row;
         }
 
-        private static Dictionary<string, object> TutorialRow(string status)
-        {
-            var row = new Dictionary<string, object>
-            {
-                ["attempt"] = tutorialAttempt, ["status"] = status, ["step_reached"] = tutorialStep,
-                ["step_title"] = tutorialStep < WorldShiftTutorial.Checkpoints.Length ? WorldShiftTutorial.Checkpoints[tutorialStep].Title : "",
-                ["drive_s"] = Round(Now), ["wallclock_s"] = Round(Time.realtimeSinceStartup - tutorialStartRealtime),
-                ["then_escape"] = runId != null, ["switches"] = current.Switches, ["impacts"] = current.Impacts, ["shots"] = current.Shots
-            };
-            float[] seconds = (float[])stepSeconds.Clone();
-            if (tutorialStep < seconds.Length) seconds[tutorialStep] += Now - stepStarted;
-            for (int i = 0; i < seconds.Length; i++)
-            {
-                string title = WorldShiftTutorial.Checkpoints[i].Title.ToLowerInvariant().Replace(' ', '_');
-                row["s_" + i + "_" + title] = Round(seconds[i]);
-                row["retries_" + i + "_" + title] = stepRetries[i];
-            }
-            return row;
-        }
-
         private static void WriteDeath(Dictionary<string, object> row, bool dead)
         {
             Death d = dead ? death : null;
@@ -385,7 +327,7 @@ namespace Outlaws.WorldShift
 
         // ----- Plumbing -----
 
-        private static bool Tracking => (legOpen || tutorialOpen) && distance != null;
+        private static bool Tracking => legOpen && distance != null;
         private static float Now => duration != null ? duration() : 0f;
         private static float Since(float at) => float.IsNegativeInfinity(at) ? -1f : Round(Now - at);
         private static float Round(float value) => Mathf.Round(value * 10f) / 10f;
@@ -434,7 +376,6 @@ namespace Outlaws.WorldShift
         private static List<KeyValuePair<string, Dictionary<string, object>>> ExitRows()
         {
             var rows = new List<KeyValuePair<string, Dictionary<string, object>>>();
-            if (tutorialOpen) rows.Add(new KeyValuePair<string, Dictionary<string, object>>("ws_tutorials", TutorialRow("tab_closed")));
             if (runId == null) return rows;
             Tally total = run.Copy();
             if (legOpen)

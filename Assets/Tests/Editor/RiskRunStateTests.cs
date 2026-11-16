@@ -16,7 +16,7 @@ public sealed class RiskRunStateTests
         run.LoseNitro();
         for (int i = 0; i < 10; i++)
         {
-            run.TryCrash(TrafficObstacleRules.YellowProximityDrain);
+            run.TryCrash(0.5f); // former yellow-traffic drain
             run.Tick(1.1f, 14f, 14f);
         }
         Assert.That(run.PursuitGap, Is.EqualTo(6f));

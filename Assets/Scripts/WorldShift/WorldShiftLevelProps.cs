@@ -120,26 +120,17 @@ namespace Outlaws.WorldShift
             if (!SignArtwork(face, artwork)) switch (sign.Kind)
             {
                 case LevelSignKind.Steer:
-                    Key(face, "", new Vector3(-3.2f, 0f, 0f), white);
-                    Arrow(face, new Vector3(-3.2f, 0f, -.08f), -1f, green);
+                    Key(face, "A", new Vector3(-3.2f, 0f, 0f), white);
                     Arrow(face, new Vector3(-1.7f, 0f, 0f), -1f, white);
                     Box(face, new Vector3(0f, 0f, 0f), new Vector3(1.1f, 1.1f, .05f), Glow(PermanentColour));
                     Arrow(face, new Vector3(1.7f, 0f, 0f), 1f, white);
-                    Key(face, "", new Vector3(3.2f, 0f, 0f), white);
-                    Arrow(face, new Vector3(3.2f, 0f, -.08f), 1f, green);
+                    Key(face, "D", new Vector3(3.2f, 0f, 0f), white);
                     break;
                 case LevelSignKind.Switch:
                     Key(face, "SPACE", new Vector3(-2.3f, 0f, 0f), white, 2.6f);
                     Box(face, new Vector3(.4f, 0f, 0f), new Vector3(1.1f, 1.1f, .05f), Glow(SwitchColour));
                     Arrow(face, new Vector3(1.9f, 0f, 0f), 1f, white);
                     Moon(face, new Vector3(3.3f, 0f, 0f), white, green);
-                    break;
-                case LevelSignKind.Dashes:
-                    DashedOutline(face, new Vector3(-2.9f, 0f, 0f), new Vector3(1.1f, 1.1f, .05f), day);
-                    Arrow(face, new Vector3(-1.4f, 0f, 0f), 1f, white);
-                    Key(face, "SPACE", new Vector3(.4f, 0f, 0f), white, 2.2f);
-                    Arrow(face, new Vector3(2.1f, 0f, 0f), 1f, white);
-                    Box(face, new Vector3(3.3f, 0f, 0f), new Vector3(1.1f, 1.1f, .05f), Glow(NightColour));
                     break;
                 case LevelSignKind.Oncoming:
                     Box(face, new Vector3(0f, .25f, 0f), new Vector3(1.5f, 1.3f, .05f), Glow(MoverColour, .5f));
@@ -220,12 +211,11 @@ namespace Outlaws.WorldShift
         {
             switch (kind)
             {
-                case LevelSignKind.Steer: return new SignArtworkSpec("CurrentTrainingSteer", new RectInt(0, 0, 1200, 360), 14f, 4.2f);
-                case LevelSignKind.Switch: return new SignArtworkSpec("CurrentTrainingSwitch", new RectInt(0, 0, 1200, 360), 14f, 4.2f);
-                case LevelSignKind.Dashes: return new SignArtworkSpec("CurrentTrainingDashes", new RectInt(0, 0, 1200, 360), 14f, 4.2f);
-                case LevelSignKind.Oncoming: return new SignArtworkSpec("CurrentTrainingOncoming", new RectInt(0, 0, 1200, 360), 14f, 4.2f);
-                case LevelSignKind.Freeze: return new SignArtworkSpec("CurrentTrainingFreeze", new RectInt(0, 0, 1200, 360), 14f, 4.2f);
-                case LevelSignKind.Ramp: return new SignArtworkSpec("TrainingRampSign", new RectInt(123, 187, 1529, 415), 12.5f, 3.39f);
+                case LevelSignKind.Steer: return new SignArtworkSpec("CurrentTrainingSteer", new RectInt(0, 0, 2400, 720), 14f, 4.2f);
+                case LevelSignKind.Switch: return new SignArtworkSpec("CurrentTrainingSwitch", new RectInt(0, 0, 2400, 720), 14f, 4.2f);
+                case LevelSignKind.Oncoming: return new SignArtworkSpec("CurrentTrainingOncoming", new RectInt(0, 0, 2400, 720), 14f, 4.2f);
+                case LevelSignKind.Freeze: return new SignArtworkSpec("CurrentTrainingFreeze", new RectInt(0, 0, 2400, 720), 14f, 4.2f);
+                case LevelSignKind.Ramp: return new SignArtworkSpec("CurrentTrainingRamp", new RectInt(0, 0, 2400, 720), 14f, 4.2f);
                 default: return default;
             }
         }

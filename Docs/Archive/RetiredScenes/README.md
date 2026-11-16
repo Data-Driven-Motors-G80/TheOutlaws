@@ -22,8 +22,11 @@ The active tests are `WorldShiftLevelTests`, `DesertLevelCourseTests` and
 `WorldShiftSceneSetupTests`, alongside retained shared-unit and controller tests.
 The common rendering helper was extracted into `WorldShiftTestCapture`.
 
-Runtime classes and supporting art/prefabs/materials were not deleted. Current
-levels reuse parts of those systems. Legacy WorldShift flow entry points route
+The scene-retirement pass retained runtime classes and supporting art/prefabs/materials.
+A later code cleanup removed unreferenced legacy spawners, portal transitions,
+scenery effects, the rift visual and `PickupSmokeRunner`; restore those from Git
+as well if you restore the old tools. Shared and tested foundations remain.
+Legacy WorldShift flow entry points route
 to the current level controller; they no longer load removed scene variants.
 Historical documents elsewhere in Docs/Archive and Docs/Legacy may still name
 removed scenes. Restore any historical scene/tool/test set together from Git

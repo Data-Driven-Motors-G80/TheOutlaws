@@ -1,8 +1,7 @@
 # Level 2 desert
 
 Level 2 uses Drew's shared level controller, six ramp sections and
-one-hit retries. Day-only obstacles stay teal, Night-only obstacles pale violet with the other
-world shown as passable dashes. All moving rocks are orange and solid in both
+one-hit retries. Still obstacles belong to Day or Night; the other world's appear as passable dashed outlines (Day yellow, Night black). All moving rocks are orange and solid in both
 worlds: Day moves them and Night freezes their exact current position.
 
 The course is 3,516 metres, approximately 121 seconds of clean driving with the
@@ -91,7 +90,7 @@ Passing it shows a small check icon and CHECKPOINT banner for 2.2 seconds, away
 from the driving line. The confirmation pauses with gameplay and clears on retry;
 the checkpoint count and positions have not changed.
 
-Geometry reuses `DesertRollingRock.CreateVisual`; motion reuses `DesertTrialRock`.
+Rolling spheres look like tumbleweeds (`WorldShiftBoulderArt`); motion reuses `DesertTrialRock`.
 `WorldShiftLevelRock` connects these to the shared hazard data and the car's
 authored flight arc. Contact uses a sphere against the swept car box, including
 height. Night and pause stop both translation and visible rotation. Checkpoint

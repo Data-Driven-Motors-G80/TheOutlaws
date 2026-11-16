@@ -1,3 +1,5 @@
+using UnityEngine;
+
 namespace Outlaws.WorldShift
 {
     public enum ShiftWorld
@@ -40,12 +42,15 @@ namespace Outlaws.WorldShift
         public float LateralOffset => Gate != null ? Gate.Lateral : Rock != null ? Rock.Lateral : LateralMotion ? -2.8f * (float)System.Math.Sin(MotionTravel) : 0f;
         public float PreviousLateralOffset { get; private set; }
         public bool VisibleIn(ShiftWorld world) => SharedAcrossWorlds || World == world;
+        // Movers never wake before the checkpoint that governs them, so a first pass and a
+        // checkpoint retry present the same layout from the same starting positions.
+        public float WakeFloor = float.NegativeInfinity;
         public void Advance(float delta, float playerDistance, ShiftWorld world)
         {
             PreviousLateralOffset = LateralOffset;
             if (Gate != null)
             {
-                Gate.Advance(delta, playerDistance, world);
+                Gate.Advance(delta, playerDistance, world, WakeFloor);
                 MotionTravel = Gate.DaySeconds * Gate.Speed;
                 return;
             }
@@ -54,12 +59,13 @@ namespace Outlaws.WorldShift
                 // Flight spheres share the activation window, with individual lanes and phases.
                 float begin = Rock.Airborne ? Rock.Flight.Source == ShiftWorld.Echo
                     ? Rock.Flight.Takeoff : Rock.Flight.Ramp - 90f : Start - 150f;
+                begin = Mathf.Max(begin, WakeFloor);
                 float finish = Rock.Airborne ? Rock.Flight.Landing + 20f : End + 20f;
                 if (playerDistance >= begin && playerDistance <= finish) Rock.Motion.Advance(delta, world);
                 MotionTravel = Rock.Motion.DaySeconds * MotionSpeed;
                 return;
             }
-            if (SharedAcrossWorlds && world == ShiftWorld.Day && playerDistance >= Start - 150f && playerDistance <= End + 20f)
+            if (SharedAcrossWorlds && world == ShiftWorld.Day && playerDistance >= Mathf.Max(Start - 150f, WakeFloor) && playerDistance <= End + 20f)
                 MotionTravel += MotionSpeed * delta;
         }
         public void ResetMotion() { MotionTravel = 0f; Rock?.Motion.Restore(0f); Gate?.Reset(); PreviousLateralOffset = LateralOffset; }

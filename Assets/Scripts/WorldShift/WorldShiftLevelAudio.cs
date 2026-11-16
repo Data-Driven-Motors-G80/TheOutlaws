@@ -11,7 +11,7 @@ namespace Outlaws.WorldShift
         private float musicGain;
         private AudioClip takeoff, landing, crash, victory;
         private ShiftRunState previousState;
-        private bool previousAirborne, suspended;
+        private bool previousAirborne, suspended, winCuePlayed;
         private float previousLateral, dayBlend = 1f, gullIn = 9f;
         public float DayBlend => dayBlend;
         public bool Suspended => suspended;
@@ -23,7 +23,7 @@ namespace Outlaws.WorldShift
             tyres = Source("Player tyres", "WS_Tyres", true);
             cues = Source("Driving events", null, false);
             takeoff = Load("WS_Takeoff"); landing = Load("WS_Landing");
-            crash = Load("WS_Crash"); victory = Load("WS_Victory");
+            crash = Load("WS_Crash"); victory = Load(game.LevelIndex == WorldShiftLevels.Count-1 ? "WS_Finale" : "WS_Victory");
             if (!game.Course.Training)
             {
                 music = Source("Environment song", "WorldShiftMusic/" + game.Environment, true);
@@ -74,8 +74,8 @@ namespace Outlaws.WorldShift
             cues.volume = .65f * effects;
             if (previousState == ShiftRunState.Running && game.State == ShiftRunState.Retrying && game.Capturing)
                 cues.PlayOneShot(crash);
-            if (previousState != ShiftRunState.Won && game.State == ShiftRunState.Won)
-                cues.PlayOneShot(victory, .8f);
+            if (game.State == ShiftRunState.Won && !winCuePlayed && (game.Course.Training || game.Escape == null || game.Escape.Active && game.Escape.Ready && (!game.Escape.IsFinale || game.Escape.FinaleRevealed)))
+            { cues.PlayOneShot(victory, .8f); winCuePlayed = true; }
             if (running && previousState == ShiftRunState.Running)
             {
                 if (airborne && !previousAirborne) cues.PlayOneShot(takeoff, .65f);
@@ -98,7 +98,7 @@ namespace Outlaws.WorldShift
             }
             if (ocean != null)
             {
-                ocean.volume = effects * (running ? .35f : .12f);
+                ocean.volume = effects * (running ? .35f : game.Escape != null && game.Escape.Active ? .28f : .12f);
                 gull.volume = effects * .30f;
                 if (running && game.World == ShiftWorld.Day)
                 {
