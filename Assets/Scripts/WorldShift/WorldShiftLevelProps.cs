@@ -220,11 +220,11 @@ namespace Outlaws.WorldShift
         {
             switch (kind)
             {
-                case LevelSignKind.Steer: return new SignArtworkSpec("TrainingSteerSign", new RectInt(0, 0, 1360, 576), 10.5f, 4.45f);
-                case LevelSignKind.Switch: return new SignArtworkSpec("TrainingSwitchSign", new RectInt(24, 38, 1914, 713), 11.5f, 4.28f);
-                case LevelSignKind.Dashes: return new SignArtworkSpec("TrainingDashesSign", new RectInt(118, 112, 1938, 454), 14f, 3.28f);
-                case LevelSignKind.Oncoming: return new SignArtworkSpec("TrainingOncomingSign", new RectInt(170, 158, 1434, 406), 14f, 3.96f);
-                case LevelSignKind.Freeze: return new SignArtworkSpec("TrainingFreezeSign", new RectInt(165, 163, 1842, 363), 14f, 2.76f);
+                case LevelSignKind.Steer: return new SignArtworkSpec("CurrentTrainingSteer", new RectInt(0, 0, 1200, 360), 14f, 4.2f);
+                case LevelSignKind.Switch: return new SignArtworkSpec("CurrentTrainingSwitch", new RectInt(0, 0, 1200, 360), 14f, 4.2f);
+                case LevelSignKind.Dashes: return new SignArtworkSpec("CurrentTrainingDashes", new RectInt(0, 0, 1200, 360), 14f, 4.2f);
+                case LevelSignKind.Oncoming: return new SignArtworkSpec("CurrentTrainingOncoming", new RectInt(0, 0, 1200, 360), 14f, 4.2f);
+                case LevelSignKind.Freeze: return new SignArtworkSpec("CurrentTrainingFreeze", new RectInt(0, 0, 1200, 360), 14f, 4.2f);
                 case LevelSignKind.Ramp: return new SignArtworkSpec("TrainingRampSign", new RectInt(123, 187, 1529, 415), 12.5f, 3.39f);
                 default: return default;
             }
@@ -233,7 +233,7 @@ namespace Outlaws.WorldShift
         public static bool TryGetSignArtwork(LevelSignKind kind, out Texture2D texture, out Rect uv)
         {
             SignArtworkSpec spec = ArtworkFor(kind);
-            texture = spec.Resource == null ? null : Resources.Load<Texture2D>(spec.Resource);
+            texture = spec.Resource == null ? null : WorldShiftTrainingSignArt.Load(spec.Resource);
             uv = Rect.zero;
             if (texture == null) return false;
             uv = new Rect(spec.Crop.xMin / (float)texture.width,
@@ -245,7 +245,7 @@ namespace Outlaws.WorldShift
         private static bool SignArtwork(Transform face, SignArtworkSpec spec)
         {
             if (spec.Resource == null) return false;
-            Texture2D texture = Resources.Load<Texture2D>(spec.Resource);
+            Texture2D texture = WorldShiftTrainingSignArt.Load(spec.Resource);
             if (texture == null) return false;
             Material template = Resources.Load<Material>("WorldShiftRuntimeUnlit");
             Material material = new Material(template != null ? template : RuntimeMaterials.Coloured(Color.white));

@@ -16,6 +16,7 @@ namespace Outlaws.WorldShift
             public GameObject Solid, Ghost;
             public Transform Root;
             public Chunk Chunk;
+            public readonly List<WorldShiftRetractableBarrier> Barriers = new List<WorldShiftRetractableBarrier>();
             public readonly List<WorldShiftRoadVehicleArt> Traffic = new List<WorldShiftRoadVehicleArt>();
         }
         private sealed class PedestrianView
@@ -159,13 +160,12 @@ namespace Outlaws.WorldShift
             }
             if (data.Rock != null)
             {
-                WorldShiftObstacleVisual.Build(solid.transform, Vector3.zero,
-                    Vector3.one * (data.Rock.Radius * 2f), sideMoverPalette);
+                WorldShiftBoulderArt.Build(solid.transform, root, data.Rock.Radius);
                 if (game.LevelMode) BuildFrozenCue(root, Vector3.zero, Vector3.one * (data.Rock.Radius * 2f));
                 hazards.Add(new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk });
                 return;
             }
-            if (game.LevelMode && data.Kind == ShiftHazardKind.Oncoming && !data.SharedAcrossWorlds && !data.LateralMotion)
+            if (game.LevelMode && data.Kind == ShiftHazardKind.Oncoming && !data.LateralMotion)
             {
                 var trafficView = new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk };
                 for (int lane = 0; lane < 3; lane++)
@@ -173,8 +173,11 @@ namespace Outlaws.WorldShift
                     if ((data.LaneMask & (1 << lane)) == 0) continue;
                     Vector3 centre = new Vector3((lane - 1) * WorldShiftLevel.RoadWidth / 3f, .9f, 0f);
                     Vector3 size = new Vector3(3.05f, 1.8f, data.End - data.Start);
-                    trafficView.Traffic.Add(WorldShiftRoadVehicleArt.Build(solid.transform, centre, size, moverPalette, game.Environment));
-                    WorldShiftLevelProps.DashedOutline(ghost.transform, centre, size,
+                    var vehicle=WorldShiftRoadVehicleArt.Build(solid.transform, centre, size, moverPalette, game.Environment);
+                    vehicle.ConfigureWarning(game,data);
+                    trafficView.Traffic.Add(vehicle);
+                    if (data.SharedAcrossWorlds) BuildFrozenCue(solid.transform, centre, size, true);
+                    else WorldShiftLevelProps.DashedOutline(ghost.transform, centre, size,
                         WorldShiftLevelProps.Glow(data.World == ShiftWorld.Day ? WorldShiftLevelProps.SwitchColour : WorldShiftLevelProps.NightColour,
                             data.World == ShiftWorld.Day ? .8f : 0f));
                 }
@@ -190,12 +193,18 @@ namespace Outlaws.WorldShift
             Material dashes = game.LevelMode && !data.SharedAcrossWorlds
                 ? WorldShiftLevelProps.Glow(data.World == ShiftWorld.Day ? WorldShiftLevelProps.SwitchColour : WorldShiftLevelProps.NightColour,
                     data.World == ShiftWorld.Day ? .8f : 0f) : null;
+            var retractable = new List<WorldShiftRetractableBarrier>();
             int oceanVariant = oceanHazardIndex++;
             if (ocean != null && data.LateralMotion) ocean.BuildTrolleyTrack(data);
             void Block(Transform frame, Transform ghostFrame, Vector3 centre, Vector3 size)
             {
                 if (game.LevelMode && data.LateralMotion && data.SharedAcrossWorlds)
                     WorldShiftSpikePlatform.Build(frame, centre, size);
+                else if (game.LevelMode && data.Kind == ShiftHazardKind.Barrier
+                    && data.SharedAcrossWorlds && !data.LateralMotion && data.MotionSpeed == 0f)
+                    WorldShiftPoliceBarricade.Build(frame, centre, size);
+                else if (game.LevelMode && WorldShiftRetractableBarrier.Supports(data))
+                    retractable.Add(WorldShiftRetractableBarrier.Build(frame, centre, size, data.World));
                 else if (ocean != null)
                     ocean.BuildObstacle(frame, centre, size, palette, data, oceanVariant);
                 else
@@ -206,7 +215,8 @@ namespace Outlaws.WorldShift
                 if (game.LevelMode && data.SharedAcrossWorlds
                     && (data.LateralMotion || data.MotionSpeed > 0f))
                     BuildFrozenCue(frame, centre, size, data.LateralMotion);
-                if (dashes != null) WorldShiftLevelProps.DashedOutline(ghostFrame, centre, size, dashes);
+                if (dashes != null && !(game.LevelMode && WorldShiftRetractableBarrier.Supports(data)))
+                    WorldShiftLevelProps.DashedOutline(ghostFrame, centre, size, dashes);
             }
             if (data.Kind == ShiftHazardKind.Gap)
             {
@@ -244,7 +254,9 @@ namespace Outlaws.WorldShift
                     }
                 }
             }
-            hazards.Add(new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk });
+            var view = new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk };
+            view.Barriers.AddRange(retractable);
+            hazards.Add(view);
         }
 
         private void BuildPitLighting(Transform parent, ShiftHazard gap)
@@ -436,6 +448,7 @@ namespace Outlaws.WorldShift
             }
             foreach (var hazard in hazards)
             {
+                foreach (var barrier in hazard.Barriers) barrier.Step(Time.deltaTime);
                 bool preview = ShouldPreview(hazard, distance);
                 hazard.Ghost.SetActive(preview);
             }
@@ -459,6 +472,8 @@ namespace Outlaws.WorldShift
         public void ResetPedestrians()
         {
             foreach (PedestrianView person in pedestrians) person.Figure.RestoreStanding();
+            foreach (var hazard in hazards)
+                foreach (var vehicle in hazard.Traffic) vehicle.ResetWarning();
         }
 
         private void RefreshHazards()
@@ -467,7 +482,8 @@ namespace Outlaws.WorldShift
             {
                 bool active = hazard.Data.VisibleIn(world) && WorldShiftCombat.IsActive(game.Combat, hazard.Data);
                 bool preview = ShouldPreview(hazard, game.Distance);
-                hazard.Solid.SetActive(active);
+                hazard.Solid.SetActive(active || hazard.Barriers.Count > 0);
+                foreach (var barrier in hazard.Barriers) barrier.SetRaised(active);
                 hazard.Ghost.SetActive(preview);
             }
         }
