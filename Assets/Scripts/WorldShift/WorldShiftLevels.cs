@@ -27,6 +27,10 @@ namespace Outlaws.WorldShift
         {
             Current = -1; Attempt = 0; transitionPending = false; StartWithStory = false;
             SceneManager.sceneLoaded -= TransitionLoaded;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // Start each development session with every level available.
+            UnlockAll = true;
+#endif
         }
 
         // Ignore input still reaching the outgoing UI while the next scene loads.
@@ -53,8 +57,21 @@ namespace Outlaws.WorldShift
         /// <summary>Team testing switch: opens every level without changing saved progress.</summary>
         public static bool UnlockAll
         {
-            get => PlayerPrefs.GetInt(UnlockAllKey, 0) == 1;
-            set { PlayerPrefs.SetInt(UnlockAllKey, value ? 1 : 0); PlayerPrefs.Save(); }
+            get
+            {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                return PlayerPrefs.GetInt(UnlockAllKey, 0) == 1;
+#else
+                return false;
+#endif
+            }
+            set
+            {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                PlayerPrefs.SetInt(UnlockAllKey, value ? 1 : 0);
+                PlayerPrefs.Save();
+#endif
+            }
         }
 
         public static void ResetProgress() { PlayerPrefs.DeleteKey(BeatenKey); PlayerPrefs.Save(); }

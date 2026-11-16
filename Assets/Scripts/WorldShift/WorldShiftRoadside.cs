@@ -46,6 +46,16 @@ namespace Outlaws.WorldShift
                 day = new[] { RuntimeMaterials.Coloured(new Color(.73f,.58f,.36f)), RuntimeMaterials.Coloured(new Color(.78f,.63f,.40f)) };
                 echo = new[] { RuntimeMaterials.Coloured(new Color(.27f,.29f,.29f)), RuntimeMaterials.Coloured(new Color(.25f,.27f,.29f)) };
             }
+            if (environment == ShiftLevel.Snow)
+            {
+                day = new[] { RuntimeMaterials.Coloured(new Color(.82f,.90f,.94f)), RuntimeMaterials.Coloured(new Color(.91f,.95f,.98f)) };
+                echo = new[] { RuntimeMaterials.Coloured(new Color(.36f,.48f,.61f)), RuntimeMaterials.Coloured(new Color(.43f,.56f,.69f)) };
+            }
+            else if (environment == ShiftLevel.Mountain)
+            {
+                day = new[] { RuntimeMaterials.Coloured(new Color(.43f,.43f,.36f)), RuntimeMaterials.Coloured(new Color(.32f,.38f,.27f)) };
+                echo = new[] { RuntimeMaterials.Coloured(new Color(.22f,.26f,.29f)), RuntimeMaterials.Coloured(new Color(.15f,.22f,.22f)) };
+            }
             dayEdge = RuntimeMaterials.Coloured(new Color(.83f, .82f, .73f));
             echoEdge = new Material(RuntimeMaterials.Coloured(new Color(.94f, .88f, .64f)));
             echoEdge.name = "Night cream road-edge paint";
@@ -109,6 +119,8 @@ namespace Outlaws.WorldShift
             // each bend with one long rectangular sidewalk.
             Vector3[] edges = road.sharedMesh.vertices;
             int rows = edges.Length / 2;
+            bool mountain = route.Course != null && route.Course.Environment == ShiftLevel.Mountain;
+            float shoulder = mountain ? 2.6f : SidewalkWidth;
             float groundWidth = route.Course != null && route.Course.Environment == ShiftLevel.Desert ? 75f : GroundWidth;
             var vertices = new List<Vector3>(rows * 6);
             var normals = new List<Vector3>(rows * 6);
@@ -123,12 +135,13 @@ namespace Outlaws.WorldShift
                 Vector3 right = road.transform.TransformPoint(edges[row * 2 + 1]);
                 Vector3 across = (right - left).normalized;
                 Vector3 up = segment.Sample(segment.Length * row / (rows - 1)).Up;
-                Add(left - across * groundWidth, up);
-                Add(left - across * SidewalkWidth, up);
+                // Mountains form a raised cutting on the left and a valley on the right.
+                Add(left - across * groundWidth + (mountain ? up * 16f : Vector3.zero), up);
+                Add(left - across * shoulder, up);
                 Add(left, up);
                 Add(right, up);
-                Add(right + across * SidewalkWidth, up);
-                Add(right + across * groundWidth, up);
+                Add(right + across * shoulder, up);
+                Add(right + across * groundWidth - (mountain ? up * 38f : Vector3.zero), up);
                 // Paint stays just inside the actual carriageway edge, following
                 // exactly the same curved/sloped samples as the rendered road.
                 Edge(left + across * .10f + up * .035f, up);
@@ -153,6 +166,7 @@ namespace Outlaws.WorldShift
             mesh.subMeshCount = 2;
             mesh.SetTriangles(sidewalks, 0);
             mesh.SetTriangles(background, 1);
+            if (mountain) mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             var root = new GameObject(mesh.name, typeof(MeshFilter), typeof(MeshRenderer));
             root.transform.SetParent(transform, false);
@@ -203,7 +217,10 @@ namespace Outlaws.WorldShift
         {
             foreach (var piece in pieces)
             {
-                bool visible = piece.End > distance - 110f && piece.Start < distance + 300f && !route.IsForkSurface((piece.Start + piece.End) * .5f);
+                // Steep mountain terrain stays visible through bends and across the valley.
+                bool mountain = route.Course != null && route.Course.Environment == ShiftLevel.Mountain;
+                bool visible = (mountain || (piece.End > distance - 110f && piece.Start < distance + 300f))
+                    && !route.IsForkSurface((piece.Start + piece.End) * .5f);
                 if (piece.Root.activeSelf != visible) piece.Root.SetActive(visible);
             }
             foreach (var dune in dunes)

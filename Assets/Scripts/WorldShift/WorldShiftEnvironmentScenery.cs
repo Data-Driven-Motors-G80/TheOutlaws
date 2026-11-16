@@ -31,7 +31,8 @@ namespace Outlaws.WorldShift
             for (float at = -80; at <= route.Course.Length + 80; at += 3f) roadPoints.Add(route.Sample(at).Position);
             if (route.Course.Training) BuildTrainingYard();
             else if (route.Course.Environment == ShiftLevel.City) { BuildCity(streetlight); route.VisitRoadPieces(StreetEdges); }
-            else BuildOases();
+            else if (route.Course.Environment == ShiftLevel.Desert) BuildOases();
+            else if (IsAlpine) BuildAlpine();
             SetWorld(ShiftWorld.Day);
             UpdateVisibility(0f);
         }
@@ -177,6 +178,7 @@ namespace Outlaws.WorldShift
 
         public void ApplyAtmosphere(Camera camera, Light sun)
         {
+            if (IsAlpine) { ApplyAlpineAtmosphere(camera, sun); return; }
             bool desert=route.Course.Environment==ShiftLevel.Desert;
             Color horizon=night?new Color(.06f,.105f,.17f):desert?new Color(.84f,.74f,.57f):new Color(.73f,.80f,.82f);
             sky.SetFloat("_Night",night?1:0);
@@ -203,7 +205,16 @@ namespace Outlaws.WorldShift
         public void UpdateVisibility(float at)
         {
             distance=at;
-            foreach(var chunk in chunks) chunk.Root.SetActive(chunk.At>at-110f && chunk.At<at+310f && (!chunk.Deck || route.HasSurface(chunk.At,night?ShiftWorld.Echo:ShiftWorld.Day)));
+            bool mountain = route.Course.Environment == ShiftLevel.Mountain;
+            foreach (var chunk in chunks)
+            {
+                // A ridge may extend far beyond its anchor or reappear around a bend.
+                // Keep mountain art alive; Unity culls each renderer against the camera.
+                bool inRange = mountain || (chunk.At > at - 110f && chunk.At < at + 310f);
+                bool hasDeck = !chunk.Deck || route.HasSurface(chunk.At, night ? ShiftWorld.Echo : ShiftWorld.Day);
+                bool visible = inRange && hasDeck;
+                if (chunk.Root.activeSelf != visible) chunk.Root.SetActive(visible);
+            }
             water.SetFloat("_OceanTime",distance*.025f);
             UpdateLamps();
         }
