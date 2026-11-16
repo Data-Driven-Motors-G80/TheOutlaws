@@ -35,6 +35,31 @@ Shader "The Outlaws/Ocean Coast Surface"
                 attenuation=attenuation*attenuation/(1+distanceSquared*.32);
                 return colour*beacon.w*attenuation*saturate(dot(normal,SafeNormalize(offset)));
             }
+            int _OutlawsLightCount;
+            float4 _OutlawsLightPositions[8], _OutlawsLightColours[8], _OutlawsLightDirections[8];
+            half3 LocalLighting(float3 position,half3 normal,half3 view,half3 albedo)
+            {
+                half3 result=0;
+                [loop] for(int lightIndex=0;lightIndex<_OutlawsLightCount;lightIndex++)
+                {
+                    float4 source=_OutlawsLightPositions[lightIndex];
+                    float3 offset=source.xyz-position;
+                    float d2=dot(offset,offset);
+                    if(d2*source.w>=1) continue;
+                    half3 direction=SafeNormalize(offset);
+                    float4 colour=_OutlawsLightColours[lightIndex];
+                    float4 cone=_OutlawsLightDirections[lightIndex];
+                    half spot=smoothstep(colour.w,cone.w,dot(-direction,cone.xyz));
+                    half falloff=saturate(1-d2*source.w);
+                    falloff=falloff*falloff*spot/(1+d2*.06);
+                    half facing=saturate(dot(normal,direction));
+                    half spec=pow(saturate(dot(normal,SafeNormalize(direction+view))),lerp(18,160,_Smoothness));
+                    // Tiny surface variation breaks up the highlight instead of a mirror-flat road.
+                    half rough=frac(sin(dot(floor(position.xz*35),float2(12.9898,78.233)))*43758.5453);
+                    result+=colour.rgb*falloff*(albedo*facing+spec*_Specular*facing*lerp(1,.55,rough*_Grain));
+                }
+                return result;
+            }
             struct A { float4 p:POSITION; float3 n:NORMAL; half4 c:COLOR; };
             struct V { float4 p:SV_POSITION; float3 world:TEXCOORD0; half3 n:TEXCOORD1; half4 c:COLOR; half fog:TEXCOORD2; };
             V Vert(A i)
@@ -74,6 +99,7 @@ Shader "The Outlaws/Ocean Coast Surface"
                     half fresnel=pow(1-saturate(dot(n,viewDirection)),4);
                     c=lerp(c,half3(.24,.43,.52)*_BaseColor.rgb,fresnel*.48);
                 }
+                c+=LocalLighting(i.world,n,viewDirection,albedo)*(1-_Emission);
                 c+=albedo*(PoliceLight(i.world,n,_PoliceBeaconRed,half3(1,.055,.075))
                     +PoliceLight(i.world,n,_PoliceBeaconBlue,half3(.055,.25,1)))*(1-_Emission);
                 return half4(MixFog(c,i.fog),1);

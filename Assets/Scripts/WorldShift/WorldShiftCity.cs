@@ -264,6 +264,7 @@ namespace Outlaws.WorldShift
             }
             if (LevelMode)
             {
+                gameObject.AddComponent<WorldShiftLocalLighting>().Bind(this);
                 gameObject.AddComponent<WorldShiftLevelAudio>().Bind(this);
                 gameObject.AddComponent<WorldShiftLevelHud>().Bind(this);
             }

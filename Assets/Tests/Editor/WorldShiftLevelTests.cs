@@ -87,6 +87,37 @@ public sealed class WorldShiftLevelTests
     }
 
     [UnityTest]
+    public IEnumerator CityNightLightingConnectsFixturesRoadAndSharedSurfaces()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");yield return new EnterPlayMode();
+        StartLevel(1);yield return null;yield return null;
+        var game=Started();var scenery=Find("WorldShiftEnvironmentScenery");var lighting=Find("WorldShiftLocalLighting");
+        lighting.enabled=false;
+        Pose(game,175f,0f);Call(game,"ApplyWorld",World("Echo"));Call(Find("WorldShiftPresentation"),"UpdateVisibility",175f);Call(lighting,"Refresh");
+        var lamps=scenery.GetComponentsInChildren<Light>(true);
+        Assert.That(lamps.Length,Is.GreaterThan(10));
+        Assert.That(lamps.All(v=>v.type==LightType.Spot&&v.range>=15f&&v.innerSpotAngle<v.spotAngle),Is.True);
+        Assert.That(lamps.Any(v=>v.isActiveAndEnabled),Is.True);
+        Assert.That((int)Get(lighting,"ActiveLightCount"),Is.InRange(1,8));
+        Assert.That(Shader.GetGlobalInt("_OutlawsLightCount"),Is.EqualTo(Get(lighting,"ActiveLightCount")));
+        Assert.That(scenery.GetComponentsInChildren<Collider>(true).Any(v=>v.enabled),Is.False);
+        var glows=scenery.GetComponentsInChildren<Renderer>(true).Where(v=>v.name=="Streetlamp optical glow").ToArray();
+        Assert.That(glows.Length,Is.EqualTo(lamps.Length));Assert.That(glows.Any(v=>v.isVisible||v.enabled),Is.True);
+        var nightRoad=(Material)Field(Get(game,"Route"),"echoRoad");
+        Assert.That(nightRoad.GetFloat("_Specular"),Is.GreaterThan(.3f));Assert.That(nightRoad.GetFloat("_Grain"),Is.GreaterThan(.5f));
+        foreach(string shader in new[]{"WorldShiftOceanSurface","WorldShiftLampGlow"})
+            Assert.That(UnityEditor.ShaderUtil.ShaderHasError(Resources.Load<Shader>(shader)),Is.False,shader);
+        Capture("city-streetlight-night-reflections");
+        Call(game,"ApplyWorld",World("Day"));Call(Find("WorldShiftPresentation"),"UpdateVisibility",175f);Call(lighting,"Refresh");
+        Assert.That(lamps.Any(v=>v.enabled),Is.False);Assert.That(glows.Any(v=>v.enabled),Is.False);
+        Capture("city-streetlight-day-finish");
+        Call(game,"ApplyWorld",World("Echo"));Call(Find("WorldShiftPresentation"),"UpdateVisibility",175f);Call(lighting,"Refresh");
+        Assert.That(lamps.Any(v=>v.isActiveAndEnabled),Is.True,"Switching back must restore the lighting immediately.");
+        lighting.enabled=true;lighting.enabled=false;
+        Assert.That(Shader.GetGlobalInt("_OutlawsLightCount"),Is.Zero,"No stale lights may leak into another scene.");
+    }
+
+    [UnityTest]
     public IEnumerator CityAndDesertSceneryMeetRoadEdgesAndFailureNoticeClearsOnRetry()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
