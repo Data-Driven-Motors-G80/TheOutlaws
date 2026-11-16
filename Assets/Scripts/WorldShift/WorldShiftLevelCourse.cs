@@ -34,6 +34,14 @@ namespace Outlaws.WorldShift
         public Vector2[] RequiredItems = System.Array.Empty<Vector2>();
         public LevelSign[] Signs;
         public Vector2[] DustZones = System.Array.Empty<Vector2>();
+        // Snow: road stretches of black ice (x = from, y = to). See WorldShiftCity.Ice.cs.
+        public Vector2[] IceZones = System.Array.Empty<Vector2>();
+
+        public bool IceAt(float d)
+        {
+            foreach (var zone in IceZones) if (d >= zone.x && d < zone.y) return true;
+            return false;
+        }
 
         // Practice sections can keep their course/checkpoint without another instruction stop.
         public int SignIndexForCheckpoint(int checkpoint)
@@ -118,6 +126,7 @@ namespace Outlaws.WorldShift
             private readonly List<LevelSign> signs = new List<LevelSign>();
             private readonly List<Vector2> items = new List<Vector2>();
             private readonly List<Vector2> dustZones = new List<Vector2>();
+            private readonly List<Vector2> iceZones = new List<Vector2>();
             private readonly bool landingCheckpoints;
             private float start;
 
@@ -158,6 +167,7 @@ namespace Outlaws.WorldShift
             public Builder Sign(float at, LevelSignKind kind) { signs.Add(new LevelSign(start + at, kind, checkpoints.Count - 1)); return this; }
             public Builder Item(float at, int lane) { items.Add(new Vector2(start + at, lane * WorldShiftLevel.RoadWidth / 3f)); return this; }
             public Builder Dust(float from, float to) { dustZones.Add(new Vector2(start + from, start + to)); return this; }
+            public Builder Ice(float from, float to) { iceZones.Add(new Vector2(start + from, start + to)); return this; }
             public Builder Checkpoint(float at, ShiftWorld world, float lateral = 0f)
             { checkpoints.Add(new ShiftCheckpoint(start + at, world, lateral, "", "")); return this; }
 
@@ -237,6 +247,7 @@ namespace Outlaws.WorldShift
                 course.Gates = gates.ToArray();
                 course.Signs = signs.ToArray();
                 course.DustZones = dustZones.ToArray();
+                course.IceZones = iceZones.ToArray();
                 course.RequiredItems = items.ToArray();
                 course.Length = ramps.Count > 0 ? ramps[ramps.Count - 1].Landing + 40f : start;
                 return course;
@@ -341,12 +352,52 @@ namespace Outlaws.WorldShift
             .Item(300f, 0).Night(350f, All).Ramp(405f, D)
             .Build();
 
+        // Snow (Level 3): black ice. On ice the car keeps its sideways momentum, builds it slowly and only
+        // countersteering brakes a slide, so a lane change on ice needs about twice the room of dry road.
+        // Hard by design, with nothing that moves in Day (no sliders, gates or boulders): every obstacle is
+        // something to steer around or a Space timing. Zippers pair white barricades with a one-world block in
+        // the open lane, so the open lane flips world every 24 m. Rules (WorldShiftLevelTests.Snow): ice starts
+        // 40 m after a landing and ends 70 m before a ramp; a Day obstacle and a Night obstacle never share a
+        // spot (20 m apart or more); a keyboard-only driver clears every section.
         private static LevelCourse Snow() => new Builder(ShiftLevel.Snow)
-            .Day(60f, Left).Night(110f, Right).Slider(160f, .65f).Night(210f, All).Ramp(250f, D)
-            .Day(50f, All).Night(100f, Left).Slider(150f, .75f).Day(220f, All).Ramp(260f, N)
-            .Day(60f, LeftMiddle).Night(110f, MiddleRight).Day(160f, All).Night(210f, All).Ramp(250f, D)
-            .Night(50f, Right).Day(90f, All).Slider(140f, -.8f).Day(200f, All).Ramp(240f, N)
-            .Night(50f, All).Day(100f, LeftMiddle).Night(110f, Right).Day(150f, All).Night(200f, All).Ramp(240f, D)
+            // 1 Frostbite: a four-gate zipper in the right lane, a wall-to-wall slide onto the ice while
+            // switching, a full-width slalom, then a quick dry finish.
+            .Permanent(50f, LeftMiddle).Night(50f, Right).Permanent(74f, LeftMiddle).Day(74f, Right)
+            .Permanent(98f, LeftMiddle).Night(98f, Right).Permanent(122f, LeftMiddle).Day(122f, Right)
+            .Ice(150f, 330f).Permanent(165f, MiddleRight).Night(195f, All).Day(230f, All)
+            .Permanent(255f, LeftMiddle).Night(270f, All).Permanent(315f, MiddleRight)
+            .Day(340f, All).Permanent(355f, Left).Night(375f, All).Day(395f, Middle).Ramp(440f, D)
+            // 2 Rush hour on ice: thread between Day traffic, pick a side for Night traffic, a barricade
+            // pocket that only Night can pass, then wall to wall.
+            .Night(60f, All)
+            .Ice(50f, 380f).DayCar(85f, Left).DayCar(110f, Right).Day(140f, All)
+            .NightCar(165f, Middle).NightCar(190f, Left).Night(215f, All)
+            .Permanent(240f, Sides).DayCar(240f, Middle).Day(275f, All).Permanent(300f, MiddleRight)
+            .Night(320f, All).Permanent(362f, LeftMiddle).Day(385f, All).Ramp(450f, N)
+            // 3 Shifting zipper: the open lane changes world every gate and slides one lane over, then a
+            // half-second switch window between barricades on the ice.
+            .Permanent(45f, LeftMiddle).Night(45f, Right).Permanent(69f, LeftMiddle).Day(69f, Right)
+            .Permanent(110f, Sides).Night(110f, Middle).Permanent(134f, Sides).Day(134f, Middle)
+            .Ice(150f, 370f).Permanent(185f, MiddleRight).Night(185f, Left).Day(220f, All)
+            .Permanent(255f, Left).Night(275f, All).Permanent(300f, Sides).Day(300f, Middle)
+            .Permanent(352f, MiddleRight).Night(385f, All).Day(410f, Left).Ramp(450f, D)
+            // 4 Whiteout gauntlet: the longest ice, wall-to-wall slides with a Space press in the middle of
+            // each, and Night traffic you cannot slide away from in time.
+            .Ice(45f, 380f).NightHalf(70f, -1).Day(95f, All).Permanent(120f, LeftMiddle).Night(135f, All)
+            .Day(170f, All).Permanent(180f, MiddleRight).NightCar(210f, Left)
+            .Permanent(245f, MiddleRight).Day(245f, Left).Night(270f, All).Permanent(300f, LeftMiddle)
+            .DayCar(330f, Right).Permanent(355f, Left).Night(355f, Middle)
+            .Day(395f, All).Night(420f, LeftMiddle).Ramp(460f, N)
+            // 5 Glacier run: everything at once. A zipper on ice, a slide while switching, traffic that
+            // forces the centre, a barricade pocket, and two half-second switch windows before the jump.
+            .Night(40f, All)
+            .Ice(55f, 420f).Day(65f, Middle)
+            .Permanent(90f, LeftMiddle).Night(90f, Right).Permanent(114f, LeftMiddle).Day(114f, Right)
+            .Permanent(138f, LeftMiddle).Night(138f, Right)
+            .Day(165f, All).Permanent(195f, MiddleRight).Night(220f, All).DayCar(245f, Left)
+            .Permanent(270f, Sides).NightCar(270f, Middle).Day(300f, All).Permanent(325f, Middle)
+            .Permanent(350f, Right).Night(350f, Left).Night(375f, All).Permanent(400f, Right).Day(400f, LeftMiddle)
+            .Permanent(445f, LeftMiddle).Night(455f, All).Ramp(500f, D)
             .Build();
 
         // Mountain keeps its half-walls and rolling rocks.

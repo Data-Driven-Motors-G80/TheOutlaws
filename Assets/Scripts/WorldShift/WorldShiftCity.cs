@@ -198,6 +198,7 @@ namespace Outlaws.WorldShift
             }, visual, WorldShiftLevel.Speed);
             presentation = gameObject.AddComponent<WorldShiftPresentation>();
             presentation.Build(this, Route, visual, view, sun);
+            if (LevelMode && course.IceZones.Length > 0) WorldShiftIcePatches.Create(this, Route, course);
             ApplyWorld(ShiftWorld.Day);
             Police = ChaseCar.CreateForFiniteRoute(policePrefab, transform, Player, d => Route.SampleDriver(d, relay != null ? relay.SamplePolice(d) : Route.Sample(d), Lateral));
             if (LevelMode)
@@ -433,9 +434,7 @@ namespace Outlaws.WorldShift
                         Notify("SPACE  /  SWITCH TO LAND", 2.5f);
                     }
                 }
-                bool snowSlide = GetawayMode && WorldShiftEscapeProfile.SnowSlide(environment, previous, RelayLayout);
-                driver.EnvironmentReleaseGrip = snowSlide ? .6f : 1f;
-                driver.EnvironmentCountersteerGrip = snowSlide ? 1.25f : 1f;
+                ApplySurfaceGrip(previous);
                 float airSteering = LevelMode && environment == ShiftLevel.Desert ? .65f : .4f;
                 driver.StepExternal(dt, (IsRelayAirborne ? steer * airSteering : steer) * (JumpSequence ? 1f : Getaway?.Extras.SteeringMultiplier ?? 1f), speed);
                 Getaway?.FinishStep(driver.RoadPositionDistance, driver);
