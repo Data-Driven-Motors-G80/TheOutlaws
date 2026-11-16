@@ -176,6 +176,9 @@ public sealed class WorldShiftLevelTests
             var policeArt=((Component)Get(game,"Police")).GetComponentsInChildren<MonoBehaviour>(true).Where(c=>c.GetType().Name=="WorldShiftPoliceCarArt").ToArray();
             Assert.That(playerArt.Length,Is.EqualTo(1),"Every level must use exactly one shared player coupe.");
             Assert.That(policeArt.Length,Is.EqualTo(1),"Every level must use exactly one shared police cruiser.");
+            Assert.That(policeArt[0].GetComponentsInChildren<MonoBehaviour>(true).Count(c=>c.GetType().Name=="WorldShiftPoliceEmergencyEffects"),Is.EqualTo(1),
+                "Every current level must bind the same police siren and lights.");
+            Assert.That(Find("WorldShiftLevelAudio"),Is.Not.Null);
             var pMeshes=playerArt[0].GetComponentsInChildren<MeshFilter>(true).OrderBy(m=>m.name).ToArray();
             var cMeshes=policeArt[0].GetComponentsInChildren<MeshFilter>(true).OrderBy(m=>m.name).ToArray();
             Vector3[] pShape=pMeshes.SelectMany(m=>m.sharedMesh.vertices).ToArray(),cShape=cMeshes.SelectMany(m=>m.sharedMesh.vertices).ToArray();
@@ -466,6 +469,154 @@ public sealed class WorldShiftLevelTests
             count++;
         }
         Assert.That(count,Is.GreaterThan(0));
+    }
+
+    [Test]
+    public void PoliceSirenClipHasHeadroomAndAContinuousLoop()
+    {
+        var clip=Resources.Load<AudioClip>("WorldShiftPoliceSiren");
+        Assert.That(clip,Is.Not.Null);Assert.That(clip.channels,Is.EqualTo(1));
+        Assert.That(clip.length,Is.EqualTo(3.2f).Within(.01f));
+        var samples=new float[clip.samples];Assert.That(clip.GetData(samples,0),Is.True);
+        Assert.That(samples.Any(v=>float.IsNaN(v)||float.IsInfinity(v)),Is.False);
+        double rms=Math.Sqrt(samples.Average(v=>(double)v*v));
+        Assert.That(rms,Is.InRange(.20,.60));Assert.That(samples.Max(v=>Math.Abs(v)),Is.LessThan(.9f));
+        float seam=samples[0]-samples[samples.Length-1],next=samples[1]-samples[0];
+        Assert.That(Mathf.Abs(seam-next),Is.LessThan(.06f),"The loop boundary must follow the waveform instead of clicking or leaving a gap.");
+    }
+
+    [Test]
+    public void DrivingAudioAssetsAreFiniteAndMusicArrangementsShareTheirLoopLength()
+    {
+        string[] names={"WS_Engine","WS_Tyres","WS_Takeoff","WS_Landing","WS_Crash","WS_Gull","WS_Ocean","WS_OceanDay","WS_OceanNight","WS_Victory"};
+        foreach(string name in names)
+        {
+            var clip=Resources.Load<AudioClip>(name);
+            Assert.That(clip,Is.Not.Null,name);
+            var samples=new float[clip.samples*clip.channels];Assert.That(clip.GetData(samples,0),Is.True,name);
+            Assert.That(samples.All(v=>!float.IsNaN(v)&&!float.IsInfinity(v)&&Math.Abs(v)<.95f),Is.True,name);
+            Assert.That(samples.Any(v=>Math.Abs(v)>.05f),Is.True,name+" must be audible.");
+        }
+        var day=Resources.Load<AudioClip>("WS_OceanDay");var night=Resources.Load<AudioClip>("WS_OceanNight");
+        Assert.That(day.samples,Is.EqualTo(night.samples));Assert.That(day.frequency,Is.EqualTo(night.frequency));
+        Assert.That(day.channels,Is.EqualTo(2));Assert.That(night.channels,Is.EqualTo(2));
+    }
+
+    [UnityTest]
+    public IEnumerator DrivingAudioBlendsWorldsPausesAndRespectsIndependentVolumeControls()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");yield return new EnterPlayMode();
+        string musicKey="ws_audio_music",effectsKey="ws_audio_effects";
+        bool hadMusic=PlayerPrefs.HasKey(musicKey),hadEffects=PlayerPrefs.HasKey(effectsKey);
+        float oldMusic=PlayerPrefs.GetFloat(musicKey),oldEffects=PlayerPrefs.GetFloat(effectsKey);
+        try
+        {
+            var settings=TypeFor("WorldShiftAudioSettings");
+            settings.GetProperty("Music").SetValue(null,.6f);settings.GetProperty("Effects").SetValue(null,.8f);
+            StartLevel(3);yield return null;yield return null;
+            var game=Started();var audio=Find("WorldShiftLevelAudio");audio.enabled=false;
+            var engine=(AudioSource)Field(audio,"engine");var tyres=(AudioSource)Field(audio,"tyres");
+            var day=(AudioSource)Field(audio,"dayMusic");var night=(AudioSource)Field(audio,"nightMusic");
+            Call(audio,"Refresh",1f);
+            Assert.That(engine.volume,Is.GreaterThan(0));Assert.That(day.volume,Is.GreaterThan(0));Assert.That(night.volume,Is.Zero);
+            Assert.That(day.loop&&night.loop&&engine.loop,Is.True);
+            Assert.That(Call(game,"TrySwitch"),Is.True);Call(audio,"Refresh",.375f);
+            Assert.That((float)Get(audio,"DayBlend"),Is.EqualTo(.5f).Within(.01f));
+            Assert.That(day.volume,Is.EqualTo(night.volume).Within(.001f));
+            Call(audio,"Refresh",.375f);Assert.That(day.volume,Is.Zero);Assert.That(night.volume,Is.GreaterThan(0));
+            Call(game,"TogglePause");Call(audio,"Refresh",1f);Assert.That(Get(audio,"Suspended"),Is.True);
+            Capture("ocean-audio-pause-controls");
+            var sliders=UnityEngine.Object.FindObjectsByType<UnityEngine.UI.Slider>(FindObjectsSortMode.None);
+            Assert.That(sliders.Length,Is.EqualTo(2));
+            var musicSlider=sliders.Single(v=>v.transform.parent.name=="Music volume");
+            var effectsSlider=sliders.Single(v=>v.transform.parent.name=="Effects volume");
+            effectsSlider.value=0f;
+            Call(game,"TogglePause");Call(audio,"Refresh",1f);
+            Assert.That(Get(audio,"Suspended"),Is.False);Assert.That(engine.volume,Is.Zero);Assert.That(tyres.volume,Is.Zero);
+            Assert.That(night.volume,Is.GreaterThan(0),"Effects mute must preserve the music.");
+            var police=Find("WorldShiftPoliceEmergencyEffects");Call(police,"Refresh",1f);
+            Assert.That(police.GetComponent<AudioSource>().volume,Is.Zero,"Effects mute includes the existing siren.");
+            effectsSlider.value=.8f;musicSlider.value=0f;Call(audio,"Refresh",1f);
+            Assert.That(day.volume+night.volume,Is.Zero);Assert.That(engine.volume,Is.GreaterThan(0));
+            Assert.That(PlayerPrefs.GetFloat(musicKey),Is.Zero);Assert.That(PlayerPrefs.GetFloat(effectsKey),Is.EqualTo(.8f));
+            StartLevel(0);yield return null;yield return null;
+            game=Started();audio=Find("WorldShiftLevelAudio");audio.enabled=false;
+            Assert.That(Field(audio,"dayMusic"),Is.Null,"The coastal score belongs only to Ocean.");
+            Assert.That((float)TypeFor("WorldShiftAudioSettings").GetProperty("Music").GetValue(null),Is.Zero);
+            game.GetType().GetProperty("TrainingLessonPaused",Flags).SetValue(game,true);
+            Call(audio,"Refresh",1f);Assert.That(Get(audio,"Suspended"),Is.True);
+            game.GetType().GetProperty("TrainingLessonPaused",Flags).SetValue(game,false);
+            Call(audio,"Refresh",1f);Assert.That(Get(audio,"Suspended"),Is.False);
+        }
+        finally
+        {
+            if(hadMusic) PlayerPrefs.SetFloat(musicKey,oldMusic);else PlayerPrefs.DeleteKey(musicKey);
+            if(hadEffects) PlayerPrefs.SetFloat(effectsKey,oldEffects);else PlayerPrefs.DeleteKey(effectsKey);
+            PlayerPrefs.Save();
+        }
+    }
+
+    [UnityTest]
+    public IEnumerator PoliceSirenAndBeaconsFollowPursuitPauseAndTrainingLessons()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");yield return new EnterPlayMode();
+        StartLevel(3);yield return null;yield return null;
+        var game=Started();var effects=Find("WorldShiftPoliceEmergencyEffects");
+        var source=effects.GetComponent<AudioSource>();
+        var red=(Light)Field(effects,"redLight");var blue=(Light)Field(effects,"blueLight");
+        Assert.That(source.clip,Is.Not.Null);Assert.That(source.loop,Is.True);
+        Assert.That(source.spatialBlend,Is.EqualTo(1));Assert.That(source.dopplerLevel,Is.Zero);
+        Assert.That(source.rolloffMode,Is.EqualTo(AudioRolloffMode.Custom));
+        var player=(Transform)Get(game,"Player");var savedPosition=effects.transform.position;
+        effects.transform.position=player.position+Vector3.forward*60f;Call(effects,"Refresh",2f);
+        float distantVolume=source.volume;
+        effects.transform.position=player.position+Vector3.forward*8f;Call(effects,"Refresh",2f);
+        Assert.That(source.volume,Is.GreaterThan(distantVolume*4f),"Approaching the player must increase loudness regardless of the chase camera position.");
+        effects.transform.position=player.position+Vector3.forward*75f;Call(effects,"Refresh",2f);
+        Assert.That(source.volume,Is.Zero,"A distant cruiser fades out.");
+        effects.transform.position=savedPosition;
+        Pose(game,120f,0f);
+        var police=(Component)Get(game,"Police");var point=Call(Get(game,"Route"),"Sample",121f);
+        police.transform.position=(Vector3)Get(point,"Position")+(Vector3)Get(point,"Right")*2.6f;
+        police.transform.rotation=Quaternion.LookRotation((Vector3)Get(point,"Forward"),(Vector3)Get(point,"Up"));
+        effects.GetType().GetField("clock",Flags).SetValue(effects,0f);Call(effects,"Refresh",0f);
+        Assert.That(Get(effects,"IsPursuing"),Is.True);Assert.That(red.enabled&&blue.enabled,Is.True);
+        Assert.That(red.intensity,Is.GreaterThan(5));Assert.That(blue.intensity,Is.LessThan(.1f));
+        Capture("police-emergency-day-red");
+        Call(effects,"Refresh",.45f);
+        Assert.That(red.intensity,Is.LessThan(.1f));Assert.That(blue.intensity,Is.GreaterThan(5));
+        Assert.That(Shader.GetGlobalVector("_PoliceBeaconBlue").w,Is.GreaterThan(0));
+        Assert.That(Call(game,"TrySwitch"),Is.True);Call(effects,"Refresh",0f);
+        Assert.That(Get(effects,"IsPursuing"),Is.True,"Night must not stop pursuit audio or lights.");
+        Capture("police-emergency-night-blue");
+        float clock=(float)Field(effects,"clock");
+        Call(game,"TogglePause");Call(effects,"Refresh",1f);
+        Assert.That(Get(effects,"IsPursuing"),Is.False);Assert.That(Get(effects,"SirenPaused"),Is.True);
+        Assert.That((float)Field(effects,"clock"),Is.EqualTo(clock));
+        Assert.That(red.enabled||blue.enabled,Is.False);Assert.That(Shader.GetGlobalVector("_PoliceBeaconBlue").w,Is.Zero);
+        Call(game,"TogglePause");Call(effects,"Refresh",0f);
+        Assert.That(Get(effects,"IsPursuing"),Is.True);Assert.That(Get(effects,"SirenPaused"),Is.False);
+        Assert.That((float)Field(effects,"clock"),Is.EqualTo(clock),"Resuming preserves the alternating light phase.");
+        Call(game,"Fail","crash");Call(effects,"Refresh",.1f);
+        Assert.That(Get(effects,"IsPursuing"),Is.True,"The siren continues while the police pull alongside after a collision.");
+        Call(game,"Fail","MISSED ITEM");Call(effects,"Refresh",0f);
+        Assert.That(Get(effects,"IsPursuing"),Is.False);Assert.That(Get(effects,"SirenPaused"),Is.False);
+        Assert.That(source.volume,Is.Zero);Assert.That(red.enabled||blue.enabled,Is.False);
+        Call(game,"RetryCheckpoint");Call(effects,"Refresh",.1f);Assert.That(Get(effects,"IsPursuing"),Is.True);
+        game.GetType().GetProperty("State",Flags).SetValue(game,Enum.Parse(Get(game,"State").GetType(),"Won"));
+        Call(effects,"Refresh",0f);Assert.That(Get(effects,"IsPursuing"),Is.False);Assert.That(source.volume,Is.Zero);
+        StartLevel(0);yield return null;yield return null;
+        game=Started();effects=Find("WorldShiftPoliceEmergencyEffects");
+        Call(effects,"Refresh",.1f);
+        game.GetType().GetProperty("TrainingLessonPaused",Flags).SetValue(game,true);
+        Call(effects,"Refresh",1f);
+        Assert.That(Get(effects,"IsPursuing"),Is.False,"Stopped Training lessons must remain quiet.");
+        Assert.That(Get(effects,"SirenPaused"),Is.True);
+        game.GetType().GetProperty("TrainingLessonPaused",Flags).SetValue(game,false);
+        Call(effects,"Refresh",0f);Assert.That(Get(effects,"IsPursuing"),Is.True);
+        effects.enabled=false;
+        Assert.That(Shader.GetGlobalVector("_PoliceBeaconRed"),Is.EqualTo(Vector4.zero));
+        Assert.That(Shader.GetGlobalVector("_PoliceBeaconBlue"),Is.EqualTo(Vector4.zero));
     }
 
     [UnityTest]

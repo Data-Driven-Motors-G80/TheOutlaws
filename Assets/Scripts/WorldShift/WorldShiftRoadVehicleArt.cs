@@ -24,6 +24,7 @@ namespace Outlaws.WorldShift
             hornSource=gameObject.AddComponent<AudioSource>();
             hornSource.playOnAwake=false; hornSource.loop=false;
             hornSource.spatialBlend=0f; hornSource.volume=.65f;
+            WorldShiftAudioGain.Bind(hornSource,game,.65f);
             if(hornClip==null)
             {
                 const int rate=22050;

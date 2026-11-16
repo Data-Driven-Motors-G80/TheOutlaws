@@ -124,6 +124,7 @@ namespace Outlaws.WorldShift
             IconButton(pause.transform, ShiftIcon.Retry, new Vector2(.36f, .6f), 100f, WorldShiftLevels.Retry);
             IconButton(pause.transform, ShiftIcon.Home, new Vector2(.64f, .6f), 100f, WorldShiftLevels.Menu);
             Controls(pause.transform);
+            AudioControls(pause.transform);
 
             if (game.Course.Training)
             {
@@ -251,7 +252,7 @@ namespace Outlaws.WorldShift
         // Key caps and the two world icons: the only controls the game needs.
         private void Controls(Transform parent)
         {
-            var row = WorldShiftMenu.Panel(parent, "Controls", new Vector2(.5f, .25f), new Vector2(.5f, .25f), Color.clear);
+            var row = WorldShiftMenu.Panel(parent, "Controls", new Vector2(.5f, .16f), new Vector2(.5f, .16f), Color.clear);
             row.sizeDelta = new Vector2(620f, 90f);
             Key(row, "A", -270f, 80f);
             Key(row, "D", -180f, 80f);
