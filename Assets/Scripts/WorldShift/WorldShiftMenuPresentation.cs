@@ -15,7 +15,6 @@ namespace Outlaws.WorldShift
         private TMP_Text completedLabel;
         private Vector2 lastGridSize = new Vector2(-1,-1);
         private Rect lastSafeArea;
-        private static readonly string[] Descriptions={"Learn the Day / Night switch","","","Collect every coastal diamond","",""};
 
         private void BuildMenuPresentation(RectTransform root)
         {
@@ -71,7 +70,7 @@ namespace Outlaws.WorldShift
             MenuText(index,level.ToString("00"),0,0,1,1,15,open?Cream:Muted,FontStyles.Bold).alignment=TextAlignmentOptions.Center;
             if(beaten) Badge(face,ShiftIcon.Check,RouteTeal,24,new Vector2(.91f,.85f));
             MenuText(face,WorldShiftLevels.Name(level),.055f,.18f,.85f,.37f,32,open?Cream:new Color(.76f,.80f,.81f),FontStyles.Bold);
-            string description=open?Descriptions[level]:"Complete "+WorldShiftLevels.Name(level-1)+" to unlock";
+            string description=open?"":"Complete "+WorldShiftLevels.Name(level-1)+" to unlock";
             if(!string.IsNullOrEmpty(description)) MenuText(face,description,.055f,.055f,.87f,.18f,12,open?new Color(.71f,.79f,.81f):Muted);
             Badge(face,open?ShiftIcon.Next:ShiftIcon.Lock,open?RouteTeal:Muted,19,new Vector2(.93f,.17f));
             return tile;
