@@ -85,6 +85,7 @@ namespace Outlaws.WorldShift
 
         private void BuildCity(GameObject streetlight)
         {
+            BuildCityRoadFinish();
             // Original city palette and facade strips, batched into small meshes.
             Color[] colours = { new Color(.36f,.53f,.57f), new Color(.58f,.43f,.37f),
                 new Color(.61f,.57f,.43f), new Color(.43f,.46f,.54f) };
@@ -109,8 +110,7 @@ namespace Outlaws.WorldShift
                     lamp.name = "City roadside streetlight";
                     lamp.transform.SetPositionAndRotation(p.Position+p.Right*side*8f,Quaternion.LookRotation(p.Forward,p.Up));
                     foreach (var collider in lamp.GetComponentsInChildren<Collider>()) { collider.enabled=false; Destroy(collider); }
-                    foreach (var light in lamp.GetComponentsInChildren<Light>())
-                    { light.shadows=LightShadows.None; light.range=10f; light.intensity=5f; lamps.Add(light); }
+                    DressStreetlight(lamp,side);
                     chunks.Add(new Chunk { At=lampAt, Root=lamp });
                 }
         }
@@ -212,6 +212,7 @@ namespace Outlaws.WorldShift
             // Only nearby lamps cast light; distant emissive lenses remain visible.
             Vector3 player=route.Sample(distance).Position;
             foreach(var lamp in lamps) lamp.enabled=night && (lamp.transform.position-player).sqrMagnitude<65f*65f;
+            RefreshStreetlightFinish();
         }
 
         private void OnDestroy()
