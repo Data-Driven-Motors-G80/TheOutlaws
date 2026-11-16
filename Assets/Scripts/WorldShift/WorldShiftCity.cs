@@ -180,6 +180,7 @@ namespace Outlaws.WorldShift
         public WorldShiftTutorialRewards TutorialRewards { get; private set; }
         public WorldShiftRoute Route { get; private set; }
         public Transform Player { get; private set; }
+        public WorldShiftLevelEscape Escape { get; private set; }
 
         public Vector3 LevelRockPosition(WorldShiftLevelRock rock)
         {
@@ -266,6 +267,7 @@ namespace Outlaws.WorldShift
             {
                 gameObject.AddComponent<WorldShiftLocalLighting>().Bind(this);
                 gameObject.AddComponent<WorldShiftLevelAudio>().Bind(this);
+                Escape=gameObject.AddComponent<WorldShiftLevelEscape>();Escape.Bind(this,view);
                 gameObject.AddComponent<WorldShiftLevelHud>().Bind(this);
             }
             else if (GetawayMode) { Getaway = gameObject.AddComponent<WorldShiftGetaway>(); Getaway.Bind(this); }
@@ -935,6 +937,7 @@ namespace Outlaws.WorldShift
 
         private void UpdateCamera(bool immediate)
         {
+            if(Escape!=null && Escape.Active) return;
             RoadPathPoint point = Route.SampleDriver(Distance, Route.Sample(Distance), Lateral);
             float follow = splitViewValidation ? 0f : .28f;
             Vector3 desired = point.Position - point.Forward * 12f + Vector3.up * 6.4f + point.Right * Lateral * follow;

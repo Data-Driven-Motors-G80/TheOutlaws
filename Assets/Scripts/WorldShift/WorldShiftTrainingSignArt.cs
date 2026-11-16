@@ -23,6 +23,18 @@ namespace Outlaws.WorldShift
             {'Z',"11111/00001/00010/00100/01000/10000/11111"}, {'=',"00000/11111/00000/11111/00000/00000/00000"},
             {':',"00000/00100/00100/00000/00100/00100/00000"}
         };
+        public static string Description(LevelSignKind kind)
+        {
+            switch(kind)
+            {
+                case LevelSignKind.Steer: return "A / D OR ARROW KEYS\nSTEER LEFT / RIGHT";
+                case LevelSignKind.Switch: return "SPACE\nSWITCH DAY / NIGHT";
+                case LevelSignKind.Dashes: return "DASHED OUTLINES ARE SAFE\nSWITCHING MAKES THEM SOLID";
+                case LevelSignKind.Oncoming: return "DODGE ONCOMING TRAFFIC\nA / D OR ARROW KEYS";
+                case LevelSignKind.Freeze: return "DAY: MOVERS MOVE\nNIGHT: MOVERS FREEZE";
+                default: return "SPACE IN MIDAIR\nSWITCH WORLDS TO LAND";
+            }
+        }
         public static Texture2D Load(string resource)
         {
             if(resource==null) return null;
@@ -36,13 +48,13 @@ namespace Outlaws.WorldShift
                 for(int i=0;i<=n;i++) {float t=n==0?0:(float)i/n;Box(Mathf.RoundToInt(Mathf.Lerp(x,xx,t))-width/2,Mathf.RoundToInt(Mathf.Lerp(y,yy,t))-width/2,width,width,c);}
             }
             void Disc(int x,int y,int r,Color c) {for(int j=-r;j<=r;j++) for(int i=-r;i<=r;i++) if(i*i+j*j<=r*r) Box(x+i,y+j,1,1,c);}
-            void Text(string text,int y,int scale) {
-                int x=(W-(text.Length*6-1)*scale)/2;
+            void TextAt(string text,int x,int y,int scale,Color colour) {
                 foreach(char ch in text) {
-                    if(letters.TryGetValue(ch,out var glyph)) {var rows=glyph.Split('/');for(int j=0;j<7;j++) for(int i=0;i<5;i++) if(rows[j][i]=='1') Box(x+i*scale,y+j*scale,scale,scale,White);}
+                    if(letters.TryGetValue(ch,out var glyph)) {var rows=glyph.Split('/');for(int j=0;j<7;j++) for(int i=0;i<5;i++) if(rows[j][i]=='1') Box(x+i*scale,y+j*scale,scale,scale,colour);}
                     x+=6*scale;
                 }
             }
+            void Text(string text,int y,int scale) => TextAt(text,(W-(text.Length*6-1)*scale)/2,y,scale,White);
             void Arrow(int x,int y,int direction) {
                 Line(x-direction*40,y,x+direction*40,y,12,White);
                 Line(x+direction*40,y,x+direction*16,y-24,12,White);
@@ -78,11 +90,12 @@ namespace Outlaws.WorldShift
                     Text("STEER",35,7);
                     Box(470,140,260,137,Ink);Box(481,151,238,115,White);
                     for(int k=0;k<3;k++) Line(500+k*78,257,518+k*78,225,15,Ink);
-                    // Keycap shapes distinguish keyboard input from obstacle movement arrows.
-                    Box(235,160,150,100,White);Box(244,169,132,82,Ink);
-                    Box(815,160,150,100,White);Box(824,169,132,82,Ink);
-                    Arrow(310,210,-1);Arrow(890,210,1);
-                    Text("ARROW KEYS",298,5);break;
+                    // Both supported bindings are shown as keycaps, distinct from movement pictograms.
+                    foreach(int x in new[]{90,295,775,980}) {Box(x,160,130,100,White);Box(x+9,169,112,82,Ink);}
+                    TextAt("A",133,180,9,White);TextAt("D",818,180,9,White);
+                    TextAt("OR",231,193,5,White);TextAt("OR",916,193,5,White);
+                    Arrow(360,210,-1);Arrow(1045,210,1);
+                    Text("A D OR ARROW KEYS",298,5);break;
                 case "Switch":
                     Text("SWITCH",30,7);
                     Barrier(90,145,WorldShiftLevelProps.SwitchColour,false);Key();Plate(850,170,WorldShiftLevelProps.SwitchColour);

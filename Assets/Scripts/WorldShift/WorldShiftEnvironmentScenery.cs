@@ -29,7 +29,8 @@ namespace Outlaws.WorldShift
             sky = new Material(Resources.Load<Shader>("WorldShiftEnvironmentSky")); materials.Add(sky);
             surface.SetFloat("_Finish",3f); surface.SetFloat("_Wear",.15f);
             for (float at = -80; at <= route.Course.Length + 80; at += 3f) roadPoints.Add(route.Sample(at).Position);
-            if (route.Course.Environment == ShiftLevel.City) { BuildCity(streetlight); route.VisitRoadPieces(StreetEdges); }
+            if (route.Course.Training) BuildTrainingYard();
+            else if (route.Course.Environment == ShiftLevel.City) { BuildCity(streetlight); route.VisitRoadPieces(StreetEdges); }
             else BuildOases();
             SetWorld(ShiftWorld.Day);
             UpdateVisibility(0f);

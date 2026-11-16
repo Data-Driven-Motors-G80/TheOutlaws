@@ -120,13 +120,11 @@ namespace Outlaws.WorldShift
             if (!SignArtwork(face, artwork)) switch (sign.Kind)
             {
                 case LevelSignKind.Steer:
-                    Key(face, "", new Vector3(-3.2f, 0f, 0f), white);
-                    Arrow(face, new Vector3(-3.2f, 0f, -.08f), -1f, green);
+                    Key(face, "A", new Vector3(-3.2f, 0f, 0f), white);
                     Arrow(face, new Vector3(-1.7f, 0f, 0f), -1f, white);
                     Box(face, new Vector3(0f, 0f, 0f), new Vector3(1.1f, 1.1f, .05f), Glow(PermanentColour));
                     Arrow(face, new Vector3(1.7f, 0f, 0f), 1f, white);
-                    Key(face, "", new Vector3(3.2f, 0f, 0f), white);
-                    Arrow(face, new Vector3(3.2f, 0f, -.08f), 1f, green);
+                    Key(face, "D", new Vector3(3.2f, 0f, 0f), white);
                     break;
                 case LevelSignKind.Switch:
                     Key(face, "SPACE", new Vector3(-2.3f, 0f, 0f), white, 2.6f);

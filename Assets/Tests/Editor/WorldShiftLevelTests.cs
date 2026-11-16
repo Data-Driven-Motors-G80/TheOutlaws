@@ -336,6 +336,54 @@ public sealed class WorldShiftLevelTests
     }
 
     [UnityTest]
+    public IEnumerator GetawayCelebrationSavesBeforePlayingAndSupportsNaturalFinishAndSkip()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");yield return new EnterPlayMode();
+        foreach(int level in new[]{3,1,2,4,5})
+        {
+            StartLevel(level);yield return null;yield return null;
+            var game=Started();float end=(float)Get(game,"RunLength");
+            Call(Get(game,"Collection"),"Restore",end+10f);
+            var ramps=(Array)Field(Get(game,"Course"),"Ramps");var last=ramps.GetValue(ramps.Length-1);
+            Pose(game,end-.5f,0f);Call(game,"ApplyWorld",Get(last,"Destination"));Step(game,.1f);
+            Assert.That(Get(game,"State").ToString(),Is.EqualTo("Won"),"A successful finish starts the celebration.");
+            Assert.That(Static(Levels,"IsBeaten",level),Is.True,"Progress must be saved before the celebration starts.");
+            var escape=(MonoBehaviour)Get(game,"Escape");Call(escape,"EnsureStarted");
+            Assert.That(Get(escape,"Active"),Is.True);Assert.That(Get(escape,"Ready"),Is.False);
+            Assert.That(((Transform)Field(escape,"stage")).GetComponentsInChildren<Collider>().Length,Is.Zero);
+            Call(escape,"Skip");Assert.That(Get(escape,"Ready"),Is.False,"A held finish input must not instantly skip the first moment.");
+            if(level==3)
+            {
+                var audio=Find("WorldShiftLevelAudio");Call(audio,"Refresh",0f);
+                Assert.That((bool)Field(audio,"winCuePlayed"),Is.False,"Save the victory sting for the reveal.");
+                Call(escape,"Advance",2.5f);Capture("ocean-ferry-escape-boarding");
+                var ferry=(Transform)Field(escape,"ferry");var police=(Transform)Field(escape,"cruiser");
+                Assert.That(ferry.localPosition.z,Is.GreaterThan(24));
+                Call(escape,"Advance",4f);Call(audio,"Refresh",0f);
+                Assert.That((bool)Field(audio,"winCuePlayed"),Is.True);
+                Assert.That(ferry.localPosition.z-police.localPosition.z,Is.GreaterThan(30));
+                Assert.That(((Transform)Field(escape,"ramp")).localEulerAngles.x,Is.GreaterThan(60));
+                Capture("ocean-ferry-you-lost-them");
+            }
+            else
+            {
+                Call(escape,"Advance",.8f);Call(escape,"Skip");
+                Assert.That(((Transform)Field(escape,"shutter")).localPosition.y,Is.EqualTo(3f).Within(.01f));
+                Assert.That(((Transform)Field(escape,"coupe")).gameObject.activeSelf,Is.False);
+                Capture("escape-passage-level-"+level);
+            }
+            Assert.That(Get(escape,"Ready"),Is.True);
+            float distance=(float)Get(game,"Distance");Step(game,.5f);
+            Assert.That((float)Get(game,"Distance"),Is.EqualTo(distance),"The cinematic must never resume simulation after success.");
+            var source=((Transform)Field(escape,"stage")).GetComponentsInChildren<AudioSource>().Single(v=>v.name=="Receding police siren");
+            Assert.That(source.volume,Is.Zero,"The police are now too far away to hear.");
+        }
+        Static(Levels,"Menu");yield return null;yield return null;
+        Assert.That(UnityEngine.Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None).Any(v=>v.GetType().Name=="WorldShiftLevelEscape"),Is.False);
+        Assert.That(GameObject.Find("Getaway celebration stage"),Is.Null);
+    }
+
+    [UnityTest]
     public IEnumerator OceanArtKeepsWorldSwitchJumpGapsOpen()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
@@ -561,9 +609,12 @@ public sealed class WorldShiftLevelTests
                 Assert.That(song.volume,Is.GreaterThan(.3f),"Desert must have an audible soundtrack too.");
                 Assert.That(song.clip,Is.EqualTo(Resources.Load<AudioClip>("WorldShiftMusic/Desert")));
                 Call(desert,"TogglePause");Call(desertAudio,"Refresh",1f);Capture("desert-recorded-music-controls");
+                WorldShiftTestCapture.Capture("pause-menu-4x3",960,720);
+                WorldShiftTestCapture.Capture("pause-menu-wide-1080");
                 UnityEngine.Object.FindObjectsByType<Button>(FindObjectsSortMode.None).Single(v=>v.name=="Music credits").onClick.Invoke();
                 Capture("desert-music-credits");
-                Assert.That(UnityEngine.Object.FindObjectsByType<TMPro.TMP_Text>(FindObjectsSortMode.None).Any(v=>v.text.Contains("Whiskey on the Mississippi")&&v.text.Contains("Attribution 4.0")),Is.True);
+                var creditText=string.Join("\n",UnityEngine.Object.FindObjectsByType<TMPro.TMP_Text>(FindObjectsSortMode.None).Select(v=>v.text));
+                Assert.That(creditText,Does.Contain("Whiskey on the Mississippi"));Assert.That(creditText,Does.Contain("Attribution 4.0"));
             }
             StartLevel(3);yield return null;yield return null;
             var game=Started();var audio=Find("WorldShiftLevelAudio");audio.enabled=false;
@@ -885,7 +936,10 @@ public sealed class WorldShiftLevelTests
         Assert.That(tiles, Is.EqualTo(new[] { "Level 0", "Level 1", "Level 2", "Level 3", "Level 4", "Level 5" }));
         Assert.That(menu.GetComponentsInChildren<Transform>().Count(t => t.name == "Lock badge"), Is.EqualTo(5));
         Assert.That(menu.GetComponentsInChildren<TMPro.TMP_Text>().Select(t => t.text), Does.Not.Contain("Upgrade car"));
+        Assert.That(menu.GetComponentsInChildren<RawImage>().Where(v=>v.name=="Environment illustration").Count(v=>v.texture!=null),Is.EqualTo(6));
         Capture("menu-locked");
+        WorldShiftTestCapture.Capture("menu-locked-4x3",960,720);
+        WorldShiftTestCapture.Capture("menu-locked-portrait",720,1080);
         menu.GetComponentsInChildren<Button>().Single(b => b.name == "Level 3").onClick.Invoke();
         yield return null;
         Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo("WorldShift_Menu"), "Locked levels do not start.");
@@ -1072,8 +1126,21 @@ public sealed class WorldShiftLevelTests
         PlayerPrefs.SetInt(UnlockAllKey, 0);
         var game = Started();
         Assert.That(Get(game, "TrainingLessonPaused"), Is.False);
+        var yard=Find("WorldShiftEnvironmentScenery");
+        Assert.That(yard.GetComponentsInChildren<Collider>(true).Any(v=>v.enabled),Is.False,"Practice scenery must stay decorative.");
+        Assert.That(yard.GetComponentsInChildren<Transform>(true).Count(v=>v.name=="Training practice depot"),Is.GreaterThan(4));
+        var lighting=Find("WorldShiftLocalLighting");
+        Call(Find("WorldShiftPresentation"),"UpdateVisibility",(float)Get(game,"Distance"));Call(lighting,"Refresh");
+        Capture("training-practice-yard-day");
+        Call(game,"ApplyWorld",World("Echo"));Call(lighting,"Refresh");Capture("training-practice-yard-night");
+        Call(game,"ApplyWorld",World("Day"));
+        float yardStart=(float)Get(game,"Distance");
+        Pose(game,45f,0f);Call(Find("WorldShiftPresentation"),"UpdateVisibility",45f);Call(lighting,"Refresh");Capture("training-practice-depot-detail");
+        Pose(game,yardStart,0f);Call(Find("WorldShiftPresentation"),"UpdateVisibility",yardStart);
         Step(game, 1.1f);
         Assert.That(Get(game, "TrainingLessonPaused"), Is.True, "Training stops with the road sign in view.");
+        var trainingHud=Find("WorldShiftLevelHud");trainingHud.GetType().GetField("lessonFade",Flags).SetValue(trainingHud,1f);
+        Capture("training-steering-sign-bindings");
         float firstSignStop = (float)Get(game, "Distance");
         Assert.That(firstSignStop, Is.GreaterThan(0f).And.LessThan(25f));
         Step(game, 1f);
@@ -1088,11 +1155,17 @@ public sealed class WorldShiftLevelTests
             var artwork = sign.Find("Sign face/Sign artwork");
             Assert.That(artwork, Is.Not.Null, lesson + " uses the supplied road-sign artwork.");
             Assert.That(artwork.GetComponent<Renderer>().sharedMaterial.mainTexture, Is.Not.Null);
+            if(lesson=="Steer")
+            {
+                // Rendered sign and enlarged lesson use the same generated texture.
+                var hint=(string)Static(TypeFor("WorldShiftTrainingSignArt"),"Description",Enum.Parse(TypeFor("LevelSignKind"),"Steer"));
+                Assert.That(hint,Does.Contain("A / D").And.Contain("ARROW KEYS"));
+            }
         }
         Assert.That(game.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Obstacle lesson"), Is.False,
             "The road signs teach with pictograms instead of sentences.");
-        Assert.That(game.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Oncoming direction" && t.localPosition.y > 1f), Is.True,
-            "The oncoming arrow is raised above the block and faces the driver.");
+        Assert.That(game.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Oncoming road direction warnings"), Is.True,
+            "Training traffic uses the same visible road-direction cue as the current van art.");
         var gates = game.GetComponentsInChildren<Transform>(true).Where(t => t.name == "Checkpoint gate").ToArray();
         Assert.That(gates.Length, Is.GreaterThan(0));
         foreach (var gate in gates)
@@ -1135,6 +1208,7 @@ public sealed class WorldShiftLevelTests
         Assert.That(attemptedLanding, Is.True);
         Assert.That(Get(game, "State").ToString(), Is.EqualTo("Won"), "Launch in Day, switch midair, land in Night, reach the finish.");
         Assert.That(StaticGet(Levels, "HighestBeaten"), Is.EqualTo(0));
+        Assert.That(Get(Get(game,"Escape"),"Active"),Is.False,"Training celebrates readiness without pretending it was a real police escape.");
         Assert.That(Static(Levels, "IsUnlocked", 1), Is.True);
         Assert.That(Static(Levels, "IsUnlocked", 2), Is.False);
         yield return null;

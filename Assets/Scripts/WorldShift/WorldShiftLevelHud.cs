@@ -119,12 +119,7 @@ namespace Outlaws.WorldShift
             noticeText.fontStyle = FontStyles.Bold;
             noticeText.alignment = TextAlignmentOptions.Center;
 
-            pause = WorldShiftMenu.Panel(safe, "Paused", Vector2.zero, Vector2.one, new Color(.01f, .02f, .03f, .82f)).gameObject;
-            IconButton(pause.transform, ShiftIcon.Play, new Vector2(.5f, .6f), 150f, game.TogglePause);
-            IconButton(pause.transform, ShiftIcon.Retry, new Vector2(.36f, .6f), 100f, WorldShiftLevels.Retry);
-            IconButton(pause.transform, ShiftIcon.Home, new Vector2(.64f, .6f), 100f, WorldShiftLevels.Menu);
-            Controls(pause.transform);
-            AudioControls(pause.transform);
+            BuildPauseScreen(safe);
 
             if (game.Course.Training)
             {
@@ -140,7 +135,7 @@ namespace Outlaws.WorldShift
                 signImage = imageObject.GetComponent<RawImage>();
                 signImage.raycastTarget = false;
                 imageObject.GetComponent<AspectRatioFitter>().aspectMode = AspectRatioFitter.AspectMode.FitInParent;
-                signFallback = WorldShiftMenu.Label(signPreview, "RED X: ONCOMING\nDODGE LEFT OR RIGHT", .07f, .08f, .93f, .92f, 52f);
+                signFallback = WorldShiftMenu.Label(signPreview, "A / D OR ARROW KEYS\nSTEER LEFT / RIGHT", .07f, .08f, .93f, .92f, 52f);
                 signFallback.fontStyle = FontStyles.Bold;
                 signFallback.alignment = TextAlignmentOptions.Center;
                 var card = WorldShiftMenu.Panel(lessonRoot, "Training lesson", new Vector2(.32f, .12f),
@@ -153,13 +148,7 @@ namespace Outlaws.WorldShift
 
             }
 
-            complete = WorldShiftMenu.Panel(safe, "Level complete", Vector2.zero, Vector2.one, new Color(.01f, .02f, .03f, .82f)).gameObject;
-            var check = WorldShiftMenu.Panel(complete.transform, "Done", new Vector2(.5f, .66f), new Vector2(.5f, .66f), new Color(.4f, 1f, .6f));
-            check.sizeDelta = new Vector2(180f, 180f);
-            check.GetComponent<Image>().sprite = WorldShiftIcons.Get(ShiftIcon.Check);
-            IconButton(complete.transform, ShiftIcon.Home, new Vector2(.36f, .34f), 100f, WorldShiftLevels.Menu);
-            IconButton(complete.transform, ShiftIcon.Retry, new Vector2(.5f, .34f), 100f, WorldShiftLevels.Retry);
-            if (WorldShiftLevels.HasNext) IconButton(complete.transform, ShiftIcon.Next, new Vector2(.64f, .34f), 130f, WorldShiftLevels.Next);
+            BuildEscapeFinish(safe);
             if (game.Environment == ShiftLevel.Ocean) PolishOceanHud();
             BuildFailurePanel(safe);
             Refresh();
@@ -249,27 +238,6 @@ namespace Outlaws.WorldShift
             return cached;
         }
 
-        // Key caps and the two world icons: the only controls the game needs.
-        private void Controls(Transform parent)
-        {
-            var row = WorldShiftMenu.Panel(parent, "Controls", new Vector2(.5f, .16f), new Vector2(.5f, .16f), Color.clear);
-            row.sizeDelta = new Vector2(620f, 90f);
-            Key(row, "A", -270f, 80f);
-            Key(row, "D", -180f, 80f);
-            Key(row, "SPACE", 60f, 200f);
-            var sun = Icon(row, ShiftIcon.Sun, 60f); sun.rectTransform.anchoredPosition = new Vector2(210f, 0f); sun.color = Gold;
-            var moon = Icon(row, ShiftIcon.Moon, 56f); moon.rectTransform.anchoredPosition = new Vector2(280f, 0f);
-        }
-
-        private static void Key(RectTransform parent, string label, float x, float width)
-        {
-            var key = WorldShiftMenu.Panel(parent, "Key " + label, new Vector2(.5f, .5f), new Vector2(.5f, .5f), Cream);
-            key.sizeDelta = new Vector2(width, 70f);
-            key.anchoredPosition = new Vector2(x, 0f);
-            var text = WorldShiftMenu.Label(key, label, 0f, 0f, 1f, 1f, 30f);
-            text.color = Ink; text.fontStyle = FontStyles.Bold; text.alignment = TextAlignmentOptions.Center;
-        }
-
         private static Image Icon(RectTransform parent, ShiftIcon icon, float size)
         {
             var rect = WorldShiftMenu.Panel(parent, icon + " icon", new Vector2(.5f, .5f), new Vector2(.5f, .5f), Color.white);
@@ -295,10 +263,11 @@ namespace Outlaws.WorldShift
 
         private void Update()
         {
-            if (game.State == ShiftRunState.Won && Keyboard.current != null && Keyboard.current.enterKey.wasPressedThisFrame)
+            if(game.State==ShiftRunState.Won && Keyboard.current!=null)
             {
-                if (WorldShiftLevels.HasNext) WorldShiftLevels.Next(); else WorldShiftLevels.Menu();
-                return;
+                game.Escape.EnsureStarted();
+                if(Keyboard.current.enterKey.wasPressedThisFrame) {ContinueAfterEscape();return;}
+                if(Keyboard.current.escapeKey.wasPressedThisFrame) game.Escape.Skip();
             }
             Refresh();
         }
@@ -314,6 +283,7 @@ namespace Outlaws.WorldShift
                     out Texture2D texture, out Rect uv);
                 signImage.gameObject.SetActive(hasArt);
                 signFallback.gameObject.SetActive(!hasArt);
+                signFallback.text = WorldShiftTrainingSignArt.Description(game.Course.Signs[shownLesson].Kind);
                 if (hasArt)
                 {
                     signImage.texture = texture;
@@ -372,15 +342,17 @@ namespace Outlaws.WorldShift
             if (game.State == ShiftRunState.Running && EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null)
                 EventSystem.current.SetSelectedGameObject(null);
             bool won = game.State == ShiftRunState.Won;
+            if(won) game.Escape.EnsureStarted();
             driving.SetActive(!won && game.State != ShiftRunState.Paused);
             RefreshLessonPreview();
             pause.SetActive(game.State == ShiftRunState.Paused);
+            RefreshPauseScreen();
             complete.SetActive(won);
-            if (won && !completeShown && EventSystem.current != null)
+            if(won) RefreshEscapeFinish();
+            if (won && game.Escape.Ready && !completeShown && EventSystem.current != null)
             {
                 completeShown = true;
-                var buttons = complete.GetComponentsInChildren<Button>();
-                EventSystem.current.SetSelectedGameObject(buttons[buttons.Length - 1].gameObject);
+                EventSystem.current.SetSelectedGameObject(finishContinue.gameObject);
             }
         }
     }

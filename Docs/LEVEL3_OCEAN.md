@@ -63,7 +63,8 @@ hide with it. Jump edges show end caps and girders; illuminated landing frames
 appear only in the destination world. These details have no colliders.
 
 Ocean's compact rounded HUD shows a diamond icon and count, smaller world/pause
-buttons and a thin progress bar. Progress movement, collection pulses and the
+buttons and the same larger progress bar, checkpoint dots and finish icon used
+in the other levels. Progress movement, collection pulses and the
 checkpoint notice animate smoothly. The checkpoint notice remains below the
 counter, above the driving sight line; missed-item retries retain clear feedback.
 
@@ -125,3 +126,19 @@ songs are separate full recordings under `Assets/Resources/WorldShiftMusic`, wit
 source URLs, hashes and CC BY 4.0 attribution in `CREDITS.txt`. Pause has Music
 credits with links to the composer and license. The police siren is capped at .04
 instead of .15 and low-pass filtered at 1600 Hz to leave space for the soundtrack.
+
+### Ferry getaway ending
+
+Success saves progress and records completion before a 6.5-second, skippable
+getaway sequence. The shared coupe drives onto a ferry, the cruiser brakes at
+the dock, the loading ramp rises and the ferry departs. A camera sweep, moving
+water, wake, lighthouse and receding siren carry the story into a "You lost them"
+reveal with the next destination. The victory sting waits for that reveal.
+Escape, Enter or the Skip button skips after the opening .65 seconds; Continue
+then loads the next level. Replaying and returning to the menu stay available.
+
+`WorldShiftLevelEscape` uses a separate temporary stage with the shared car art,
+no colliders and no simulation/progress changes. It restores hidden driving
+renderers/world-space signs and releases stage meshes, materials and audio on
+scene exit. Training finishes with readiness copy; the other environments have
+themed closing-passage escapes.

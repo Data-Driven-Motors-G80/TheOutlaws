@@ -4,7 +4,7 @@ using UnityEngine;
 
 public static class WorldShiftTestCapture
 {
-    public static void Capture(string name)
+    public static void Capture(string name, int width = 1280, int height = 720)
     {
         string folder = Environment.GetEnvironmentVariable("OUTLAWS_CAMPAIGN_PREVIEW");
         if (string.IsNullOrEmpty(folder)) folder = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "Outlaws-Campaign-Preview");
@@ -12,11 +12,13 @@ public static class WorldShiftTestCapture
             .FirstOrDefault(c => c.GetType().Name == "WorldShiftCity");
         if (driver != null) driver.GetType().GetMethod("UpdateCamera", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(driver, new object[] { true });
         Camera camera = Camera.main;
-        var canvases = UnityEngine.Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None);
+        // World-space sign symbols must stay in the world, not be promoted to screen overlays.
+        var canvases = UnityEngine.Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None)
+            .Where(c => c.renderMode != RenderMode.WorldSpace).ToArray();
         var modes = canvases.Select(c => c.renderMode).ToArray();
         var cameras = canvases.Select(c => c.worldCamera).ToArray();
         var planes = canvases.Select(c => c.planeDistance).ToArray();
-        int width = name.EndsWith("-1080") ? 1920 : 1280, height = name.EndsWith("-1080") ? 1080 : 720;
+        if (name.EndsWith("-1080")) { width = 1920; height = 1080; }
         var target = new RenderTexture(width, height, 24);
         var image = new Texture2D(width, height, TextureFormat.RGB24, false);
         var oldTarget = camera.targetTexture; var active = RenderTexture.active; int mask = camera.cullingMask; float aspect = camera.aspect;
@@ -24,7 +26,15 @@ public static class WorldShiftTestCapture
         {
             camera.targetTexture = target; camera.aspect = (float)width / height;
             foreach (var c in canvases) { c.renderMode = RenderMode.ScreenSpaceCamera; c.worldCamera = camera; c.planeDistance = 1f; }
-            camera.cullingMask = -1; Canvas.ForceUpdateCanvases(); camera.Render();
+            camera.cullingMask = -1; Canvas.ForceUpdateCanvases();
+            // Responsive panels must measure the capture viewport, rather than the previous render target.
+            var hud = UnityEngine.Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None)
+                .FirstOrDefault(c => c.GetType().Name == "WorldShiftLevelHud");
+            if (hud != null) hud.GetType().GetMethod("Refresh", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(hud, null);
+            var menu = UnityEngine.Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None)
+                .FirstOrDefault(c => c.GetType().Name == "WorldShiftMenu");
+            if (menu != null) menu.GetType().GetMethod("UpdateMenuLayout", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(menu, null);
+            Canvas.ForceUpdateCanvases(); camera.Render();
             RenderTexture.active = target; image.ReadPixels(new Rect(0, 0, width, height), 0, 0); image.Apply();
             System.IO.Directory.CreateDirectory(folder);
             System.IO.File.WriteAllBytes(System.IO.Path.Combine(folder, name + ".png"), image.EncodeToPNG());
