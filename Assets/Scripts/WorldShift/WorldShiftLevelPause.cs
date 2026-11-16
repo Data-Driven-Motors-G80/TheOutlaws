@@ -8,9 +8,9 @@ namespace Outlaws.WorldShift
 {
     public sealed partial class WorldShiftLevelHud
     {
-        private static readonly Color PauseFace = new Color(.035f,.065f,.09f,.98f);
-        private static readonly Color PauseMuted = new Color(.55f,.66f,.71f);
-        private static readonly Color PauseAccent = new Color(.42f,.86f,.78f);
+        private static readonly Color PauseFace = WorldShiftUiStyle.Face;
+        private static readonly Color PauseMuted = WorldShiftUiStyle.Muted;
+        private static readonly Color PauseAccent = WorldShiftUiStyle.Accent;
         private RectTransform pauseCard;
         private CanvasGroup pauseBody;
         private GameObject musicCreditsPanel;
@@ -20,7 +20,7 @@ namespace Outlaws.WorldShift
         private RectTransform pauseProgressFill;
         private Image pauseWorldIcon;
 
-        private static readonly Color CardRim = new Color(.22f,.34f,.36f);
+        private static readonly Color CardRim = WorldShiftUiStyle.Rim;
 
         /// <summary>Shared card chrome for pause, finish, failure, story and Training prompts: soft shadow, fine rim, dark face.</summary>
         private static void CardChrome(RectTransform card, bool shadow = true, float shadowSpread = 5f, float shadowDrop = 12f)

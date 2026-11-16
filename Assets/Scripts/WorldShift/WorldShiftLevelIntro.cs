@@ -47,7 +47,7 @@ namespace Outlaws.WorldShift
             }
             PauseTextButton(storyCard,"Skip",new Vector2(.84f,.85f),new Vector2(.95f,.92f),EndCityStory);
             storyTitle = PauseLabel(storyCard,"",.62f,.53f,.95f,.82f,48,Cream,FontStyles.Bold);
-            storyLine = PauseLabel(storyCard,"",.62f,.34f,.95f,.52f,22,new Color(.75f,.83f,.83f));
+            storyLine = PauseLabel(storyCard,"",.62f,.34f,.95f,.52f,22,WorldShiftUiStyle.Muted);
             storyNext = PauseAction(storyCard,"Continue",new Vector2(.62f,.19f),new Vector2(.95f,.29f),ShiftIcon.Play,AdvanceCityStory,true);
             PauseLabel(storyNext.transform,"ENTER",.79f,.12f,.96f,.88f,10,PauseFace).alignment = TextAlignmentOptions.Right;
             storyBack = PauseTextButton(storyCard,"Back",new Vector2(.62f,.08f),new Vector2(.76f,.15f),PreviousCityStory);

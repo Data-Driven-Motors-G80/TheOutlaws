@@ -32,15 +32,15 @@ namespace Outlaws.WorldShift
         {
             var canvas = WorldShiftMenu.CreateCanvas(transform,"Loading canvas");
             canvas.GetComponent<Canvas>().sortingOrder = 1000;
-            var backdrop = WorldShiftMenu.Panel(canvas,"Loading backdrop",Vector2.zero,Vector2.one,new Color(.018f,.035f,.055f));
+            var backdrop = WorldShiftMenu.Panel(canvas,"Loading backdrop",Vector2.zero,Vector2.one,WorldShiftUiStyle.Backdrop);
             backdrop.GetComponent<Image>().raycastTarget = true;
-            symbol = WorldShiftMenu.Panel(canvas,"Loading sun",new Vector2(.5f,.66f),new Vector2(.5f,.66f),new Color(1f,.75f,.32f));
+            symbol = WorldShiftMenu.Panel(canvas,"Loading sun",new Vector2(.5f,.66f),new Vector2(.5f,.66f),WorldShiftUiStyle.Gold);
             symbol.sizeDelta = new Vector2(34,34); symbol.GetComponent<Image>().sprite = WorldShiftIcons.Get(ShiftIcon.Sun);
             var title = WorldShiftMenu.Label(canvas,destination,.2f,.50f,.8f,.61f,38);
             WorldShiftTypography.Apply(title,FontStyles.Bold,38);
-            title.color = new Color(1f,.95f,.84f); title.alignment = TextAlignmentOptions.Center;
-            var track = WorldShiftMenu.Panel(canvas,"Loading track",new Vector2(.35f,.455f),new Vector2(.65f,.46f),new Color(.12f,.21f,.25f));
-            fill = WorldShiftMenu.Panel(track,"Loading progress",Vector2.zero,new Vector2(.03f,1),new Color(.42f,.86f,.78f));
+            title.color = WorldShiftUiStyle.Cream; title.alignment = TextAlignmentOptions.Center;
+            var track = WorldShiftMenu.Panel(canvas,"Loading track",new Vector2(.35f,.455f),new Vector2(.65f,.46f),WorldShiftUiStyle.Track);
+            fill = WorldShiftMenu.Panel(track,"Loading progress",Vector2.zero,new Vector2(.03f,1),WorldShiftUiStyle.Accent);
         }
 
         private IEnumerator LoadScene(string scene,string music)

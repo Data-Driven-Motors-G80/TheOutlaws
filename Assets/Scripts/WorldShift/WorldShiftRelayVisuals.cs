@@ -26,6 +26,12 @@ namespace Outlaws.WorldShift
             boost = Unlit(new Color(.25f, 1f, .54f));
             white = Unlit(new Color(.9f, 1f, .96f));
             dark = Unlit(new Color(.025f, .04f, .07f));
+            WorldShiftLevelDropScenery drops = null;
+            if (route.Course != null)
+            {
+                drops = gameObject.AddComponent<WorldShiftLevelDropScenery>();
+                drops.Bind(GetComponentInParent<WorldShiftCity>(), route);
+            }
             foreach (var data in sections)
             {
                 var view = new View { Data = data, Root = Child(transform, "Relay " + data.Number + " - launch and landing") };
@@ -54,8 +60,9 @@ namespace Outlaws.WorldShift
                 view.SourceVoid = Child(view.Root.transform, "Launch world missing landing");
                 view.DestinationVoid = Child(view.Root.transform, "Landing world missing ramp");
                 view.SourceRecoveryVoid = Child(view.Root.transform, "Launch world recovery before successful landing");
-                // Ocean jumps expose the sea below; other courses keep their existing shafts.
-                if (!openWater)
+                // Level scenery is continuous across both worlds; only the road changes solidity.
+                if (drops != null) drops.BuildJump(view.Root.transform, data);
+                else if (!openWater)
                 {
                     WorldShiftPitVisuals.Build(view.SourceVoid.transform, route,
                         new ShiftHazard(data.Source, ShiftHazardKind.Gap, data.Takeoff, route.Course != null ? data.Landing : data.End, 7), false);
@@ -142,7 +149,7 @@ namespace Outlaws.WorldShift
             Line(parent,label,white,width,a+offset,b+offset);
         }
 
-        // Upright corner brackets give the touchdown edge a silhouette against busy lava.
+        // Upright corner brackets give the touchdown edge a silhouette against the drop below.
         // Keep the middle open and every marker outside the drivable road width.
         private void LandingCornerMarkers(Transform parent, ShiftRelay jump, bool dashed)
         {

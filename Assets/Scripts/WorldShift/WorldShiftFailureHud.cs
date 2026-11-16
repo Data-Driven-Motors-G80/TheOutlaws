@@ -10,7 +10,7 @@ namespace Outlaws.WorldShift
         private TMP_Text failureTitle, failureDetail;
         private Image retryFill;
 
-        private static readonly Color FailureAccent = new Color(1f,.52f,.39f);
+        private static readonly Color FailureAccent = WorldShiftUiStyle.Danger;
         private TMP_Text failureKicker;
 
         // Matches the pause and finish cards: dark face, soft shadow, fine rim, spaced kicker over a bold cream title.

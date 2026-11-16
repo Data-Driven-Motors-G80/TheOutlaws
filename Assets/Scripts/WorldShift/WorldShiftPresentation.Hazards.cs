@@ -74,7 +74,7 @@ namespace Outlaws.WorldShift
                     && data.SharedAcrossWorlds && !data.LateralMotion && data.MotionSpeed == 0f)
                     WorldShiftPoliceBarricade.Build(frame, centre, size);
                 else if (game.LevelMode && WorldShiftRetractableBarrier.Supports(data))
-                    retractable.Add(WorldShiftRetractableBarrier.Build(frame, centre, size, data.World));
+                    retractable.Add(WorldShiftRetractableBarrier.Build(frame, centre, size, data.World, game.Environment));
                 else if (ocean != null)
                     ocean.BuildObstacle(frame, centre, size, palette, data, oceanVariant);
                 else

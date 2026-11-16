@@ -6,8 +6,8 @@ namespace Outlaws.WorldShift
 {
     public sealed partial class WorldShiftMenu
     {
-        private static readonly Color RouteTeal = new Color(.42f,.86f,.78f);
-        private static readonly Color Muted = new Color(.55f,.67f,.73f);
+        private static readonly Color RouteTeal = WorldShiftUiStyle.Accent;
+        private static readonly Color Muted = WorldShiftUiStyle.Muted;
         private static Sprite roundedCard;
         private static Texture2D cardShade;
         private RectTransform menuSafe;
@@ -18,7 +18,7 @@ namespace Outlaws.WorldShift
 
         private void BuildMenuPresentation(RectTransform root)
         {
-            Panel(root,"Midnight background",Vector2.zero,Vector2.one,new Color(.018f,.035f,.055f));
+            Panel(root,"Midnight background",Vector2.zero,Vector2.one,WorldShiftUiStyle.Backdrop);
             var glow=Panel(root,"Header atmosphere",new Vector2(.55f,.76f),Vector2.one,Color.clear);
             var wash=TextureLayer(glow,"Atmosphere wash");
             wash.texture=Shade();wash.color=new Color(.22f,.55f,.58f,.10f);wash.raycastTarget=false;

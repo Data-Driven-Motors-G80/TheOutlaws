@@ -24,7 +24,8 @@ namespace Outlaws.WorldShift
             pauseButton.anchorMin=pauseButton.anchorMax=new Vector2(.955f,.945f);
             pauseButton.anchoredPosition=Vector2.zero;pauseButton.sizeDelta=new Vector2(52,52);
             Round(pauseButton,panel);
-            foreach(Transform child in pauseButton) ((RectTransform)child).sizeDelta=new Vector2(27,27);
+            foreach(Transform child in pauseButton)
+                if(child.name!="Button face") ((RectTransform)child).sizeDelta=new Vector2(27,27);
             if(collectionStatus!=null)
             {
                 oceanCounter=(RectTransform)collectionStatus.transform.parent;

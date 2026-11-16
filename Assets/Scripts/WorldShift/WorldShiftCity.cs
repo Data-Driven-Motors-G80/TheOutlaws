@@ -128,6 +128,7 @@ namespace Outlaws.WorldShift
         public Transform Player { get; private set; }
         public WorldShiftLevelEscape Escape { get; private set; }
         public bool StoryActive { get; private set; }
+        internal WorldShiftImpactMoments Impact { get; private set; }
         private int storyFinishedFrame = -1;
 
         public Vector3 LevelRockPosition(WorldShiftLevelRock rock)
@@ -215,6 +216,7 @@ namespace Outlaws.WorldShift
             if (LevelMode)
             {
                 gameObject.AddComponent<WorldShiftLocalLighting>().Bind(this);
+                Impact = gameObject.AddComponent<WorldShiftImpactMoments>(); Impact.Bind(this);
                 gameObject.AddComponent<WorldShiftLevelAudio>().Bind(this);
                 Escape=gameObject.AddComponent<WorldShiftLevelEscape>();Escape.Bind(this,view);
                 gameObject.AddComponent<WorldShiftLevelHud>().Bind(this);
@@ -461,6 +463,7 @@ namespace Outlaws.WorldShift
                     if (landed)
                     {
                         if (LevelMode) WorldShiftLevelAnalytics.RampEnded(true, "landed");
+                        Impact?.Land(Player.position, Player.forward, environment, World);
                         Notify("LANDED", 1.2f);
                     }
                 }
@@ -575,6 +578,11 @@ namespace Outlaws.WorldShift
                 lastFailure = reason;
                 fallVelocity = -1f;
                 retryRemaining = Capturing ? 1.6f : 1.05f;
+                if (Impact != null)
+                {
+                    if (reason == "NO ROAD" || reason == "MISSED RELAY LANDING") Impact.Fall();
+                    else if (reason != "MISSED ITEM") Impact.Crash(Player.position, Player.forward);
+                }
                 return;
             }
             WorldShiftAnalytics.Died(reason);
@@ -639,6 +647,7 @@ namespace Outlaws.WorldShift
             UpdateCamera(true);
             Notify("CHECKPOINT " + (checkpointIndex + 1), 2f);
             if (PauseQueued) { PauseQueued = false; TogglePause(); }
+            Impact?.Clear();
         }
 
         private void ApplyWorld(ShiftWorld world)
