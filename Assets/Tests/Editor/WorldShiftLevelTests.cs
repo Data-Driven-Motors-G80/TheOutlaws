@@ -13,6 +13,7 @@ using UnityEngine.UI;
 
 public sealed partial class WorldShiftLevelTests
 {
+    private const int DesertLevel = 5, OceanLevel = 2;
     private const BindingFlags Flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
     private const string BeatenKey = "WorldShift.Levels.HighestBeaten", UnlockAllKey = "WorldShift.Levels.UnlockAll";
     private int savedBeaten, savedUnlockAll;
@@ -106,14 +107,16 @@ public sealed partial class WorldShiftLevelTests
         for (int level = 0; level < 6; level++)
         {
             object course = Static(builder, "For", level);
+            string[] expected = { "City", "City", "Ocean", "Snow", "Mountain", "Desert" };
+            Assert.That(Field(course, "Environment").ToString(), Is.EqualTo(expected[level]), "Course order must match level select.");
             var ramps = ((Array)Field(course, "Ramps")).Cast<object>().ToArray();
             var hazards = ((Array)Field(course, "Hazards")).Cast<object>().ToArray();
             var checkpoints = ((Array)Field(course, "Checkpoints")).Cast<object>().ToArray();
             float length = (float)Field(course, "Length");
             Assert.That(((Array)Field(course, "Signs")).Length, Is.EqualTo(level == 0 ? 5 : 0),
                 "Only Training has instructional highway signs.");
-            Assert.That(ramps.Length, Is.EqualTo(level == 0 ? 1 : level == 2 ? 6 : 5), "level " + level);
-            Assert.That(checkpoints.Length, Is.EqualTo(level == 2 ? 7 : level == 0 ? 6 : 5), "Respawn positions, including the initial spawn, level " + level);
+            Assert.That(ramps.Length, Is.EqualTo(level == 0 ? 1 : level == DesertLevel ? 6 : 5), "level " + level);
+            Assert.That(checkpoints.Length, Is.EqualTo(level == DesertLevel ? 7 : level == 0 ? 6 : 5), "Respawn positions, including the initial spawn, level " + level);
             if (level == 0)
             {
                 Assert.That(hazards.Any(h => (float)Field(h, "Start") == 90f && (bool)Field(h, "SharedAcrossWorlds")), Is.True,
@@ -157,7 +160,7 @@ public sealed partial class WorldShiftLevelTests
             StartLevel(level);yield return WaitForNavigation();
             var game=Started();var jump=((Array)Get(game,"RelayLayout")).GetValue(0);
             float takeoff=(float)Field(jump,"Takeoff"),landing=(float)Field(jump,"Landing");
-            float lane=level==2 ? 3.3f : 0f; // The existing safe bypass of Desert's first aerial pair.
+            float lane=level==DesertLevel ? 3.3f : 0f; // The existing safe bypass of Desert's first aerial pair.
             object source=Field(jump,"Source"),destination=Get(jump,"Destination");
             var checkpoints=((IEnumerable)Get(game,"Checkpoints")).Cast<object>().ToArray();
             int checkpoint=Array.FindLastIndex(checkpoints,c=>(float)Field(c,"Distance")<takeoff);
@@ -189,7 +192,7 @@ public sealed partial class WorldShiftLevelTests
             Assert.That(Call(route,"HasSurface",landedAt,source),Is.True);
             object roadPiece=((IEnumerable)Field(route,"pieces")).Cast<object>().First(p=>(float)Field(p,"Start")<=landedAt && (float)Field(p,"End")>landedAt);
             Assert.That(((Renderer)Field(roadPiece,"Surface")).enabled,Is.True,"The shared collision deck must be visibly solid immediately.");
-            if(level==3) Capture("ocean-landed-return-switch");
+            if(level==OceanLevel) Capture("ocean-landed-return-switch");
             Call(game,"StepSimulation",0f,0f,true);
             Assert.That(Get(game,"World"),Is.EqualTo(destination));
             Assert.That((float)Get(game,"Distance"),Is.EqualTo(landedAt));
@@ -263,7 +266,7 @@ public sealed partial class WorldShiftLevelTests
     public IEnumerator DesertSlidersMoveInDayAndFreezeInNight()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
-        StartLevel(2); yield return WaitForNavigation();
+        StartLevel(DesertLevel); yield return WaitForNavigation();
         var game = Started();
         Assert.That(Get(game, "Environment").ToString(), Is.EqualTo("Desert"));
         Assert.That(game.GetComponentsInChildren<Transform>(true).Any(t => t.name.StartsWith("Highway sign")), Is.False);

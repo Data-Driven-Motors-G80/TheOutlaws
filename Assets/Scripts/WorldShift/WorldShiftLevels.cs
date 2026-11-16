@@ -9,7 +9,7 @@ namespace Outlaws.WorldShift
         // Slot 0 is training. Every level runs in the shared City scene; the course
         // sets the environment, so new levels need no new scene.
         public static readonly ShiftLevel[] Environments =
-            { ShiftLevel.Tutorial, ShiftLevel.City, ShiftLevel.Desert, ShiftLevel.Ocean, ShiftLevel.Snow, ShiftLevel.Mountain };
+            { ShiftLevel.Tutorial, ShiftLevel.City, ShiftLevel.Ocean, ShiftLevel.Snow, ShiftLevel.Mountain, ShiftLevel.Desert };
         public static int Count => Environments.Length;
         public const string LevelScene = "City_WorldShift";
         private const string BeatenKey = "WorldShift.Levels.HighestBeaten";

@@ -9,20 +9,20 @@ using UnityEngine.UI;
 public sealed partial class WorldShiftLevelTests
 {
     [UnityTest]
-    public IEnumerator FinalMountainEscapeClosesStoryAndRevealsTheEnd()
+    public IEnumerator FinalDesertEscapeClosesStoryAndRevealsTheEnd()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");yield return new EnterPlayMode();
-        StartLevel(5);yield return WaitForNavigation();
+        StartLevel(DesertLevel);yield return WaitForNavigation();
         var game=Started();FinishForButtons(game);
         var escape=Get(game,"Escape");var hud=Find("WorldShiftLevelHud");var audio=Find("WorldShiftLevelAudio");
-        Assert.That(Static(Levels,"IsBeaten",5),Is.True,"The ending never delays the saved win.");
+        Assert.That(Static(Levels,"IsBeaten",DesertLevel),Is.True,"The ending never delays the saved win.");
         Assert.That(Get(escape,"IsFinale"),Is.True);
         Assert.That((float)Get(escape,"SequenceDuration"),Is.GreaterThan(6.5f));
-        Call(escape,"Advance",5.5f);Call(hud,"Refresh");Capture("finale-mountain-exit");
+        Call(escape,"Advance",5.5f);Call(hud,"Refresh");Capture("finale-desert-exit");
         Call(escape,"Advance",3.5f);Call(hud,"Refresh");
         Assert.That(Get(escape,"Ready"),Is.False);
         Assert.That(((Transform)Field(escape,"coupe")).gameObject.activeSelf,Is.True);
-        Capture("finale-mountain-dawn");
+        Capture("finale-desert-dawn");
         Call(escape,"Advance",20f);Call(hud,"Refresh");Call(audio,"Refresh",0f);yield return null;
         Assert.That(Get(escape,"Ready"),Is.True);
         Assert.That((bool)Field(audio,"winCuePlayed"),Is.False,"Save the finale chord for The End.");
@@ -58,17 +58,17 @@ public sealed partial class WorldShiftLevelTests
     public IEnumerator FinaleCanSkipToTheEndAndReplayTheFinalLevel()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");yield return new EnterPlayMode();
-        StartLevel(5);yield return WaitForNavigation();
+        StartLevel(DesertLevel);yield return WaitForNavigation();
         var game=Started();FinishForButtons(game);var escape=Get(game,"Escape");var hud=Find("WorldShiftLevelHud");
         Call(escape,"Advance",.8f);Call(hud,"Refresh");yield return null;
         ClickButton((Button)Field(hud,"finishSkip"));Call(hud,"Refresh");yield return null;
         Assert.That((int)Field(hud,"finalePage"),Is.Zero,"Skipping the drive still offers the story conclusion.");
         ClickButton(VisibleButton("Skip"));yield return null;
         Assert.That((int)Field(hud,"finalePage"),Is.EqualTo(3));
-        ClickButton(VisibleButton("Replay Mountain"));yield return WaitForNavigation();
-        Assert.That(Get(Find("WorldShiftCity"),"LevelIndex"),Is.EqualTo(5));
+        ClickButton(VisibleButton("Replay Desert"));yield return WaitForNavigation();
+        Assert.That(Get(Find("WorldShiftCity"),"LevelIndex"),Is.EqualTo(DesertLevel));
         Assert.That(Get(Find("WorldShiftCity"),"StoryActive"),Is.False);
-        Assert.That(Static(Levels,"IsBeaten",5),Is.True);
+        Assert.That(Static(Levels,"IsBeaten",DesertLevel),Is.True);
         Assert.That(GameObject.Find("Getaway celebration stage"),Is.Null);
     }
 }

@@ -61,7 +61,7 @@ public sealed partial class WorldShiftLevelTests
         {
             var settings=TypeFor("WorldShiftAudioSettings");
             settings.GetProperty("Music").SetValue(null,.6f);settings.GetProperty("Effects").SetValue(null,.8f);
-            StartLevel(2);yield return WaitForNavigation();
+            StartLevel(DesertLevel);yield return WaitForNavigation();
             {
                 var desert=Started();var desertAudio=Find("WorldShiftLevelAudio");desertAudio.enabled=false;
                 var song=(AudioSource)Field(desertAudio,"music");song.time=10f;Call(desertAudio,"Refresh",1f);
@@ -75,7 +75,7 @@ public sealed partial class WorldShiftLevelTests
                 var creditText=string.Join("\n",UnityEngine.Object.FindObjectsByType<TMPro.TMP_Text>(FindObjectsSortMode.None).Select(v=>v.text));
                 Assert.That(creditText,Does.Contain("Whiskey on the Mississippi"));Assert.That(creditText,Does.Contain("Attribution 4.0"));
             }
-            StartLevel(3);yield return WaitForNavigation();
+            StartLevel(OceanLevel);yield return WaitForNavigation();
             var game=Started();var audio=Find("WorldShiftLevelAudio");audio.enabled=false;
             var engine=(AudioSource)Field(audio,"engine");var tyres=(AudioSource)Field(audio,"tyres");
             var music=(AudioSource)Field(audio,"music");music.time=10f;
@@ -125,7 +125,7 @@ public sealed partial class WorldShiftLevelTests
     public IEnumerator PoliceSirenAndBeaconsFollowPursuitPauseAndTrainingLessons()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");yield return new EnterPlayMode();
-        StartLevel(3);yield return WaitForNavigation();
+        StartLevel(OceanLevel);yield return WaitForNavigation();
         var game=Started();var effects=Find("WorldShiftPoliceEmergencyEffects");
         var source=effects.GetComponent<AudioSource>();
         var red=(Light)Field(effects,"redLight");var blue=(Light)Field(effects,"blueLight");

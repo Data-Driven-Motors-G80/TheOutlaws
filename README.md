@@ -10,7 +10,7 @@ A low-fidelity Unity driving playtest built around switching between Day and Nig
 
 ## How it plays
 
-- The home screen lists the levels: **0 Training, 1 City, 2 Desert, 3 Ocean, 4 Snow, 5 Mountain**. Beat a level to unlock the next.
+- The home screen lists the levels: **0 Training, 1 City, 2 Ocean, 3 Snow, 4 Mountain, 5 Desert**. Beat a level to unlock the next.
 - Still obstacles belong to Day or Night. The other world's obstacles show as dashed outlines (Day yellow, Night black): you can drive through dashes, but switching while inside one is a crash. Oncoming traffic belongs to one world too.
 - Anything that slides sideways or rolls toward you exists in both worlds, stays orange, moves in Day and freezes in Night.
 - Training teaches each rule with green highway signs before the real levels.
@@ -39,7 +39,7 @@ The older endless escape (cash, garage, fuel, shooting, forks) is still in the c
 ## Development documentation
 
 - [Documentation index](Docs/README.md)
-- [Level 2 Desert](Docs/LEVEL2_DESERT.md) and [Level 3 Ocean](Docs/LEVEL3_OCEAN.md)
+- [Level 5 Desert](Docs/LEVEL2_DESERT.md) and [Level 2 Ocean](Docs/LEVEL3_OCEAN.md)
 - [Architecture and code map](Docs/ARCHITECTURE.md)
 - [Road geometry and tuning](Docs/CURVED_ROADS.md)
 - [Current game scenes](Docs/SCENES.md)

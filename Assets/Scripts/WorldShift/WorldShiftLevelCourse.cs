@@ -248,13 +248,13 @@ namespace Outlaws.WorldShift
 
         public static LevelCourse For(int level)
         {
-            switch (level)
+            switch (WorldShiftLevels.Environments[level])
             {
-                case 0: return Training();
-                case 1: return City();
-                case 2: return Desert();
-                case 3: return Ocean();
-                case 4: return Snow();
+                case ShiftLevel.Tutorial: return Training();
+                case ShiftLevel.City: return City();
+                case ShiftLevel.Desert: return Desert();
+                case ShiftLevel.Ocean: return Ocean();
+                case ShiftLevel.Snow: return Snow();
                 default: return Mountain();
             }
         }

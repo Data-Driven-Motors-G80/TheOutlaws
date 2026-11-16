@@ -49,7 +49,7 @@ public sealed partial class WorldShiftLevelTests
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
         yield return new EnterPlayMode();
-        for (int level = 1; level <= 2; level++)
+        foreach (int level in new[] { 1, DesertLevel })
         {
             StartLevel(level); yield return WaitForNavigation();
             var game = Started();
@@ -72,7 +72,7 @@ public sealed partial class WorldShiftLevelTests
                     Assert.That(Vector3.Distance(roadRenderer.transform.TransformPoint(edges[j*2+1]),side.transform.TransformPoint(vertices[j*6+3])), Is.LessThan(.001f));
                 }
             }
-            if (level == 2)
+            if (level == DesertLevel)
             {
                 int oases = 0, trees = 0;
                 foreach (Transform child in scenery.transform)
@@ -86,7 +86,7 @@ public sealed partial class WorldShiftLevelTests
             Capture(level == 1 ? "restored-city-day" : "desert-oasis-day");
             Call(game, "ApplyWorld", World("Echo"));
             Capture(level == 1 ? "restored-city-night" : "desert-oasis-night");
-            if (level == 2)
+            if (level == DesertLevel)
             {
                 Pose(game, 1830f, 0); Call(game,"ApplyWorld",World("Day")); Capture("desert-late-bend");
             }
@@ -111,7 +111,7 @@ public sealed partial class WorldShiftLevelTests
     public IEnumerator OceanArtKeepsWorldSwitchJumpGapsOpen()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
-        StartLevel(3); yield return WaitForNavigation();
+        StartLevel(OceanLevel); yield return WaitForNavigation();
         var game = Started(); var coast = Find("WorldShiftOceanPresentation");
         Assert.That(coast.GetComponentsInChildren<Collider>(true), Is.Empty,
             "Coastal scenery must never add physical obstacles to the authored course.");
@@ -169,7 +169,7 @@ public sealed partial class WorldShiftLevelTests
     public IEnumerator OceanObstacleArtFitsItsCollisionFootprintsAndSwitchesWithItsWorld()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
-        StartLevel(3); yield return WaitForNavigation();
+        StartLevel(OceanLevel); yield return WaitForNavigation();
         var game = Started(); var presentation = Field(game, "presentation");
         bool capturedContainer = false, capturedBarrier = false, capturedCargo = false, capturedTrolley = false, capturedVan = false;
         foreach (object hazardView in (IEnumerable)Field(presentation, "hazards"))
@@ -288,7 +288,7 @@ public sealed partial class WorldShiftLevelTests
     public IEnumerator OceanPoliceCruiserKeepsItsIdentityInBothWorlds()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
-        StartLevel(3); yield return WaitForNavigation();
+        StartLevel(OceanLevel); yield return WaitForNavigation();
         var game=Started();var police=(Component)Get(game,"Police");
         var cruisers=police.GetComponentsInChildren<MonoBehaviour>(true).Where(c=>c.GetType().Name=="WorldShiftPoliceCarArt").ToArray();
         Assert.That(cruisers.Length,Is.EqualTo(1),"Ocean must keep the shared marked cruiser, rather than replacing it with a coupe.");

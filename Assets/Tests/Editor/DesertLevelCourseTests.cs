@@ -10,6 +10,7 @@ using UnityEngine.TestTools;
 
 public sealed class DesertLevelCourseTests
 {
+    private const int DesertLevel = 5;
     private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
     private const string Progress = "WorldShift.Levels.HighestBeaten", Unlock = "WorldShift.Levels.UnlockAll";
     private int savedProgress, savedUnlock;
@@ -27,7 +28,7 @@ public sealed class DesertLevelCourseTests
         g.GetType().GetProperty("Lateral", Flags).SetValue(g, x);
         Call(F(g, "driver"), "RestoreExternalPose", d, x);
     }
-    private static object Course() => T("WorldShiftLevelCourse").GetMethod("For").Invoke(null, new object[] { 2 });
+    private static object Course() => T("WorldShiftLevelCourse").GetMethod("For").Invoke(null, new object[] { DesertLevel });
     private static bool Air(object h) => F(h, "Rock") != null && (bool)P(F(h, "Rock"), "Airborne");
     private static float EscapeLane(System.Collections.Generic.List<object> rocks, int first, int count)
     {
@@ -203,7 +204,7 @@ public sealed class DesertLevelCourseTests
         Action<string, string, System.Collections.Generic.Dictionary<string, object>> sink = (sheet, ev, row) => { };
         T("WorldShiftLevelAnalytics").GetField("Sink", Flags).SetValue(null, sink);
         T("WorldShiftLevels").GetProperty("UnlockAll").SetValue(null, true);
-        T("WorldShiftLevels").GetMethod("Play").Invoke(null, new object[] { 2, "menu" });
+        T("WorldShiftLevels").GetMethod("Play").Invoke(null, new object[] { DesertLevel, "menu" });
         yield return null; yield return null;
         var game = Game(); game.enabled = false;
         var hazards = Items(P(game, "Hazards"));
@@ -285,7 +286,7 @@ public sealed class DesertLevelCourseTests
         Action<string, string, System.Collections.Generic.Dictionary<string, object>> sink = (sheet, ev, row) => { };
         T("WorldShiftLevelAnalytics").GetField("Sink", Flags).SetValue(null, sink);
         T("WorldShiftLevels").GetProperty("UnlockAll").SetValue(null, true);
-        T("WorldShiftLevels").GetMethod("Play").Invoke(null, new object[] { 2, "menu" });
+        T("WorldShiftLevels").GetMethod("Play").Invoke(null, new object[] { DesertLevel, "menu" });
         yield return null; yield return null;
         var game = Game(); game.enabled = false;
         var ramps = Items(F(P(game, "Course"), "Ramps"));

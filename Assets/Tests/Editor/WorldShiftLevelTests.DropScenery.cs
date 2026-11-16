@@ -19,7 +19,7 @@ public sealed partial class WorldShiftLevelTests
 
     private IEnumerator CheckThemedJumpDrops()
     {
-        string[] themes={"Depot safety pit","City storm drain","Sandstone ravine","Open sea and shark fins","Blue ice crevasse","Mountain river gorge"};
+        string[] themes={"Depot safety pit","City storm drain","Open sea and shark fins","Blue ice crevasse","Mountain river gorge","Sandstone ravine"};
         for(int level=0;level<6;level++)
         {
             StartLevel(level);yield return WaitForNavigation();
@@ -48,7 +48,7 @@ public sealed partial class WorldShiftLevelTests
             Call(game,"ApplyWorld",World("Day"));
             Capture("drop-"+level+"-driving-day");CaptureDropScenery(route,start,end,"drop-"+level+"-day");
             Call(game,"ApplyWorld",World("Echo"));CaptureDropScenery(route,start,end,"drop-"+level+"-night");
-            if(level==3)
+            if(level==OceanLevel)
             {
                 var fins=visuals.GetComponentsInChildren<Transform>(true).Where(t=>t.name=="Circling shark fin").ToArray();
                 Assert.That(fins.Length,Is.EqualTo(ramps.Length*2));

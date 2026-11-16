@@ -8,7 +8,7 @@ namespace Outlaws.WorldShift
     public sealed partial class WorldShiftLevelHud
     {
         private static readonly string[] FinaleTitles={"The last\nshift.","The last\nspark.","A new\ndawn."};
-        private static readonly string[] FinaleLines={"The mountain seals the road behind you.","The device burns out. It got you this far.","No sirens. No one in the mirror."};
+        private static readonly string[] FinaleLines={"The passage seals the road behind you.","The device burns out. It got you this far.","No sirens. No one in the mirror."};
         private RectTransform finaleCard;
         private GameObject finaleStory, finaleEnd;
         private RawImage finaleArt;
@@ -52,7 +52,7 @@ namespace Outlaws.WorldShift
             PauseLabel(finaleEnd.transform,"THE END",.06f,.46f,.64f,.76f,112,Cream,FontStyles.Bold);
             PauseLabel(finaleEnd.transform,"You lost them. For good.",.065f,.38f,.57f,.46f,26,Cream);
             finaleRoutes=PauseAction(finaleEnd.transform,"Level select",new Vector2(.065f,.16f),new Vector2(.34f,.26f),ShiftIcon.Home,ContinueAfterEscape,true);
-            PauseAction(finaleEnd.transform,"Replay Mountain",new Vector2(.065f,.055f),new Vector2(.34f,.135f),ShiftIcon.Retry,WorldShiftLevels.Retry);
+            PauseAction(finaleEnd.transform,"Replay " + WorldShiftLevels.Name(game.LevelIndex),new Vector2(.065f,.055f),new Vector2(.34f,.135f),ShiftIcon.Retry,WorldShiftLevels.Retry);
             finaleEndFade=finaleEnd.AddComponent<CanvasGroup>();
             finaleEnd.SetActive(false);ShowFinalePage();
         }

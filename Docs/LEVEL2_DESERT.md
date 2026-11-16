@@ -1,6 +1,6 @@
-# Level 2 desert
+# Level 5 Desert
 
-Level 2 uses Drew's shared level controller, six ramp sections and
+Level 5 uses Drew's shared level controller, six ramp sections and
 one-hit retries. Still obstacles belong to Day or Night; the other world's appear as passable dashed outlines (Day yellow, Night black). All moving rocks are orange and solid in both
 worlds: Day moves them and Night freezes their exact current position.
 

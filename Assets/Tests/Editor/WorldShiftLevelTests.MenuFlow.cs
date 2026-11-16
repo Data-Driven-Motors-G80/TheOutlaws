@@ -20,7 +20,7 @@ public sealed partial class WorldShiftLevelTests
         yield return new EnterPlayMode();
         PlayerPrefs.SetInt(UnlockAllKey, 1);
         Static(Levels, "Menu"); yield return WaitForNavigation();
-        string[] environments = { "City", "City", "Desert", "Ocean", "Snow", "Mountain" };
+        string[] environments = { "City", "City", "Ocean", "Snow", "Mountain", "Desert" };
         Vector3[] playerShape=null,policeShape=null;
         Color[] playerPaint=null,policePaint=null;
         for (int level = 0; level < environments.Length; level++)
@@ -35,7 +35,7 @@ public sealed partial class WorldShiftLevelTests
             Assert.That((bool)Field(Get(game, "Course"), "Training"), Is.EqualTo(level == 0));
             Assert.That(((Array)Get(game, "Checkpoints")).Length, Is.GreaterThan(0));
             Assert.That(((Array)Get(game, "Hazards")).Length, Is.GreaterThan(0));
-            if (level == 3) Assert.That(((Vector2[])Field(Get(game, "Course"), "RequiredItems")).Length, Is.EqualTo(11));
+            if (level == OceanLevel) Assert.That(((Vector2[])Field(Get(game, "Course"), "RequiredItems")).Length, Is.EqualTo(11));
             var playerArt=((Transform)Get(game,"Player")).GetComponentsInChildren<MonoBehaviour>(true).Where(c=>c.GetType().Name=="WorldShiftPlayerCarArt").ToArray();
             var policeArt=((Component)Get(game,"Police")).GetComponentsInChildren<MonoBehaviour>(true).Where(c=>c.GetType().Name=="WorldShiftPoliceCarArt").ToArray();
             Assert.That(playerArt.Length,Is.EqualTo(1),"Every level must use exactly one shared player coupe.");
@@ -63,7 +63,7 @@ public sealed partial class WorldShiftLevelTests
             Step(game, .1f);
             Assert.That(Get(game, "State").ToString(), Is.EqualTo("Running"));
             Assert.That((float)Get(game, "Distance"), Is.GreaterThan(0f));
-            if(level==1 || level==3)
+            if(level==1 || level==OceanLevel)
             {
                 Pose(game,70f,0f);
                 var point=Call(Get(game,"Route"),"Sample",71f);
@@ -98,7 +98,7 @@ public sealed partial class WorldShiftLevelTests
             Assert.That(Get(escape,"Active"),Is.True);Assert.That(Get(escape,"Ready"),Is.False);
             Assert.That(((Transform)Field(escape,"stage")).GetComponentsInChildren<Collider>().Length,Is.Zero);
             Call(escape,"Skip");Assert.That(Get(escape,"Ready"),Is.False,"A held finish input must not instantly skip the first moment.");
-            if(level==3)
+            if(level==OceanLevel)
             {
                 var audio=Find("WorldShiftLevelAudio");Call(audio,"Refresh",0f);
                 Assert.That((bool)Field(audio,"winCuePlayed"),Is.False,"Save the victory sting for the reveal.");
@@ -185,6 +185,9 @@ public sealed partial class WorldShiftLevelTests
         {
             Assert.That(Get(Find("WorldShiftCity"),"StoryActive"),Is.EqualTo(level==1),"Only entering City opens the story.");
             var game=Started();Assert.That(Get(game,"LevelIndex"),Is.EqualTo(level));
+            string[] expected = { "City", "City", "Ocean", "Snow", "Mountain", "Desert" };
+            Assert.That(Get(game,"Environment").ToString(),Is.EqualTo(expected[level]));
+            Assert.That(Get(Get(game,"Escape"),"IsFinale"),Is.EqualTo(level==DesertLevel),"Only Desert ends the campaign.");
             Assert.That(Get(game,"State").ToString(),Is.EqualTo("Running"));
             FinishForButtons(game);
             var escape=Get(game,"Escape");if((bool)Get(escape,"Active")) Call(escape,"Advance",Get(escape,"SequenceDuration"));

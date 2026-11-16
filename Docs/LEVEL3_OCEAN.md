@@ -1,4 +1,4 @@
-# Level 3 Ocean
+# Level 2 Ocean
 
 Ocean uses the shared level controller: five coastal driving sections, a world-switch
 ramp at the end of each section, one-hit crashes and checkpoints after the first

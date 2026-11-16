@@ -16,7 +16,7 @@ public sealed partial class WorldShiftLevelTests
     [Test]
     public void OceanItemsAreRequiredSweptAndResetOnlyInTheRetriedSection()
     {
-        var course = Static(TypeFor("WorldShiftLevelCourse"), "For", 3);
+        var course = Static(TypeFor("WorldShiftLevelCourse"), "For", OceanLevel);
         var items = (Vector2[])Field(course, "RequiredItems");
         var ramps = ((Array)Field(course, "Ramps")).Cast<object>().ToArray();
         var checkpoints = ((Array)Field(course, "Checkpoints")).Cast<object>().ToArray();
@@ -30,7 +30,7 @@ public sealed partial class WorldShiftLevelTests
             Assert.That(targets.All(i => i.x >= start + 60f && i.x <= ramp - 60f), Is.True);
         }
         for (int level = 0; level < 6; level++)
-            if (level != 3) Assert.That(((Vector2[])Field(Static(TypeFor("WorldShiftLevelCourse"), "For", level), "RequiredItems")), Is.Empty);
+            if (level != OceanLevel) Assert.That(((Vector2[])Field(Static(TypeFor("WorldShiftLevelCourse"), "For", level), "RequiredItems")), Is.Empty);
 
         var collection = Activator.CreateInstance(TypeFor("WorldShiftLevelCollection"), new object[] { items });
         Assert.That(Call(collection, "Step", 90f, 110f, -2f, 2f), Is.True, "Swept contact at the target counts.");
@@ -55,7 +55,7 @@ public sealed partial class WorldShiftLevelTests
     public IEnumerator OceanCheckpointGantriesMatchSavesAndConfirmOnlyOnCrossing()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
-        StartLevel(3); yield return WaitForNavigation();
+        StartLevel(OceanLevel); yield return WaitForNavigation();
         var game=Started();var coast=Find("WorldShiftCheckpointGantries");
         var checkpoints=(Array)Get(game,"Checkpoints");
         var gates=((IEnumerable)Field(coast,"checkpointGates")).Cast<object>().OrderBy(g=>(int)Field(g,"Index")).ToArray();
@@ -100,7 +100,7 @@ public sealed partial class WorldShiftLevelTests
     public IEnumerator OceanCollectionWorksInBothWorldsAndMissRetriesTheCheckpoint()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
-        StartLevel(3); yield return WaitForNavigation();
+        StartLevel(OceanLevel); yield return WaitForNavigation();
         var game = Started();
         var collection = Get(game, "Collection");
         Pose(game, 70f, 0f);
