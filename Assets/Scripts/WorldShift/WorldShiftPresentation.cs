@@ -8,6 +8,7 @@ namespace Outlaws.WorldShift
     /// <summary>Primitive city geometry. Only the current world has visible hazards.</summary>
     public sealed partial class WorldShiftPresentation : MonoBehaviour
     {
+        private WorldShiftPlayerCarArt playerCar;
         private sealed class PaletteItem { public Renderer Renderer; public Material Day, Echo; }
         private sealed class Chunk { public GameObject Root; public float At, End; public float Tail = 90f; public bool CityBlock; }
         private sealed class HazardView
@@ -197,6 +198,8 @@ namespace Outlaws.WorldShift
             if (relayVisuals != null) relayVisuals.SetWorld(next);
             foreach (GameObject lamp in nightLamps) lamp.SetActive(!day);
             if (playerHeadlight != null) playerHeadlight.enabled = !day;
+            if (playerCar == null && game != null && game.Player != null) playerCar = game.Player.GetComponentInChildren<WorldShiftPlayerCarArt>();
+            if (playerCar != null) playerCar.NightLamps = !day;
             if (headlightHaze != null) headlightHaze.SetActive(!day);
             if (roadside != null) roadside.SetWorld(next);
             if (scenery != null) scenery.SetWorld(next);

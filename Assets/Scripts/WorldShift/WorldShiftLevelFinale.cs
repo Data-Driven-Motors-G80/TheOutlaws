@@ -38,7 +38,7 @@ namespace Outlaws.WorldShift
             }
             PauseTextButton(finaleCard,"Skip",new Vector2(.85f,.845f),new Vector2(.96f,.92f),CompleteFinale);
             finaleTitle=PauseLabel(finaleCard,"",.63f,.53f,.96f,.81f,54,Cream,FontStyles.Bold);
-            finaleLine=PauseLabel(finaleCard,"",.63f,.34f,.95f,.52f,22,new Color(.75f,.83f,.83f));
+            finaleLine=PauseLabel(finaleCard,"",.63f,.34f,.95f,.52f,22,WorldShiftUiStyle.Muted);
             finaleNext=PauseAction(finaleCard,"Continue",new Vector2(.63f,.19f),new Vector2(.95f,.29f),ShiftIcon.Play,AdvanceFinale,true);
             finaleBack=PauseTextButton(finaleCard,"Back",new Vector2(.63f,.08f),new Vector2(.77f,.15f),PreviousFinale);
 

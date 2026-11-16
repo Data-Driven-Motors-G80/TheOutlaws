@@ -17,7 +17,8 @@ namespace Outlaws.WorldShift
             || data.Kind == ShiftHazardKind.HalfBarrier || data.Kind == ShiftHazardKind.SwitchWall
             || data.Kind == ShiftHazardKind.Divider);
 
-        public static WorldShiftRetractableBarrier Build(Transform parent, Vector3 centre, Vector3 size, ShiftWorld world)
+        public static WorldShiftRetractableBarrier Build(Transform parent, Vector3 centre, Vector3 size, ShiftWorld world,
+            ShiftLevel environment = ShiftLevel.City)
         {
             var root = new GameObject("Retractable " + world + " barrier");
             root.transform.SetParent(parent, false);
@@ -61,6 +62,7 @@ namespace Outlaws.WorldShift
                         body.Box(new Vector3(x+corner*panelWidth,h*.89f,z),new Vector3(.065f,.065f,.025f),dark);
                     Icon(body,new Vector3(x,h*.53f,z+side*.018f),Mathf.Min(panelWidth*.36f,h*.38f),world,dark);
                 }
+                Theme(body,environment,world,x,panelWidth-.12f,h,d-.08f);
             }
             result.finish = new Material(Resources.Load<Shader>("WorldShiftOceanSurface"));
             result.finish.name = world + " retractable barrier";
@@ -80,6 +82,100 @@ namespace Outlaws.WorldShift
             obj.GetComponent<MeshFilter>().sharedMesh=mesh;
             obj.GetComponent<MeshRenderer>().sharedMaterial=finish;
             return obj.transform;
+        }
+
+        // Environment dressing around the world-coloured face. The face colour, sun/moon icon,
+        // footprint and sinking motion stay identical, so the mechanic reads the same everywhere.
+        // All detail stays inside the panel's box (collision is independent of this art).
+        private static void Theme(WorldShiftArtMesh art, ShiftLevel environment, ShiftWorld world,
+            float x, float w, float h, float d)
+        {
+            bool day = world == ShiftWorld.Day;
+            Color ink = day ? new Color(.06f,.07f,.09f) : new Color(.78f,.8f,.82f);
+            Color wood = new Color(.46f,.32f,.19f), woodDark = new Color(.3f,.2f,.12f);
+            float front = d*.5f;
+            // Keep every face detail clear of the sun/moon icon so the world stays readable.
+            float iconR = Mathf.Min((w+.12f)*.36f,h*.38f)*1.12f, iconY = h*.53f;
+            bool OverIcon(float px, float y, float height) => Mathf.Abs(px) < iconR && y+height*.5f > iconY-iconR && y-height*.5f < iconY+iconR;
+            void FaceBox(float x0, float x1, float y, float height, float depth, Color c)
+            {
+                if (x1-x0 < .01f) return;
+                foreach (float side in new[] {-1f,1f})
+                    art.Box(new Vector3(x+(x0+x1)*.5f,y,side*(front-depth*.5f+.012f)),new Vector3(x1-x0,height,depth),c);
+            }
+            void OnBothFaces(float y, float height, float x0, float x1, float depth, Color c)
+            {
+                if (y+height*.5f > iconY-iconR && y-height*.5f < iconY+iconR)
+                {
+                    FaceBox(x0,Mathf.Min(x1,-iconR),y,height,depth,c);
+                    FaceBox(Mathf.Max(x0,iconR),x1,y,height,depth,c);
+                }
+                else FaceBox(x0,x1,y,height,depth,c);
+            }
+            switch (environment)
+            {
+                case ShiftLevel.City:
+                {
+                    // Roadworks: a diagonal hazard band along the foot and amber lamps at the top corners.
+                    float band = h*.17f;
+                    OnBothFaces(band*.5f,band,-w*.5f,w*.5f,.02f,ink);
+                    Color stripe = day ? WorldShiftLevelProps.SwitchColour : new Color(.95f,.72f,.2f);
+                    for (float sx=-w*.5f+.12f; sx<w*.5f-.12f; sx+=.42f)
+                        if (!OverIcon(sx+band*.5f,band*.5f,band)) foreach (float side in new[] {-1f,1f})
+                        {
+                            float z=side*(front+.006f);
+                            art.Quad(new Vector3(x+sx,0,z),new Vector3(x+sx+.14f,0,z),
+                                new Vector3(x+sx+.14f+band,band,z),new Vector3(x+sx+band,band,z),stripe);
+                            art.Quad(new Vector3(x+sx+band,band,z),new Vector3(x+sx+.14f+band,band,z),
+                                new Vector3(x+sx+.14f,0,z),new Vector3(x+sx,0,z),stripe);
+                        }
+                    foreach (float cx in new[] {-w*.38f,w*.38f})
+                        art.Box(new Vector3(x+cx,h-.09f,0),new Vector3(.18f,.14f,d-.02f),new Color(1f,.62f,.12f));
+                    break;
+                }
+                case ShiftLevel.Desert:
+                {
+                    // Weathered stockade: plank seams, timber end posts and sand drifted against the foot.
+                    for (int i=1;i<5;i++) if (i!=2) OnBothFaces(h*i/5f,.035f,-w*.5f,w*.5f,.02f,woodDark);
+                    foreach (float px in new[] {-w*.5f+.09f,w*.5f-.09f})
+                        art.Box(new Vector3(x+px,h*.5f,0),new Vector3(.18f,h,d),wood);
+                    art.Box(new Vector3(x,h*.07f,0),new Vector3(w,h*.14f,d),new Color(.86f,.7f,.47f));
+                    break;
+                }
+                case ShiftLevel.Ocean:
+                {
+                    // Harbour floodgate: rivet rows and a black rubber fender along the top.
+                    art.Box(new Vector3(x,h-.07f,0),new Vector3(w,.14f,d),new Color(.05f,.05f,.06f));
+                    for (float rx=-w*.5f+.18f; rx<w*.5f-.1f; rx+=.34f)
+                        foreach (float ry in new[] {h*.2f,h*.78f})
+                            if (!OverIcon(rx,ry,.06f)) FaceBox(rx-.03f,rx+.03f,ry,.06f,.03f,ink);
+                    break;
+                }
+                case ShiftLevel.Snow:
+                {
+                    // Snow piled on top with a row of icicles below the cap.
+                    Color snow = new Color(.93f,.96f,1f);
+                    art.ChamferBox(new Vector3(x,h-.08f,0),new Vector3(w,.16f,d),.05f,snow);
+                    for (float ix=-w*.5f+.16f; ix<w*.5f-.1f; ix+=.27f)
+                        if (!OverIcon(ix,h-.2f,.1f)) foreach (float side in new[] {-1f,1f})
+                        {
+                            float z=side*(front+.006f), len=.12f+.08f*Mathf.Abs(Mathf.Sin(ix*7.3f));
+                            art.Triangle(new Vector3(x+ix-.05f,h-.16f,z),new Vector3(x+ix+.05f,h-.16f,z),
+                                new Vector3(x+ix,h-.16f-len,z),new Color(.82f,.92f,1f),true);
+                        }
+                    break;
+                }
+                case ShiftLevel.Mountain:
+                {
+                    // Rockfall wall: staggered stone courses under a timber top rail.
+                    Color mortar = day ? new Color(.18f,.15f,.1f) : new Color(.5f,.52f,.55f);
+                    foreach (float y in new[] {h*.22f,h*.84f}) OnBothFaces(y,.035f,-w*.5f,w*.5f,.02f,mortar);
+                    for (float jx=-w*.5f+.35f; jx<w*.5f; jx+=.7f)
+                        if (!OverIcon(jx,h*.11f,h*.22f)) FaceBox(jx-.017f,jx+.017f,h*.11f,h*.22f,.02f,mortar);
+                    art.Box(new Vector3(x,h-.06f,0),new Vector3(w,.12f,d),wood);
+                    break;
+                }
+            }
         }
 
         private static void Icon(WorldShiftArtMesh art,Vector3 centre,float r,ShiftWorld world,Color ink)

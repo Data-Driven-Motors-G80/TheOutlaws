@@ -11,9 +11,9 @@ namespace Outlaws.WorldShift
     public sealed partial class WorldShiftMenu : MonoBehaviour
     {
         private static readonly Color Ink = new Color(.025f, .045f, .07f, .98f);
-        private static readonly Color Accent = new Color(.35f, .85f, 1f);
-        private static readonly Color Cream = new Color(1f, .95f, .84f);
-        private static readonly Color Gold = new Color(1f, .75f, .32f);
+        private static readonly Color Accent = WorldShiftUiStyle.Accent;
+        private static readonly Color Cream = WorldShiftUiStyle.Cream;
+        private static readonly Color Gold = WorldShiftUiStyle.Gold;
         private RectTransform levels;
         private GameObject testBadge;
 

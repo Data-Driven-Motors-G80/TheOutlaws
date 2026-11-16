@@ -12,8 +12,8 @@ namespace Outlaws.WorldShift
     public sealed partial class WorldShiftLevelHud : MonoBehaviour
     {
         private static readonly Color Ink = new Color(.025f, .045f, .07f, .9f);
-        private static readonly Color Cream = new Color(1f, .95f, .84f);
-        private static readonly Color Gold = new Color(1f, .75f, .32f);
+        private static readonly Color Cream = WorldShiftUiStyle.Cream;
+        private static readonly Color Gold = WorldShiftUiStyle.Gold;
         private WorldShiftCity game;
         private Image worldIcon, progressFill, crashFlash;
         private RectTransform carMarker;
@@ -225,8 +225,13 @@ namespace Outlaws.WorldShift
 
         public static RectTransform IconButton(Transform parent, ShiftIcon icon, Vector2 anchor, float size, Action action)
         {
-            var rect = WorldShiftMenu.Panel(parent, icon + " button", anchor, anchor, new Color(.14f, .23f, .30f, .95f));
+            // Same card language as the pause/finish screens: fine rim around the dark face.
+            var rect = WorldShiftMenu.Panel(parent, icon + " button", anchor, anchor, WorldShiftUiStyle.Rim);
             rect.sizeDelta = new Vector2(size, size);
+            Round(rect, WorldShiftUiStyle.Rim);
+            var face = WorldShiftMenu.Panel(rect, "Button face", Vector2.zero, Vector2.one, WorldShiftUiStyle.Face);
+            face.offsetMin = Vector2.one * 2f; face.offsetMax = -Vector2.one * 2f; Round(face, WorldShiftUiStyle.Face);
+            face.GetComponent<Image>().raycastTarget = false;
             var image = rect.GetComponent<Image>();
             image.raycastTarget = true;
             var button = rect.gameObject.AddComponent<Button>();

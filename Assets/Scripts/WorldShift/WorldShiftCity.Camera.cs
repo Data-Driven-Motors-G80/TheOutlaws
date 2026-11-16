@@ -38,6 +38,8 @@ namespace Outlaws.WorldShift
             view.fieldOfView = Mathf.Lerp(view.fieldOfView, cameraFov, blend);
             if (falling) target = Player.position + point.Forward * 4f;
             view.transform.rotation = Quaternion.Slerp(view.transform.rotation, Quaternion.LookRotation(target - view.transform.position, Vector3.up), IsMerged ? 1f : blend);
+            // Crash/landing kick, applied in camera space after the normal follow.
+            if (Impact != null) view.transform.position += view.transform.rotation * Impact.ShakeOffset;
         }
     }
 }
