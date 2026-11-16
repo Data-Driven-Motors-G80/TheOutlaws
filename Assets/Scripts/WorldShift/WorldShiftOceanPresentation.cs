@@ -65,6 +65,7 @@ namespace Outlaws.WorldShift
             route.VisitRoadPieces(BuildBridge);
             BuildCoast();
             BuildHarbour();
+            BuildSpray();
             BuildSectionLandmarks();
             BuildLandingFrames();
             BuildGems();
@@ -275,6 +276,7 @@ namespace Outlaws.WorldShift
             animationTime += Time.deltaTime;
             AnimateGulls();
             AnimateHarbour(Time.deltaTime);
+            AnimateSpray(Time.deltaTime);
             for (int i = 0; i < gems.Count; i++)
             {
                 var gem = gems[i];
@@ -290,6 +292,7 @@ namespace Outlaws.WorldShift
             foreach (var mesh in meshes) Release(mesh);
             foreach (var material in materials) Release(material);
             Release(chime);
+            ClearSpray();
         }
         private static void Release(Object obj)
         {

@@ -82,7 +82,8 @@ namespace Outlaws.WorldShift
             foreach (float side in new[] { -1f, 1f })
                 for (int i = 0; i < 7; i++)
                 {
-                    Vector3 v = right * side * R(1.5f, 4f) - forward * R(1f, 3f) + Vector3.up * R(.5f, 1.8f);
+                    bool splash = environment == ShiftLevel.Ocean; // sea spray rather than dust
+                    Vector3 v = right * side * R(1.5f, 4f) - forward * R(1f, 3f) + Vector3.up * (splash ? R(2.5f, 4.5f) : R(.5f, 1.8f));
                     Spawn(at + right * side * 1.1f - forward * 1.2f + Vector3.up * .15f, v, R(.25f, .45f), R(.35f, .6f), mat, true);
                 }
         }
