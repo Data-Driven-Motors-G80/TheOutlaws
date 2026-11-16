@@ -20,7 +20,7 @@ namespace Outlaws.WorldShift
             PlayerPrefs.SetFloat(key, float.IsNaN(value) ? 0f : Mathf.Clamp01(value));
             PlayerPrefs.Save();
         }
-        public static bool Suspended(WorldShiftCity game) => game.State == ShiftRunState.Paused
+        public static bool Suspended(WorldShiftCity game) => game.StoryActive || game.State == ShiftRunState.Paused
             || game.TrainingLessonPaused || game.TrainingFreezeWaiting;
     }
 }

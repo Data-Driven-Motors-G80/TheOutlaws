@@ -1,4 +1,4 @@
-> Historical prototype notes. This describes the older World game Desert experiment. Current rules: [WorldShift campaign](../WORLD_SHIFT_CAMPAIGN.md).
+> Historical prototype notes. This describes the older World game Desert experiment. Current rules: [project README](../../README.md).
 
 # Desert prototype — first playable slice
 

@@ -1,18 +1,16 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 
+/// <summary>Car handling on a finite WorldShift route, ticked explicitly by the level controller.</summary>
 [DisallowMultipleComponent]
 public sealed class AutoDriveCar : MonoBehaviour
 {
     [Header("References")]
-    [SerializeField] private InfiniteRoad road;
     [SerializeField] private Transform visual;
 
     [Header("Speed")]
-    [SerializeField, Min(0.01f)] private float forwardSpeed = RunDifficultyState.StartSpeed;
-    [SerializeField, Min(0.01f)] private float maximumForwardSpeed = RunDifficultyState.MaximumSpeed;
-    [SerializeField, Min(0f)] private float speedIncreaseAmount = 0.75f;
-    [SerializeField, Min(0.01f)] private float speedIncreaseInterval = 30f;
+    // Steering response scales between these speeds.
+    [SerializeField, Min(0.01f)] private float forwardSpeed = 20f;
+    [SerializeField, Min(0.01f)] private float maximumForwardSpeed = 55f;
 
     [Header("Steering")]
     [SerializeField, Min(0.01f)] private float minimumLateralSpeed = 8f;
@@ -91,11 +89,8 @@ public sealed class AutoDriveCar : MonoBehaviour
     private const float PitchPerAcceleration = 0.35f;
     private const float LandingCompression = 0.02f;
 
-    private InputAction steerAction;
-    private CarPickupEffects pickupEffects;
     private Vector3 visualBasePosition;
     private float currentForwardSpeed;
-    private float speedIncreaseTimer;
     private float lateralOffset;
     private float lateralSpeed;
     private float heightOffset;
@@ -117,13 +112,10 @@ public sealed class AutoDriveCar : MonoBehaviour
     private float hop, hopVelocity;
     private float yawAngle, yawVelocity;
     private float pitch, pitchVelocity;
-    private bool hasStarted;
     private bool hasGroundSample;
     private bool hasSpeedSample;
     private bool wasDrifting;
-    private bool managedDifficulty;
-    // Finite prototypes can supply a path and tick the same handling explicitly.
-    // The regular InfiniteRoad/input-driven lifecycle continues to use Update.
+    // The finite controller supplies the path and ticks the handling explicitly.
     private System.Func<float, RoadPathPoint> externalRoute;
 
     public event System.Action<float> Landed;
@@ -152,11 +144,6 @@ public sealed class AutoDriveCar : MonoBehaviour
     public float RoadDistanceTravelled { get; private set; }
     public float RoadPositionDistance { get; private set; }
     public float LateralOffset => lateralOffset;
-    public float SpeedIncreaseTimer => speedIncreaseTimer;
-    public float StartingSpeed => forwardSpeed;
-    public float MaximumSpeed => maximumForwardSpeed;
-    public float SpeedIncreaseAmount => speedIncreaseAmount;
-    public float SpeedIncreaseInterval => speedIncreaseInterval;
 
     public void ConfigureExternalRoute(System.Func<float, RoadPathPoint> sampler, Transform body, float speed)
     {
@@ -164,8 +151,6 @@ public sealed class AutoDriveCar : MonoBehaviour
         enabled = false;
         visual = body;
         if (visual != null) visualBasePosition = visual.localPosition;
-        pickupEffects = null;
-        managedDifficulty = true;
         currentForwardSpeed = speed;
         RestoreExternalPose(0f, 0f);
     }
@@ -210,92 +195,12 @@ public sealed class AutoDriveCar : MonoBehaviour
         transform.position = point.Position + point.Right * lateralOffset + point.Up * heightOffset + Vector3.up * airHeight;
     }
 
-    public void SetDifficultySpeed(float speed)
-    {
-        managedDifficulty = true;
-        currentForwardSpeed = Mathf.Clamp(speed, forwardSpeed, maximumForwardSpeed);
-    }
-
-    public void SetTutorialSpeed(float speed)
-    {
-        managedDifficulty = true;
-        currentForwardSpeed = Mathf.Clamp(speed, 1f, maximumForwardSpeed);
-    }
-
-    public void ApplyLateralImpulse(float metersPerSecond)
-    {
-        if (IsDriveReady && isActiveAndEnabled)
-            lateralSpeed = Mathf.Clamp(lateralSpeed + metersPerSecond, -maximumLateralSpeed, maximumLateralSpeed);
-    }
-
-    public void RestoreMotion(float currentSpeed, float increaseTimer)
-    {
-        currentForwardSpeed = Mathf.Clamp(
-            currentSpeed, Mathf.Min(forwardSpeed, maximumForwardSpeed), maximumForwardSpeed);
-        speedIncreaseTimer = Mathf.Max(0f, increaseTimer);
-    }
-
     private void Awake()
     {
-        if (RunSession.TryGetPending(out RunSnapshot carried) && carried.MaximumSpeed > 0f)
-        {
-            forwardSpeed = carried.StartingSpeed;
-            maximumForwardSpeed = carried.MaximumSpeed;
-            speedIncreaseAmount = carried.SpeedIncreaseAmount;
-            speedIncreaseInterval = carried.SpeedIncreaseInterval;
-            RestoreMotion(carried.ForwardSpeed, carried.SpeedTimer);
-        }
-        steerAction = CreateSteerAction();
-        pickupEffects = GetComponent<CarPickupEffects>();
         if (visual != null) visualBasePosition = visual.localPosition;
     }
 
-    private void OnEnable()
-    {
-        steerAction.Enable();
-        if (hasStarted) InitializeRoad();
-    }
-
-    private void OnDisable()
-    {
-        IsDriveReady = false;
-        steerAction.Disable();
-    }
-
-    private void OnDestroy()
-    {
-        steerAction.Dispose();
-    }
-
-    private void Start()
-    {
-        hasStarted = true;
-        InitializeRoad();
-        if (RunSession.TryGetPending(out RunSnapshot carried))
-            RestoreMotion(carried.ForwardSpeed, carried.SpeedTimer);
-    }
-
-    private void InitializeRoad()
-    {
-        if (road == null || !road.TryGetPathPoint(transform.position, out RoadPathPoint start))
-        {
-            Debug.LogError(
-                $"{nameof(AutoDriveCar)}: needs a road reference, and the car must start on the road.",
-                this);
-            enabled = false;
-            return;
-        }
-
-        road.TryGetDistance(transform.position, out float initialDistance);
-        RoadPositionDistance = initialDistance;
-
-        Vector3 offset = transform.position - start.Position;
-        lateralOffset = Vector3.Dot(offset, start.Right);
-        heightOffset = Vector3.Dot(offset, start.Up);
-
-        currentForwardSpeed = Mathf.Min(forwardSpeed, maximumForwardSpeed);
-        ResetHandling();
-    }
+    private void OnDisable() => IsDriveReady = false;
 
     private void ResetHandling()
     {
@@ -318,16 +223,6 @@ public sealed class AutoDriveCar : MonoBehaviour
         IsDriveReady = true;
     }
 
-    private void Update()
-    {
-        if (Time.timeScale <= 0f) return;
-        float deltaTime = Time.deltaTime;
-
-        if (!managedDifficulty) UpdateForwardSpeed(deltaTime);
-
-        Drive(deltaTime, steerAction.ReadValue<float>());
-    }
-
     private void Drive(float deltaTime, float rawSteering)
     {
         float speedProgress = Mathf.InverseLerp(forwardSpeed, maximumForwardSpeed, currentForwardSpeed);
@@ -336,20 +231,6 @@ public sealed class AutoDriveCar : MonoBehaviour
         float steerInput = SmoothSteering(Mathf.Clamp(rawSteering, -1f, 1f), deltaTime);
 
         float forwardDistance = currentForwardSpeed * EnvironmentSpeedMultiplier * deltaTime;
-        float accelerationMultiplier = 1f;
-        bool captured = false;
-
-        if (pickupEffects != null && pickupEffects.isActiveAndEnabled)
-        {
-            if (!pickupEffects.SimulationActive) return;
-
-            forwardDistance = pickupEffects.RunState.LastTickForwardDistance;
-            captured = pickupEffects.RunState.IsGameOver;
-            if (captured && forwardDistance <= 0f) return;
-
-            steerInput *= pickupEffects.SteeringMultiplier;
-            accelerationMultiplier = pickupEffects.LateralAccelerationMultiplier;
-        }
 
         SteerInput = steerInput;
         UpdateSkid(steerInput, currentMaxLateralSpeed, deltaTime);
@@ -370,9 +251,7 @@ public sealed class AutoDriveCar : MonoBehaviour
         lateralSpeed = Mathf.MoveTowards(
             lateralSpeed,
             steerInput * currentMaxLateralSpeed,
-            currentLateralAcceleration * accelerationMultiplier * surfaceGrip * deltaTime);
-
-        if (captured) lateralSpeed = 0f;
+            currentLateralAcceleration * surfaceGrip * deltaTime);
 
         float nextDistance = RoadPositionDistance + forwardDistance;
         if (!TrySampleRoad(nextDistance, out RoadPathPoint next)) return;
@@ -463,7 +342,6 @@ public sealed class AutoDriveCar : MonoBehaviour
     private bool TrySampleRoad(float distance, out RoadPathPoint point)
     {
         if (externalRoute != null) { point = externalRoute(distance); return true; }
-        if (road != null) return road.TrySample(distance, out point);
         point = default;
         return false;
     }
@@ -600,18 +478,6 @@ public sealed class AutoDriveCar : MonoBehaviour
         return noise * roadVibration * speedFactor * speedFactor * (icyRoad ? 0.3f : 1f);
     }
 
-    private void UpdateForwardSpeed(float deltaTime)
-    {
-        if (currentForwardSpeed >= maximumForwardSpeed) return;
-
-        speedIncreaseTimer += deltaTime;
-        while (speedIncreaseTimer >= speedIncreaseInterval)
-        {
-            speedIncreaseTimer -= speedIncreaseInterval;
-            currentForwardSpeed = Mathf.Min(currentForwardSpeed + speedIncreaseAmount, maximumForwardSpeed);
-        }
-    }
-
     private void ApplyRotation(RoadPathPoint point, float deltaTime, Vector3 airDirection)
     {
         Quaternion bodyRotation = Quaternion.LookRotation(point.Forward, point.Up);
@@ -631,17 +497,5 @@ public sealed class AutoDriveCar : MonoBehaviour
         if (visual == null) return;
         visual.localRotation = lean;
         visual.localPosition = visualBasePosition + Vector3.up * (bounce + RoadVibration() + hop);
-    }
-
-    private static InputAction CreateSteerAction()
-    {
-        InputAction action = new InputAction("Steer", InputActionType.Value, expectedControlType: "Axis");
-        action.AddCompositeBinding("1DAxis")
-            .With("Negative", "<Keyboard>/leftArrow")
-            .With("Positive", "<Keyboard>/rightArrow");
-        action.AddCompositeBinding("1DAxis")
-            .With("Negative", "<Keyboard>/a")
-            .With("Positive", "<Keyboard>/d");
-        return action;
     }
 }

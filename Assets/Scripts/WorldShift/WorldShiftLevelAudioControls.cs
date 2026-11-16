@@ -9,16 +9,10 @@ namespace Outlaws.WorldShift
     {
         private void AudioControls(Transform parent)
         {
-            PauseLabel(parent,"AUDIO",0,.90f,1,1,13,PauseMuted,FontStyles.Bold).characterSpacing=2;
-            VolumeSlider(parent,"Music",.72f,WorldShiftAudioSettings.Music,value=>WorldShiftAudioSettings.Music=value);
-            VolumeSlider(parent,"Effects",.40f,WorldShiftAudioSettings.Effects,value=>WorldShiftAudioSettings.Effects=value);
-            if(!game.Course.Training)
-            {
-                PauseLabel(parent,"ON THE RADIO",0,.16f,1,.23f,10,PauseMuted).characterSpacing=1.5f;
-                var song=PauseLabel(parent,WorldShiftMusicLibrary.Title(game.Environment),0,.02f,1,.16f,17,Cream);
-                song.textWrappingMode=TextWrappingModes.NoWrap;song.overflowMode=TextOverflowModes.Ellipsis;
-            }
+            VolumeSlider(parent,"Music",.62f,WorldShiftAudioSettings.Music,value=>WorldShiftAudioSettings.Music=value);
+            VolumeSlider(parent,"Effects",.23f,WorldShiftAudioSettings.Effects,value=>WorldShiftAudioSettings.Effects=value);
         }
+
         private void MusicCredits(Transform parent)
         {
             var credits=WorldShiftMenu.Panel(pauseCard,"Music credits panel",Vector2.zero,Vector2.one,PauseFace);
@@ -43,7 +37,7 @@ namespace Outlaws.WorldShift
                 if(EventSystem.current!=null) EventSystem.current.SetSelectedGameObject(creditsLink.gameObject);
             });
             credits.gameObject.SetActive(false);
-            creditsLink=PauseTextButton(parent,"Music credits",new Vector2(.76f,.05f),new Vector2(.95f,.11f),()=>
+            creditsLink=PauseTextButton(parent,"Music credits",new Vector2(.735f,.014f),new Vector2(.95f,.06f),()=>
             {
                 pauseBody.interactable=pauseBody.blocksRaycasts=false;pauseBody.alpha=0f;credits.gameObject.SetActive(true);credits.SetAsLastSibling();
                 if(EventSystem.current!=null) EventSystem.current.SetSelectedGameObject(back.gameObject);
@@ -61,7 +55,7 @@ namespace Outlaws.WorldShift
         private void VolumeSlider(Transform parent,string label,float y,float value,UnityEngine.Events.UnityAction<float> changed)
         {
             var row=WorldShiftMenu.Panel(parent,label+" volume",new Vector2(0,y),new Vector2(1,y),Color.clear);
-            row.sizeDelta=new Vector2(0,64);
+            row.sizeDelta=new Vector2(0,52);
             PauseLabel(row,label,0,.53f,.70f,1,18,Cream);
             var percent=PauseLabel(row,Mathf.RoundToInt(value*100)+"%",.72f,.53f,1,1,15,PauseMuted);
             percent.alignment=TextAlignmentOptions.Right;

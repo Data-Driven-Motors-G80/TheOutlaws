@@ -46,50 +46,6 @@ namespace Outlaws.WorldShift
             return pit;
         }
 
-        private void BuildSpikes(WorldShiftRoute route, ShiftHazard gap, List<Row> rows)
-        {
-            Material steel = Glow(new Color(.62f, .68f, .73f), .18f);
-            if (steel.HasProperty("_Metallic")) steel.SetFloat("_Metallic", .7f);
-            if (steel.HasProperty("_Smoothness")) steel.SetFloat("_Smoothness", .6f);
-            Material blood = Glow(new Color(.65f, .015f, .025f), .12f);
-            if (blood.HasProperty("_Smoothness")) blood.SetFloat("_Smoothness", .65f);
-            Material bed = Glow(new Color(.12f, .14f, .16f), .05f);
-            BuildSurface(rows, 4.8f, "Day spike bed", bed);
-            var triangles = new List<Vector3>();
-            var redTips = new List<Vector3>();
-            int row = 0;
-            // Staggered pyramids fill the opening while their tips stay below road height.
-            for (float at = gap.Start + 1.2f; at < gap.End - .8f; at += 2.4f, row++)
-            {
-                var point = route.Sample(at);
-                float halfWidth = point.Width * .5f;
-                int column = 0;
-                for (float x = -halfWidth + .8f + (row % 2) * .45f; x < halfWidth - .6f; x += 1.65f, column++)
-                {
-                    Vector3 centre = point.Position + point.Right * x + Vector3.down * 4.8f;
-                    float height = 2.8f + .65f * (.5f + .5f * Mathf.Sin(row * 2.1f + column * 1.7f));
-                    Vector3 tip = centre + Vector3.up * height;
-                    Vector3 right = point.Right * .58f, forward = point.Forward * .7f;
-                    Vector3 a = centre - right - forward, b = centre + right - forward;
-                    Vector3 c = centre + right + forward, d = centre - right + forward;
-                    // Uneven stain edges keep the red caps from looking like painted bands.
-                    float stain = .69f + .035f * Mathf.Sin(row * 1.6f + column * 2.4f);
-                    Vector3 ca = Vector3.Lerp(a, tip, stain), cb = Vector3.Lerp(b, tip, stain + .06f);
-                    Vector3 cc = Vector3.Lerp(c, tip, stain - .05f), cd = Vector3.Lerp(d, tip, stain + .025f);
-                    void Face(Vector3 left, Vector3 rightEdge, Vector3 cutLeft, Vector3 cutRight)
-                    {
-                        Triangle(triangles, left, cutLeft, rightEdge);
-                        Triangle(triangles, rightEdge, cutLeft, cutRight);
-                        Triangle(redTips, cutLeft, tip, cutRight);
-                    }
-                    Face(a, b, ca, cb); Face(b, c, cb, cc);
-                    Face(c, d, cc, cd); Face(d, a, cd, ca);
-                }
-            }
-            TriangleObject("Day pit metal spikes", triangles, steel);
-            TriangleObject("Blood-stained spike tips", redTips, blood);
-        }
-
         private void BuildLava(WorldShiftRoute route, ShiftHazard gap, List<Row> rows)
         {
             // Orange molten flow surrounds scattered, irregular black volcanic rocks.

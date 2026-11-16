@@ -1,4 +1,4 @@
-> Historical prototype notes. The old City prototype and merged finale are not the current Escape specification. Current rules: [WorldShift campaign](../WORLD_SHIFT_CAMPAIGN.md).
+> Historical prototype notes. The old City prototype and merged finale are not the current Escape specification. Current rules: [project README](../../README.md).
 
 # City World Shift prototype
 

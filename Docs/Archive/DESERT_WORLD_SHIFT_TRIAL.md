@@ -1,4 +1,4 @@
-> Historical prototype notes. The short Desert trial is retained for development; Escape uses a separate full course. Current rules: [WorldShift campaign](../WORLD_SHIFT_CAMPAIGN.md).
+> Historical prototype notes. The short Desert trial is retained for development; Escape uses a separate full course. Current rules: [project README](../../README.md).
 
 # Desert world-switch timing trial
 

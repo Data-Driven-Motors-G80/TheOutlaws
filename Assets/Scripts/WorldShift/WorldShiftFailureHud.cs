@@ -10,23 +10,27 @@ namespace Outlaws.WorldShift
         private TMP_Text failureTitle, failureDetail;
         private Image retryFill;
 
+        private static readonly Color FailureAccent = new Color(1f,.52f,.39f);
+        private TMP_Text failureKicker;
+
+        // Matches the pause and finish cards: dark face, soft shadow, fine rim, spaced kicker over a bold cream title.
         private void BuildFailurePanel(Transform parent)
         {
-            var panel=WorldShiftMenu.Panel(parent,"Checkpoint retry notice",new Vector2(.24f,.64f),new Vector2(.76f,.84f),Ink);
-            Round(panel, new Color(.025f,.045f,.07f,.96f));
+            var panel=WorldShiftMenu.Panel(parent,"Checkpoint retry notice",new Vector2(.31f,.62f),new Vector2(.69f,.84f),Color.clear);
             failurePanel=panel.gameObject;
             var group=panel.gameObject.AddComponent<CanvasGroup>();
             group.blocksRaycasts=false; group.interactable=false;
-            WorldShiftMenu.Panel(panel,"Failure accent",new Vector2(.025f,.16f),new Vector2(.035f,.84f),new Color(1,.35f,.25f));
-            failureTitle=WorldShiftMenu.Label(panel,"BUSTED",.08f,.43f,.94f,.91f,38);
-            failureTitle.color=new Color(1,.52f,.39f); failureTitle.fontStyle=FontStyles.Bold;
+            CardChrome(panel);
+            failureKicker=PauseLabel(panel,"CAUGHT",.06f,.73f,.94f,.88f,12,FailureAccent,FontStyles.Bold);
+            failureKicker.characterSpacing=2.5f; failureKicker.alignment=TextAlignmentOptions.Center;
+            failureTitle=PauseLabel(panel,"BUSTED",.06f,.40f,.94f,.74f,44,Cream,FontStyles.Bold);
             failureTitle.alignment=TextAlignmentOptions.Center;
-            failureTitle.enableAutoSizing=true; failureTitle.fontSizeMin=20; failureTitle.fontSizeMax=38;
-            failureDetail=WorldShiftMenu.Label(panel,"Returning to checkpoint",.08f,.16f,.94f,.43f,20);
-            failureDetail.color=Cream; failureDetail.alignment=TextAlignmentOptions.Center;
-            failureDetail.enableAutoSizing=true; failureDetail.fontSizeMin=12; failureDetail.fontSizeMax=20;
-            var track=WorldShiftMenu.Panel(panel,"Retry track",new Vector2(.08f,.08f),new Vector2(.94f,.105f),new Color(.2f,.27f,.32f));
-            retryFill=WorldShiftMenu.Panel(track,"Retry progress",Vector2.zero,Vector2.one,Gold).GetComponent<Image>();
+            failureTitle.enableAutoSizing=true; failureTitle.fontSizeMin=22; failureTitle.fontSizeMax=44;
+            failureDetail=PauseLabel(panel,"Returning to checkpoint",.06f,.21f,.94f,.38f,17,PauseMuted);
+            failureDetail.alignment=TextAlignmentOptions.Center;
+            var track=WorldShiftMenu.Panel(panel,"Retry track",new Vector2(.12f,.11f),new Vector2(.88f,.135f),new Color(.18f,.26f,.30f,.7f));
+            Round(track,new Color(.18f,.26f,.30f,.7f));
+            retryFill=WorldShiftMenu.Panel(track,"Retry progress",Vector2.zero,Vector2.one,FailureAccent).GetComponent<Image>();
             failurePanel.SetActive(false);
         }
 
@@ -38,7 +42,9 @@ namespace Outlaws.WorldShift
             failureTitle.text=game.MissedRequiredItem?"MISSED DIAMOND":game.Capturing?"BUSTED"
                 :game.FailureReason=="MISSED RELAY LANDING"?"MISSED LANDING":"OFF THE ROAD";
             failureDetail.text=game.CheckpointIndex==0?"Returning to the start":"Returning to checkpoint";
-            failureTitle.color=game.MissedRequiredItem?WorldShiftLevelProps.CollectionColour:new Color(1,.52f,.39f);
+            Color accent=game.MissedRequiredItem?WorldShiftLevelProps.CollectionColour:FailureAccent;
+            failureKicker.text=game.MissedRequiredItem?"SECTION RETRY":game.Capturing?"CAUGHT":"CRASHED";
+            failureKicker.color=accent; retryFill.color=accent;
             retryFill.rectTransform.anchorMax=new Vector2(game.CheckpointRetryProgress,1);
         }
     }

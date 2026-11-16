@@ -1,4 +1,4 @@
-> Historical prototype notes. The fixed split-screen compositor is a development experiment, not part of current Escape. Current rules: [WorldShift campaign](../WORLD_SHIFT_CAMPAIGN.md).
+> Historical prototype notes. The fixed split-screen compositor is a development experiment, not part of current Escape. Current rules: [project README](../../README.md).
 
 # Short city dual-world validation
 

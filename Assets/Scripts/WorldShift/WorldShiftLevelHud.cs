@@ -23,6 +23,8 @@ namespace Outlaws.WorldShift
         private bool completeShown;
         private GameObject freezePrompt;
         private TMP_Text freezeAction, freezeState, collectionStatus;
+        private Image freezeWorldIcon;
+        private GameObject freezeSpaceKey;
         private readonly List<Image> freezeProgressDots = new List<Image>();
         private int previousFreezeStep;
         private float freezeCompleteRemaining;
@@ -98,7 +100,7 @@ namespace Outlaws.WorldShift
             flag.GetComponent<Image>().sprite = WorldShiftIcons.Get(ShiftIcon.Flag);
             carMarker = WorldShiftMenu.Panel(bar, "You", new Vector2(0f, .5f), new Vector2(0f, .5f), Cream);
             carMarker.sizeDelta = new Vector2(14f, 34f);
-            IconButton(driving.transform, ShiftIcon.Pause, new Vector2(.93f, .87f), 72f, game.TogglePause);
+            IconButton(driving.transform, ShiftIcon.Pause, new Vector2(.93f, .87f), 72f, () => { if (game.State == ShiftRunState.Running) game.TogglePause(); });
 
             var notice = WorldShiftMenu.Panel(driving.transform, "Checkpoint notice", new Vector2(.5f, .83f), new Vector2(.5f, .83f), Ink);
             notice.sizeDelta = new Vector2(360f, 60f);
@@ -135,15 +137,19 @@ namespace Outlaws.WorldShift
                 signImage = imageObject.GetComponent<RawImage>();
                 signImage.raycastTarget = false;
                 imageObject.GetComponent<AspectRatioFitter>().aspectMode = AspectRatioFitter.AspectMode.FitInParent;
-                signFallback = WorldShiftMenu.Label(signPreview, "A / D OR ARROW KEYS\nSTEER LEFT / RIGHT", .07f, .08f, .93f, .92f, 52f);
+                signFallback = WorldShiftMenu.Label(signPreview, WorldShiftTrainingSignArt.Description(LevelSignKind.Steer), .07f, .08f, .93f, .92f, 52f);
                 signFallback.fontStyle = FontStyles.Bold;
                 signFallback.alignment = TextAlignmentOptions.Center;
-                var card = WorldShiftMenu.Panel(lessonRoot, "Training lesson", new Vector2(.32f, .12f),
-                    new Vector2(.68f, .21f), new Color(.025f, .045f, .07f, .94f));
+                // Same card language as Pause/Finish: dark face, fine rim, cream text and a key cap.
+                var card = WorldShiftMenu.Panel(lessonRoot, "Training lesson", new Vector2(.39f, .12f),
+                    new Vector2(.61f, .2f), Color.clear);
                 trainingLesson = card.gameObject;
-                var continueText = WorldShiftMenu.Label(card, "ENTER  TO CONTINUE", .04f, .08f, .96f, .92f, 25f);
-                continueText.color = WorldShiftLevelProps.CheckpointColour;
-                continueText.fontStyle = FontStyles.Bold;
+                CardChrome(card, shadowSpread: 4f, shadowDrop: 9f);
+                var keyCap = WorldShiftMenu.Panel(card, "Enter key", new Vector2(.06f, .2f), new Vector2(.40f, .8f), Cream);
+                Round(keyCap, Cream);
+                var keyText = PauseLabel(keyCap, "ENTER", 0, 0, 1, 1, 17, PauseFace, FontStyles.Bold);
+                keyText.alignment = TextAlignmentOptions.Center;
+                var continueText = PauseLabel(card, "Continue", .45f, .1f, .95f, .9f, 24, Cream, FontStyles.Bold);
                 continueText.alignment = TextAlignmentOptions.Center;
 
             }
@@ -151,68 +157,38 @@ namespace Outlaws.WorldShift
             BuildEscapeFinish(safe);
             if (game.Environment == ShiftLevel.Ocean) PolishOceanHud();
             BuildFailurePanel(safe);
+            BuildCityStory(safe);
             Refresh();
         }
 
-        private static readonly Color FreezeTeal = new Color(.06f, .88f, .81f);
         private static Sprite freezePillSprite, freezeKeySprite;
 
         private void BuildFreezePrompt(Transform parent)
         {
-            var border = FreezeBox(parent, "Freeze demonstration", new Vector2(.26f, .045f), new Vector2(.74f, .195f), FreezeTeal, true);
-            freezePrompt = border.gameObject;
-            var face = FreezeBox(border, "Dark face", Vector2.zero, Vector2.one, new Color(.025f, .045f, .06f, .98f), true);
-            face.offsetMin = new Vector2(3f, 3f); face.offsetMax = new Vector2(-3f, -3f);
-            freezeState = WorldShiftMenu.Label(face, "DAY - MOVING", .04f, .70f, .96f, .96f, 22f);
-            freezeState.color = FreezeTeal;
-            freezeState.fontStyle = FontStyles.Bold;
-            freezeState.alignment = TextAlignmentOptions.Center;
-            freezeAction = WorldShiftMenu.Label(face, "SPACE: FREEZE SPIKES", .04f, .29f, .96f, .70f, 28f);
-            freezeAction.color = Color.white;
-            freezeAction.fontStyle = FontStyles.Bold;
-            freezeAction.alignment = TextAlignmentOptions.Center;
+            var card = WorldShiftMenu.Panel(parent,"Freeze demonstration",new Vector2(.26f,.045f),new Vector2(.74f,.195f),Color.clear);
+            freezePrompt = card.gameObject;
+            var group = card.gameObject.AddComponent<CanvasGroup>();
+            group.blocksRaycasts = false; group.interactable = false;
+            CardChrome(card,shadowSpread:3f,shadowDrop:7f);
+            freezeWorldIcon = Icon(card,ShiftIcon.Sun,25);
+            freezeWorldIcon.rectTransform.anchorMin = freezeWorldIcon.rectTransform.anchorMax = new Vector2(.065f,.60f);
+            freezeWorldIcon.rectTransform.anchoredPosition = Vector2.zero;
+            freezeWorldIcon.color = Gold;
+            freezeState = PauseLabel(card,"Moving",.12f,.58f,.68f,.89f,15,PauseMuted);
+            freezeAction = PauseLabel(card,"Freeze spikes",.12f,.25f,.69f,.64f,24,Cream,FontStyles.Bold);
             freezeAction.textWrappingMode = TextWrappingModes.NoWrap;
-            freezeAction.fontSizeMin = 14f;
-            for (int i = 0; i < 3; i++)
+            var key = WorldShiftMenu.Panel(card,"Space key",new Vector2(.74f,.27f),new Vector2(.95f,.77f),Cream);
+            Round(key,Cream); freezeSpaceKey = key.gameObject;
+            PauseLabel(key,"SPACE",0,0,1,1,17,PauseFace,FontStyles.Bold).alignment = TextAlignmentOptions.Center;
+            for (int i=0;i<3;i++)
             {
-                var rim = WorldShiftMenu.Panel(face, "Freeze step " + (i+1), new Vector2(.5f,.15f),new Vector2(.5f,.15f),FreezeTeal);
-                rim.anchoredPosition = new Vector2((i-1)*30f,0f);
-                rim.sizeDelta = new Vector2(18f,18f);
-                rim.GetComponent<Image>().sprite = WorldShiftIcons.Get(ShiftIcon.Circle);
-                rim.GetComponent<Image>().raycastTarget = false;
-                var fill = WorldShiftMenu.Panel(rim,"Progress fill",new Vector2(.18f,.18f),new Vector2(.82f,.82f),Ink).GetComponent<Image>();
-                fill.sprite = WorldShiftIcons.Get(ShiftIcon.Circle);
-                fill.raycastTarget = false;
-                freezeProgressDots.Add(fill);
+                var dot = WorldShiftMenu.Panel(card,"Freeze step "+(i+1),new Vector2(.12f,.16f),new Vector2(.12f,.16f),CardRim);
+                dot.pivot = new Vector2(0,.5f); dot.anchoredPosition = new Vector2(i*17f,0);
+                dot.sizeDelta = Vector2.one*7;
+                var image = dot.GetComponent<Image>(); image.sprite = WorldShiftIcons.Get(ShiftIcon.Circle);
+                freezeProgressDots.Add(image);
             }
             freezePrompt.SetActive(false);
-        }
-
-        private static void FreezeKey(RectTransform parent, string label, float left, float right)
-        {
-            var edge = FreezeBox(parent, "Freeze key " + label, new Vector2(left, .20f), new Vector2(right, .80f), FreezeTeal, false);
-            var face = FreezeBox(edge, "Key face", Vector2.zero, Vector2.one, Ink, false);
-            face.offsetMin = new Vector2(2f, 2f); face.offsetMax = new Vector2(-2f, -2f);
-            FreezeLabel(face, label, 0f, 1f);
-        }
-
-        private static TMP_Text FreezeLabel(RectTransform parent, string value, float left, float right, float fontSize = 28f)
-        {
-            var label = WorldShiftMenu.Label(parent, value, left, .05f, right, .95f, fontSize);
-            label.color = Color.white;
-            label.fontStyle = FontStyles.Bold;
-            label.alignment = TextAlignmentOptions.Center;
-            label.textWrappingMode = TextWrappingModes.NoWrap;
-            return label;
-        }
-
-        private static RectTransform FreezeBox(Transform parent, string name, Vector2 min, Vector2 max, Color color, bool pill)
-        {
-            var rect = WorldShiftMenu.Panel(parent, name, min, max, color);
-            var image = rect.GetComponent<Image>();
-            image.sprite = FreezeRoundedSprite(pill);
-            image.type = Image.Type.Sliced;
-            return rect;
         }
 
         private static Sprite FreezeRoundedSprite(bool pill)
@@ -263,6 +239,7 @@ namespace Outlaws.WorldShift
 
         private void Update()
         {
+            if (game.StoryActive) { UpdateCityStory(); Refresh(); return; }
             if(game.State==ShiftRunState.Won && Keyboard.current!=null)
             {
                 game.Escape.EnsureStarted();
@@ -275,10 +252,11 @@ namespace Outlaws.WorldShift
         private void RefreshLessonPreview()
         {
             if (lessonGroup == null) return;
-            bool showing = game.TrainingLessonPaused && game.State == ShiftRunState.Running;
-            if (showing && shownLesson != game.CheckpointIndex && game.CheckpointIndex < game.Course.Signs.Length)
+            int signIndex = game.Course.SignIndexForCheckpoint(game.CheckpointIndex);
+            bool showing = signIndex >= 0 && game.TrainingLessonPaused && game.State == ShiftRunState.Running;
+            if (showing && shownLesson != signIndex)
             {
-                shownLesson = game.CheckpointIndex;
+                shownLesson = signIndex;
                 bool hasArt = WorldShiftLevelProps.TryGetSignArtwork(game.Course.Signs[shownLesson].Kind,
                     out Texture2D texture, out Rect uv);
                 signImage.gameObject.SetActive(hasArt);
@@ -312,10 +290,14 @@ namespace Outlaws.WorldShift
             if (game.State == ShiftRunState.Running) freezeCompleteRemaining = Mathf.Max(0f,freezeCompleteRemaining-Time.unscaledDeltaTime);
             bool showCompletion = game.Course.Training && game.CheckpointIndex == 4 && freezeCompleteRemaining > 0f;
             freezePrompt.SetActive((game.TrainingFreezeWaiting || showCompletion) && !game.TrainingLessonPaused && game.State == ShiftRunState.Running);
-            for (int i=0;i<freezeProgressDots.Count;i++) freezeProgressDots[i].color = i<freezeStep ? FreezeTeal : Ink;
+            for (int i=0;i<freezeProgressDots.Count;i++) freezeProgressDots[i].color = i<freezeStep ? PauseAccent : CardRim;
             bool day = game.World == ShiftWorld.Day;
-            freezeState.text = day ? "DAY - MOVING" : "NIGHT - FROZEN";
-            freezeAction.text = freezeStep == 3 ? "COMPLETE" : day ? "SPACE: FREEZE SPIKES" : "SPACE: MOVE SPIKES";
+            freezeState.text = day ? "Moving" : "Frozen";
+            freezeWorldIcon.sprite = WorldShiftIcons.Get(day ? ShiftIcon.Sun : ShiftIcon.Moon);
+            freezeWorldIcon.color = day ? Gold : Cream;
+            freezeAction.text = freezeStep == 3 ? "Complete" : day ? "Freeze spikes" : "Move spikes";
+            freezeAction.color = freezeStep == 3 ? PauseAccent : Cream;
+            freezeSpaceKey.SetActive(freezeStep<3);
             if (freezeEdges != null)
             {
                 if (previousFeedbackWorld != game.World && game.World == ShiftWorld.Echo
@@ -343,7 +325,8 @@ namespace Outlaws.WorldShift
                 EventSystem.current.SetSelectedGameObject(null);
             bool won = game.State == ShiftRunState.Won;
             if(won) game.Escape.EnsureStarted();
-            driving.SetActive(!won && game.State != ShiftRunState.Paused);
+            driving.SetActive(!game.StoryActive && !won && game.State != ShiftRunState.Paused);
+            RefreshCityStory();
             RefreshLessonPreview();
             pause.SetActive(game.State == ShiftRunState.Paused);
             RefreshPauseScreen();

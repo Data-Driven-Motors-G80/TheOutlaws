@@ -9,9 +9,9 @@ namespace Outlaws.WorldShift
         private Material rockMaterial, arrowMaterial;
         private GameObject arrow;
 
-        public static void Build(Transform rollingParent, Transform cueParent, float radius)
+        public static void Build(Transform rollingParent, Transform cueParent, float radius, bool tumbleweed = false)
         {
-            var root = new GameObject("Teal-banded desert boulder");
+            var root = new GameObject(tumbleweed ? "Desert tumbleweed" : "Teal-banded desert boulder");
             root.transform.SetParent(rollingParent, false);
             var owner = root.AddComponent<WorldShiftBoulderArt>();
             var rock = new WorldShiftArtMesh();
@@ -25,7 +25,8 @@ namespace Outlaws.WorldShift
                 return new Vector3(Mathf.Cos(latitude)*Mathf.Cos(longitude), Mathf.Sin(latitude),
                     Mathf.Cos(latitude)*Mathf.Sin(longitude)) * radius * variation;
             }
-            for (int ring=0; ring<rings; ring++)
+            if (tumbleweed) Tumbleweed(rock, radius);
+            else for (int ring=0; ring<rings; ring++)
                 for (int segment=0; segment<segments; segment++)
                 {
                     bool band = ring == 3 || ring == 4 || ring == 7 || ring == 8;
@@ -52,6 +53,47 @@ namespace Outlaws.WorldShift
             owner.arrowMaterial=Material("Boulder arrow",1f);
             owner.arrow.GetComponent<MeshFilter>().sharedMesh=owner.arrowMesh;
             owner.arrow.GetComponent<MeshRenderer>().sharedMaterial=owner.arrowMaterial;
+        }
+
+        // Tangled, sun-bleached twigs filling the gameplay sphere, like a real tumbleweed.
+        private static void Tumbleweed(WorldShiftArtMesh art, float radius)
+        {
+            var random = new System.Random(7341);
+            float R() => (float)random.NextDouble();
+            Vector3 OnSphere(float scale)
+            {
+                float z = R() * 2f - 1f, a = R() * Mathf.PI * 2f, r = Mathf.Sqrt(1f - z * z);
+                return new Vector3(r * Mathf.Cos(a), z, r * Mathf.Sin(a)) * radius * scale;
+            }
+            // Dry tumbleweed palette: bleached straw, greyish beige and dusty light brown.
+            Color[] palette =
+            {
+                new Color(.86f, .76f, .58f), new Color(.78f, .68f, .52f), new Color(.70f, .62f, .50f),
+                new Color(.64f, .50f, .34f), new Color(.82f, .72f, .50f)
+            };
+            Color Twig() { Color c = palette[random.Next(palette.Length)] * (.9f + R() * .14f); c.a = 1f; return c; }
+            // Sparse darker inner stems give depth without a solid core.
+            Color stem = new Color(.50f, .40f, .28f);
+            for (int i = 0; i < 14; i++)
+                art.Beam(OnSphere(.2f), OnSphere(.75f), radius * .035f, radius * .035f, stem);
+            // Many thin, kinked branches arcing around the ball.
+            for (int i = 0; i < 110; i++)
+            {
+                Vector3 axis = OnSphere(1f).normalized, start = Vector3.Cross(axis, OnSphere(1f)).normalized;
+                float span = 60f + R() * 100f, shell = .55f + R() * .45f;
+                float width = radius * (.012f + R() * .016f);
+                Color colour = Twig();
+                Vector3 prev = start * radius * shell;
+                for (int step = 1; step <= 6; step++)
+                {
+                    float wobble = shell + (R() - .5f) * .14f;
+                    Vector3 next = Quaternion.AngleAxis(span * step / 6f, axis) * start * radius * Mathf.Min(wobble, 1f);
+                    art.Beam(prev, next, width, width, colour);
+                    // Short side twigs make it look scratchy and tangled.
+                    if (R() < .3f) art.Beam(next, Vector3.ClampMagnitude(next + OnSphere(.18f), radius), width * .7f, width * .7f, colour);
+                    prev = next;
+                }
+            }
         }
 
         private static Material Material(string name,float emission)

@@ -87,7 +87,7 @@ namespace Outlaws.WorldShift
         public static TMP_Text Label(Transform parent, string text, float x0, float y0, float x1, float y1, float size)
         {
             var root = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI)); root.transform.SetParent(parent, false);
-            var label = root.GetComponent<TextMeshProUGUI>(); label.font = TMP_Settings.defaultFontAsset;
+            var label = root.GetComponent<TextMeshProUGUI>(); label.font = WorldShiftTypography.Body;
             label.text = text; label.fontSize = size; label.color = Color.white; label.raycastTarget = false;
             label.textWrappingMode = TextWrappingModes.Normal; label.enableAutoSizing = true; label.fontSizeMin = size * .8f; label.fontSizeMax = size;
             label.rectTransform.anchorMin = new Vector2(x0, y0); label.rectTransform.anchorMax = new Vector2(x1, y1);

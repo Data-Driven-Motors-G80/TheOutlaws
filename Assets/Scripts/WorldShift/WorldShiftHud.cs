@@ -107,8 +107,8 @@ namespace Outlaws.WorldShift
             lessonDone.SetActive(game.State == ShiftRunState.Won);
             bool driving = game.State == ShiftRunState.Running || game.State == ShiftRunState.Retrying;
             lessonDriving.SetActive(driving);
-            lessonHint.text = game.TutorialPrompt;
-            string key = game.TutorialControlKey;
+            lessonHint.text = "";
+            const string key = "A / D";
             bool steeringKeys = key == "A / D";
             lessonKey.text = steeringKeys ? "A" : key;
             lessonKey.alignment = steeringKeys ? TextAlignmentOptions.Midline : TextAlignmentOptions.Center;
@@ -403,10 +403,5 @@ namespace Outlaws.WorldShift
             if (module.actionsAsset == null) module.AssignDefaultActions();
         }
 
-        private static string FormatTime(float elapsed)
-        {
-            int seconds = Mathf.Max(0, Mathf.FloorToInt(elapsed));
-            return $"{seconds / 60}:{seconds % 60:00}";
-        }
     }
 }

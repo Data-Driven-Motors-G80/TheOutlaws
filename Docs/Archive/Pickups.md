@@ -1,4 +1,4 @@
-> Historical prototype notes. The mystery-reward prototype is not the current Escape pickup system. Current rules: [WorldShift campaign](../WORLD_SHIFT_CAMPAIGN.md).
+> Historical prototype notes. The mystery-reward prototype is not the current Escape pickup system. Current rules: [project README](../../README.md).
 
 # Risk and recovery prototype
 

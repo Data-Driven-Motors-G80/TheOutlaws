@@ -1,0 +1,8 @@
+Barlow by Jeremy Tribby / The Barlow Project Authors.
+Source: https://github.com/google/fonts/tree/main/ofl/barlow
+Display face: https://github.com/google/fonts/tree/main/ofl/barlowcondensed
+Barlow-Medium.ttf: UI text. Barlow-Bold.ttf: actual bold UI weight.
+BarlowCondensed-SemiBold.ttf: large display headings and highway-sign titles.
+Distributed unmodified under the SIL Open Font License 1.1 (see OFL.txt).
+Baked SDF assets: Assets/Resources/WorldShiftFonts.
+Create missing font assets with The Outlaws > Art > Create Missing Font Assets.

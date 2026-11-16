@@ -160,7 +160,8 @@ namespace Outlaws.WorldShift
             }
             if (data.Rock != null)
             {
-                WorldShiftBoulderArt.Build(solid.transform, root, data.Rock.Radius);
+                WorldShiftBoulderArt.Build(solid.transform, root, data.Rock.Radius,
+                    game.LevelMode && game.Environment == ShiftLevel.Desert);
                 if (game.LevelMode) BuildFrozenCue(root, Vector3.zero, Vector3.one * (data.Rock.Radius * 2f));
                 hazards.Add(new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk });
                 return;

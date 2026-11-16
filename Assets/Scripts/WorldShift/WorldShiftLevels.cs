@@ -19,9 +19,30 @@ namespace Outlaws.WorldShift
         public static int Current { get; private set; } = -1;
         public static bool Active => Current >= 0;
         public static int Attempt { get; private set; }
+        private static bool transitionPending;
+        public static bool StartWithStory { get; private set; }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetSession() { Current = -1; Attempt = 0; }
+        private static void ResetSession()
+        {
+            Current = -1; Attempt = 0; transitionPending = false; StartWithStory = false;
+            SceneManager.sceneLoaded -= TransitionLoaded;
+        }
+
+        // LoadScene completes on the next frame. Ignore input still reaching the outgoing UI.
+        private static bool BeginTransition()
+        {
+            if (transitionPending) return false;
+            transitionPending = true;
+            SceneManager.sceneLoaded += TransitionLoaded;
+            return true;
+        }
+
+        private static void TransitionLoaded(Scene scene, LoadSceneMode mode)
+        {
+            transitionPending = false;
+            SceneManager.sceneLoaded -= TransitionLoaded;
+        }
 
         public static string Name(int level) => level == 0 ? "Training" : Environments[level].ToString();
         public static int HighestBeaten => PlayerPrefs.GetInt(BeatenKey, -1);
@@ -40,9 +61,10 @@ namespace Outlaws.WorldShift
 
         public static bool Play(int level, string from = "menu")
         {
-            if (!IsUnlocked(level)) return false;
+            if (!IsUnlocked(level) || !BeginTransition()) return false;
             WorldShiftLevelAnalytics.EndAttempt(from == "retry" ? "retry" : "left");
             Current = level;
+            StartWithStory = level == 1 && from != "retry";
             Attempt++;
             WorldShiftLevelAnalytics.PendingStart = from;
             Time.timeScale = 1f;
@@ -59,12 +81,14 @@ namespace Outlaws.WorldShift
         public static void Leave() => Current = -1;
 
         public static void Retry() => Play(Current, "retry");
-        public static void Next() { if (HasNext) Play(Current + 1, "next"); else Menu(); }
+        public static void Next() { if (transitionPending) return; if (HasNext) Play(Current + 1, "next"); else Menu(); }
 
         public static void Menu()
         {
+            if (!BeginTransition()) return;
             WorldShiftLevelAnalytics.EndAttempt("menu");
             Current = -1;
+            StartWithStory = false;
             Time.timeScale = 1f;
             SceneManager.LoadScene(WorldShiftFlow.MenuScene);
         }
