@@ -17,7 +17,7 @@ public sealed partial class WorldShiftLevelTests
     public IEnumerator TrainingFreezeDemonstrationWaitsSafelyAndAcceptsEarlyInput()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
-        StartLevel(0); yield return null; yield return null;
+        StartLevel(0); yield return WaitForNavigation();
         var game = Started();
         game.GetType().GetField("checkpointIndex", Flags).SetValue(game, 4);
         Call(game, "RetryCheckpoint");
@@ -113,7 +113,7 @@ public sealed partial class WorldShiftLevelTests
     {
         Static(Levels, "ResetProgress");
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
-        StartLevel(0); yield return null; yield return null;
+        StartLevel(0); yield return WaitForNavigation();
         PlayerPrefs.SetInt(UnlockAllKey, 0);
         var game = Started();
         Assert.That(Get(game, "TrainingLessonPaused"), Is.False);
@@ -216,7 +216,7 @@ public sealed partial class WorldShiftLevelTests
     public IEnumerator TrainingRecordsSignReadingTriesAndWhereLessonsFail()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
-        StartLevel(0); yield return null; yield return null;
+        StartLevel(0); yield return WaitForNavigation();
         var game = Started();
         Step(game, 1.1f);
         Assert.That(Get(game, "TrainingLessonPaused"), Is.True);
@@ -266,7 +266,7 @@ public sealed partial class WorldShiftLevelTests
     public IEnumerator SwitchingHasOneSignThenUninterruptedPracticeBeforeTraffic()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");yield return new EnterPlayMode();
-        StartLevel(0);yield return null;yield return null;
+        StartLevel(0);yield return WaitForNavigation();
         var game=Started();var course=Get(game,"Course");
         Assert.That(Call(course,"SignIndexForCheckpoint",2),Is.EqualTo(-1),"Switch practice has no second instruction stop.");
         Assert.That(((Array)Get(game,"Checkpoints")).Length,Is.EqualTo(6),"Keep the existing saves and encounters.");

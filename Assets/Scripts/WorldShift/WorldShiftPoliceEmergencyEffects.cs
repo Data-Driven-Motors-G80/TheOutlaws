@@ -53,7 +53,7 @@ namespace Outlaws.WorldShift
         public void Refresh(float delta)
         {
             if(game==null || siren==null) return;
-            bool suspended=game.State==ShiftRunState.Paused || game.TrainingLessonPaused || game.TrainingFreezeWaiting;
+            bool suspended=WorldShiftAudioSettings.Suspended(game);
             bool active=!suspended && (game.State==ShiftRunState.Running || game.Capturing);
             bool wasPursuing=IsPursuing;IsPursuing=active;
             if(!active)

@@ -26,9 +26,14 @@ namespace Outlaws.WorldShift
             BuildLevels();
         }
 
+        // CanvasScaler runs in this phase too. Recheck the grid after it handles a viewport resize.
+        private void OnEnable() => Canvas.preWillRenderCanvases += UpdateMenuLayout;
+        private void OnDisable() => Canvas.preWillRenderCanvases -= UpdateMenuLayout;
+
         private void Update()
         {
             UpdateMenuLayout();
+            if (WorldShiftSceneLoading.Active) return;
             var keyboard = UnityEngine.InputSystem.Keyboard.current;
             if (keyboard != null && keyboard.uKey.wasPressedThisFrame && keyboard.shiftKey.isPressed)
             {
@@ -40,7 +45,10 @@ namespace Outlaws.WorldShift
 
         private void BuildLevels()
         {
-            for (int i = levels.childCount - 1; i >= 0; i--) Destroy(levels.GetChild(i).gameObject);
+            for (int i = levels.childCount - 1; i >= 0; i--)
+            {
+                var old = levels.GetChild(i).gameObject; old.SetActive(false); Destroy(old);
+            }
             testBadge.SetActive(WorldShiftLevels.UnlockAll);
             completedLabel.text = Mathf.Clamp(WorldShiftLevels.HighestBeaten + 1, 0, WorldShiftLevels.Count).ToString("00") + " / 06";
             GameObject first = null;
@@ -52,7 +60,12 @@ namespace Outlaws.WorldShift
                 if (open && (first == null || WorldShiftLevels.IsBeaten(level - 1) && !firstUnbeaten))
                 { first = tile.gameObject; firstUnbeaten = !WorldShiftLevels.IsBeaten(level); }
             }
+            // Resolve CanvasScaler and the grid before the menu can render its first frame.
+            Canvas.ForceUpdateCanvases();
+            menuSafe.ForceUpdateRectTransforms();
             UpdateMenuLayout();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(levels);
+            Canvas.ForceUpdateCanvases();
             if (EventSystem.current != null && first != null) EventSystem.current.SetSelectedGameObject(first);
         }
 
@@ -65,12 +78,18 @@ namespace Outlaws.WorldShift
 
         public static RectTransform CreateCanvas(Transform parent, string name)
         {
-            var root = new GameObject(name, typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+            var root = new GameObject(name, typeof(RectTransform));
+            root.SetActive(false);
             root.transform.SetParent(parent, false);
-            root.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
-            root.GetComponent<Canvas>().sortingOrder = 150;
-            var scaler = root.GetComponent<CanvasScaler>(); scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            var canvas = root.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay; canvas.sortingOrder = 150;
+            var scaler = root.AddComponent<CanvasScaler>(); scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1280f, 720f); scaler.matchWidthOrHeight = .5f;
+            root.AddComponent<GraphicRaycaster>();
+            // CanvasScaler.OnEnable must see the final settings, rather than its defaults.
+            root.SetActive(true);
+            Canvas.ForceUpdateCanvases();
+            ((RectTransform)root.transform).ForceUpdateRectTransforms();
             if (EventSystem.current == null)
             {
                 var events = new GameObject("UI input", typeof(EventSystem), typeof(InputSystemUIInputModule));

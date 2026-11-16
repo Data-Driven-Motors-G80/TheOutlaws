@@ -13,6 +13,8 @@ namespace Outlaws.WorldShift
         private RectTransform menuSafe;
         private GridLayoutGroup routeGrid;
         private TMP_Text completedLabel;
+        private Vector2 lastGridSize = new Vector2(-1,-1);
+        private Rect lastSafeArea;
         private static readonly string[] Descriptions={"Learn the Day / Night switch","","","Collect every coastal diamond","",""};
 
         private void BuildMenuPresentation(RectTransform root)
@@ -51,6 +53,7 @@ namespace Outlaws.WorldShift
             button.colors=colours;
             button.onClick.AddListener(()=>
             {
+                if (WorldShiftSceneLoading.Active) return;
                 WorldShiftLevelAnalytics.LevelPicked(level,WorldShiftLevels.IsUnlocked(level));
                 WorldShiftLevels.Play(level);
             });
@@ -76,10 +79,20 @@ namespace Outlaws.WorldShift
         private void UpdateMenuLayout()
         {
             if(routeGrid==null||menuSafe==null) return;
+            Rect area=Screen.safeArea;
+            if(area!=lastSafeArea)
+            {
+                lastSafeArea=area;
+                menuSafe.anchorMin=new Vector2(area.xMin/Screen.width,area.yMin/Screen.height);
+                menuSafe.anchorMax=new Vector2(area.xMax/Screen.width,area.yMax/Screen.height);
+                menuSafe.ForceUpdateRectTransforms();
+            }
             int columns=menuSafe.rect.width/menuSafe.rect.height<1.2f?2:3;
+            var size=levels.rect.size;
+            if(size==lastGridSize && routeGrid.constraintCount==columns) return;
+            lastGridSize=size;
             routeGrid.constraintCount=columns;
             int rows=WorldShiftLevels.Count/columns;
-            var size=levels.rect.size;
             routeGrid.cellSize=new Vector2(Mathf.Max(1,(size.x-18*(columns-1))/columns),Mathf.Max(1,(size.y-18*(rows-1))/rows));
         }
         internal static RawImage TextureLayer(Transform parent,string name)

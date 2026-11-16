@@ -231,7 +231,7 @@ namespace Outlaws.WorldShift
             image.raycastTarget = true;
             var button = rect.gameObject.AddComponent<Button>();
             button.targetGraphic = image;
-            button.onClick.AddListener(() => action());
+            button.onClick.AddListener(() => { if (!WorldShiftSceneLoading.Active) action(); });
             var glyph = Icon(rect, icon, size * .6f);
             glyph.color = Cream;
             return rect;
@@ -239,12 +239,17 @@ namespace Outlaws.WorldShift
 
         private void Update()
         {
+            if (WorldShiftSceneLoading.Active) { Refresh(); return; }
             if (game.StoryActive) { UpdateCityStory(); Refresh(); return; }
             if(game.State==ShiftRunState.Won && Keyboard.current!=null)
             {
                 game.Escape.EnsureStarted();
                 if(Keyboard.current.enterKey.wasPressedThisFrame) {ContinueAfterEscape();return;}
-                if(Keyboard.current.escapeKey.wasPressedThisFrame) game.Escape.Skip();
+                if(Keyboard.current.escapeKey.wasPressedThisFrame)
+                {
+                    if(game.Escape.IsFinale && game.Escape.Ready) CompleteFinale();
+                    else game.Escape.Skip();
+                }
             }
             Refresh();
         }

@@ -77,6 +77,17 @@ public sealed partial class WorldShiftLevelTests
         Assert.That(Static(Levels, "Play", level, "menu"), Is.True);
     }
 
+    private static IEnumerator WaitForNavigation()
+    {
+        float deadline=Time.realtimeSinceStartup+30f;
+        while ((bool)StaticGet(TypeFor("WorldShiftSceneLoading"),"Active"))
+        {
+            Assert.That(Time.realtimeSinceStartup,Is.LessThan(deadline),"Scene navigation must finish.");
+            yield return null;
+        }
+        yield return null;yield return null;
+    }
+
     private static MonoBehaviour Started()
     {
         var game = Find("WorldShiftCity");
@@ -143,7 +154,7 @@ public sealed partial class WorldShiftLevelTests
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");yield return new EnterPlayMode();
         for(int level=0;level<6;level++)
         {
-            StartLevel(level);yield return null;yield return null;
+            StartLevel(level);yield return WaitForNavigation();
             var game=Started();var jump=((Array)Get(game,"RelayLayout")).GetValue(0);
             float takeoff=(float)Field(jump,"Takeoff"),landing=(float)Field(jump,"Landing");
             float lane=level==2 ? 3.3f : 0f; // The existing safe bypass of Desert's first aerial pair.
@@ -199,7 +210,7 @@ public sealed partial class WorldShiftLevelTests
     public IEnumerator OneHitCrashLetsPoliceCatchUpThenRestartsAtTheCheckpoint()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
-        StartLevel(1); yield return null; yield return null;
+        StartLevel(1); yield return WaitForNavigation();
         var game = Started();
         Assert.That(Get(game, "LevelMode"), Is.True);
         Assert.That(Get(game, "Combat"), Is.Null, "No shooting in level play.");
@@ -233,7 +244,7 @@ public sealed partial class WorldShiftLevelTests
     public IEnumerator OtherWorldObstaclesShowAsDashesAndSwitchingIntoOneCrashes()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
-        StartLevel(1); yield return null; yield return null;
+        StartLevel(1); yield return WaitForNavigation();
         var game = Started();
         // City section 1: a Night block covers the left and middle lanes at 150 m.
         Pose(game, 132f, 0f);
@@ -252,7 +263,7 @@ public sealed partial class WorldShiftLevelTests
     public IEnumerator DesertSlidersMoveInDayAndFreezeInNight()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
-        StartLevel(2); yield return null; yield return null;
+        StartLevel(2); yield return WaitForNavigation();
         var game = Started();
         Assert.That(Get(game, "Environment").ToString(), Is.EqualTo("Desert"));
         Assert.That(game.GetComponentsInChildren<Transform>(true).Any(t => t.name.StartsWith("Highway sign")), Is.False);

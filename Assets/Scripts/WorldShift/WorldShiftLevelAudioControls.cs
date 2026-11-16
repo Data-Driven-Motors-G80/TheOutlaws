@@ -47,7 +47,7 @@ namespace Outlaws.WorldShift
         {
             var rect=WorldShiftMenu.Panel(parent,title,min,max,new Color(.08f,.15f,.19f));Round(rect,new Color(.08f,.15f,.19f));
             var image=rect.GetComponent<Image>();image.raycastTarget=true;
-            var button=rect.gameObject.AddComponent<Button>();button.targetGraphic=image;button.onClick.AddListener(action);
+            var button=rect.gameObject.AddComponent<Button>();button.targetGraphic=image;button.onClick.AddListener(()=>{if(!WorldShiftSceneLoading.Active) action();});
             var colours=button.colors;colours.normalColor=new Color(.70f,.80f,.85f);colours.highlightedColor=colours.selectedColor=Color.white;colours.fadeDuration=.12f;button.colors=colours;
             PauseLabel(rect,title,.03f,.05f,.97f,.95f,15,PauseAccent).alignment=TextAlignmentOptions.Center;
             return button;

@@ -93,7 +93,7 @@ namespace Outlaws.WorldShift
             Color face=primary?Gold:new Color(.075f,.125f,.16f);
             var rect=WorldShiftMenu.Panel(parent,title,min,max,face);Round(rect,face);
             var image=rect.GetComponent<Image>();image.raycastTarget=true;
-            var button=rect.gameObject.AddComponent<Button>();button.targetGraphic=image;button.onClick.AddListener(()=>action());
+            var button=rect.gameObject.AddComponent<Button>();button.targetGraphic=image;button.onClick.AddListener(()=>{if(!WorldShiftSceneLoading.Active) action();});
             var colours=button.colors;
             colours.normalColor=primary?Color.white:new Color(.65f,.75f,.80f);colours.highlightedColor=primary?new Color(.92f,1f,.88f):Color.white;
             colours.selectedColor=colours.highlightedColor;colours.pressedColor=new Color(.75f,.85f,.85f);colours.fadeDuration=.12f;

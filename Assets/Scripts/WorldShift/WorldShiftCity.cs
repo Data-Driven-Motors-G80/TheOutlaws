@@ -153,6 +153,13 @@ namespace Outlaws.WorldShift
                 course = WorldShiftLevelCourse.For(LevelIndex);
                 environment = course.Environment;
                 levelHazards = course.CreateHazards();
+                foreach (var hazard in levelHazards)
+                {
+                    float at = hazard.Gate != null ? hazard.Gate.Airborne ? hazard.Gate.Flight.Ramp : hazard.Gate.Distance
+                        : hazard.Rock != null && hazard.Rock.Airborne ? hazard.Rock.Flight.Ramp : hazard.Start;
+                    foreach (var checkpoint in course.Checkpoints)
+                        if (checkpoint.Distance <= at) hazard.WakeFloor = Mathf.Max(hazard.WakeFloor, checkpoint.Distance);
+                }
                 Collection = new WorldShiftLevelCollection(course.RequiredItems);
             }
             GetawayMode = !LevelMode && WorldShiftFlow.Escape.Status == GetawayRunState.RunStatus.Running;
@@ -228,7 +235,7 @@ namespace Outlaws.WorldShift
 
         private void Update()
         {
-            if (StoryActive || storyFinishedFrame == Time.frameCount) return;
+            if (WorldShiftSceneLoading.Active || StoryActive || storyFinishedFrame == Time.frameCount) return;
             var keyboard = Keyboard.current;
             bool switchPressed = keyboard != null && keyboard.spaceKey.wasPressedThisFrame;
             if (keyboard != null)
@@ -245,7 +252,8 @@ namespace Outlaws.WorldShift
                 else if (State == ShiftRunState.Ready && keyboard.enterKey.wasPressedThisFrame) BeginRun();
                 else if (!GetawayMode && !LevelMode && State == ShiftRunState.Won && keyboard.enterKey.wasPressedThisFrame) WorldShiftFlow.Next(environment);
                 else if (!GetawayMode && !LevelMode && State == ShiftRunState.Won && keyboard.rKey.wasPressedThisFrame) RestartRun();
-                else if ((State == ShiftRunState.Running || State == ShiftRunState.Paused) && keyboard.rKey.wasPressedThisFrame) RetryCheckpoint();
+                // R restarts the checkpoint while driving; while paused, the pause card owns restarts.
+                else if (State == ShiftRunState.Running && keyboard.rKey.wasPressedThisFrame) RetryCheckpoint();
             }
             float steer = keyboard == null ? 0f :
                 ((keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed) ? 1f : 0f)
@@ -306,8 +314,12 @@ namespace Outlaws.WorldShift
             RestoreCheckpoint();
         }
 
+        // Esc during the crash card is remembered and pauses once the car respawns.
+        public bool PauseQueued { get; private set; }
+
         public void TogglePause()
         {
+            if (State == ShiftRunState.Retrying) { PauseQueued = !PauseQueued; return; }
             if (State == ShiftRunState.Running) { if (LevelMode) WorldShiftLevelAnalytics.Paused(); else WorldShiftAnalytics.Paused(); }
             if (State == ShiftRunState.Running) State = ShiftRunState.Paused;
             else if (State == ShiftRunState.Paused)
@@ -626,6 +638,7 @@ namespace Outlaws.WorldShift
             UpdatePolice(0f);
             UpdateCamera(true);
             Notify("CHECKPOINT " + (checkpointIndex + 1), 2f);
+            if (PauseQueued) { PauseQueued = false; TogglePause(); }
         }
 
         private void ApplyWorld(ShiftWorld world)

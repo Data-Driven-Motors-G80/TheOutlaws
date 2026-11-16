@@ -23,7 +23,7 @@ namespace Outlaws.WorldShift
             tyres = Source("Player tyres", "WS_Tyres", true);
             cues = Source("Driving events", null, false);
             takeoff = Load("WS_Takeoff"); landing = Load("WS_Landing");
-            crash = Load("WS_Crash"); victory = Load("WS_Victory");
+            crash = Load("WS_Crash"); victory = Load(game.LevelIndex == WorldShiftLevels.Count-1 ? "WS_Finale" : "WS_Victory");
             if (!game.Course.Training)
             {
                 music = Source("Environment song", "WorldShiftMusic/" + game.Environment, true);
@@ -74,7 +74,7 @@ namespace Outlaws.WorldShift
             cues.volume = .65f * effects;
             if (previousState == ShiftRunState.Running && game.State == ShiftRunState.Retrying && game.Capturing)
                 cues.PlayOneShot(crash);
-            if (game.State == ShiftRunState.Won && !winCuePlayed && (game.Course.Training || game.Escape == null || game.Escape.Active && game.Escape.Ready))
+            if (game.State == ShiftRunState.Won && !winCuePlayed && (game.Course.Training || game.Escape == null || game.Escape.Active && game.Escape.Ready && (!game.Escape.IsFinale || game.Escape.FinaleRevealed)))
             { cues.PlayOneShot(victory, .8f); winCuePlayed = true; }
             if (running && previousState == ShiftRunState.Running)
             {

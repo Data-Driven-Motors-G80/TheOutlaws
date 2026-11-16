@@ -55,7 +55,7 @@ public sealed partial class WorldShiftLevelTests
     public IEnumerator OceanCheckpointGantriesMatchSavesAndConfirmOnlyOnCrossing()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
-        StartLevel(3); yield return null; yield return null;
+        StartLevel(3); yield return WaitForNavigation();
         var game=Started();var coast=Find("WorldShiftOceanPresentation");
         var checkpoints=(Array)Get(game,"Checkpoints");
         var gates=((IEnumerable)Field(coast,"checkpointGates")).Cast<object>().OrderBy(g=>(int)Field(g,"Index")).ToArray();
@@ -100,7 +100,7 @@ public sealed partial class WorldShiftLevelTests
     public IEnumerator OceanCollectionWorksInBothWorldsAndMissRetriesTheCheckpoint()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
-        StartLevel(3); yield return null; yield return null;
+        StartLevel(3); yield return WaitForNavigation();
         var game = Started();
         var collection = Get(game, "Collection");
         Pose(game, 70f, 0f);

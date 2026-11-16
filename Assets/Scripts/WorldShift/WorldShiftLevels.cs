@@ -29,10 +29,10 @@ namespace Outlaws.WorldShift
             SceneManager.sceneLoaded -= TransitionLoaded;
         }
 
-        // LoadScene completes on the next frame. Ignore input still reaching the outgoing UI.
+        // Ignore input still reaching the outgoing UI while the next scene loads.
         private static bool BeginTransition()
         {
-            if (transitionPending) return false;
+            if (transitionPending || WorldShiftSceneLoading.Active) return false;
             transitionPending = true;
             SceneManager.sceneLoaded += TransitionLoaded;
             return true;
@@ -68,7 +68,7 @@ namespace Outlaws.WorldShift
             Attempt++;
             WorldShiftLevelAnalytics.PendingStart = from;
             Time.timeScale = 1f;
-            SceneManager.LoadScene(LevelScene);
+            WorldShiftSceneLoading.Load(LevelScene, Name(level), level > 0 ? "WorldShiftMusic/" + Environments[level] : null);
             return true;
         }
 
@@ -90,7 +90,7 @@ namespace Outlaws.WorldShift
             Current = -1;
             StartWithStory = false;
             Time.timeScale = 1f;
-            SceneManager.LoadScene(WorldShiftFlow.MenuScene);
+            WorldShiftSceneLoading.Load(WorldShiftFlow.MenuScene, "Worldshift");
         }
     }
 }

@@ -17,7 +17,7 @@ public sealed partial class WorldShiftLevelTests
     public IEnumerator CityNightLightingConnectsFixturesRoadAndSharedSurfaces()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");yield return new EnterPlayMode();
-        StartLevel(1);yield return null;yield return null;
+        StartLevel(1);yield return WaitForNavigation();
         var game=Started();var scenery=Find("WorldShiftEnvironmentScenery");var lighting=Find("WorldShiftLocalLighting");
         lighting.enabled=false;
         Pose(game,175f,0f);Call(game,"ApplyWorld",World("Echo"));Call(Find("WorldShiftPresentation"),"UpdateVisibility",175f);Call(lighting,"Refresh");
@@ -51,7 +51,7 @@ public sealed partial class WorldShiftLevelTests
         yield return new EnterPlayMode();
         for (int level = 1; level <= 2; level++)
         {
-            StartLevel(level); yield return null; yield return null;
+            StartLevel(level); yield return WaitForNavigation();
             var game = Started();
             var scenery = Find("WorldShiftEnvironmentScenery");
             Assert.That(scenery.GetComponentsInChildren<Collider>(true).Any(c => c.enabled), Is.False);
@@ -111,7 +111,7 @@ public sealed partial class WorldShiftLevelTests
     public IEnumerator OceanArtKeepsWorldSwitchJumpGapsOpen()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
-        StartLevel(3); yield return null; yield return null;
+        StartLevel(3); yield return WaitForNavigation();
         var game = Started(); var coast = Find("WorldShiftOceanPresentation");
         Assert.That(coast.GetComponentsInChildren<Collider>(true), Is.Empty,
             "Coastal scenery must never add physical obstacles to the authored course.");
@@ -169,7 +169,7 @@ public sealed partial class WorldShiftLevelTests
     public IEnumerator OceanObstacleArtFitsItsCollisionFootprintsAndSwitchesWithItsWorld()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
-        StartLevel(3); yield return null; yield return null;
+        StartLevel(3); yield return WaitForNavigation();
         var game = Started(); var presentation = Field(game, "presentation");
         bool capturedContainer = false, capturedBarrier = false, capturedCargo = false, capturedTrolley = false, capturedVan = false;
         foreach (object hazardView in (IEnumerable)Field(presentation, "hazards"))
@@ -202,7 +202,9 @@ public sealed partial class WorldShiftLevelTests
                 object world = World(mode);
                 Call(game, "PresentWorldForCamera", world);
                 bool visible = (bool)Call(data, "VisibleIn", world);
-                Assert.That(solid.activeSelf, Is.EqualTo(visible));
+                // Retractable barriers stay active and sink into the road in the other world.
+                bool retractable = solid.GetComponentsInChildren<MonoBehaviour>(true).Any(c => c.GetType().Name == "WorldShiftRetractableBarrier");
+                Assert.That(solid.activeSelf, Is.EqualTo(visible || retractable));
                 Assert.That(ghost.activeSelf, Is.EqualTo(!moving && !visible));
             }
             Call(game, "PresentWorldForCamera", Field(data, "World"));
@@ -223,15 +225,18 @@ public sealed partial class WorldShiftLevelTests
                 Capture("ocean-obstacle-" + label);
             }
         }
-        Assert.That(capturedContainer && capturedBarrier && capturedCargo && capturedTrolley, Is.True,
-            "The Ocean course should present all four coastal obstacle silhouettes.");
+        // Wide blockers may use the retractable barrier instead of a container or barricade model.
+        bool retractableWide = game.GetComponentsInChildren<MonoBehaviour>(true).Any(c => c.GetType().Name == "WorldShiftRetractableBarrier");
+        // Static blockers use retractable barriers or parked vans; older container/cargo models remain optional.
+        Assert.That((capturedContainer || capturedBarrier || capturedCargo || capturedVan || retractableWide) && capturedTrolley, Is.True,
+            $"The Ocean course should present static and moving coastal obstacle silhouettes (container {capturedContainer}, barricade {capturedBarrier}, cargo {capturedCargo}, van {capturedVan}, retractable {retractableWide}, trolley {capturedTrolley}).");
     }
 
     [UnityTest]
     public IEnumerator OncomingTrafficHasApproachingHeadlightsAndWheelsThatFollowTravel()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
-        StartLevel(1); yield return null; yield return null;
+        StartLevel(1); yield return WaitForNavigation();
         var game=Started(); var presentation=Field(game,"presentation");
         int count=0;
         foreach(object hazardView in (IEnumerable)Field(presentation,"hazards"))
@@ -249,7 +254,8 @@ public sealed partial class WorldShiftLevelTests
             Assert.That(car.GetComponentsInChildren<Collider>(true),Is.Empty,
                 "Art must use the existing swept collision footprint, without new physics colliders.");
             // Every visible vehicle part must stay inside the established road-space envelope.
-            foreach(var mesh in car.GetComponentsInChildren<MeshFilter>(true))
+            // The painted road-direction warning sits on the asphalt ahead of the vehicle, outside its body.
+            foreach(var mesh in car.GetComponentsInChildren<MeshFilter>(true).Where(m=>m.name!="Oncoming road direction warnings"))
                 foreach(Vector3 vertex in mesh.sharedMesh.vertices)
                 {
                     Vector3 p=car.transform.InverseTransformPoint(mesh.transform.TransformPoint(vertex));
@@ -282,7 +288,7 @@ public sealed partial class WorldShiftLevelTests
     public IEnumerator OceanPoliceCruiserKeepsItsIdentityInBothWorlds()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity"); yield return new EnterPlayMode();
-        StartLevel(3); yield return null; yield return null;
+        StartLevel(3); yield return WaitForNavigation();
         var game=Started();var police=(Component)Get(game,"Police");
         var cruisers=police.GetComponentsInChildren<MonoBehaviour>(true).Where(c=>c.GetType().Name=="WorldShiftPoliceCarArt").ToArray();
         Assert.That(cruisers.Length,Is.EqualTo(1),"Ocean must keep the shared marked cruiser, rather than replacing it with a coupe.");

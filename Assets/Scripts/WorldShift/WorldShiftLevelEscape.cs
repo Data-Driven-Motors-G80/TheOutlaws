@@ -4,7 +4,7 @@ using UnityEngine;
 namespace Outlaws.WorldShift
 {
     /// <summary>Post-win presentation only. Progress is already saved by the simulation.</summary>
-    public sealed class WorldShiftLevelEscape : MonoBehaviour
+    public sealed partial class WorldShiftLevelEscape : MonoBehaviour
     {
         public const float Duration = 6.5f;
         private WorldShiftCity game;
@@ -20,9 +20,13 @@ namespace Outlaws.WorldShift
         private readonly List<Mesh> meshes = new List<Mesh>();
         private float elapsed;
         public bool Active { get; private set; }
-        public bool Ready => !Active || elapsed >= Duration;
+        public bool IsFinale => game != null && game.LevelIndex == WorldShiftLevels.Count - 1;
+        public float SequenceDuration => IsFinale ? 14f : Duration;
+        public bool FinaleRevealed { get; private set; }
+        public void RevealFinale() { if (IsFinale && Active && Ready) FinaleRevealed = true; }
+        public bool Ready => !Active || elapsed >= SequenceDuration;
         public bool CanSkip => Active && elapsed >= .65f && !Ready;
-        public float Progress => Mathf.Clamp01(elapsed / Duration);
+        public float Progress => Mathf.Clamp01(elapsed / SequenceDuration);
         public void Bind(WorldShiftCity controller, Camera camera) { game = controller; view = camera; }
         public void EnsureStarted()
         {
@@ -40,9 +44,10 @@ namespace Outlaws.WorldShift
             blueLens = cruiser.Find("Blue roof light lens").GetComponent<Renderer>();
             lensProperties = new MaterialPropertyBlock();
             if (game.Environment == ShiftLevel.Ocean) BuildHarbour(); else BuildPassage();
+            if (IsFinale) BuildFinalOverlook();
             engine = Source("Final getaway engine", "WS_Engine", true);
             siren = Source("Receding police siren", "WorldShiftPoliceSiren", true);
-            siren.gameObject.AddComponent<AudioLowPassFilter>().cutoffFrequency = 1400f;
+            siren.gameObject.AddComponent<AudioLowPassFilter>().cutoffFrequency = 1600f; // matches the driving siren
             policeBrake=Source("Police braking", "WS_Tyres", false);policeBrake.pitch=.85f;
             engine.Play(); siren.Play();
             ApplyPose();
@@ -63,13 +68,13 @@ namespace Outlaws.WorldShift
         public void Advance(float delta)
         {
             if (!Active) return;
-            elapsed = Mathf.Min(Duration, elapsed + Mathf.Max(0, delta));
+            elapsed = Mathf.Min(SequenceDuration, elapsed + Mathf.Max(0, delta));
             ApplyPose();
         }
         public void Skip()
         {
             if (!CanSkip) return;
-            elapsed = Duration; ApplyPose();
+            elapsed = SequenceDuration; ApplyPose();
         }
         private void ApplyPose()
         {
@@ -112,6 +117,7 @@ namespace Outlaws.WorldShift
             Vector3 target = ocean ? new Vector3(0, 1, Mathf.Lerp(-3, 23, Progress)) : new Vector3(0, 1.8f, Mathf.Lerp(-3, 18, Progress));
             view.transform.SetPositionAndRotation(stage.TransformPoint(camera), Quaternion.LookRotation(target - camera, Vector3.up));
             view.fieldOfView = 55f;
+            if (IsFinale) ApplyFinalOverlook();
         }
         private void Lens(Renderer renderer, float strength)
         {
@@ -237,6 +243,7 @@ namespace Outlaws.WorldShift
             foreach(var canvas in hiddenCanvases) if(canvas!=null) canvas.enabled=true;
             hiddenCanvases.Clear();
             if(stage!=null) Destroy(stage.gameObject);
+            RestoreFinaleSky();
             Shader.SetGlobalVector("_PoliceBeaconRed",Vector4.zero);Shader.SetGlobalVector("_PoliceBeaconBlue",Vector4.zero);
         }
         private void OnDestroy()

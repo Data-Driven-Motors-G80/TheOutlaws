@@ -22,6 +22,7 @@ namespace Outlaws.WorldShift
             escapeCaption.alignment=TextAlignmentOptions.Center;
             finishBackdrop=WorldShiftMenu.Panel(complete.transform,"Result backdrop",Vector2.zero,Vector2.one,new Color(.008f,.018f,.03f,.78f)).gameObject;
             finishBackdrop.GetComponent<Image>().raycastTarget=true;
+            if (game.Escape.IsFinale) { BuildFinale(finishBackdrop.transform); return; }
             finishCard=WorldShiftMenu.Panel(finishBackdrop.transform,"Escape result",new Vector2(.5f,.5f),new Vector2(.5f,.5f),PauseFace);
             finishCard.sizeDelta=new Vector2(1020,540);Round(finishCard,PauseFace);finishResult=finishCard.gameObject;
             CardChrome(finishCard);
@@ -44,12 +45,21 @@ namespace Outlaws.WorldShift
         }
         private void ContinueAfterEscape()
         {
+            if (game.Escape.IsFinale) { AdvanceFinale(); return; }
             if(game.Escape.Active&&!game.Escape.Ready) { game.Escape.Skip();return; }
             if(WorldShiftLevels.HasNext) WorldShiftLevels.Next();else WorldShiftLevels.Menu();
         }
         private void RefreshEscapeFinish()
         {
             bool ready=game.Escape.Ready;
+            if (game.Escape.IsFinale)
+            {
+                finishBackdrop.SetActive(ready);finishCinematic.SetActive(!ready);
+                finishSkip.interactable=game.Escape.CanSkip;
+                escapeCaption.text=game.Escape.Progress<.33f?"One last shift.":"Leave the sirens behind.";
+                if (ready) RefreshFinale();
+                return;
+            }
             finishBackdrop.SetActive(ready);
             finishResult.SetActive(ready);
             finishCinematic.SetActive(!ready);
