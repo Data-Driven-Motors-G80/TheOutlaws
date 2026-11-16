@@ -35,6 +35,8 @@ namespace Outlaws.WorldShift
             siren.rolloffMode=AudioRolloffMode.Custom;
             siren.SetCustomCurve(AudioSourceCurveType.CustomRolloff,AnimationCurve.Linear(0f,1f,1f,1f));
             siren.priority=160;
+            var filter=gameObject.AddComponent<AudioLowPassFilter>();
+            filter.cutoffFrequency=1600f;filter.lowpassResonanceQ=1f;
             Refresh(0f);
         }
 
@@ -71,7 +73,7 @@ namespace Outlaws.WorldShift
             clock=Mathf.Repeat(clock+delta,Cycle);
             float distance=Vector3.Distance(transform.position,game.Player.position);
             float proximity=1f-Mathf.InverseLerp(8f,70f,distance);
-            sirenGain=Mathf.MoveTowards(sirenGain,.15f*proximity,delta*.22f);
+            sirenGain=Mathf.MoveTowards(sirenGain,.04f*proximity,delta*.10f);
             siren.volume=sirenGain*WorldShiftAudioSettings.Effects;
             float red=Mathf.SmoothStep(0f,1f,.5f+.5f*Mathf.Cos(clock/Cycle*Mathf.PI*2));
             SetLights(red,1f-red,true);

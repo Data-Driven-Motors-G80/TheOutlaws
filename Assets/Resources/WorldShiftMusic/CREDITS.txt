@@ -1,0 +1,34 @@
+THE OUTLAWS — MUSIC CREDITS
+
+All songs by Kevin MacLeod (incompetech.com).
+Licensed under Creative Commons: By Attribution 4.0 License
+https://creativecommons.org/licenses/by/4.0/
+
+Full original recordings; playback loops, fades and Night filtering applied in-game.
+Downloaded from the composer’s official site on 2026-11-16.
+
+City — "Funkorama"
+Source: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100474
+Download: https://incompetech.com/music/royalty-free/mp3-royaltyfree/Funkorama.mp3
+SHA-256: 6be229815d85a0b99382b944d31098b882702c04ac7ad899e44ab7f8ba89b5ad
+
+Desert — "Whiskey on the Mississippi"
+Source: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100709
+Download: https://incompetech.com/music/royalty-free/mp3-royaltyfree/Whiskey%20on%20the%20Mississippi.mp3
+SHA-256: 60d5bd3b67ac9519e79f9581c53ef3eb59f5fe586f55f135996c491113ca9b28
+
+Ocean — "Surf Shimmy"
+Source: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700018
+Download: https://incompetech.com/music/royalty-free/mp3-royaltyfree/Surf%20Shimmy.mp3
+SHA-256: 932424252801c51a6385c1339ebb57571cee76eda6431eaa338dcacb677c4d94
+
+Snow — "Cold Funk"
+Source: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100499
+Download: https://incompetech.com/music/royalty-free/mp3-royaltyfree/Cold%20Funk.mp3
+SHA-256: a7d0b772f05b99c4ac3df28cb2feaa5190781c2b87bceef5052cc45408b6fc75
+
+Mountain — "Mountain Emperor"
+Source: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700012
+Download: https://incompetech.com/music/royalty-free/mp3-royaltyfree/Mountain%20Emperor.mp3
+SHA-256: 5dd109bdeb8f206ec4ca276e47aa6b6b8ca96df4b5580e5e2f078f4a95a00f7b
+

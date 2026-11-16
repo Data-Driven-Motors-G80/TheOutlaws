@@ -178,7 +178,11 @@ public sealed class WorldShiftLevelTests
             Assert.That(policeArt.Length,Is.EqualTo(1),"Every level must use exactly one shared police cruiser.");
             Assert.That(policeArt[0].GetComponentsInChildren<MonoBehaviour>(true).Count(c=>c.GetType().Name=="WorldShiftPoliceEmergencyEffects"),Is.EqualTo(1),
                 "Every current level must bind the same police siren and lights.");
-            Assert.That(Find("WorldShiftLevelAudio"),Is.Not.Null);
+            var levelAudio=Find("WorldShiftLevelAudio");
+            Assert.That(levelAudio,Is.Not.Null);
+            var song=(AudioSource)Field(levelAudio,"music");
+            if(level==0) Assert.That(song,Is.Null);
+            else { Assert.That(song.clip,Is.Not.Null);Assert.That(song.clip.length,Is.GreaterThan(80)); }
             var pMeshes=playerArt[0].GetComponentsInChildren<MeshFilter>(true).OrderBy(m=>m.name).ToArray();
             var cMeshes=policeArt[0].GetComponentsInChildren<MeshFilter>(true).OrderBy(m=>m.name).ToArray();
             Vector3[] pShape=pMeshes.SelectMany(m=>m.sharedMesh.vertices).ToArray(),cShape=cMeshes.SelectMany(m=>m.sharedMesh.vertices).ToArray();
@@ -486,9 +490,9 @@ public sealed class WorldShiftLevelTests
     }
 
     [Test]
-    public void DrivingAudioAssetsAreFiniteAndMusicArrangementsShareTheirLoopLength()
+    public void DrivingAudioAssetsAreFiniteAndEveryEnvironmentHasAFullSong()
     {
-        string[] names={"WS_Engine","WS_Tyres","WS_Takeoff","WS_Landing","WS_Crash","WS_Gull","WS_Ocean","WS_OceanDay","WS_OceanNight","WS_Victory"};
+        string[] names={"WS_Engine","WS_Tyres","WS_Takeoff","WS_Landing","WS_Crash","WS_Gull","WS_Ocean","WS_Victory"};
         foreach(string name in names)
         {
             var clip=Resources.Load<AudioClip>(name);
@@ -497,9 +501,15 @@ public sealed class WorldShiftLevelTests
             Assert.That(samples.All(v=>!float.IsNaN(v)&&!float.IsInfinity(v)&&Math.Abs(v)<.95f),Is.True,name);
             Assert.That(samples.Any(v=>Math.Abs(v)>.05f),Is.True,name+" must be audible.");
         }
-        var day=Resources.Load<AudioClip>("WS_OceanDay");var night=Resources.Load<AudioClip>("WS_OceanNight");
-        Assert.That(day.samples,Is.EqualTo(night.samples));Assert.That(day.frequency,Is.EqualTo(night.frequency));
-        Assert.That(day.channels,Is.EqualTo(2));Assert.That(night.channels,Is.EqualTo(2));
+        foreach(string environment in new[]{"City","Desert","Ocean","Snow","Mountain"})
+        {
+            var song=Resources.Load<AudioClip>("WorldShiftMusic/"+environment);
+            Assert.That(song,Is.Not.Null,environment);Assert.That(song.length,Is.GreaterThan(80f));
+            Assert.That(song.channels,Is.EqualTo(2));
+            var importer=(UnityEditor.AudioImporter)UnityEditor.AssetImporter.GetAtPath("Assets/Resources/WorldShiftMusic/"+environment+".mp3");
+            Assert.That(importer.defaultSampleSettings.loadType,Is.EqualTo(AudioClipLoadType.CompressedInMemory));
+        }
+        Assert.That(Resources.Load<TextAsset>("WorldShiftMusic/CREDITS").text,Does.Contain("https://creativecommons.org/licenses/by/4.0/"));
     }
 
     [UnityTest]
@@ -513,17 +523,31 @@ public sealed class WorldShiftLevelTests
         {
             var settings=TypeFor("WorldShiftAudioSettings");
             settings.GetProperty("Music").SetValue(null,.6f);settings.GetProperty("Effects").SetValue(null,.8f);
+            StartLevel(2);yield return null;yield return null;
+            {
+                var desert=Started();var desertAudio=Find("WorldShiftLevelAudio");desertAudio.enabled=false;
+                var song=(AudioSource)Field(desertAudio,"music");song.time=10f;Call(desertAudio,"Refresh",1f);
+                Assert.That(song.volume,Is.GreaterThan(.3f),"Desert must have an audible soundtrack too.");
+                Assert.That(song.clip,Is.EqualTo(Resources.Load<AudioClip>("WorldShiftMusic/Desert")));
+                Call(desert,"TogglePause");Call(desertAudio,"Refresh",1f);Capture("desert-recorded-music-controls");
+                UnityEngine.Object.FindObjectsByType<Button>(FindObjectsSortMode.None).Single(v=>v.name=="Music credits").onClick.Invoke();
+                Capture("desert-music-credits");
+                Assert.That(UnityEngine.Object.FindObjectsByType<TMPro.TMP_Text>(FindObjectsSortMode.None).Any(v=>v.text.Contains("Whiskey on the Mississippi")&&v.text.Contains("Attribution 4.0")),Is.True);
+            }
             StartLevel(3);yield return null;yield return null;
             var game=Started();var audio=Find("WorldShiftLevelAudio");audio.enabled=false;
             var engine=(AudioSource)Field(audio,"engine");var tyres=(AudioSource)Field(audio,"tyres");
-            var day=(AudioSource)Field(audio,"dayMusic");var night=(AudioSource)Field(audio,"nightMusic");
+            var music=(AudioSource)Field(audio,"music");music.time=10f;
+            var filter=music.GetComponent<AudioLowPassFilter>();
             Call(audio,"Refresh",1f);
-            Assert.That(engine.volume,Is.GreaterThan(0));Assert.That(day.volume,Is.GreaterThan(0));Assert.That(night.volume,Is.Zero);
-            Assert.That(day.loop&&night.loop&&engine.loop,Is.True);
+            Assert.That(engine.volume,Is.GreaterThan(0));Assert.That(music.volume,Is.GreaterThan(.2f));
+            Assert.That(music.loop&&engine.loop,Is.True);
+            float songPosition=music.time;
             Assert.That(Call(game,"TrySwitch"),Is.True);Call(audio,"Refresh",.375f);
             Assert.That((float)Get(audio,"DayBlend"),Is.EqualTo(.5f).Within(.01f));
-            Assert.That(day.volume,Is.EqualTo(night.volume).Within(.001f));
-            Call(audio,"Refresh",.375f);Assert.That(day.volume,Is.Zero);Assert.That(night.volume,Is.GreaterThan(0));
+            Assert.That(filter.cutoffFrequency,Is.InRange(5000f,17000f));
+            Assert.That(music.time,Is.EqualTo(songPosition).Within(.1f),"Switching worlds must not restart the song.");
+            Call(audio,"Refresh",.375f);Assert.That(filter.cutoffFrequency,Is.EqualTo(4200f).Within(1f));Assert.That(music.volume,Is.GreaterThan(0));
             Call(game,"TogglePause");Call(audio,"Refresh",1f);Assert.That(Get(audio,"Suspended"),Is.True);
             Capture("ocean-audio-pause-controls");
             var sliders=UnityEngine.Object.FindObjectsByType<UnityEngine.UI.Slider>(FindObjectsSortMode.None);
@@ -533,15 +557,15 @@ public sealed class WorldShiftLevelTests
             effectsSlider.value=0f;
             Call(game,"TogglePause");Call(audio,"Refresh",1f);
             Assert.That(Get(audio,"Suspended"),Is.False);Assert.That(engine.volume,Is.Zero);Assert.That(tyres.volume,Is.Zero);
-            Assert.That(night.volume,Is.GreaterThan(0),"Effects mute must preserve the music.");
+            Assert.That(music.volume,Is.GreaterThan(0),"Effects mute must preserve the music.");
             var police=Find("WorldShiftPoliceEmergencyEffects");Call(police,"Refresh",1f);
             Assert.That(police.GetComponent<AudioSource>().volume,Is.Zero,"Effects mute includes the existing siren.");
             effectsSlider.value=.8f;musicSlider.value=0f;Call(audio,"Refresh",1f);
-            Assert.That(day.volume+night.volume,Is.Zero);Assert.That(engine.volume,Is.GreaterThan(0));
+            Assert.That(music.volume,Is.Zero);Assert.That(engine.volume,Is.GreaterThan(0));
             Assert.That(PlayerPrefs.GetFloat(musicKey),Is.Zero);Assert.That(PlayerPrefs.GetFloat(effectsKey),Is.EqualTo(.8f));
             StartLevel(0);yield return null;yield return null;
             game=Started();audio=Find("WorldShiftLevelAudio");audio.enabled=false;
-            Assert.That(Field(audio,"dayMusic"),Is.Null,"The coastal score belongs only to Ocean.");
+            Assert.That(Field(audio,"music"),Is.Null,"Training stays quiet for lessons.");
             Assert.That((float)TypeFor("WorldShiftAudioSettings").GetProperty("Music").GetValue(null),Is.Zero);
             game.GetType().GetProperty("TrainingLessonPaused",Flags).SetValue(game,true);
             Call(audio,"Refresh",1f);Assert.That(Get(audio,"Suspended"),Is.True);
@@ -572,6 +596,8 @@ public sealed class WorldShiftLevelTests
         float distantVolume=source.volume;
         effects.transform.position=player.position+Vector3.forward*8f;Call(effects,"Refresh",2f);
         Assert.That(source.volume,Is.GreaterThan(distantVolume*4f),"Approaching the player must increase loudness regardless of the chase camera position.");
+        Assert.That(source.volume,Is.LessThanOrEqualTo(.041f),"The close siren must stay behind the music.");
+        Assert.That(effects.GetComponent<AudioLowPassFilter>().cutoffFrequency,Is.LessThanOrEqualTo(1600f));
         effects.transform.position=player.position+Vector3.forward*75f;Call(effects,"Refresh",2f);
         Assert.That(source.volume,Is.Zero,"A distant cruiser fades out.");
         effects.transform.position=savedPosition;

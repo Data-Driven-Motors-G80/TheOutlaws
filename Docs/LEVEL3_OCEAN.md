@@ -106,10 +106,10 @@ not an external recording. Police AI, collision rules and retry timing are uncha
 All current levels have a speed-responsive engine, tyre squeal during sharp ground
 steering, ramp takeoff, landing, collision and completion sounds. Airborne engine
 volume drops and the engine free-revs slightly. Ocean adds coastal wind/waves,
-sparse daytime gull calls and an original 110 BPM getaway score. Day uses bright
-plucked chords and percussion; Night uses a quieter melody and sustained harmony.
-Both eight-bar arrangements start on the same DSP clock and crossfade over .75 s
-without restarting. This first music/ambience pass is exclusive to Ocean.
+sparse daytime gull calls and the full licensed instrumental song "Surf Shimmy" by Kevin MacLeod. All five
+environments have a distinct licensed song; Training stays quiet. Night smoothly
+softens the same recording over .75 s without changing its playback position.
+Ocean ambience remains exclusive to Ocean.
 
 Pause has separate Music and Effects sliders, saved in `ws_audio_music` and
 `ws_audio_effects`. Effects includes the engine, ambience, cues, existing diamond
@@ -118,6 +118,10 @@ pauses with gameplay and stopped Training lessons. Music ducks on retry and
 makes room for a short completion sting on success. Existing collection chimes
 are reused rather than doubled. Gameplay and level unlocks are unchanged.
 
-The source WAVs are original synthetic audio. Rebuild them with
+The effects WAVs are original synthetic audio. Rebuild them with
 `python3 Tools/Audio/generate_game_audio.py` from the repository root; this uses
-only the Python standard library and preserves existing asset GUIDs.
+only the Python standard library and preserves existing asset GUIDs. Licensed
+songs are separate full recordings under `Assets/Resources/WorldShiftMusic`, with
+source URLs, hashes and CC BY 4.0 attribution in `CREDITS.txt`. Pause has Music
+credits with links to the composer and license. The police siren is capped at .04
+instead of .15 and low-pass filtered at 1600 Hz to leave space for the soundtrack.

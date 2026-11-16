@@ -1,15 +1,15 @@
 fileFormatVersion: 2
-guid: 773c3b2e966e48c6a33dc72e61dc132d
+guid: 8ca1810fb6244823a8bbf0990f23a2a5
 AudioImporter:
   externalObjects: {}
   serializedVersion: 7
   defaultSettings:
     serializedVersion: 2
-    loadType: 0
+    loadType: 1
     sampleRateSetting: 0
     sampleRateOverride: 22050
     compressionFormat: 1
-    quality: 0.8
+    quality: 0.65
     conversionMode: 0
   platformSettingOverrides: {}
   forceToMono: 0
@@ -18,6 +18,6 @@ AudioImporter:
   loadInBackground: 0
   ambisonic: 0
   3D: 1
-  userData: Original synthesized WS_OceanDay. Seamless loop.
+  userData: Whiskey on the Mississippi - Kevin MacLeod. CC BY 4.0; see CREDITS.txt.
   assetBundleName:
   assetBundleVariant:
