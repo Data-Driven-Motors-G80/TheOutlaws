@@ -6,7 +6,7 @@ namespace Outlaws.WorldShift
     public enum ShiftRunState { Ready, Running, Paused, Retrying, Won, Lost }
 
     /// <summary>Isolated two-world prototype. Distance is the same coordinate in both worlds.</summary>
-    public sealed class WorldShiftCity : MonoBehaviour, IWorldShiftView
+    public sealed partial class WorldShiftCity : MonoBehaviour, IWorldShiftView
     {
         // Every solid hazard costs half the initial 45 m gap. Capture still depends
         // on the remaining pursuit distance, never on a scripted collision count.
@@ -551,99 +551,6 @@ namespace Outlaws.WorldShift
             if (pursuit.IsGameOver) Fail("CAUGHT");
         }
 
-        private bool policeReady, policeCapturing;
-        private float policeCaptureTime, policeCaptureStart, policeCaptureX;
-        private readonly WorldShiftPolicePursuit policePursuit = new WorldShiftPolicePursuit();
-        private readonly System.Collections.Generic.List<WorldShiftPolicePursuit.Obstacle> policeObstacles = new System.Collections.Generic.List<WorldShiftPolicePursuit.Obstacle>();
-        public float PoliceRoadDistance => LevelMode ? policePursuit.Distance : Distance - 9.3f;
-        private bool PoliceAirborne(float at)
-        {
-            foreach(var section in RelayLayout)
-                if(at>=section.Takeoff && at<section.Landing) return true;
-            return false;
-        }
-        private void CollectPoliceObstacles()
-        {
-            policeObstacles.Clear();
-            foreach(var h in Hazards)
-            {
-                if(!WorldShiftCombat.IsActive(Combat,h) || !h.VisibleIn(World) || h.Kind==ShiftHazardKind.Gap) continue;
-                void Add(float start,float end,float left,float right)
-                { policeObstacles.Add(new WorldShiftPolicePursuit.Obstacle(h,start,end,left,right)); }
-                if(h.Gate!=null)
-                {
-                    if(!h.Gate.Airborne) Add(h.Gate.Distance-h.Gate.Size.z*.5f,h.Gate.Distance+h.Gate.Size.z*.5f,
-                        h.Gate.Lateral-h.Gate.Size.x*.5f,h.Gate.Lateral+h.Gate.Size.x*.5f);
-                    continue;
-                }
-                if(h.Rock!=null)
-                {
-                    if(!h.Rock.Airborne) Add(h.Rock.Distance-h.Rock.Radius,h.Rock.Distance+h.Rock.Radius,
-                        h.Rock.Lateral-h.Rock.Radius,h.Rock.Lateral+h.Rock.Radius);
-                    continue;
-                }
-                // Bounds are evaluated at PLAYER progress, exactly as the rendered oncoming traffic.
-                h.BoundsAt(Distance,out float start,out float end);
-                if(h.LateralMotion) Add(start,end,h.LateralOffset-WorldShiftSpikePlatform.Width*.5f,h.LateralOffset+WorldShiftSpikePlatform.Width*.5f);
-                else if(h.Kind==ShiftHazardKind.HalfBarrier) Add(start,end,h.HalfSide<0?-5f:0f,h.HalfSide<0?0f:5f);
-                else for(int lane=0;lane<3;lane++)
-                {
-                    if((h.LaneMask & (1<<lane))==0) continue;
-                    float x=(lane-1)*WorldShiftLevel.RoadWidth/3f;
-                    Add(start,end,x-WorldShiftLevel.RoadWidth/6f,x+WorldShiftLevel.RoadWidth/6f);
-                }
-            }
-        }
-
-        private void UpdatePolice(float deltaTime)
-        {
-            if (Police == null) return;
-            if (LevelMode)
-            {
-                if(!policeReady) { policePursuit.Reset(Distance,Lateral); policeReady=true; }
-                if(Capturing)
-                {
-                    // Capture remains scripted: a player crash always retries the checkpoint.
-                    if(!policeCapturing)
-                    {
-                        policeCaptureTime=0f; policeCaptureStart=policePursuit.Distance; policeCaptureX=policePursuit.Lateral;
-                    }
-                    policeCapturing=true;
-                    policeCaptureTime+=deltaTime;
-                    float t=Mathf.Clamp01(policeCaptureTime/1.2f);
-                    t=1f-Mathf.Pow(1f-t,3f);
-                    Police.PresentFinitePose(deltaTime,Mathf.Lerp(policeCaptureStart,Distance-3.3f,t),
-                        Mathf.Lerp(policeCaptureX,Lateral+(Lateral>0f?-2.6f:2.6f),t),Distance,0f);
-                }
-                else
-                {
-                    policeCapturing=false;
-                    CollectPoliceObstacles();
-                    float limit=Mathf.Max(0f,Route.Sample(policePursuit.Distance).Width*.5f-1f);
-                    policePursuit.Step(deltaTime,Distance,Lateral,Speed,limit,policeObstacles,PoliceAirborne);
-                    Police.PresentFinitePose(deltaTime,policePursuit.Distance,policePursuit.Lateral,Distance,policePursuit.Jolt);
-                }
-                return;
-            }
-            // Like the original chase, compress logical distance into a readable mirror gap.
-            Police.StepFinite(deltaTime, Distance, Lateral, Mathf.Lerp(.45f, 6f, PursuitFraction));
-        }
-
-        private float ResolveDividers(float from, float to, float previousLateral, float lateral, float steer)
-        {
-            float clearance = WorldShiftLevel.RoadWidth / 6f + .8f + .03f;
-            foreach (var hazard in Hazards)
-            {
-                if (!WorldShiftCombat.IsActive(Combat, hazard, hazard.VisibleIn(World)) || hazard.Kind != ShiftHazardKind.Divider
-                    || to + 1.5f < hazard.Start || from - 1.5f > hazard.End || Mathf.Abs(lateral) >= clearance) continue;
-                float side = Mathf.Abs(previousLateral) > .1f ? Mathf.Sign(previousLateral)
-                    : Mathf.Abs(steer) > .1f ? Mathf.Sign(steer) : 1f;
-                lateral = side * clearance;
-                driver.ConstrainExternalLateral(lateral);
-            }
-            return lateral;
-        }
-
         private void Fail(string reason)
         {
             if (LevelMode)
@@ -671,105 +578,6 @@ namespace Outlaws.WorldShift
             fallVelocity = -1f;
             retryRemaining = reason == "NO ROAD" || reason == "MISSED RELAY LANDING" ? 1.05f : 0.7f;
             Notify(reason, 1.1f);
-        }
-
-        private void CollectFuel(float from, float to, float fromLateral, float toLateral)
-        {
-            if (GetawayMode)
-                for (int i = 0; i < fuelPassed.Length; i++)
-                    if (!fuelTaken[i] && !fuelPassed[i] && from > Pickups[i].Distance + 1.3f) { fuelPassed[i] = true; WorldShiftAnalytics.Missed("fuel"); }
-            if (GetawayMode && World != ShiftWorld.Day) return;
-            for (int i = 0; i < fuelTaken.Length; i++)
-            {
-                ShiftFuelPickup pickup = Pickups[i];
-                if (fuelTaken[i] || (!GetawayMode && !IsWorldVisible(pickup.World, pickup.Distance, pickup.Lane * WorldShiftLevel.RoadWidth / 3f, World)) || to + 1.3f < pickup.Distance || from - 1.3f > pickup.Distance) continue;
-                float t = Mathf.InverseLerp(from, to, pickup.Distance);
-                if (Mathf.Abs(Mathf.Lerp(fromLateral, toLateral, t) - pickup.Lane * WorldShiftLevel.RoadWidth / 3f) > 1.35f) continue;
-                fuelTaken[i] = true;
-                FuelCollected++;
-                WorldShiftAnalytics.Fuel();
-                fuel.Refill(WorldShiftLevel.FuelRefill);
-                presentation.RefreshFuel();
-                Notify("FUEL +26", 1.2f);
-            }
-        }
-
-        // Swept checks in the common road coordinate prevent tunnelling or switching inside a wall.
-        private ShiftHazard FindCollision(ShiftWorld world, float from, float to, float fromLateral, float toLateral, bool skipHandled = false,
-            float fromHeight = float.NaN, float toHeight = float.NaN)
-        {
-            const float halfWidth = 0.8f;
-            foreach (var hazard in Hazards)
-            {
-                bool merged = IsJoinedDistance(hazard.Start);
-                if (!WorldShiftCombat.IsActive(Combat, hazard)) continue;
-                if ((!merged && !hazard.VisibleIn(world)) || (skipHandled && hitHazards.Contains(hazard))) continue;
-                if (hazard.Gate != null)
-                {
-                    if (hazard.Gate.Airborne != IsRelayAirborne) continue;
-                    float aHeight = float.IsNaN(fromHeight) ? Player.position.y : fromHeight;
-                    float bHeight = float.IsNaN(toHeight) ? Player.position.y : toHeight;
-                    if (hazard.Gate.Touches(from, to, fromLateral, toLateral, aHeight, bHeight,
-                        Mathf.Abs(to - from) < .00001f ? hazard.Gate.Lateral : hazard.PreviousLateralOffset,
-                        LevelGatePosition(hazard.Gate).y)) return hazard;
-                    continue;
-                }
-                if (hazard.Rock != null)
-                {
-                    if (hazard.Rock.Airborne != IsRelayAirborne) continue;
-                    float aHeight = float.IsNaN(fromHeight) ? Player.position.y : fromHeight;
-                    float bHeight = float.IsNaN(toHeight) ? Player.position.y : toHeight;
-                    if (hazard.Rock.Touches(from, to, fromLateral, toLateral, aHeight, bHeight,
-                        Mathf.Abs(to - from) < .00001f ? hazard.Rock.Lateral : hazard.PreviousLateralOffset,
-                        LevelRockPosition(hazard.Rock).y)) return hazard;
-                    continue;
-                }
-                if (IsRelayAirborne) continue;
-                // A missing deck drops the car when its centre crosses the lip.
-                float halfLength = hazard.Kind == ShiftHazardKind.Gap ? 0f : 1.5f;
-                hazard.BoundsAt(from, out float start, out float end);
-                hazard.BoundsAt(to, out float nextStart, out float nextEnd);
-                if (hazard.Kind == ShiftHazardKind.Pedestrians)
-                {
-                    // The authored six-metre crossing is road paint, not a solid
-                    // wall. Contact belongs to the figures standing near its centre.
-                    float centre = (start + end) * .5f;
-                    float nextCentre = (nextStart + nextEnd) * .5f;
-                    start = centre - .65f;
-                    end = centre + .65f;
-                    nextStart = nextCentre - .65f;
-                }
-                float relativeFrom = from - start, relativeTo = to - nextStart;
-                float depth = end - start;
-                if (relativeTo + halfLength < 0f || relativeFrom - halfLength > depth) continue;
-                float entry = relativeTo > relativeFrom ? Mathf.Clamp01((-halfLength - relativeFrom) / (relativeTo - relativeFrom)) : 0f;
-                float exit = relativeTo > relativeFrom ? Mathf.Clamp01((depth + halfLength - relativeFrom) / (relativeTo - relativeFrom)) : 1f;
-                float a = Mathf.Lerp(fromLateral, toLateral, entry), b = Mathf.Lerp(fromLateral, toLateral, exit);
-                if (hazard.LateralMotion)
-                {
-                    float obstacleHalfWidth = LevelMode ? WorldShiftSpikePlatform.Width * .5f : .8f;
-                    float left = Mathf.Min(hazard.PreviousLateralOffset, hazard.LateralOffset) - obstacleHalfWidth - halfWidth;
-                    float right = Mathf.Max(hazard.PreviousLateralOffset, hazard.LateralOffset) + obstacleHalfWidth + halfWidth;
-                    if (Mathf.Max(a, b) >= left && Mathf.Min(a, b) <= right) return hazard;
-                    continue;
-                }
-                if (hazard.Kind == ShiftHazardKind.HalfBarrier)
-                {
-                    float min = hazard.HalfSide < 0 ? -WorldShiftLevel.RoadWidth * .5f : 0f;
-                    float max = hazard.HalfSide < 0 ? 0f : WorldShiftLevel.RoadWidth * .5f;
-                    if (merged && hazard.World != WorldShiftLevel.WorldAt(hazard.HalfSide)) continue;
-                    if (Mathf.Max(a, b) + halfWidth > min && Mathf.Min(a, b) - halfWidth < max) return hazard;
-                    continue;
-                }
-                for (int lane = 0; lane < 3; lane++)
-                {
-                    if ((hazard.LaneMask & (1 << lane)) == 0) continue;
-                    float centre = (lane - 1) * WorldShiftLevel.RoadWidth / 3f;
-                    float extent = WorldShiftLevel.RoadWidth / 6f + halfWidth;
-                    if (Mathf.Max(a, b) >= centre - extent && Mathf.Min(a, b) <= centre + extent) return hazard;
-                }
-            }
-            return null;
         }
 
         private void RestoreCheckpoint()
@@ -837,42 +645,6 @@ namespace Outlaws.WorldShift
             presentation.SetWorld(displayedWorld);
             presentation.UpdateVisibility(Distance);
             Getaway?.Present(displayedWorld);
-        }
-
-        private void UpdateCamera(bool immediate)
-        {
-            if(Escape!=null && Escape.Active) return;
-            RoadPathPoint point = Route.SampleDriver(Distance, Route.Sample(Distance), Lateral);
-            const float follow = .28f;
-            Vector3 desired = point.Position - point.Forward * 12f + Vector3.up * 6.4f + point.Right * Lateral * follow;
-            bool falling = State == ShiftRunState.Retrying && (lastFailure == "NO ROAD" || lastFailure == "MISSED RELAY LANDING");
-            if ((IsRelayAirborne || (Getaway?.Extras.Jump.Traversing ?? false)) && !falling) desired.y += Player.position.y - point.Position.y - .08f;
-            if (falling) desired = point.Position - point.Forward * 2f + Vector3.up * 10f;
-            Vector3 target = Route.SampleDriver(Distance + 22f, Route.Sample(Distance + 22f), Lateral).Position + Vector3.up * 0.6f;
-            float cameraFov = Mathf.Lerp(70f, 76f, Mathf.InverseLerp(WorldShiftLevel.Speed * WorldShiftLevel.CruiseSpeedMultiplier, WorldShiftRelay.BoostSpeed, Speed));
-            // Show the actual practice block and its ice while driving is safely stopped.
-            // Keep the view centred on the road so sideways motion remains easy to judge.
-            if (TrainingFreezeWaiting && !TrainingLessonPaused && State == ShiftRunState.Running)
-            {
-                ShiftHazard practice = null;
-                foreach (var hazard in Hazards)
-                    if (hazard.LateralMotion && hazard.Start > Distance && (practice == null || hazard.Start < practice.Start))
-                        practice = hazard;
-                if (practice != null)
-                {
-                    var focus = Route.Sample((practice.Start + practice.End) * .5f);
-                    desired = focus.Position - focus.Forward * 10f + focus.Up * 4f;
-                    target = focus.Position + focus.Up * .7f;
-                    cameraFov = 55f;
-                }
-            }
-            float blend = immediate ? 1f : 1f - Mathf.Exp(-8f * Time.unscaledDeltaTime);
-            view.transform.position = Vector3.Lerp(view.transform.position, desired, blend);
-            if (IsMerged)
-                view.transform.position -= point.Right * Vector3.Dot(view.transform.position - point.Position, point.Right);
-            view.fieldOfView = Mathf.Lerp(view.fieldOfView, cameraFov, blend);
-            if (falling) target = Player.position + point.Forward * 4f;
-            view.transform.rotation = Quaternion.Slerp(view.transform.rotation, Quaternion.LookRotation(target - view.transform.position, Vector3.up), IsMerged ? 1f : blend);
         }
 
         private void Notify(string value, float seconds) { Message = value; MessageRemaining = seconds; }
