@@ -1,16 +1,18 @@
+using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 namespace Outlaws.WorldShift
 {
-    /// <summary>Snow-only background art. No colliders, lights, audio or changes to driving.</summary>
-    public sealed class WorldShiftSnowSky : MonoBehaviour
+    /// <summary>Snow-only sky art and a sleigh-bell flyby. No colliders, lights or changes to driving.</summary>
+    public sealed partial class WorldShiftSnowSky : MonoBehaviour
     {
         public const float FlyoverSeconds = 14f;
         private WorldShiftCity game;
         private Camera view;
         private Material sky, figureFinish;
-        private Mesh figureMesh;
+        private readonly List<Mesh> figureMeshes=new List<Mesh>();
+        private AudioSource sleighBells;
+        private bool bellsPaused;
         private Transform santa;
         private float skyTime, flyoverTime;
         private bool flyoverStarted;
@@ -21,59 +23,12 @@ namespace Outlaws.WorldShift
             game=controller;view=camera;sky=skyMaterial;
             sky.SetFloat("_Snow",1f);
             // Every Snow run gets one flyover; checkpoint retries never repeat it.
-            BuildSanta();santa.gameObject.SetActive(false);
-        }
-
-        private void BuildSanta()
-        {
-            var art=new WorldShiftArtMesh();
-            Color red=new Color(.68f,.06f,.08f),cream=new Color(.96f,.94f,.83f);
-            Color gold=new Color(.88f,.62f,.18f),bark=new Color(.25f,.14f,.08f);
-            art.ChamferBox(new Vector3(-5,-.15f,0),new Vector3(3.8f,.75f,1.5f),.15f,red);
-            art.Box(new Vector3(-6.5f,.55f,0),new Vector3(.30f,1.3f,1.5f),red);
-            foreach(float side in new[]{-1f,1f})
-            {
-                art.Beam(new Vector3(-7,-.8f,side*.70f),new Vector3(-2.6f,-.8f,side*.70f),.10f,.10f,gold);
-                art.Beam(new Vector3(-2.6f,-.8f,side*.70f),new Vector3(-2.2f,-.35f,side*.70f),.10f,.10f,gold);
-                art.Beam(new Vector3(-6,-.35f,side*.60f),new Vector3(-6,-.78f,side*.70f),.10f,.10f,gold);
-            }
-            // Red coat, white beard and bent hat read from the side at Easter-egg scale.
-            art.ChamferBox(new Vector3(-4.4f,.75f,0),new Vector3(.9f,1.15f,.9f),.16f,red);
-            art.Rock(new Vector3(-4.25f,1.25f,0),new Vector3(.36f,.6f,.38f),new Color(.89f,.66f,.49f),5);
-            art.Rock(new Vector3(-3.92f,1.05f,0),new Vector3(.26f,.55f,.39f),cream,6);
-            art.Cylinder(new Vector3(-4.25f,1.8f,0),.39f,.08f,.72f,red,10);
-            art.Rock(new Vector3(-4.05f,2.38f,0),new Vector3(.17f,.23f,.17f),cream,8);
-            art.Rock(new Vector3(-5.7f,.25f,0),new Vector3(.65f,1.35f,.55f),new Color(.35f,.27f,.12f),14);
-            for(int deer=0;deer<3;deer++)
-            {
-                float x=deer*3.8f;
-                art.ChamferBox(new Vector3(x,.45f,0),new Vector3(1.65f,.70f,.62f),.13f,bark);
-                art.Beam(new Vector3(x+.55f,.60f,0),new Vector3(x+.9f,1.35f,0),.36f,.36f,bark);
-                art.ChamferBox(new Vector3(x+1.1f,1.35f,0),new Vector3(.76f,.40f,.44f),.08f,bark);
-                foreach(float side in new[]{-1f,1f})
-                {
-                    art.Beam(new Vector3(x-.60f,.24f,side*.22f),new Vector3(x-1.2f,-.6f,side*.30f),.12f,.12f,bark);
-                    art.Beam(new Vector3(x+.55f,.24f,side*.22f),new Vector3(x+.15f,-.45f,side*.30f),.12f,.12f,bark);
-                    art.Beam(new Vector3(x+.88f,1.50f,side*.18f),new Vector3(x+.55f,2.12f,side*.45f),.07f,.07f,gold);
-                    art.Beam(new Vector3(x+.70f,1.85f,side*.32f),new Vector3(x+1.05f,2.08f,side*.55f),.06f,.06f,gold);
-                    art.Beam(new Vector3(-3.6f,.70f,side*.4f),new Vector3(x+.4f,.70f,side*.4f),.025f,.025f,gold);
-                }
-                art.Box(new Vector3(x,.48f,0),new Vector3(.10f,.75f,.67f),red);
-            }
-            for(int i=0;i<12;i++)
-            {
-                float x=-8-i*.85f;
-                art.Rock(new Vector3(x,Mathf.Sin(i*1.7f)*.4f,Mathf.Cos(i)*.35f),
-                    Vector3.one*(.12f+(i%3)*.04f),new Color(.85f,.76f,.48f,1-i/15f),i);
-            }
-            figureMesh=art.Mesh("Santa sleigh, three reindeer and faint star trail");
-            figureFinish=new Material(Resources.Load<Shader>("WorldShiftSkyArt")){name="Snow Santa flyover"};
-            var root=new GameObject("Santa sky Easter egg",typeof(MeshFilter),typeof(MeshRenderer));
-            root.transform.SetParent(transform,false);santa=root.transform;
-            santa.localScale=Vector3.one*2.4f;
-            root.GetComponent<MeshFilter>().sharedMesh=figureMesh;
-            var renderer=root.GetComponent<MeshRenderer>();renderer.sharedMaterial=figureFinish;
-            renderer.shadowCastingMode=ShadowCastingMode.Off;renderer.receiveShadows=false;
+            BuildSanta();
+            sleighBells=santa.gameObject.AddComponent<AudioSource>();
+            sleighBells.playOnAwake=false;sleighBells.loop=true;sleighBells.spatialBlend=0;
+            sleighBells.dopplerLevel=0;sleighBells.priority=180;sleighBells.volume=0;
+            sleighBells.clip=Resources.Load<AudioClip>("WS_SantaBells");
+            santa.gameObject.SetActive(false);
         }
 
         private bool SafeToStart()
@@ -97,6 +52,7 @@ namespace Outlaws.WorldShift
         {
             if(game==null || WorldShiftSceneLoading.Active || game.State!=ShiftRunState.Running || game.TrainingLessonPaused)
             {
+                UpdateFlyoverAudio();
                 if(game!=null && (game.State==ShiftRunState.Won || game.State==ShiftRunState.Lost)) santa.gameObject.SetActive(false);
                 return;
             }
@@ -104,20 +60,49 @@ namespace Outlaws.WorldShift
             figureFinish.SetFloat("_Night",sky.GetFloat("_Night"));
             if(!flyoverStarted && game.Distance>=4f && SafeToStart())
             {flyoverStarted=true;flyoverTime=0;santa.gameObject.SetActive(true);}
-            if(!FlyoverActive) {santa.gameObject.SetActive(false);return;}
+            if(!FlyoverActive) {UpdateFlyoverAudio();santa.gameObject.SetActive(false);return;}
             flyoverTime=Mathf.Min(FlyoverSeconds,flyoverTime+dt);
-            PoseSanta();
+            PoseSanta();UpdateFlyoverAudio();
             if(!FlyoverActive) santa.gameObject.SetActive(false);
+        }
+
+        private static Vector3 FlightPoint(float t)
+        {
+            float u=1-t;
+            return u*u*u*new Vector3(-150,32,145)+3*u*u*t*new Vector3(-65,50,95)
+                +3*u*t*t*new Vector3(75,16,105)+t*t*t*new Vector3(160,42,155);
         }
 
         private void PoseSanta()
         {
             float t=flyoverTime/FlyoverSeconds;
             Vector3 forward=Vector3.ProjectOnPlane(game.Route.Sample(game.Distance).Forward,Vector3.up).normalized;
-            Vector3 right=Vector3.Cross(Vector3.up,forward);
-            santa.SetPositionAndRotation(view.transform.position+forward*115f+right*Mathf.Lerp(-145f,145f,t)
-                +Vector3.up*(32f+Mathf.Sin(t*Mathf.PI)*3f),Quaternion.LookRotation(forward,Vector3.up));
+            Quaternion frame=Quaternion.LookRotation(forward,Vector3.up);
+            Vector3 point=FlightPoint(t);
+            Vector3 tangent=(FlightPoint(Mathf.Min(1,t+.002f))-FlightPoint(Mathf.Max(0,t-.002f))).normalized;
+            Vector3 normal=Vector3.Cross(tangent,Vector3.up).normalized;
+            Quaternion heading=Quaternion.LookRotation(normal,Vector3.Cross(normal,tangent));
+            float bank=Mathf.Sin(t*Mathf.PI*2)*8f;
+            santa.SetPositionAndRotation(view.transform.position+frame*point,
+                frame*heading*Quaternion.AngleAxis(bank,Vector3.right));
+            AnimateTeam(flyoverTime);
             figureFinish.SetFloat("_Opacity",Mathf.SmoothStep(0,1,t/.10f)*(1-Mathf.SmoothStep(0,1,(t-.90f)/.10f)));
+        }
+
+        private void UpdateFlyoverAudio()
+        {
+            if(sleighBells==null) return;
+            if(!FlyoverActive || game==null || game.State==ShiftRunState.Won || game.State==ShiftRunState.Lost)
+            {sleighBells.Stop();bellsPaused=false;return;}
+            float t=flyoverTime/FlyoverSeconds;
+            float envelope=Mathf.Pow(Mathf.Max(0,Mathf.Sin(t*Mathf.PI)),.7f);
+            sleighBells.volume=WorldShiftAudioSettings.Effects*.18f*envelope;
+            sleighBells.panStereo=Mathf.Clamp(FlightPoint(t).x/145f,-1,1)*.75f;
+            sleighBells.pitch=Mathf.Lerp(1.03f,.96f,t);
+            bool pause=WorldShiftAudioSettings.Suspended(game) || game.State!=ShiftRunState.Running;
+            if(pause) {if(!bellsPaused) sleighBells.Pause();bellsPaused=true;return;}
+            if(bellsPaused) {sleighBells.UnPause();bellsPaused=false;}
+            if(!sleighBells.isPlaying) sleighBells.Play();
         }
 
         private void Update() => Advance(Time.deltaTime);
@@ -126,7 +111,8 @@ namespace Outlaws.WorldShift
         private void OnDestroy()
         {
             if(sky!=null) {sky.SetFloat("_Snow",0);sky.SetFloat("_SkyTime",0);}
-            if(figureMesh!=null) Destroy(figureMesh);
+            if(sleighBells!=null) sleighBells.Stop();
+            foreach(var mesh in figureMeshes) if(mesh!=null) Destroy(mesh);
             if(figureFinish!=null) Destroy(figureFinish);
         }
     }
