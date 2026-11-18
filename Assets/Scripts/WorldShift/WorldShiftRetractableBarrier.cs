@@ -18,7 +18,7 @@ namespace Outlaws.WorldShift
             || data.Kind == ShiftHazardKind.Divider);
 
         public static WorldShiftRetractableBarrier Build(Transform parent, Vector3 centre, Vector3 size, ShiftWorld world,
-            ShiftLevel environment = ShiftLevel.City)
+            ShiftLevel environment = ShiftLevel.City, int variant = 0)
         {
             var root = new GameObject("Retractable " + world + " barrier");
             root.transform.SetParent(parent, false);
@@ -29,6 +29,9 @@ namespace Outlaws.WorldShift
             var body = new WorldShiftArtMesh();
             var footing = new WorldShiftArtMesh();
             float w = size.x, h = size.y, d = size.z;
+            string winterShape=environment!=ShiftLevel.Snow?null:w<=3.1f?"World-coloured block"
+                :w<6f || (variant/5)%2==0?"Upright pines":"World-coloured roadblock";
+            if(winterShape!=null) root.name="Retractable "+world+" "+winterShape;
             footing.Box(new Vector3(0,.025f,0), new Vector3(w,.05f,d), new Color(.29f,.31f,.33f));
             // Solid road cover with thick dashed paint, never a raised wireframe or dark opening.
             const float stripe = .22f, dash = .95f, gap = .32f;
@@ -51,7 +54,8 @@ namespace Outlaws.WorldShift
                 footing.Box(new Vector3(-w*.5f+w*seam/count,.054f,0),
                     new Vector3(.035f,.012f,d-.15f), new Color(.22f,.24f,.26f));
             float panelWidth = w / count;
-            for (int i=0; i<count; i++)
+            if(winterShape=="Upright pines") WorldShiftSnowObstacleArt.UprightPines(body,w,h,d,world);
+            else for (int i=0; i<count; i++)
             {
                 float x = -w*.5f + (i+.5f)*panelWidth;
                 body.ChamferBox(new Vector3(x,h*.5f,0),new Vector3(panelWidth-.12f,h,d-.08f),.08f,colour);
@@ -149,20 +153,6 @@ namespace Outlaws.WorldShift
                     for (float rx=-w*.5f+.18f; rx<w*.5f-.1f; rx+=.34f)
                         foreach (float ry in new[] {h*.2f,h*.78f})
                             if (!OverIcon(rx,ry,.06f)) FaceBox(rx-.03f,rx+.03f,ry,.06f,.03f,ink);
-                    break;
-                }
-                case ShiftLevel.Snow:
-                {
-                    // Snow piled on top with a row of icicles below the cap.
-                    Color snow = new Color(.93f,.96f,1f);
-                    art.ChamferBox(new Vector3(x,h-.08f,0),new Vector3(w,.16f,d),.05f,snow);
-                    for (float ix=-w*.5f+.16f; ix<w*.5f-.1f; ix+=.27f)
-                        if (!OverIcon(ix,h-.2f,.1f)) foreach (float side in new[] {-1f,1f})
-                        {
-                            float z=side*(front+.006f), len=.12f+.08f*Mathf.Abs(Mathf.Sin(ix*7.3f));
-                            art.Triangle(new Vector3(x+ix-.05f,h-.16f,z),new Vector3(x+ix+.05f,h-.16f,z),
-                                new Vector3(x+ix,h-.16f-len,z),new Color(.82f,.92f,1f),true);
-                        }
                     break;
                 }
                 case ShiftLevel.Mountain:

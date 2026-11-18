@@ -51,6 +51,43 @@ public sealed partial class WorldShiftLevelTests
     }
 
     [UnityTest]
+    public IEnumerator SnowUsesIceFlowWithoutRestartingForWorldSwitchPauseOrCheckpoint()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");yield return new EnterPlayMode();
+        bool hadMusic=PlayerPrefs.HasKey("ws_audio_music");float savedMusic=PlayerPrefs.GetFloat("ws_audio_music");
+        try
+        {
+            TypeFor("WorldShiftAudioSettings").GetProperty("Music").SetValue(null,.6f);
+            StartLevel(SnowLevel);yield return WaitForNavigation();
+            var game=Started();var audio=Find("WorldShiftLevelAudio");audio.enabled=false;
+            var song=(AudioSource)Field(audio,"music");var clip=Resources.Load<AudioClip>("WorldShiftMusic/Snow");
+            Assert.That(song.clip,Is.SameAs(clip));Assert.That(song.loop,Is.True);
+            Assert.That(clip.length,Is.EqualTo(142.344f).Within(.5f));
+            var library=TypeFor("WorldShiftMusicLibrary");
+            Assert.That(Static(library,"Title",Get(game,"Environment")),Is.EqualTo("Ice Flow"));
+            Assert.That((string)Static(library,"SourceUrl",Get(game,"Environment")),Does.Contain("USUAN1200088"));
+            var credits=Resources.Load<TextAsset>("WorldShiftMusic/CREDITS").text;
+            Assert.That(credits,Does.Contain("Ice Flow"));Assert.That(credits,Does.Not.Contain("Cold Funk"));
+            song.time=10f;Call(audio,"Refresh",1f);float time=song.time;
+            Assert.That(song.volume,Is.GreaterThan(.2f));
+            Assert.That(Call(game,"TrySwitch"),Is.True);Call(audio,"Refresh",1f);
+            Assert.That(song.clip,Is.SameAs(clip));Assert.That(song.time,Is.EqualTo(time).Within(.1f));
+            Assert.That(song.GetComponent<AudioLowPassFilter>().cutoffFrequency,Is.EqualTo(4200f).Within(1f));
+            Call(game,"TogglePause");Call(audio,"Refresh",1f);time=song.time;
+            yield return new WaitForSecondsRealtime(.12f);
+            Assert.That(song.time,Is.EqualTo(time).Within(.02f));
+            Call(game,"TogglePause");Call(audio,"Refresh",1f);
+            Call(game,"Fail","NO ROAD");Call(audio,"Refresh",.1f);Step(game,1.1f);Call(audio,"Refresh",.1f);
+            Assert.That(song.clip,Is.SameAs(clip));Assert.That(song.time,Is.GreaterThanOrEqualTo(time-.1f));
+        }
+        finally
+        {
+            if(hadMusic) PlayerPrefs.SetFloat("ws_audio_music",savedMusic);else PlayerPrefs.DeleteKey("ws_audio_music");
+            PlayerPrefs.Save();
+        }
+    }
+
+    [UnityTest]
     public IEnumerator DrivingAudioBlendsWorldsPausesAndRespectsIndependentVolumeControls()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");yield return new EnterPlayMode();

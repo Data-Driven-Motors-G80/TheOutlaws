@@ -1,11 +1,12 @@
-WORLDSHIFT — MUSIC CREDITS
+WEE WOO RUN — MUSIC CREDITS
 
 All songs by Kevin MacLeod (incompetech.com).
 Licensed under Creative Commons: By Attribution 4.0 License
 https://creativecommons.org/licenses/by/4.0/
 
 Full original recordings; playback loops, fades and Night filtering applied in-game.
-Downloaded from the composer’s official site on 2026-11-16.
+Original environment songs downloaded from the composer’s official site on 2026-11-16.
+Snow replaced with Ice Flow from the same official site on 2026-11-17.
 
 City — "Funkorama"
 Source: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100474
@@ -22,10 +23,10 @@ Source: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700018
 Download: https://incompetech.com/music/royalty-free/mp3-royaltyfree/Surf%20Shimmy.mp3
 SHA-256: 932424252801c51a6385c1339ebb57571cee76eda6431eaa338dcacb677c4d94
 
-Snow — "Cold Funk"
-Source: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100499
-Download: https://incompetech.com/music/royalty-free/mp3-royaltyfree/Cold%20Funk.mp3
-SHA-256: a7d0b772f05b99c4ac3df28cb2feaa5190781c2b87bceef5052cc45408b6fc75
+Snow — "Ice Flow"
+Source: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1200088
+Download: https://incompetech.com/music/royalty-free/mp3-royaltyfree/Ice%20Flow.mp3
+SHA-256: a8c77bcc296157b0a46a60ddf870f7e2c50f2273841907791c50cef662c71653
 
 Mountain — "Mountain Emperor"
 Source: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700012

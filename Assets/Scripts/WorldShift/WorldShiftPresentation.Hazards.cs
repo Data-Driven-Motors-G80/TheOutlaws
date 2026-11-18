@@ -45,7 +45,7 @@ namespace Outlaws.WorldShift
                     Vector3 centre = new Vector3((lane - 1) * WorldShiftLevel.RoadWidth / 3f, .9f, 0f);
                     Vector3 size = new Vector3(3.05f, 1.8f, data.End - data.Start);
                     var vehicle=WorldShiftRoadVehicleArt.Build(solid.transform, centre, size, moverPalette, game.Environment,
-                        Mathf.RoundToInt(data.Start * 7f) + lane * 3, data.SharedAcrossWorlds);
+                        Mathf.RoundToInt(data.Start * 7f) + lane * 3, data.SharedAcrossWorlds, data.World);
                     vehicle.ConfigureWarning(game,data);
                     trafficView.Traffic.Add(vehicle);
                     if (data.SharedAcrossWorlds) BuildFrozenCue(solid.transform, centre, size, true);
@@ -72,11 +72,15 @@ namespace Outlaws.WorldShift
             {
                 if (game.LevelMode && data.LateralMotion && data.SharedAcrossWorlds)
                     WorldShiftSpikePlatform.Build(frame, centre, size);
+                else if (game.LevelMode && game.Environment == ShiftLevel.Snow && data.SharedAcrossWorlds
+                    && data.Kind == ShiftHazardKind.Barrier && !data.LateralMotion && data.MotionSpeed == 0f)
+                    WorldShiftSnowObstacleArt.Snowbank(frame, centre, size);
                 else if (game.LevelMode && data.Kind == ShiftHazardKind.Barrier
                     && data.SharedAcrossWorlds && !data.LateralMotion && data.MotionSpeed == 0f)
                     WorldShiftPoliceBarricade.Build(frame, centre, size);
                 else if (game.LevelMode && WorldShiftRetractableBarrier.Supports(data))
-                    retractable.Add(WorldShiftRetractableBarrier.Build(frame, centre, size, data.World, game.Environment));
+                    retractable.Add(WorldShiftRetractableBarrier.Build(frame, centre, size, data.World, game.Environment,
+                        Mathf.RoundToInt(data.Start)));
                 else if (ocean != null)
                     ocean.BuildObstacle(frame, centre, size, palette, data, oceanVariant);
                 else

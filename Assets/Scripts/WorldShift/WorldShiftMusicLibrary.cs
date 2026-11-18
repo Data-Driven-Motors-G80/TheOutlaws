@@ -12,7 +12,7 @@ namespace Outlaws.WorldShift
                 case ShiftLevel.City: return "Funkorama";
                 case ShiftLevel.Desert: return "Whiskey on the Mississippi";
                 case ShiftLevel.Ocean: return "Surf Shimmy";
-                case ShiftLevel.Snow: return "Cold Funk";
+                case ShiftLevel.Snow: return "Ice Flow";
                 case ShiftLevel.Mountain: return "Mountain Emperor";
                 default: return "";
             }
@@ -28,7 +28,7 @@ namespace Outlaws.WorldShift
                 case ShiftLevel.City: isrc = "USUAN1100474"; break;
                 case ShiftLevel.Desert: isrc = "USUAN1100709"; break;
                 case ShiftLevel.Ocean: isrc = "USUAN1700018"; break;
-                case ShiftLevel.Snow: isrc = "USUAN1100499"; break;
+                case ShiftLevel.Snow: isrc = "USUAN1200088"; break;
                 case ShiftLevel.Mountain: isrc = "USUAN1700012"; break;
                 default: return "https://incompetech.com/";
             }

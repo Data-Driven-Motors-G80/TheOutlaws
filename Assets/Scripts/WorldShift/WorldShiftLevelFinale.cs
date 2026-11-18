@@ -48,7 +48,7 @@ namespace Outlaws.WorldShift
             var heroFit=hero.gameObject.AddComponent<AspectRatioFitter>();heroFit.aspectMode=AspectRatioFitter.AspectMode.EnvelopeParent;
             heroFit.aspectRatio=hero.texture!=null?(float)hero.texture.width/hero.texture.height:16f/9f;
             WorldShiftMenu.TextureLayer(finaleEnd.transform,"Final dawn contrast").texture=WorldShiftMenu.Shade();
-            PauseLabel(finaleEnd.transform,"W O R L D S H I F T",.065f,.79f,.57f,.86f,19,PauseAccent,FontStyles.Bold);
+            PauseLabel(finaleEnd.transform,"W E E   W O O   R U N",.065f,.79f,.57f,.86f,19,PauseAccent,FontStyles.Bold);
             PauseLabel(finaleEnd.transform,"THE END",.06f,.46f,.64f,.76f,112,Cream,FontStyles.Bold);
             PauseLabel(finaleEnd.transform,"You lost them. For good.",.065f,.38f,.57f,.46f,26,Cream);
             finaleRoutes=PauseAction(finaleEnd.transform,"Level select",new Vector2(.065f,.16f),new Vector2(.34f,.26f),ShiftIcon.Home,ContinueAfterEscape,true);
