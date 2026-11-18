@@ -86,6 +86,7 @@ namespace Outlaws.WorldShift
                 root.transform.SetParent(transform, false);
                 scenery = root.AddComponent<WorldShiftEnvironmentScenery>();
                 scenery.Build(route, game.StreetlightPrefab);
+                if (game.Environment == ShiftLevel.Snow) scenery.AddSnowSky(game, view);
             }
             convergence = gameObject.AddComponent<WorldShiftConvergence>();
             convergence.BuildWallsOnly(route);

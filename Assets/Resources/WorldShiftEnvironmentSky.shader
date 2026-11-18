@@ -5,6 +5,8 @@ Shader "The Outlaws/City and Desert Sky"
         _Night ("Night", Range(0,1)) = 0
         _Horizon ("Horizon", Color) = (.85,.81,.71,1)
         _Zenith ("Zenith", Color) = (.19,.43,.65,1)
+        [HideInInspector] _Snow ("Snow sky art", Float) = 0
+        [HideInInspector] _SkyTime ("Sky animation time", Float) = 0
     }
     SubShader
     {
@@ -18,7 +20,7 @@ Shader "The Outlaws/City and Desert Sky"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             CBUFFER_START(UnityPerMaterial)
                 half4 _Horizon, _Zenith;
-                float _Night;
+                float _Night, _Snow, _SkyTime;
             CBUFFER_END
             struct V { float4 p:SV_POSITION; float3 d:TEXCOORD0; };
             V Vert(float4 p:POSITION) { V o; o.p=TransformObjectToHClip(p.xyz); o.d=p.xyz; return o; }
@@ -39,6 +41,27 @@ Shader "The Outlaws/City and Desert Sky"
                 c=lerp(c,lerp(half3(.90,.88,.82),_Horizon.rgb,_Night),clouds*.32);
                 float star=step(.9985,frac(sin(dot(floor(d*320),float3(12.98,78.23,39.42)))*43758.54));
                 c+=star*_Night*smoothstep(.16,.4,h)*.4;
+                if (_Snow > .5)
+                {
+                    float azimuth=atan2(d.x,d.z);
+                    // High, thin cirrus and sparse ice glints leave the road horizon quiet.
+                    float wisp=sin(azimuth*12+h*30+sin(azimuth*5+_SkyTime*.015)*2);
+                    float cirrus=pow(saturate(wisp*.5+.5),10)*smoothstep(.24,.40,h)*(1-smoothstep(.60,.85,h));
+                    c=lerp(c,half3(.87,.95,1),cirrus*.18*(1-_Night));
+                    float glint=star*pow(saturate(sin(_SkyTime*.5+dot(floor(d*320),float3(2,5,3)))),12);
+                    c+=half3(.24,.32,.38)*glint*(1-_Night)*smoothstep(.36,.62,h);
+                    // Three broad ribbons with finer vertical folds: green, teal and violet.
+                    // This is background-only art, masked well above the road and landing markers.
+                    float drift=_SkyTime*.035;
+                    float centre=.34+.055*sin(azimuth*2.4+drift)+.025*sin(azimuth*6-drift*.7);
+                    float curtain=.56+.44*pow(saturate(sin(azimuth*52+drift*2)*.5+.5),2);
+                    float lower=exp(-pow((h-centre)/.040,2));
+                    float middle=exp(-pow((h-centre-.025)/.043,2));
+                    float upper=exp(-pow((h-centre+.045)/.026,2));
+                    float skyMask=smoothstep(.23,.30,h)*(1-smoothstep(.72,.86,h));
+                    half3 aurora=half3(.12,.74,.34)*lower+half3(.06,.43,.54)*middle+half3(.37,.12,.53)*upper;
+                    c+=aurora*curtain*skyMask*_Night*.56;
+                }
                 return half4(c,1);
             }
             ENDHLSL

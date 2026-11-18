@@ -45,6 +45,12 @@ namespace Outlaws.WorldShift
             return material;
         }
 
+        public void AddSnowSky(WorldShiftCity controller, Camera camera)
+        {
+            if (route.Course.Environment == ShiftLevel.Snow)
+                gameObject.AddComponent<WorldShiftSnowSky>().Bind(controller, camera, sky);
+        }
+
         private Transform Root(string label, float at, float lateral)
         {
             var p = route.Sample(at);
