@@ -6,7 +6,7 @@ namespace Outlaws.WorldShift
     /// <summary>Snow-only background art. No colliders, lights, audio or changes to driving.</summary>
     public sealed class WorldShiftSnowSky : MonoBehaviour
     {
-        public const float FlyoverSeconds = 7f;
+        public const float FlyoverSeconds = 14f;
         private WorldShiftCity game;
         private Camera view;
         private Material sky, figureFinish;
@@ -70,6 +70,7 @@ namespace Outlaws.WorldShift
             figureFinish=new Material(Resources.Load<Shader>("WorldShiftSkyArt")){name="Snow Santa flyover"};
             var root=new GameObject("Santa sky Easter egg",typeof(MeshFilter),typeof(MeshRenderer));
             root.transform.SetParent(transform,false);santa=root.transform;
+            santa.localScale=Vector3.one*2.4f;
             root.GetComponent<MeshFilter>().sharedMesh=figureMesh;
             var renderer=root.GetComponent<MeshRenderer>();renderer.sharedMaterial=figureFinish;
             renderer.shadowCastingMode=ShadowCastingMode.Off;renderer.receiveShadows=false;
@@ -86,6 +87,8 @@ namespace Outlaws.WorldShift
                 hazard.BoundsAt(d,out float start,out float end);
                 if(start<d+35f && end>d-5f) return false;
             }
+            // The opening is clear dry road. Don't postpone the flyover for its gentle first bend.
+            if(d<20f) return true;
             var a=game.Route.Sample(d);var b=game.Route.Sample(d+12f);
             return Vector3.Angle(a.Forward,b.Forward)<5f;
         }
@@ -99,7 +102,7 @@ namespace Outlaws.WorldShift
             }
             float dt=Mathf.Max(0,delta);skyTime+=dt;sky.SetFloat("_SkyTime",skyTime);
             figureFinish.SetFloat("_Night",sky.GetFloat("_Night"));
-            if(!flyoverStarted && game.Distance>=8f && SafeToStart())
+            if(!flyoverStarted && game.Distance>=4f && SafeToStart())
             {flyoverStarted=true;flyoverTime=0;santa.gameObject.SetActive(true);}
             if(!FlyoverActive) {santa.gameObject.SetActive(false);return;}
             flyoverTime=Mathf.Min(FlyoverSeconds,flyoverTime+dt);
@@ -112,8 +115,8 @@ namespace Outlaws.WorldShift
             float t=flyoverTime/FlyoverSeconds;
             Vector3 forward=Vector3.ProjectOnPlane(game.Route.Sample(game.Distance).Forward,Vector3.up).normalized;
             Vector3 right=Vector3.Cross(Vector3.up,forward);
-            santa.SetPositionAndRotation(view.transform.position+forward*160f+right*Mathf.Lerp(-180f,180f,t)
-                +Vector3.up*(50f+Mathf.Sin(t*Mathf.PI)*3f),Quaternion.LookRotation(forward,Vector3.up));
+            santa.SetPositionAndRotation(view.transform.position+forward*115f+right*Mathf.Lerp(-145f,145f,t)
+                +Vector3.up*(32f+Mathf.Sin(t*Mathf.PI)*3f),Quaternion.LookRotation(forward,Vector3.up));
             figureFinish.SetFloat("_Opacity",Mathf.SmoothStep(0,1,t/.10f)*(1-Mathf.SmoothStep(0,1,(t-.90f)/.10f)));
         }
 

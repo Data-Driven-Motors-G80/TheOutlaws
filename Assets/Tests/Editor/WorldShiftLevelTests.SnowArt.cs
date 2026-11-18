@@ -19,8 +19,8 @@ public sealed partial class WorldShiftLevelTests
         StartLevel(SnowLevel);yield return WaitForNavigation();var game=Started();
         var presentation=Find("WorldShiftPresentation");
         var all=game.GetComponentsInChildren<Transform>(true);
-        Assert.That(all.Any(t=>t.name=="Packed snowbank"),Is.True);
-        foreach(string shape in new[]{"Fallen pine","Glacier block","Frozen roadwork gate"})
+        Assert.That(all.Any(t=>t.name=="Packed snowdrift"),Is.True);
+        foreach(string shape in new[]{"Upright pines","World-coloured block","World-coloured roadblock"})
             Assert.That(all.Any(t=>t.name.EndsWith(shape)),Is.True,shape);
         foreach(var bank in game.GetComponentsInChildren<MonoBehaviour>(true).Where(c=>c.GetType().Name=="WorldShiftSnowObstacleArt"))
         {
@@ -31,7 +31,7 @@ public sealed partial class WorldShiftLevelTests
                 Assert.That(v.y,Is.InRange(-.001f,1.801f));Assert.That(Mathf.Abs(v.z),Is.LessThanOrEqualTo(3.001f));
             }
         }
-        int ploughs=0;bool capturedPine=false,capturedIce=false,capturedGate=false;
+        int ploughs=0;bool capturedPine=false,capturedBlock=false,capturedGate=false,capturedDrift=false;
         foreach(object view in (IEnumerable)Field(presentation,"hazards"))
         {
             var data=Field(view,"Data");var solid=(GameObject)Field(view,"Solid");var ghost=(GameObject)Field(view,"Ghost");
@@ -39,6 +39,16 @@ public sealed partial class WorldShiftLevelTests
             bool traffic=Field(data,"Kind").ToString()=="Oncoming";
             var barrier=solid.GetComponentsInChildren<MonoBehaviour>(true).FirstOrDefault(c=>c.GetType().Name=="WorldShiftRetractableBarrier");
             Pose(game,start-(traffic?90f:24f),0f);Call(game,"PresentWorldForCamera",Field(data,"World"));
+            if((bool)Field(data,"SharedAcrossWorlds") && solid.GetComponentsInChildren<Transform>(true).Any(t=>t.name=="Packed snowdrift"))
+            {
+                foreach(string mode in new[]{"Day","Echo"})
+                {
+                    Call(game,"PresentWorldForCamera",World(mode));
+                    Assert.That(solid.activeSelf,Is.True,"Packed snow is a physical obstruction in both worlds.");
+                    if(!capturedDrift) Capture("snow-packed-drift-"+mode.ToLowerInvariant());
+                }
+                capturedDrift=true;
+            }
             if(barrier!=null)
             {
                 Call(barrier,"Step",1f);
@@ -47,12 +57,18 @@ public sealed partial class WorldShiftLevelTests
                     foreach(Vector3 v in filter.sharedMesh.vertices)
                     {
                         Assert.That(Mathf.Abs(v.x),Is.LessThanOrEqualTo(width*.5f+.02f));
-                        Assert.That(v.y,Is.InRange(-.02f,1.82f));Assert.That(Mathf.Abs(v.z),Is.LessThanOrEqualTo(3.02f));
+                        Assert.That(v.y,Is.InRange(-.02f,barrier.name.EndsWith("Upright pines")?5.80f:1.82f));
+                        Assert.That(Mathf.Abs(v.z),Is.LessThanOrEqualTo(3.02f));
                     }
+                if(barrier.name.EndsWith("Upright pines"))
+                    Assert.That(((Mesh)Field(barrier,"bodyMesh")).bounds.max.y,Is.GreaterThanOrEqualTo(5.3f),"Trees must stand visibly upright above the car.");
+                if(barrier.name.EndsWith("World-coloured block") || barrier.name.EndsWith("World-coloured roadblock"))
+                    Assert.That(((Mesh)Field(barrier,"bodyMesh")).colors.Any(c=>c.r>.85f&&c.g>.85f&&c.b>.85f),Is.False,
+                        "Day/Night boxes must keep their world colour without white snow caps.");
                 string label=null;
-                if(!capturedPine&&barrier.name.EndsWith("Fallen pine")){capturedPine=true;label="pine";}
-                if(!capturedIce&&barrier.name.EndsWith("Glacier block")){capturedIce=true;label="glacier";}
-                if(!capturedGate&&barrier.name.EndsWith("Frozen roadwork gate")){capturedGate=true;label="gate";}
+                if(!capturedPine&&barrier.name.EndsWith("Upright pines")){capturedPine=true;label="pine";}
+                if(!capturedBlock&&barrier.name.EndsWith("World-coloured block")){capturedBlock=true;label="plain-block";}
+                if(!capturedGate&&barrier.name.EndsWith("World-coloured roadblock")){capturedGate=true;label="gate";}
                 if(label!=null) Capture("snow-winter-"+label);
                 Call(game,"PresentWorldForCamera",Field(data,"World").ToString()=="Day"?World("Echo"):World("Day"));
                 Call(barrier,"Step",1f);
@@ -90,6 +106,6 @@ public sealed partial class WorldShiftLevelTests
             Assert.That(solid.activeSelf,Is.False);Assert.That(ghost.activeSelf,Is.True);
         }
         Assert.That(ploughs,Is.GreaterThan(0));
-        Assert.That(capturedPine&&capturedIce&&capturedGate,Is.True);
+        Assert.That(capturedPine&&capturedBlock&&capturedGate&&capturedDrift,Is.True);
     }
 }

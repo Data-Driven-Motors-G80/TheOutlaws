@@ -10,6 +10,11 @@ namespace Outlaws.WorldShift
             || route.Course.Environment == ShiftLevel.Mountain;
         private bool IsSnow => route.Course.Environment == ShiftLevel.Snow;
         private Transform snowfall;
+        private ParticleSystem snowParticles;
+        private WorldShiftCity snowGame;
+        private Material snowflakeFinish;
+        private float previousSnowDistance;
+        public float SnowfallStrength { get; private set; }
         private static readonly Color Powder = new Color(.91f, .96f, 1f);
         private static readonly Color Granite = new Color(.43f, .46f, .48f);
 
@@ -361,18 +366,16 @@ namespace Outlaws.WorldShift
 
         private void BuildSnowfall()
         {
-            snowfall = new GameObject("Light alpine snowfall").transform;
+            snowfall = new GameObject("Alpine snowfall - heavier over black ice").transform;
             snowfall.SetParent(transform, false);
             snowfall.position = route.Sample(22f).Position + Vector3.up * 12f;
-            var flakes = new WorldShiftArtMesh();
-            flakes.Triangle(new Vector3(-.5f, 0, 0), new Vector3(.5f, 0, 0), new Vector3(0, .7f, 0), Powder, true);
-            flakes.Triangle(new Vector3(0, 0, -.5f), new Vector3(0, 0, .5f), new Vector3(0, .7f, 0), Powder, true);
-            Mesh flake = flakes.Mesh("Reusable snowflake"); meshes.Add(flake);
             var particles = snowfall.gameObject.AddComponent<ParticleSystem>();
+            snowParticles=particles;snowGame=GetComponentInParent<WorldShiftCity>();
             particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             var main = particles.main;
-            main.loop = true; main.playOnAwake = false; main.maxParticles = 180;
+            main.loop = true; main.playOnAwake = false; main.maxParticles = 1100;
             main.startLifetime = 8f; main.startSpeed = 0f;
+            main.startColor=Color.white;
             main.startSize = new ParticleSystem.MinMaxCurve(.065f, .14f);
             main.simulationSpace = ParticleSystemSimulationSpace.Local;
             var shape = particles.shape; shape.shapeType = ParticleSystemShapeType.Box;
@@ -382,8 +385,11 @@ namespace Outlaws.WorldShift
             velocity.space = ParticleSystemSimulationSpace.Local;
             velocity.x = .4f; velocity.y = -2.5f; velocity.z = -1.2f;
             var renderer = particles.GetComponent<ParticleSystemRenderer>();
-            renderer.renderMode = ParticleSystemRenderMode.Mesh; renderer.mesh = flake;
-            renderer.sharedMaterial = surface; renderer.shadowCastingMode = ShadowCastingMode.Off;
+            snowflakeFinish=new Material(Resources.Load<Shader>("WorldShiftSnowfall")){name="Soft white Snow flakes"};
+            materials.Add(snowflakeFinish);
+            renderer.renderMode = ParticleSystemRenderMode.Billboard;
+            renderer.sharedMaterial = snowflakeFinish; renderer.shadowCastingMode = ShadowCastingMode.Off;
+            renderer.receiveShadows=false;
             particles.useAutoRandomSeed = false; particles.randomSeed = 347u;
             particles.Simulate(8f, true, true); particles.Play();
         }
@@ -391,7 +397,42 @@ namespace Outlaws.WorldShift
         private void LateUpdate()
         {
             if (snowfall != null)
+            {
                 snowfall.position = route.Sample(distance + 22f).Position + Vector3.up * 12f;
+                RefreshSnowfall();
+            }
+        }
+
+        private void RefreshSnowfall()
+        {
+            if(snowParticles==null) return;
+            if(snowGame!=null && (snowGame.State!=ShiftRunState.Running || snowGame.StoryActive || WorldShiftSceneLoading.Active))
+            {
+                if(snowParticles.isPlaying) snowParticles.Pause();
+                return;
+            }
+            // Feather the weather at each ice boundary. Fade early enough for the dry ramp approach.
+            float strength=0;
+            foreach(var zone in route.Course.IceZones)
+            {
+                float entry=Mathf.SmoothStep(0,1,Mathf.InverseLerp(zone.x,zone.x+18f,distance));
+                float exit=1-Mathf.SmoothStep(0,1,Mathf.InverseLerp(zone.y-45f,zone.y,distance));
+                strength=Mathf.Max(strength,entry*exit);
+            }
+            if(snowGame!=null && snowGame.IsRelayAirborne) strength=0;
+            SnowfallStrength=strength;
+            snowflakeFinish.SetFloat("_Night",night?1f:0f);
+            // Retries must not carry a dense cloud from the ice back onto a clear checkpoint.
+            if(Mathf.Abs(distance-previousSnowDistance)>80f) snowParticles.Clear();
+            previousSnowDistance=distance;
+            var emission=snowParticles.emission;emission.rateOverTime=Mathf.Lerp(22f,165f,strength);
+            var main=snowParticles.main;
+            main.startLifetime=Mathf.Lerp(8f,4f,strength);
+            main.startSize=new ParticleSystem.MinMaxCurve(Mathf.Lerp(.065f,.085f,strength),Mathf.Lerp(.14f,.18f,strength));
+            var velocity=snowParticles.velocityOverLifetime;
+            velocity.x=Mathf.Lerp(.4f,1.2f,strength);velocity.y=Mathf.Lerp(-2.5f,-4.2f,strength);
+            velocity.z=Mathf.Lerp(-1.2f,-1.9f,strength);
+            if(!snowParticles.isPlaying) snowParticles.Play();
         }
 
         private void ApplyAlpineAtmosphere(Camera camera, Light sun)

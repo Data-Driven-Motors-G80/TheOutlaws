@@ -3,7 +3,7 @@ using UnityEngine.Rendering;
 
 namespace Outlaws.WorldShift
 {
-    /// <summary>Snow-only obstacle art. Geometry stays in the existing obstacle box and adds no colliders.</summary>
+    /// <summary>Snow-only obstacle art. Ground footprints stay unchanged; upright tree canopies rise above the box. No colliders.</summary>
     internal sealed class WorldShiftSnowObstacleArt : MonoBehaviour
     {
         private Mesh mesh;
@@ -13,24 +13,40 @@ namespace Outlaws.WorldShift
 
         public static void Snowbank(Transform parent, Vector3 centre, Vector3 size)
         {
-            var root=new GameObject("Packed snowbank");root.transform.SetParent(parent,false);
+            var root=new GameObject("Packed snowdrift");root.transform.SetParent(parent,false);
             root.transform.localPosition=centre-Vector3.up*size.y*.5f;
             var owner=root.AddComponent<WorldShiftSnowObstacleArt>();
             var art=new WorldShiftArtMesh();float w=size.x,h=size.y,d=size.z;
-            art.ChamferBox(new Vector3(0,h*.40f,0),new Vector3(w,h*.8f,d),.24f,Ice);
-            art.ChamferBox(new Vector3(0,h*.68f,0),new Vector3(w*.93f,h*.48f,d*.96f),.28f,Snow);
-            // Hard, dark edging and reflector stakes separate a solid bank from harmless roadside snow.
+            // Sloping, asymmetric rings form a ploughed pile rather than a rectangular crate.
+            Vector2[] rim={new Vector2(.5f,.32f),new Vector2(.30f,.5f),new Vector2(-.30f,.5f),new Vector2(-.5f,.32f),
+                new Vector2(-.5f,-.32f),new Vector2(-.30f,-.5f),new Vector2(.30f,-.5f),new Vector2(.5f,-.32f)};
+            var foot=new Vector3[rim.Length];var shoulder=new Vector3[rim.Length];var crown=new Vector3[rim.Length];
+            float seed=Mathf.Round(parent.position.z+centre.x*7f);
+            float lean=Mathf.Sin(seed*1.3f)*w*.08f;
+            for(int i=0;i<rim.Length;i++)
+            {
+                Vector2 v=rim[i];float variation=Mathf.Sin(seed+i*2.1f);
+                foot[i]=new Vector3(v.x*w,.015f,v.y*d);
+                shoulder[i]=new Vector3(v.x*w*.88f,h*(.32f+variation*.055f),v.y*d*.88f);
+                crown[i]=new Vector3(v.x*w*.46f+lean,h*(.64f+variation*.075f),v.y*d*.46f);
+            }
+            Vector3 peak=new Vector3(lean,h*.98f,Mathf.Sin(seed)*d*.09f);
+            for(int i=0;i<rim.Length;i++)
+            {
+                int j=(i+1)%rim.Length;
+                Color packed=Color.Lerp(Ice,Snow,.45f+(i%3)*.12f);
+                art.Quad(foot[i],shoulder[i],shoulder[j],foot[j],packed);
+                art.Quad(shoulder[i],crown[i],crown[j],shoulder[j],Snow*(i%2==0?1f:.93f));
+                art.Triangle(crown[i],peak,crown[j],Snow);
+            }
+            // Small plough markers identify the blocked edges without framing the pile like a box.
             foreach(float side in new[]{-1f,1f})
             {
-                float x=side*(w*.5f-.13f);
-                art.Box(new Vector3(x,h*.5f,0),new Vector3(.13f,h,d*.90f),new Color(.13f,.24f,.30f));
-                foreach(float z in new[]{-d*.5f+.12f,d*.5f-.12f})
-                {
-                    art.Box(new Vector3(x,h*.5f,z),new Vector3(.20f,h,.20f),new Color(.17f,.23f,.26f));
-                    art.Box(new Vector3(x,h*.76f,z),new Vector3(.21f,h*.20f,.21f),new Color(.96f,.42f,.15f));
-                }
+                Vector3 stake=new Vector3(side*w*.41f,h*.34f,-d*.39f);
+                art.Box(stake,new Vector3(.085f,h*.68f,.085f),new Color(.28f,.32f,.34f));
+                art.Box(stake+Vector3.up*h*.23f,new Vector3(.13f,h*.18f,.13f),new Color(.96f,.30f,.12f));
             }
-            owner.mesh=art.Mesh("Packed snow and reflector stakes");
+            owner.mesh=art.Mesh("Sloped packed snow mound and plough markers");
             owner.material=new Material(Resources.Load<Shader>("WorldShiftOceanSurface")){name="Solid snowbank finish"};
             owner.material.SetFloat("_Emission",.15f);
             root.AddComponent<MeshFilter>().sharedMesh=owner.mesh;
@@ -38,40 +54,35 @@ namespace Outlaws.WorldShift
             renderer.shadowCastingMode=ShadowCastingMode.Off;
         }
 
-        public static void Glacier(WorldShiftArtMesh art,float w,float h,float d,ShiftWorld world)
+        public static void UprightPines(WorldShiftArtMesh art,float w,float h,float d,ShiftWorld world)
         {
-            art.Rock(Vector3.zero,new Vector3(w*.5f,h,d*.5f),Ice,17);
-            art.Rock(new Vector3(-w*.12f,h*.07f,0),new Vector3(w*.34f,h*.90f,d*.35f),Snow,41);
-            foreach(float side in new[]{-1f,1f})
+            Color bark=new Color(.27f,.15f,.09f),needles=new Color(.055f,.22f,.17f);
+            // A bank fills the existing blocked area, so gaps between trunks never suggest a safe lane.
+            art.ChamferBox(new Vector3(0,h*.15f,0),new Vector3(w,h*.30f,d),.16f,Ice);
+            art.ChamferBox(new Vector3(0,h*.28f,0),new Vector3(w*.97f,h*.20f,d*.98f),.14f,Snow);
+            int count=Mathf.Max(1,Mathf.RoundToInt(w/3f));
+            float spacing=w/count;
+            for(int tree=0;tree<count;tree++)
             {
-                float z=side*(d*.5f-.05f);
-                WorldPanel(art,new Vector3(0,h*.45f,z),w*.86f,h*.60f,world);
-            }
-        }
-
-        public static void FallenPine(WorldShiftArtMesh art,float w,float h,float d,ShiftWorld world)
-        {
-            Color bark=new Color(.31f,.19f,.12f), needles=new Color(.07f,.25f,.21f);
-            float trunkY=h*.52f;
-            art.ChamferBox(new Vector3(0,h*.08f,0),new Vector3(w,h*.16f,d),.10f,Snow);
-            art.Beam(new Vector3(-w*.48f,trunkY,0),new Vector3(w*.48f,trunkY,0),h*.32f,h*.32f,bark);
-            for(int tier=0;tier<3;tier++)
-            {
-                float start=-w*.38f+tier*w*.19f,tip=Mathf.Min(w*.47f,start+w*.48f);
-                float ry=h*(.44f-tier*.045f),rz=Mathf.Min(d*.43f,h*(.70f-tier*.07f));
-                for(int i=0;i<12;i++)
+                float x=-w*.5f+spacing*(tree+.5f);
+                float height=h*(3f+(tree%2)*.2f),radius=Mathf.Min(spacing*.45f,1.55f);
+                art.Cylinder(new Vector3(x,h*.12f,0),.22f,.14f,height*.72f,bark,10);
+                for(int tier=0;tier<3;tier++)
                 {
-                    float a=i*Mathf.PI/6f,b=(i+1)*Mathf.PI/6f;
-                    Vector3 A=new Vector3(start,trunkY+Mathf.Sin(a)*ry,Mathf.Cos(a)*rz);
-                    Vector3 B=new Vector3(start,trunkY+Mathf.Sin(b)*ry,Mathf.Cos(b)*rz);
-                    Vector3 T=new Vector3(tip,trunkY,0);
-                    Color tint=Mathf.Sin((a+b)*.5f)>.3f?Snow:needles*(i%2==0?1f:.80f);tint.a=1;
-                    art.Triangle(A,B,T,tint,true);
+                    float bottom=height*(.20f+tier*.22f),top=height*(.72f+tier*.14f);
+                    float r=radius*(1f-tier*.22f),coneHeight=top-bottom;
+                    art.Cylinder(new Vector3(x,bottom,0),r,0,coneHeight,needles,12);
+                    // Snow caps leave a broad dark-green skirt on every upright branch tier.
+                    art.Cylinder(new Vector3(x,bottom+coneHeight*.32f,0),r*.72f,0,coneHeight*.68f,Snow,12);
                 }
+                foreach(float side in new[]{-1f,1f})
+                    WorldPanel(art,new Vector3(x,h*.62f,side*(d*.5f-.05f)),
+                        Mathf.Min(spacing*.68f,2.1f),h*.56f,world);
             }
-            // World panels stay unobscured by branches and fit within the original front/back edges.
+            // Bright, continuous lower edges make the full blocked width readable on approach.
+            Color marker=world==ShiftWorld.Day?WorldShiftLevelProps.SwitchColour:WorldShiftLevelProps.NightColour;
             foreach(float side in new[]{-1f,1f})
-                WorldPanel(art,new Vector3(0,h*.42f,side*(d*.5f-.05f)),Mathf.Min(w*.65f,3f),h*.42f,world);
+                art.Box(new Vector3(0,h*.19f,side*(d*.5f-.04f)),new Vector3(w,h*.16f,.06f),marker);
         }
 
         internal static void WorldPanel(WorldShiftArtMesh art,Vector3 centre,float width,float height,ShiftWorld world)
