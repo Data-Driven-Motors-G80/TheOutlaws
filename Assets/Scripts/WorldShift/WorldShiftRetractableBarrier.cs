@@ -18,7 +18,7 @@ namespace Outlaws.WorldShift
             || data.Kind == ShiftHazardKind.Divider);
 
         public static WorldShiftRetractableBarrier Build(Transform parent, Vector3 centre, Vector3 size, ShiftWorld world,
-            ShiftLevel environment = ShiftLevel.City)
+            ShiftLevel environment = ShiftLevel.City, int variant = 0)
         {
             var root = new GameObject("Retractable " + world + " barrier");
             root.transform.SetParent(parent, false);
@@ -29,6 +29,9 @@ namespace Outlaws.WorldShift
             var body = new WorldShiftArtMesh();
             var footing = new WorldShiftArtMesh();
             float w = size.x, h = size.y, d = size.z;
+            string winterShape=environment!=ShiftLevel.Snow?null:w<=3.1f?"Glacier block"
+                :w<6f || (variant/5)%2==0?"Fallen pine":"Frozen roadwork gate";
+            if(winterShape!=null) root.name="Retractable "+world+" "+winterShape;
             footing.Box(new Vector3(0,.025f,0), new Vector3(w,.05f,d), new Color(.29f,.31f,.33f));
             // Solid road cover with thick dashed paint, never a raised wireframe or dark opening.
             const float stripe = .22f, dash = .95f, gap = .32f;
@@ -51,7 +54,9 @@ namespace Outlaws.WorldShift
                 footing.Box(new Vector3(-w*.5f+w*seam/count,.054f,0),
                     new Vector3(.035f,.012f,d-.15f), new Color(.22f,.24f,.26f));
             float panelWidth = w / count;
-            for (int i=0; i<count; i++)
+            if(winterShape=="Glacier block") WorldShiftSnowObstacleArt.Glacier(body,w,h,d,world);
+            else if(winterShape=="Fallen pine") WorldShiftSnowObstacleArt.FallenPine(body,w,h,d,world);
+            else for (int i=0; i<count; i++)
             {
                 float x = -w*.5f + (i+.5f)*panelWidth;
                 body.ChamferBox(new Vector3(x,h*.5f,0),new Vector3(panelWidth-.12f,h,d-.08f),.08f,colour);

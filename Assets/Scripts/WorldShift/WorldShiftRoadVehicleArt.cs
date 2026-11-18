@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 namespace Outlaws.WorldShift
 {
     /// <summary>Actual oncoming traffic, facing against travel. Rendering never changes its collision box.</summary>
-    public sealed class WorldShiftRoadVehicleArt : MonoBehaviour
+    public sealed partial class WorldShiftRoadVehicleArt : MonoBehaviour
     {
         private readonly List<Mesh> meshes = new List<Mesh>();
         private readonly List<Material> materials = new List<Material>();
@@ -72,14 +72,15 @@ namespace Outlaws.WorldShift
         private static readonly int TintId = Shader.PropertyToID("_BaseColor");
 
         public static WorldShiftRoadVehicleArt Build(Transform parent, Vector3 centre, Vector3 size,
-            WorldShiftObstacleVisual.Palette palette, ShiftLevel environment, int variant = 0, bool shared = false)
+            WorldShiftObstacleVisual.Palette palette, ShiftLevel environment, int variant = 0, bool shared = false,
+            ShiftWorld world = ShiftWorld.Day)
         {
             var root = new GameObject("Oncoming traffic vehicle");
             root.transform.SetParent(parent, false);
-            root.transform.localPosition = centre + Vector3.up * size.y * .175f;
+            root.transform.localPosition = centre + Vector3.up * size.y * (environment==ShiftLevel.Snow?0f:.175f);
             root.transform.localRotation = Quaternion.Euler(0,180,0);
             var art = root.AddComponent<WorldShiftRoadVehicleArt>();
-            art.Create(size,palette,environment,variant,shared);
+            art.Create(size,palette,environment,variant,shared,world);
             art.SetHeadlightPulse(Time.time);
             return art;
         }
@@ -91,8 +92,9 @@ namespace Outlaws.WorldShift
             new Color(.40f,.27f,.55f), new Color(.45f,.66f,.82f), new Color(.30f,.33f,.37f), new Color(.62f,.52f,.38f)
         };
 
-        private void Create(Vector3 size, WorldShiftObstacleVisual.Palette palette, ShiftLevel environment, int variant, bool shared)
+        private void Create(Vector3 size, WorldShiftObstacleVisual.Palette palette, ShiftLevel environment, int variant, bool shared, ShiftWorld world)
         {
+            if(environment==ShiftLevel.Snow) { CreateSnowplough(size,world);return; }
             // Taller warning silhouette; horizontal gameplay footprint remains unchanged.
             transform.localScale = new Vector3(size.x/3.05f,size.y/1.8f*1.35f,size.z/5.5f);
             var paint=new WorldShiftArtMesh();
@@ -160,6 +162,11 @@ namespace Outlaws.WorldShift
             bodyFinish.SetFloat("_Emission",shared ? .35f : .12f);
             Draw(shared ? "Shared mover van body" : "Traffic car body",paint,bodyFinish);
             Draw("Traffic glass, bumper and trim",trim,OwnMaterial("Traffic trim",false));
+            BuildDirectionWarnings();
+        }
+
+        private void BuildDirectionWarnings()
+        {
             // Large road chevrons point along local +Z (toward the approaching player).
             // No hovering marker: keep the skyline and tutorial signs unobstructed.
             var warning = new WorldShiftArtMesh();
@@ -174,6 +181,7 @@ namespace Outlaws.WorldShift
         private void Update()
         {
             SetHeadlightPulse(Time.time);
+            UpdateSnowBeacon();
             UpdateHorn();
         }
         private void OnDisable()
