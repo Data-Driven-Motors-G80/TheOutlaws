@@ -81,7 +81,7 @@ namespace Outlaws.WorldShift
             if (!IsUnlocked(level) || !BeginTransition()) return false;
             WorldShiftLevelAnalytics.EndAttempt(from == "retry" ? "retry" : "left");
             Current = level;
-            StartWithStory = level == 1 && from != "retry";
+            StartWithStory = (level == 1 || level == 2) && from != "retry";
             Attempt++;
             WorldShiftLevelAnalytics.PendingStart = from;
             Time.timeScale = 1f;

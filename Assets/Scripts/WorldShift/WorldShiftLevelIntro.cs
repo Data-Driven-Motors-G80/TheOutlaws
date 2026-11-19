@@ -27,6 +27,7 @@ namespace Outlaws.WorldShift
         private void BuildCityStory(Transform safe)
         {
             if (!game.StoryActive) return;
+            if(game.Environment==ShiftLevel.Ocean) {BuildOceanIntro(safe);return;}
             storyRoot = WorldShiftMenu.Panel(safe,"City opening story",Vector2.zero,Vector2.one,new Color(.008f,.018f,.03f,.98f)).gameObject;
             storyRoot.GetComponent<Image>().raycastTarget = true;
             storyCard = WorldShiftMenu.Panel(storyRoot.transform,"Story card",new Vector2(.5f,.5f),new Vector2(.5f,.5f),PauseFace);
@@ -90,6 +91,7 @@ namespace Outlaws.WorldShift
 
         private void UpdateCityStory()
         {
+            if(game.Environment==ShiftLevel.Ocean) {UpdateOceanIntro();return;}
             if (Keyboard.current==null || Time.unscaledTime<storyKeyboardReady) return;
             var keys = Keyboard.current;
             if (keys.escapeKey.wasPressedThisFrame) EndCityStory();
@@ -99,6 +101,7 @@ namespace Outlaws.WorldShift
 
         private void RefreshCityStory()
         {
+            if(game.Environment==ShiftLevel.Ocean) {RefreshOceanIntro();return;}
             if (storyRoot==null) return;
             storyRoot.SetActive(game.StoryActive);
             if (!game.StoryActive) return;

@@ -153,7 +153,15 @@ namespace Outlaws.WorldShift
                 }
                 case ShiftLevel.Ocean:
                 {
-                    // Harbour floodgate: rivet rows and a black rubber fender along the top.
+                    // Harbour floodgate: inset framed face, safety tape and bolted steel ribs.
+                    OnBothFaces(h*.12f,h*.09f,-w*.5f,w*.5f,.035f,new Color(.87f,.9f,.88f));
+                    foreach(float edge in new[]{-1f,1f})
+                    {
+                        float rib=edge*(w*.5f-.09f);
+                        art.ChamferBox(new Vector3(x+rib,h*.48f,0),new Vector3(.16f,h*.88f,d+.025f),.025f,new Color(.23f,.29f,.32f));
+                        OnBothFaces(h*.9f,.07f,rib-.07f,rib+.07f,.045f,new Color(1f,.8f,.35f));
+                    }
+                    // Rubber crown and rivets stay clear of the shared sun/moon symbol.
                     art.Box(new Vector3(x,h-.07f,0),new Vector3(w,.14f,d),new Color(.05f,.05f,.06f));
                     for (float rx=-w*.5f+.18f; rx<w*.5f-.1f; rx+=.34f)
                         foreach (float ry in new[] {h*.2f,h*.78f})
@@ -173,7 +181,7 @@ namespace Outlaws.WorldShift
             }
         }
 
-        private static void Icon(WorldShiftArtMesh art,Vector3 centre,float r,ShiftWorld world,Color ink)
+        internal static void Icon(WorldShiftArtMesh art,Vector3 centre,float r,ShiftWorld world,Color ink)
         {
             if(world == ShiftWorld.Day)
             {

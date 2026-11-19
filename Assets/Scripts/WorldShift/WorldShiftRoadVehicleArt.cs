@@ -162,7 +162,20 @@ namespace Outlaws.WorldShift
             bodyFinish.SetFloat("_Emission",shared ? .35f : .12f);
             Draw(shared ? "Shared mover van body" : "Traffic car body",paint,bodyFinish);
             Draw("Traffic glass, bumper and trim",trim,OwnMaterial("Traffic trim",false));
+            if (!shared) BuildWorldBadge(world);
             BuildDirectionWarnings();
+        }
+
+        private void BuildWorldBadge(ShiftWorld world)
+        {
+            var badge = new WorldShiftArtMesh();
+            Color colour = world == ShiftWorld.Day ? WorldShiftLevelProps.SwitchColour : WorldShiftLevelProps.NightColour;
+            Color ink = new Color(.035f,.045f,.06f);
+            // A broad front-facing roof plate, readable over the hood without hiding the headlights.
+            badge.ChamferBox(new Vector3(0,.89f,1.05f),new Vector3(1.42f,1.05f,.13f),.06f,ink);
+            badge.ChamferBox(new Vector3(0,.89f,1.13f),new Vector3(1.3f,.93f,.05f),.03f,colour);
+            WorldShiftRetractableBarrier.Icon(badge,new Vector3(0,.89f,1.161f),.36f,world,ink);
+            Draw(world + " traffic sun-moon badge",badge,OwnMaterial("Traffic world symbol",true));
         }
 
         private void BuildDirectionWarnings()

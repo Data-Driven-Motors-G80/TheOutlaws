@@ -13,10 +13,11 @@ A low-fidelity Unity driving playtest built around switching between Day and Nig
 - The home screen lists the levels: **0 Training, 1 City, 2 Ocean, 3 Snow, 4 Mountain, 5 Desert**. Beat a level to unlock the next.
 - Still obstacles belong to Day or Night. The other world's obstacles show as dashed outlines (Day yellow, Night black): you can drive through dashes, but switching while inside one is a crash. Oncoming traffic belongs to one world too.
 - Anything that slides sideways or rolls toward you exists in both worlds, stays orange, moves in Day and freezes in Night.
+- Ocean adds an optional police helicopter: collect Day ammunition to auto-fire; Night freezes attack preparation. Hits weaken the helicopter and 6 bring it down. Missing ammo never fails the level.
 - Training teaches each rule with green highway signs before the real levels.
 - One hit and the police catch you (BUSTED); you restart at the last checkpoint.
 - Beating a level plays a short getaway scene, then unlocks the next destination.
-- Every section ends with a big ramp: launch in one world, switch in the air, land in the other. After a successful landing, the recovery deck exists in both worlds and Space responds immediately. Checkpoint positions are unchanged.
+- Every section ends with a big ramp: launch in one world, switch in the air, land in the other. After a successful landing, the recovery deck exists in both worlds and Space responds immediately. Successful landings provide saved checkpoints.
 
 **Team testing:** press **Shift+U** on the home screen (or use **The Outlaws > Levels > Unlock All Levels (testing)** in the Editor) to open every level. An open-lock icon in the corner shows it is on. **Reset Level Progress** clears saved progress.
 

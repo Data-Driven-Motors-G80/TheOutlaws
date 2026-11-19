@@ -1,31 +1,123 @@
-# Level 2 Ocean
+# Level 2 Ocean — optional helicopter pursuit
 
-Ocean uses the shared level controller: five coastal driving sections, a world-switch
-ramp at the end of each section, one-hit crashes and checkpoints after the first
-four landings. The final landing finishes the level and unlocks Snow.
+Five sections, one-hit collisions and four saved landing checkpoints remain. Ocean
+still ends with the ferry escape and unlocks Snow. Existing scenery, traffic and
+world-switch mechanics are preserved; dry approaches are longer to reserve safe
+helicopter strike pockets.
 
-The new rule is **collect every diamond**. Faceted mint diamonds above glowing road circles
-exist in both Day and Night. Drive through them; no extra button is needed.
-They are required targets, separate from the X-marked obstacles.
+## Ammunition and counterattack
 
-Passing a diamond by more than 5 m without collecting it shows
-MISSED DIAMOND - RETRY and returns to the current checkpoint. A crash, missed
-jump or manual checkpoint retry also resets that section's diamonds. Diamonds
-from completed sections stay collected. Restarting the whole level clears all
-items. The HUD shows the total collected out of 11.
+There are 12 rocket crates (2 / 2 / 2 / 3 / 3 per section).
+They are collectible in Day; Night shows their ground markers. Missing one never
+retries the level. Each pickup automatically launches a homing rocket from the
+roof launcher, with no new input, inventory or manual aiming.
 
-| Section | Required diamonds | Focus |
-| --- | --- | --- |
-| 1 | 1 | Collect a central diamond, then switch and freeze |
-| 2 | 2 | Steer from the left target to the right target |
-| 3 | 2 | Freeze moving blocks and line up for targets |
-| 4 | 3 | Collect across lanes between world-specific walls |
-| 5 | 3 | Combine collection, steering and freezing |
+The helicopter has 6 health. At 3 hits it smokes and stops combining strikes with
+Day cargo; at 5 hits it loses its twin attack and repeats last-stand barrages in subsequent safe attack pockets.
+All stages keep the ordinary attack cadence. At 6 hits it explodes, immediately
+cancels its attacks and falls into the sea. Remaining ammo is hidden.
+A segmented health bar follows the aircraft, alongside the HUD counter. Zero
+pickups still allow a win. Police stripes, POLICE lettering and red/blue beacons
+match the shared cruiser. The final rocket triggers a large fireball, shock ring,
+flying police-aircraft fragments and a short breakup kick. A fixed world-space dive
+ends in a foam ring, water plumes, a separate crash boom/wash and a second .7-second
+camera kick. Both pulses decay quickly. Effects play once and clear on retry.
+The larger finned player rocket takes 1.35 seconds, arcs upward with bright exhaust
+and a smoke trail, and tracks the moving aircraft. Health visuals update on arrival.
+The roof launcher recoils; rocket arrival triggers
+sparks, a brief flash, a small aircraft kick and a synthesized metallic hit cue.
 
-Items are at least 60 m after a checkpoint and 60 m before a ramp, with clear
-space around each target. Instructional green signs appear only in Training.
-Both worlds keep the same targets, speed and road geometry.
-The course is 2,729 m. Fuel, cash, shooting and power-ups remain disabled in level play.
+## Attacks and switching
+
+The five sections have 20 attack starts (3 / 4 / 4 / 4 / 5). Each section now
+reserves one **108 m spread field**, replacing two compact encounters instead
+of stacking a long attack on top of the old Night walls. Other attacks normally
+start 72 m apart. All damage stages use the available pockets; damage removes
+cargo combinations and eventually twins instead of skipping attacks.
+
+- **Missile / twin:** the existing single-lane and adjacent-lane strikes.
+- **Compact point saturation:** seven separate 1.8 m square impacts in a small
+  pocket, with a marked outside exit.
+- **Spread point saturation:** seven individual targets 18 m apart, covering
+  left, middle and right over 108 m. Later impacts are timed to their road
+  distance, creating repeated steering decisions. Each square has its own
+  warning, missile, impact and solid debris. There is no single green lane
+  through the entire field; players can steer between points or freeze the attack.
+- **Repeated last stand:** at 1 HP, every subsequent ordinary safe attack start
+  becomes an 18-missile barrage until the boss is killed. Compact pockets retain
+  an outside exit. Spread pockets have three six-missile waves 54 m apart,
+  alternating the free outside lane. Saving a checkpoint does not suppress later
+  barrages. The five curtain encounters retain their slower timing at 1 HP.
+- **Slow missile curtain:** one authored opportunity per section, five at most
+  if the aircraft survives. Fifteen missiles cover almost the full road in three
+  small rows. Launches are staggered, impact takes 3.05–3.35 seconds of Day time,
+  and warnings lock 90 m ahead. It asks the player to freeze the incoming field
+  in Night before it reaches the road, rather than squeeze through a fake gap.
+  No Night closure or cargo occupies the curtain pocket.
+
+Warnings never retarget. Current-lane/short movement prediction selects the
+attack side once, with a per-run seed retained on retries. Night freezes launch
+and impact clocks and missiles. Already landed debris remains solid in both
+worlds. Warning squares alone cause no damage. Full-health single/twin encounters
+can still combine with Day cargo; Night lowers that cargo. Point fields and
+curtains never add cargo.
+
+Course data explicitly reserves each field's start and end. The whole span stays
+clear of ordinary hazards, pickups, ramps and checkpoint recovery. Night closure
+edges stay at least 28 m beyond attack-pocket edges. Existing separated Night
+closures require a return to Day, and ammo remains Day-only. Passed attacks expire
+only after their final target, including a long field's distant waves. Pausing
+freezes simulation; retry clears live effects and restores banked damage. A kill
+immediately cancels every attack, with no unavoidable after-death barrage. The
+Night freeze rule itself has not been weakened or given an energy/cooldown limit.
+
+## Restored ordinary road hazards
+
+The five sections include 15 ordinary Day barrier rows, alongside the ten
+oncoming vehicles and helicopter attacks. They reuse the existing retractable
+sun-marked barriers, including their original colours and sinking animation.
+Two original teal police spike sliders per section (ten total) use the unchanged
+WorldShiftSpikePlatform factory: metal cones, teal base and white direction
+arrows. They move in Day and freeze while remaining solid in Night.
+
+Spikes sit at section offsets 124 m and 347 m. Later compact missile pockets move
+8 m forward to clear the second spike. The long bombing fields, all 20 helicopter
+opportunities, 12 ammo pickups and five slow curtains remain. Selected late
+closures now belong to Day, leaving readable separation from Night rows; the
+last 34 m before each ramp stays clear.
+
+## Two giant airborne dolphins
+
+Each 132 m flight has two large, bright swimmers, at takeoff +38 m and +98 m.
+They face sideways and cross in opposite directions at 9 m/s, reaching beyond
+both road edges. Centred bodies cover all three lanes: use Day to move them aside,
+then either steer through or freeze the opening in Night. The second swimmer asks
+for another sideways adjustment. Bodies stay solid in both worlds and after the
+boss is defeated. Tapered, swept collision follows their broad body rather than an
+oversized spherical hitbox. Every upcoming dolphin moves from the start of Day
+play, even far from the player; there is no approach trigger. Night freezes all
+of them. Retries reset their clocks, then Day movement resumes.
+Ocean air steering remains .6 and the destination-world landing rule is unchanged.
+
+Dolphin deaths show DAY: MOVE / NIGHT: FREEZE.
+Missile deaths show NIGHT: FREEZE MISSILES / ROCKETS: HIT HELI. Only these two causes receive 3 seconds to read the hint;
+ordinary cargo collisions retain the original retry timing and no mechanic hint.
+
+Implementation: WorldShiftOceanHelicopter.cs / .Art.cs / .ArtDetails.cs / .Effects.cs / .Defeat.cs / .Dolphins.cs, optional mode in
+WorldShiftLevelCollection, and the existing Ocean presentation/HUD. Short coverage
+lives in WorldShiftLevelTests.Ocean.cs. Existing death analytics records AIR STRIKE or DOLPHIN COLLISION.
+
+## Skippable helicopter introduction
+
+Fresh Ocean entries (menu or Next Level) show a 5.5-second fly-in using the real
+helicopter and coastal scenery. The camera follows the aircraft, then returns to
+the car. Brief captions introduce rocket pickups and freezing missiles. Skip,
+Enter or Escape starts play immediately; otherwise the intro ends automatically.
+Driving, attack/dolphin clocks, chase audio and attempt analytics wait until it
+finishes. Checkpoint retries and full-level retries skip it. No new raster art,
+video files or scene are required.
+
+## Preserved coastal art
 
 Ocean has an authored low-poly coastal presentation: a viaduct over animated
 water, rocky palm islands, coastal houses, sailboats and striped lighthouses.
@@ -34,23 +126,22 @@ beacons marking the jump approaches. Day uses a turquoise coast; Night uses a
 starry blue sky and turquoise bridge lighting. Jump gaps expose the sea and the
 bridge edges disappear with their world's deck.
 
-The player coupe is shared across Training and all five levels, with the same silhouette, wheels, windows, lights and maroon livery. Diamonds bob
+The player coupe is shared across Training and all five levels, with the same silhouette, wheels, windows, lights and maroon livery. Rocket crates bob
 and rotate, then play a short glass chime and expanding ripple when collected.
 Scenery has no colliders and stays outside the driving corridor. This art pass
-keeps the existing layout, steering, collision rules and 11 required diamonds.
+keeps the existing layout, steering, collision rules and 12 optional ammunition pickups.
 
-Ocean obstacles use coastal models: corrugated shipping containers and striped
-harbour barricades close the road, while strapped fishing crates fill individual
-lanes. Sideways movers are powered inspection trolleys: inset rails, drive rollers,
-electric motor housings and directional markings explain their shuttle motion.
-Some lane closures use parked coastal service vans; their wheels remain still.
-Their world colours, dashed other-world footprints, movement and collision sizes
-remain the same. Model details stay within the existing hazard footprints.
+Ocean road closures reuse world-coloured retractable harbour panels with the same
+sun/moon symbols, rivets, steel ribs and reflective trim. Footprints and .18-second
+sinking stay consistent with the rest of the game. Older cargo/trolley/parked-van
+art factories remain available, but are not part of this revised authored layout.
 
 Oncoming traffic in the shared level renderer uses vehicles facing the player,
 with approaching headlights, mirrors, windows, bumpers and rotating wheels. Ocean
-currently has no oncoming traffic placements; its service vans are stationary
-closures. Vehicle art changes do not add traffic or alter hazard timing.
+includes ten oncoming service vehicles (five in each world), with broad sun/moon
+plates matching the shared barrier symbols. Day and Night encounter rows are separated.
+Retractable harbour panels gain framed steel ribs and reflective trim without changing
+collision or the sinking animation. Background art is unchanged.
 
 The visual polish is Ocean-only. The five sections have authored fishing-harbour,
 rocky-headland, cable-bridge, lighthouse and final-crossing landmarks. Soft contact
@@ -62,16 +153,16 @@ natural material colours. Road scuffs and expansion joints follow each deck and
 hide with it. Jump edges show end caps and girders; illuminated landing frames
 appear only in the destination world. These details have no colliders.
 
-Ocean's compact rounded HUD shows a diamond icon and count, smaller world/pause
+Ocean's compact rounded HUD shows a police icon and helicopter health, smaller world/pause
 buttons and the same larger progress bar, checkpoint dots and finish icon used
 in the other levels. Progress movement, collection pulses and the
 checkpoint notice animate smoothly. The checkpoint notice remains below the
-counter, above the driving sight line; missed-item retries retain clear feedback.
+counter, above the driving sight line; collision retries retain clear feedback.
 
 The pursuing police use the shared black-and-white patrol cruiser, with POLICE
 livery on the doors, bonnet and rear, a roof unit number and alternating red/blue
 roof beacons. Ocean retains that marked model in both worlds, alongside its
-existing contact shadow. Catch-up timing and checkpoint retries are unchanged.
+existing contact shadow. Catch-up motion is unchanged; only dolphin/missile retry hints extend the pause to 3 seconds.
 
 The four saved checkpoints use coastal road gantries at the exact respawn
 positions. Galvanised posts sit outside the carriageway, with a small dark
@@ -86,8 +177,7 @@ landing opens its recovery deck in both worlds, including the matching road,
 bridge edges and landing frame. Before a successful landing, the launch world's
 landing stays missing and touching down in the wrong world still retries the
 section. Retrying before a ramp restores that puzzle; saved, completed sections
-retain their shared recovery decks. Checkpoint positions and driving speeds are
-unchanged.
+retain their shared recovery decks. Checkpoints follow the current authored landings; driving speeds are unchanged.
 
 Ocean uses the same player and police model factories as the other levels; it
 adds its coastal lighting and contact shadows without creating vehicle overrides.
@@ -113,7 +203,7 @@ softens the same recording over .75 s without changing its playback position.
 Ocean ambience remains exclusive to Ocean.
 
 Pause has separate Music and Effects sliders, saved in `ws_audio_music` and
-`ws_audio_effects`. Effects includes the engine, ambience, cues, existing diamond
+`ws_audio_effects`. Effects includes the engine, ambience, cues, existing pickup
 and checkpoint chimes, traffic warning horns and the police siren. Sound playback
 pauses with gameplay and stopped Training lessons. Music ducks on retry and
 makes room for a short completion sting on success. Existing collection chimes

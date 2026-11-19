@@ -150,20 +150,18 @@ namespace Outlaws.WorldShift
             for (int i = 0; i < game.Collection.Items.Length; i++)
             {
                 var item = game.Collection.Items[i]; var p = route.Sample(item.x);
-                var root = new GameObject("Ocean diamond " + (i + 1)).transform;
+                var root = new GameObject("Ocean rocket ammunition " + (i + 1)).transform;
                 root.SetParent(transform, false);
                 root.SetPositionAndRotation(p.Position + p.Right * item.y, Quaternion.LookRotation(p.Forward, p.Up));
                 var geometry = new WorldShiftArtMesh();
-                for (int side = 0; side < 8; side++)
+                geometry.ChamferBox(Vector3.zero,new Vector3(1.35f,.6f,.95f),.10f,new Color(.16f,.27f,.27f));
+                foreach(float x in new[]{-.35f,.35f})
                 {
-                    float a = side * Mathf.PI / 4f, b = (side + 1) * Mathf.PI / 4f;
-                    Vector3 left = new Vector3(Mathf.Cos(a) * .8f, .15f, Mathf.Sin(a) * .8f);
-                    Vector3 right = new Vector3(Mathf.Cos(b) * .8f, .15f, Mathf.Sin(b) * .8f);
-                    Color c = Color.Lerp(new Color(.12f, .79f, .73f), new Color(.85f, 1f, .92f), (side % 3) * .42f);
-                    geometry.Triangle(left, Vector3.up * 1.1f, right, c);
-                    geometry.Triangle(right, Vector3.down * .85f, left, c * .8f);
+                    geometry.Cylinder(new Vector3(x,.3f,0),.16f,.16f,.7f,new Color(.92f,.78f,.28f),10);
+                    geometry.Cylinder(new Vector3(x,1,0),.16f,0,.3f,new Color(.95f,.35f,.12f),10);
                 }
-                var stone = Render("Faceted diamond", geometry, luminous, root).transform;
+                geometry.Box(new Vector3(0,0,-.49f),new Vector3(.8f,.15f,.035f),new Color(1,.8f,.25f));
+                var stone = Render("Twin rocket ammo crate", geometry, luminous, root).transform;
                 stone.localPosition = Vector3.up * 1.65f;
                 var ringWorldShiftArtMesh = new WorldShiftArtMesh();
                 ringWorldShiftArtMesh.Ring(1.1f, .065f, new Color(.35f, .96f, .83f));
@@ -263,8 +261,9 @@ namespace Outlaws.WorldShift
                 gem.Taken = taken;
                 float age = animationTime - gem.CollectedAt;
                 gem.Root.gameObject.SetActive(game.Collection.Items[i].x > distance - 30f
-                    && game.Collection.Items[i].x < distance + 260f && (!taken || age < .55f));
-                gem.Stone.gameObject.SetActive(!taken); gem.Ring.gameObject.SetActive(!taken);
+                    && game.Collection.Items[i].x < distance + 260f && (!taken || age < .55f)
+                    && (game.OceanBoss == null || !game.OceanBoss.Defeated));
+                gem.Stone.gameObject.SetActive(!taken && world == ShiftWorld.Day); gem.Ring.gameObject.SetActive(!taken);
                 gem.Burst.gameObject.SetActive(taken && age < .55f);
                 gem.Burst.localScale = Vector3.one * (1f + Mathf.Max(0f, age) * 6f);
             }

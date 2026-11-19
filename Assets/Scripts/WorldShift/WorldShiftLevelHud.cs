@@ -71,7 +71,7 @@ namespace Outlaws.WorldShift
             RectTransform collectionPanel = null;
             if (game.Course.RequiredItems.Length > 0)
             {
-                var items = WorldShiftMenu.Panel(driving.transform, "Required diamonds", new Vector2(.34f, .85f), new Vector2(.66f, .90f), Ink);
+                var items = WorldShiftMenu.Panel(driving.transform, "Ocean air pursuit", new Vector2(.34f, .85f), new Vector2(.66f, .90f), Ink);
                 collectionPanel = items;
                 collectionStatus = WorldShiftMenu.Label(items, "", .02f, 0f, .98f, 1f, 24f);
                 collectionStatus.color = WorldShiftLevelProps.CollectionColour;
@@ -272,7 +272,7 @@ namespace Outlaws.WorldShift
         private void Refresh()
         {
             if (collectionStatus != null)
-                collectionStatus.text = game.MissedRequiredItem ? (oceanHud ? "MISS - RETRY" : "MISSED DIAMOND - RETRY")
+                collectionStatus.text = game.OceanBoss != null ? game.OceanBoss.Status : game.MissedRequiredItem ? (oceanHud ? "MISS - RETRY" : "MISSED DIAMOND - RETRY")
                     : (oceanHud ? "" : "DIAMONDS ") + game.Collection.Count + " / " + game.Course.RequiredItems.Length;
             int freezeStep = Mathf.Clamp(game.TrainingFreezeStep,0,3);
             if (freezeStep == 3 && previousFreezeStep < 3) freezeCompleteRemaining = .65f;
