@@ -35,7 +35,7 @@ public sealed partial class WorldShiftLevelTests
             Assert.That((bool)Field(Get(game, "Course"), "Training"), Is.EqualTo(level == 0));
             Assert.That(((Array)Get(game, "Checkpoints")).Length, Is.GreaterThan(0));
             Assert.That(((Array)Get(game, "Hazards")).Length, Is.GreaterThan(0));
-            if (level == OceanLevel) Assert.That(((Vector2[])Field(Get(game, "Course"), "RequiredItems")).Length, Is.EqualTo(11));
+            if (level == OceanLevel) Assert.That(((Vector2[])Field(Get(game, "Course"), "RequiredItems")).Length, Is.EqualTo(12));
             var playerArt=((Transform)Get(game,"Player")).GetComponentsInChildren<MonoBehaviour>(true).Where(c=>c.GetType().Name=="WorldShiftPlayerCarArt").ToArray();
             var policeArt=((Component)Get(game,"Police")).GetComponentsInChildren<MonoBehaviour>(true).Where(c=>c.GetType().Name=="WorldShiftPoliceCarArt").ToArray();
             Assert.That(playerArt.Length,Is.EqualTo(1),"Every level must use exactly one shared player coupe.");
@@ -183,7 +183,7 @@ public sealed partial class WorldShiftLevelTests
         ClickButton(VisibleButton("Level 0"));yield return WaitForNavigation();
         for(int level=0;level<6;level++)
         {
-            Assert.That(Get(Find("WorldShiftCity"),"StoryActive"),Is.EqualTo(level==1),"Only entering City opens the story.");
+            Assert.That(Get(Find("WorldShiftCity"),"StoryActive"),Is.EqualTo(level==1||level==2),"City and Ocean have skippable introductions.");
             var game=Started();Assert.That(Get(game,"LevelIndex"),Is.EqualTo(level));
             string[] expected = { "City", "City", "Ocean", "Snow", "Mountain", "Desert" };
             Assert.That(Get(game,"Environment").ToString(),Is.EqualTo(expected[level]));
@@ -291,7 +291,8 @@ public sealed partial class WorldShiftLevelTests
         Static(Levels,"Menu");yield return WaitForNavigation();
         Assert.That(GameObject.Find("City opening story"),Is.Null,"Leaving the scene cleans up the whole comic.");
         StartLevel(2);yield return WaitForNavigation();
-        Assert.That(Get(Find("WorldShiftCity"),"StoryActive"),Is.False);
+        Assert.That(Get(Find("WorldShiftCity"),"StoryActive"),Is.True);
+        Assert.That(GameObject.Find("City opening story"),Is.Null,"Ocean uses its own fly-in, not the City comic.");
     }
     [UnityTest]
     public IEnumerator MenuIsLaidOutBeforeFirstDrawAndLoadingRespondsImmediately()

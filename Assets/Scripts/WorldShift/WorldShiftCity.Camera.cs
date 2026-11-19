@@ -7,6 +7,7 @@ namespace Outlaws.WorldShift
         private void UpdateCamera(bool immediate)
         {
             if(Escape!=null && Escape.Active) return;
+            if(StoryActive && OceanBoss!=null && OceanBoss.PresentIntroCamera(view)) return;
             RoadPathPoint point = Route.SampleDriver(Distance, Route.Sample(Distance), Lateral);
             const float follow = .28f;
             Vector3 desired = point.Position - point.Forward * 12f + Vector3.up * 6.4f + point.Right * Lateral * follow;

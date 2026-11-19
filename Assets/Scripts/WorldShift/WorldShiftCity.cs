@@ -21,8 +21,10 @@ namespace Outlaws.WorldShift
         private LevelCourse course;
         private ShiftHazard[] levelHazards;
         public WorldShiftLevelCollection Collection { get; private set; }
+        public WorldShiftOceanHelicopter OceanBoss { get; private set; }
         public string FailureReason => State == ShiftRunState.Retrying ? lastFailure : "";
-        public float CheckpointRetryProgress => Mathf.Clamp01(1f - retryRemaining / (Capturing ? 1.6f : 1.05f));
+        private float RetryDuration => lastFailure == "DOLPHIN COLLISION" || lastFailure == "AIR STRIKE" ? 3f : Capturing ? 1.6f : 1.05f;
+        public float CheckpointRetryProgress => Mathf.Clamp01(1f - retryRemaining / RetryDuration);
         public GameObject StreetlightPrefab => streetlightPrefab;
         public bool MissedRequiredItem => LevelMode && State == ShiftRunState.Retrying && lastFailure == "MISSED ITEM";
         public LevelCourse Course => course;
@@ -161,7 +163,7 @@ namespace Outlaws.WorldShift
                     foreach (var checkpoint in course.Checkpoints)
                         if (checkpoint.Distance <= at) hazard.WakeFloor = Mathf.Max(hazard.WakeFloor, checkpoint.Distance);
                 }
-                Collection = new WorldShiftLevelCollection(course.RequiredItems);
+                Collection = new WorldShiftLevelCollection(course.RequiredItems, environment == ShiftLevel.Ocean);
             }
             GetawayMode = !LevelMode && WorldShiftFlow.Escape.Status == GetawayRunState.RunStatus.Running;
             if (GetawayMode) { fuel.SetCapacity(WorldShiftFlow.Garage.FuelCapacity); fuel.RefillToFull(); }
@@ -220,6 +222,8 @@ namespace Outlaws.WorldShift
                 Impact = gameObject.AddComponent<WorldShiftImpactMoments>(); Impact.Bind(this);
                 gameObject.AddComponent<WorldShiftLevelAudio>().Bind(this);
                 Escape=gameObject.AddComponent<WorldShiftLevelEscape>();Escape.Bind(this,view);
+                if (environment == ShiftLevel.Ocean)
+                { OceanBoss = gameObject.AddComponent<WorldShiftOceanHelicopter>(); OceanBoss.Bind(this); }
                 gameObject.AddComponent<WorldShiftLevelHud>().Bind(this);
             }
             else if (GetawayMode) { Getaway = gameObject.AddComponent<WorldShiftGetaway>(); Getaway.Bind(this); }
@@ -287,6 +291,7 @@ namespace Outlaws.WorldShift
             if (!StoryActive) return;
             StoryActive = false;
             storyFinishedFrame = Time.frameCount;
+            if(OceanBoss!=null) UpdateCamera(true);
             BeginRun();
         }
 
@@ -435,7 +440,8 @@ namespace Outlaws.WorldShift
                     }
                 }
                 ApplySurfaceGrip(previous);
-                float airSteering = LevelMode && environment == ShiftLevel.Desert ? .65f : .4f;
+                float airSteering = LevelMode && environment == ShiftLevel.Desert ? .65f
+                    : LevelMode && environment == ShiftLevel.Ocean ? .6f : .4f;
                 driver.StepExternal(dt, (IsRelayAirborne ? steer * airSteering : steer) * (JumpSequence ? 1f : Getaway?.Extras.SteeringMultiplier ?? 1f), speed);
                 Getaway?.FinishStep(driver.RoadPositionDistance, driver);
                 float nextLateral = driver.LateralOffset;
@@ -489,8 +495,10 @@ namespace Outlaws.WorldShift
                     trainingSignShownAt = Time.realtimeSinceStartup;
                     WorldShiftLevelAnalytics.SignShown(checkpointIndex);
                 }
-                if (Collection != null && !Collection.Step(previous, next, previousLateral, nextLateral))
+                if (Collection != null && !Collection.Step(previous, next, previousLateral, nextLateral, OceanBoss == null || (!OceanBoss.Defeated && World == ShiftWorld.Day)))
                 { Fail("MISSED ITEM"); break; }
+                if (OceanBoss != null && OceanBoss.Step(dt, previous, next, previousLateral, nextLateral))
+                { Fail(OceanBoss.CollisionReason); break; }
                 UpdateMergeState();
                 presentation.StepPedestrians(dt);
                 CollectFuel(previous, next, previousLateral, nextLateral);
@@ -499,6 +507,8 @@ namespace Outlaws.WorldShift
                 if (checkpointIndex + 1 < Checkpoints.Length && Distance >= Checkpoints[checkpointIndex + 1].Distance)
                 {
                     checkpointIndex++;
+                    Collection?.SaveCheckpoint();
+                    OceanBoss?.SaveCheckpoint();
                     trainingLessonRead = completedTrainingSigns.Contains(checkpointIndex);
                     if (LevelMode)
                     {
@@ -576,7 +586,7 @@ namespace Outlaws.WorldShift
                 State = ShiftRunState.Retrying;
                 lastFailure = reason;
                 fallVelocity = -1f;
-                retryRemaining = Capturing ? 1.6f : 1.05f;
+                retryRemaining = RetryDuration;
                 if (Impact != null)
                 {
                     if (reason == "NO ROAD" || reason == "MISSED RELAY LANDING") Impact.Fall();
@@ -615,6 +625,7 @@ namespace Outlaws.WorldShift
             ShiftCheckpoint checkpoint = Checkpoints[checkpointIndex];
             CheckpointNoticeRemaining = 0f;
             Collection?.Restore(checkpoint.Distance);
+            OceanBoss?.Restore(checkpoint.Distance);
             Distance = checkpoint.Distance;
             Lateral = checkpoint.Lateral;
             retryRemaining = 0f;

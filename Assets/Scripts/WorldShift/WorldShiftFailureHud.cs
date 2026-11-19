@@ -7,9 +7,9 @@ namespace Outlaws.WorldShift
     public sealed partial class WorldShiftLevelHud
     {
         // A game moment, not a menu: one stamped word with an icon, a thin retry underline, and
-        // police-light (or dark) vignette at the screen edges. Retry timing is unchanged.
+        // police-light (or dark) vignette at the screen edges. Ocean mechanic hints get reading time.
         private GameObject failurePanel;
-        private TMP_Text failureTitle;
+        private TMP_Text failureTitle, failureHint;
         private Image failureIcon, retryFill, failureVignette;
         private RectTransform failureStamp;
         private float failureShownAt = -1f;
@@ -19,6 +19,9 @@ namespace Outlaws.WorldShift
 
         private void BuildFailurePanel(Transform parent)
         {
+            bool coast=game.Environment==ShiftLevel.Ocean;
+            Color titleColour=coast ? new Color(.96f,.18f,.12f) : Cream;
+            Color hintColour=coast ? new Color(1f,.68f,.12f) : Cream;
             var panel = WorldShiftMenu.Panel(parent, "Checkpoint retry notice", Vector2.zero, Vector2.one, Color.clear);
             failurePanel = panel.gameObject;
             var group = panel.gameObject.AddComponent<CanvasGroup>();
@@ -30,15 +33,20 @@ namespace Outlaws.WorldShift
             failureStamp.sizeDelta = new Vector2(760f, 120f);
             failureIcon = Icon(failureStamp, ShiftIcon.Siren, 72f);
             failureIcon.rectTransform.anchorMin = failureIcon.rectTransform.anchorMax = new Vector2(.5f, .5f);
-            failureTitle = PauseLabel(failureStamp, "BUSTED", 0f, 0f, 1f, 1f, 76, Cream, FontStyles.Bold);
+            failureTitle = PauseLabel(failureStamp, "BUSTED", 0f, 0f, 1f, 1f, 76, titleColour, FontStyles.Bold);
             failureTitle.alignment = TextAlignmentOptions.Center;
             failureTitle.enableAutoSizing = true; failureTitle.fontSizeMin = 40; failureTitle.fontSizeMax = 76;
             failureTitle.textWrappingMode = TextWrappingModes.NoWrap;
-            failureTitle.outlineWidth = .18f; failureTitle.outlineColor = new Color32(10, 14, 20, 230);
+            failureTitle.outlineWidth = coast ? .25f : .18f;
+            failureTitle.outlineColor = new Color32(10, 14, 20, coast ? (byte)255 : (byte)230);
             var track = WorldShiftMenu.Panel(failureStamp, "Retry track", new Vector2(.32f, -.06f), new Vector2(.68f, -.02f),
                 new Color(1f, 1f, 1f, .18f));
             Round(track, new Color(1f, 1f, 1f, .18f));
             retryFill = WorldShiftMenu.Panel(track, "Retry progress", Vector2.zero, Vector2.one, Cream).GetComponent<Image>();
+            failureHint = PauseLabel(panel, "", .15f, .51f, .85f, .65f, 27, hintColour, FontStyles.Bold);
+            failureHint.alignment = TextAlignmentOptions.Center;
+            failureHint.outlineWidth = coast ? .25f : .18f;
+            failureHint.outlineColor = new Color32(10,14,20,coast ? (byte)255 : (byte)240);
             failurePanel.SetActive(false);
         }
 
@@ -48,6 +56,11 @@ namespace Outlaws.WorldShift
             failurePanel.SetActive(failed);
             if (!failed) { failureShownAt = -1f; return; }
             if (failureShownAt < 0f) failureShownAt = Time.unscaledTime;
+            failureHint.text = game.FailureReason == "DOLPHIN COLLISION"
+                ? "DAY: MOVE\nNIGHT: FREEZE"
+                : game.FailureReason == "AIR STRIKE"
+                    ? "NIGHT: FREEZE MISSILES\nROCKETS: HIT HELI" : "";
+            failureHint.gameObject.SetActive(failureHint.text.Length > 0);
             bool busted = game.Capturing && !game.MissedRequiredItem;
             failureTitle.text = game.MissedRequiredItem ? "MISSED DIAMOND" : game.Capturing ? "BUSTED"
                 : game.FailureReason == "MISSED RELAY LANDING" ? "MISSED LANDING" : "OFF THE ROAD";

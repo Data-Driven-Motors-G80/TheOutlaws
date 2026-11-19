@@ -10,6 +10,7 @@ namespace Outlaws.WorldShift
         private int lastCollection;
         private float collectionPulse, oceanProgress;
         private bool oceanProgressReady;
+        private Image[] helicopterHealth;
 
         private void PolishOceanHud()
         {
@@ -30,17 +31,22 @@ namespace Outlaws.WorldShift
             {
                 oceanCounter=(RectTransform)collectionStatus.transform.parent;
                 oceanCounter.anchorMin=oceanCounter.anchorMax=new Vector2(.5f,.88f);
-                oceanCounter.anchoredPosition=Vector2.zero;oceanCounter.sizeDelta=new Vector2(166,38);
+                oceanCounter.anchoredPosition=Vector2.zero;oceanCounter.sizeDelta=new Vector2(245,38);
                 Round(oceanCounter,panel);
                 collectionStatus.fontSize=20;collectionStatus.enableAutoSizing=true;
                 collectionStatus.fontSizeMin=14;collectionStatus.fontSizeMax=20;
                 collectionStatus.textWrappingMode=TMPro.TextWrappingModes.NoWrap;
                 collectionStatus.rectTransform.anchorMin=new Vector2(.27f,0);
                 collectionStatus.rectTransform.anchorMax=new Vector2(.94f,1);
-                var diamond=Icon(oceanCounter,ShiftIcon.Diamond,23);
+                var diamond=Icon(oceanCounter,ShiftIcon.Siren,23);
                 diamond.color=WorldShiftLevelProps.CollectionColour;
-                diamond.rectTransform.anchoredPosition=new Vector2(-52,0);
+                diamond.rectTransform.anchoredPosition=new Vector2(-95,0);
                 lastCollection=game.Collection.Count;
+                helicopterHealth=new Image[WorldShiftOceanHelicopter.MaximumHealth];
+                for(int i=0;i<helicopterHealth.Length;i++) helicopterHealth[i]=WorldShiftMenu.Panel(oceanCounter,"Helicopter armour "+i,new Vector2(.09f+i*(.82f/helicopterHealth.Length),.04f),new Vector2(.09f+(i+.86f)*(.82f/helicopterHealth.Length),.13f),WorldShiftLevelProps.CollectionColour).GetComponent<Image>();
+                var help=WorldShiftMenu.Panel(oceanCounter,"Air pursuit hint",new Vector2(-.22f,-.72f),new Vector2(1.22f,-.12f),panel);Round(help,panel);
+                var hint=WorldShiftMenu.Label(help,"DAY: AMMO > AUTO FIRE   /   NIGHT: FREEZE",.02f,0,.98f,1,13);
+                hint.alignment=TMPro.TextAlignmentOptions.Center; hint.color=new Color(.85f,.93f,1f);
             }
         }
 
@@ -61,6 +67,8 @@ namespace Outlaws.WorldShift
             if(oceanCounter!=null)
             {
                 int collected=game.Collection.Count;
+                if(helicopterHealth!=null && game.OceanBoss!=null)
+                    for(int i=0;i<helicopterHealth.Length;i++) helicopterHealth[i].color=i<game.OceanBoss.DisplayHealth ? WorldShiftLevelProps.CollectionColour : new Color(.16f,.24f,.26f);
                 if(collected>lastCollection) collectionPulse=.32f;
                 if(collected<lastCollection) collectionPulse=0;
                 lastCollection=collected;

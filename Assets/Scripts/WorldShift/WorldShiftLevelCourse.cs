@@ -30,8 +30,11 @@ namespace Outlaws.WorldShift
         public ShiftCheckpoint[] Checkpoints;
         // Tutorial sections end at a plain gate instead of a ramp.
         public float[] Gates;
-        // Required Ocean items exist in both worlds and never act as hazards.
+        // Authored pickup positions; Ocean uses optional Day-only ammunition.
         public Vector2[] RequiredItems = System.Array.Empty<Vector2>();
+        public float[] AirStrikeTargets = System.Array.Empty<float>();
+        public float[] AirStrikeEnds = System.Array.Empty<float>();
+        public bool[] AirStrikeCurtains = System.Array.Empty<bool>();
         public LevelSign[] Signs;
         public Vector2[] DustZones = System.Array.Empty<Vector2>();
         // Snow: road stretches of black ice (x = from, y = to). See WorldShiftCity.Ice.cs.
@@ -125,6 +128,9 @@ namespace Outlaws.WorldShift
             private readonly List<float> gates = new List<float>();
             private readonly List<LevelSign> signs = new List<LevelSign>();
             private readonly List<Vector2> items = new List<Vector2>();
+            private readonly List<float> airStrikes = new List<float>();
+            private readonly List<float> airStrikeEnds = new List<float>();
+            private readonly List<bool> airStrikeCurtains = new List<bool>();
             private readonly List<Vector2> dustZones = new List<Vector2>();
             private readonly List<Vector2> iceZones = new List<Vector2>();
             private readonly bool landingCheckpoints;
@@ -177,6 +183,52 @@ namespace Outlaws.WorldShift
                 float k = speed / WorldShiftLevel.Speed;
                 float spawn = start + at + 150f * k / (1f + k);
                 return new ShiftHazard(world, ShiftHazardKind.Oncoming, spawn, spawn + 5.5f, lane, speed, sharedAcrossWorlds: shared);
+            }
+
+            // Coastal attack corridors alternate with visible world-specific harbour closures.
+            // All distances are authored once here; the boss consumes the same target list.
+            public Builder OceanSection(int section, float rampAt, ShiftWorld launch)
+            {
+                Day(38f, Sides);
+                DayCar(62f, section % 2 == 0 ? Left : Right, 18f);
+                Day(66f,section%2==0 ? LeftMiddle : MiddleRight);
+                NightCar(100f, Middle, 16f);
+                // Reuse the original teal police spike platform and its shared Day-move/Night-freeze rule.
+                Slider(124f,section%2==0 ? -1.25f : 1.25f);
+                Slider(347f,section%2==0 ? 1.4f : -1.4f);
+                Item(95f, section % 2 == 0 ? -1 : 1);
+                // A long point-bombing corridor replaces the second/third compact attacks.
+                // Reserve its entire span: no hidden Night wall, ammo or cargo inside it.
+                int index=0;
+                float lastDayRow=66f;
+                for(float authoredAt=150f;authoredAt<=rampAt-80f;authoredAt+=72f,index++)
+                {
+                    if(index==2) continue; // consumed by the 108 m corridor starting at index 1
+                    float at=authoredAt+(index>=3?8f:0f); // room for the second spike platform after the long field
+                    bool spread=index==1;
+                    airStrikes.Add(start+at);
+                    airStrikeEnds.Add(start+at+(spread?108f:0f));
+                    // One slow, almost full-width missile curtain per section, five at most.
+                    airStrikeCurtains.Add(section==1 ? index==3 : index==0);
+                    if(spread) continue;
+                    float gap=at+33f;
+                    if(gap>rampAt-45f) continue;
+                    bool ammo=index==0 || (section>=4 && index==3);
+                    if(ammo) Item(gap,index==0?-1:1);
+                    if(!ammo && rampAt-gap<74f)
+                    {
+                        // The final ordinary closure belongs to Day, with no nearby Night counterpart.
+                        Day(gap,All);lastDayRow=gap;continue;
+                    }
+                    // These separated closures break permanent Night camping without occupying
+                    // any missile footprint. The active bombing corridor itself remains fair.
+                    if(ammo || index%3==0 || index%3==2) Night(gap,All);
+                    else Night(gap,(section+index)%2==0 ? LeftMiddle : MiddleRight);
+                }
+                if(rampAt-40f-lastDayRow>=28f)
+                    Day(rampAt-40f,section%2==0 ? MiddleRight : LeftMiddle);
+                // Keep the final 34 m clear so the player can line up and select the launch world.
+                return Ramp(rampAt,launch,flightLength:132f);
             }
 
             private Builder Add(ShiftHazard hazard) { hazards.Add(hazard); return this; }
@@ -249,6 +301,9 @@ namespace Outlaws.WorldShift
                 course.DustZones = dustZones.ToArray();
                 course.IceZones = iceZones.ToArray();
                 course.RequiredItems = items.ToArray();
+                course.AirStrikeTargets = airStrikes.ToArray();
+                course.AirStrikeEnds = airStrikeEnds.ToArray();
+                course.AirStrikeCurtains = airStrikeCurtains.ToArray();
                 course.Length = ramps.Count > 0 ? ramps[ramps.Count - 1].Landing + 40f : start;
                 return course;
             }
@@ -328,28 +383,14 @@ namespace Outlaws.WorldShift
             .SlidingGate(270f, -1f).Night(320f, All).Checkpoint(290f, D).Ramp(360f, D, 10, 196f)
             .Build();
 
-        // Each landing banks a completed collection section. Items stay clear of jumps
-        // and give at least 35 m to read a hazard or steer toward the next target.
-        // Harbour obstacles reuse familiar mechanics: container walls (Day/Night), dock traffic (one world),
-        // cargo trolleys (sliders) and rolling oil drums (Desert-style crossing rocks). Nothing new sits
-        // within 25 m of a diamond, and each diamond's lane stays open in at least one world.
+        // Mixed compact attacks and 108 m point-bombing corridors; five slow curtains. Preserve the authored
+        // ramp/checkpoint coordinates while filling the formerly empty dry approaches.
         private static LevelCourse Ocean() => new Builder(ShiftLevel.Ocean)
-            // 1: learn the diamond on a clear approach, then a lane wall, a drum and dock traffic.
-            .Item(100f, 0)
-            .Day(150f, Sides).Crossing(195f, 4.1f, 1f, 3.6f).DayCar(225f, Left).Night(255f, All).Ramp(310f, D)
-            // 2: steer to both sides; the diamonds remain collectible in either world.
-            .Item(85f, -1).Day(135f, MiddleRight).NightCar(160f, Middle)
-            .Item(190f, 1).Night(240f, LeftMiddle).Crossing(262f, 0f, -1f, 3.8f).Day(295f, All).Ramp(340f, N)
-            // 3: freeze the movers, then line up for each required item.
-            .Slider(55f, 1.25f).Item(110f, 1).Night(160f, All).DayCar(190f, Right)
-            .Slider(210f, -1.4f).Item(265f, -1).NightHalf(290f, 1).Ramp(330f, D)
-            // 4: collect through alternating closures, with a drum between the diamonds.
-            .Item(65f, -1).Day(110f, All).Item(160f, 0).Crossing(195f, 2f, 1f, 4f)
-            .Night(220f, Sides).Item(260f, 1).Day(305f, All).Ramp(360f, N)
-            // 5: combine collection, world choice, traffic and freezing before the last jump.
-            .Night(50f, All).Item(100f, 1).Day(145f, LeftMiddle).DayCar(170f, Middle)
-            .Item(195f, -1).Slider(245f, 1.3f).NightCar(262f, Right)
-            .Item(300f, 0).Night(350f, All).Ramp(405f, D)
+            .OceanSection(1,488f,D)
+            .OceanSection(2,528f,N)
+            .OceanSection(3,538f,D)
+            .OceanSection(4,568f,N)
+            .OceanSection(5,608f,D)
             .Build();
 
         // Snow (Level 3): black ice. On ice the car keeps its sideways momentum, builds it slowly and only
