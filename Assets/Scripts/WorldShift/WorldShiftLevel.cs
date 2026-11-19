@@ -45,9 +45,19 @@ namespace Outlaws.WorldShift
         // Movers never wake before the checkpoint that governs them, so a first pass and a
         // checkpoint retry present the same layout from the same starting positions.
         public float WakeFloor = float.NegativeInfinity;
+        // Desert: sideways movers (sliders, sliding blocks, crossing and airborne rocks) move whenever it is Day,
+        // wherever the player is, so they are always visibly moving on approach. Set by the Desert course builder (WorldShiftLevelCourse).
+        public bool MovesWheneverDay;
         public void Advance(float delta, float playerDistance, ShiftWorld world)
         {
             PreviousLateralOffset = LateralOffset;
+            if (MovesWheneverDay)
+            {
+                if (Gate != null) { Gate.AdvanceAnywhere(delta, world); MotionTravel = Gate.DaySeconds * Gate.Speed; }
+                else if (Rock != null) { Rock.Motion.Advance(delta, world); MotionTravel = Rock.Motion.DaySeconds * MotionSpeed; }
+                else if (world == ShiftWorld.Day) MotionTravel += MotionSpeed * delta;
+                return;
+            }
             if (Gate != null)
             {
                 Gate.Advance(delta, playerDistance, world, WakeFloor);

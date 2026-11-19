@@ -4,6 +4,7 @@ Start with the [project README](../README.md) to run the current game. These are
 
 | Guide | Use it for |
 | --- | --- |
+| [Obstacle visual rules](OBSTACLE_VISUAL_RULES.md) | Sun/moon, sideways arrow, no-text rules for every level, plus open issues per level |
 | [Level 5 Desert](LEVEL2_DESERT.md) | Desert sections, movers, sandstorm and respawns |
 | [Level 2 Ocean](LEVEL3_OCEAN.md) | Required diamonds, checkpoints and section retries |
 | [Architecture](ARCHITECTURE.md) | Code ownership and shared simulation systems |

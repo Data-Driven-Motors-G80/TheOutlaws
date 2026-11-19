@@ -27,11 +27,9 @@ at least 6 m of longitudinal spacing from the others in that flight, so their
 visible bodies cannot merge even when their sideways paths cross.
 
 Desert air steering uses the previous desert trial's .65 control. Night-launch
-flights (2 and 4) have a full-width orange rectangular block 56 m after takeoff,
-in the later half of the flight. Its face says **DAY TO MOVE**. In Day it repeatedly
-slides to the roadside and back; Night stops it at its current position.
-Motion starts at takeoff, so earlier Day driving cannot
-accidentally open it. The first block opens left; the second opens right, with
+flights (2 and 4) have a full-width vulture flock 56 m after takeoff, in the later
+half of the flight. In Day it repeatedly swings 4.5 m to one side, then the same 4.5 m to the other; Night stops it at its current position. Like every Desert
+sideways mover it moves whenever it is Day, so it is already moving as you approach. The first block opens left; the second opens right, with
 two earlier spheres away from its exit side. Land in the other world.
 
 The final jump always launches in Day. Its 196 m flight fits ten fast spheres
@@ -45,21 +43,20 @@ each frozen wave leaves an outside bypass. The last rock centre
 is at least 20 m before landing; landings remain clear.
 Instructional green highway signs appear only in Training.
 
-Six ground sliding blocks at 780, 1,315, 1,715, 2,385, 2,530 and 3,130 m use the
-same orange, shared-world rule. They start closed, activate within 40 m in Day
-and repeatedly shuttle to the roadside and back. Remaining in Night leaves them closed;
+Six ground sliding blocks (camel caravans) at 780, 1,315, 1,715, 2,385, 2,530 and 3,130 m use the
+same shared-world rule. They start closed on each attempt/retry, move whenever it is
+Day, wherever the player is, and repeatedly walk 4.5 m to one side and then the same 4.5 m to the other (staying close to the road). Remaining in Night leaves them closed;
 return to Day to create an exit, then freeze the opening if useful. They do not
 vanish on switching. The same swept box footprint drives contact and the visual.
-Every sliding block, including the two smaller sliders, carries the same
-**DAY TO MOVE** cue. Small blocks use a raised label so it remains readable.
+Every sideways mover carries the same white left/right arrow (`WorldShiftMoverArrow`)
+and no text.
 
 Section 5 has 19 ground rocks (up from 13) in three waves, with mixed initial
 positions and opposing movement. Two sliding blocks and Night roadblocks between waves
 make players wake the next group rather than stay frozen for the entire field.
 Three Night-only half-road barriers at 2,232, 2,300 and 2,446 m alternate right,
 left, right. They leave the opposite half open in Night and become passable
-dashes in Day. The entrance has **STORM** painted directly on the road at 2,200 m.
-Dust fades in from 2,200 m and clears by 2,595 m, before the 2,660 m ramp.
+dashes in Day. Dust fades in from 2,200 m and clears by 2,595 m, before the 2,660 m ramp.
 It reuses `DesertSandstorm.ApplyVisibility`, with at least 70 m of visible road,
 the same dust intensity in both modes and pause/retry-safe distance-based fades.
 
@@ -90,7 +87,13 @@ Passing it shows a small check icon and CHECKPOINT banner for 2.2 seconds, away
 from the driving line. The confirmation pauses with gameplay and clears on retry;
 the checkpoint count and positions have not changed.
 
-Rolling spheres look like tumbleweeds (`WorldShiftBoulderArt`); motion reuses `DesertTrialRock`.
+Ground spheres are dense tumbleweeds (`WorldShiftDesertRockArt`); airborne spheres are
+large vultures (same 1.1 m hitbox) that face their direction of travel and flap on the Day
+clock, so Night and pause freeze them mid-flap (`WorldShiftDesertCreatures`); motion reuses `DesertTrialRock`.
+Sliders are camels crossing the road, ground sliding blocks are camel caravans, airborne
+sliding blocks are vulture flocks, and wide
+Day/Night closures alternate sandstone hoodoos and tall saguaro cactus stands, both with Lydia's sun/moon panels
+(`WorldShiftDesertObstacleArt`). See `OBSTACLE_VISUAL_RULES.md`.
 `WorldShiftLevelRock` connects these to the shared hazard data and the car's
 authored flight arc. Contact uses a sphere against the swept car box, including
 height. Night and pause stop both translation and visible rotation. Checkpoint

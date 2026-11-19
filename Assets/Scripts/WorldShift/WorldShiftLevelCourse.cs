@@ -55,7 +55,8 @@ namespace Outlaws.WorldShift
         {
             // Motion state lives on each hazard, so every attempt gets fresh copies.
             return System.Array.ConvertAll(Hazards, h => new ShiftHazard(h.World, h.Kind, h.Start, h.End, h.LaneMask,
-                h.MotionSpeed, h.HalfSide, h.SharedAcrossWorlds, h.LateralMotion, h.Rock?.Copy(), h.Gate?.Copy()));
+                h.MotionSpeed, h.HalfSide, h.SharedAcrossWorlds, h.LateralMotion, h.Rock?.Copy(), h.Gate?.Copy())
+                { MovesWheneverDay = h.MovesWheneverDay });
         }
 
         public float Heading(float d)
@@ -179,7 +180,13 @@ namespace Outlaws.WorldShift
                 return new ShiftHazard(world, ShiftHazardKind.Oncoming, spawn, spawn + 5.5f, lane, speed, sharedAcrossWorlds: shared);
             }
 
-            private Builder Add(ShiftHazard hazard) { hazards.Add(hazard); return this; }
+            private Builder Add(ShiftHazard hazard)
+            {
+                // Desert sideways movers never wait for the car (Docs/OBSTACLE_VISUAL_RULES.md, rule 4).
+                hazard.MovesWheneverDay = !course.Training && course.Environment == ShiftLevel.Desert
+                    && hazard.SharedAcrossWorlds && hazard.LateralMotion;
+                hazards.Add(hazard); return this;
+            }
 
             /// <summary>Ends the section with a big ramp at "rampAt" launching from "from".</summary>
             public Builder Ramp(float rampAt, ShiftWorld from, int airRocks = 0, float flightLength = 84f, bool releaseGate = false)

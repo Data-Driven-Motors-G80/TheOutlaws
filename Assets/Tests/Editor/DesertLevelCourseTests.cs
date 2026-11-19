@@ -28,6 +28,17 @@ public sealed class DesertLevelCourseTests
         g.GetType().GetProperty("Lateral", Flags).SetValue(g, x);
         Call(F(g, "driver"), "RestoreExternalPose", d, x);
     }
+    // Levels load asynchronously behind WorldShiftSceneLoading; two frames are no longer enough.
+    private static IEnumerator WaitForLevel()
+    {
+        float deadline = Time.realtimeSinceStartup + 30f;
+        while ((bool)T("WorldShiftSceneLoading").GetProperty("Active", Flags).GetValue(null))
+        {
+            Assert.That(Time.realtimeSinceStartup, Is.LessThan(deadline), "Desert must finish loading.");
+            yield return null;
+        }
+        yield return null; yield return null;
+    }
     private static object Course() => T("WorldShiftLevelCourse").GetMethod("For").Invoke(null, new object[] { DesertLevel });
     private static bool Air(object h) => F(h, "Rock") != null && (bool)P(F(h, "Rock"), "Airborne");
     private static float EscapeLane(System.Collections.Generic.List<object> rocks, int first, int count)
@@ -154,11 +165,9 @@ public sealed class DesertLevelCourseTests
             var gate = F(hazard, "Gate"); float gateAt = (float)F(gate, "Distance");
             var flight = F(gate, "Flight"); float activeAt = flight == null ? gateAt - 40f : (float)F(flight, "Takeoff") + 10f;
             if (flight != null) Assert.That(gateAt - (float)F(flight, "Takeoff"), Is.EqualTo(56f));
-            else
-            {
-                Call(hazard, "Advance", 3f, gateAt - 60f, World("Day"));
-                Assert.That(Float(gate, "DaySeconds"), Is.Zero, "A distant ground block must not open before the approach.");
-            }
+            Call(hazard, "Advance", 3f, gateAt - 600f, World("Day"));
+            Assert.That(Float(gate, "DaySeconds"), Is.EqualTo(3f), "Blocks keep moving in Day however far ahead they are.");
+            Call(hazard, "ResetMotion");
             Call(hazard, "Advance", 1f, activeAt, World("Echo"));
             Assert.That(Float(gate, "Lateral"), Is.Zero);
             for (float xLane = -4f; xLane <= 4f; xLane += .25f)
@@ -169,13 +178,19 @@ public sealed class DesertLevelCourseTests
             Assert.That(Call(gate, "Touches", gateAt, gateAt, exitX, exitX, 0f, 0f, opened, 1.1f), Is.False);
             Call(hazard, "Advance", 1f, activeAt, World("Echo"));
             Assert.That(Float(gate, "Lateral"), Is.EqualTo(opened), "Night holds an opened block in place.");
-            float toEdge = 11f / (float)F(gate, "Speed");
-            Call(hazard, "Advance", toEdge - 1f, activeAt, World("Day"));
-            Assert.That(Mathf.Abs(Float(gate, "Lateral")), Is.EqualTo(11f).Within(.001f));
-            Call(hazard, "Advance", .5f, activeAt, World("Day"));
-            Assert.That(Mathf.Abs(Float(gate, "Lateral")), Is.LessThan(11f), "The block returns from the roadside.");
-            Call(hazard, "Advance", toEdge - .5f, activeAt, World("Day"));
-            Assert.That(Float(gate, "Lateral"), Is.EqualTo(0f).Within(.001f), "It completes a repeatable out-and-back cycle.");
+            float travel = (float)T("WorldShiftSlidingGate").GetField("Travel").GetValue(null);
+            Assert.That(travel, Is.LessThanOrEqualTo(4.5f), "Movers stay close to the road.");
+            float direction = (float)F(gate, "Direction"), quarter = Mathf.PI * .5f * travel / (float)F(gate, "Speed");
+            Call(hazard, "ResetMotion");
+            Call(hazard, "Advance", quarter, activeAt, World("Day"));
+            Assert.That(Float(gate, "Lateral"), Is.EqualTo(direction * travel).Within(.001f));
+            Call(hazard, "Advance", quarter * 2f, activeAt, World("Day"));
+            Assert.That(Float(gate, "Lateral"), Is.EqualTo(-direction * travel).Within(.001f),
+                "The block swings exactly as far to the other side.");
+            Assert.That(Call(gate, "Touches", gateAt, gateAt, -exitX, -exitX, 0f, 0f, Float(gate, "Lateral"), 1.1f), Is.False,
+                "The other swing opens the other side lane.");
+            Call(hazard, "Advance", quarter, activeAt, World("Day"));
+            Assert.That(Float(gate, "Lateral"), Is.EqualTo(0f).Within(.001f), "It completes a repeatable side-to-side cycle.");
             Call(hazard, "ResetMotion");
             Assert.That(Float(gate, "Lateral"), Is.Zero);
         }
@@ -205,7 +220,7 @@ public sealed class DesertLevelCourseTests
         T("WorldShiftLevelAnalytics").GetField("Sink", Flags).SetValue(null, sink);
         T("WorldShiftLevels").GetProperty("UnlockAll").SetValue(null, true);
         T("WorldShiftLevels").GetMethod("Play").Invoke(null, new object[] { DesertLevel, "menu" });
-        yield return null; yield return null;
+        yield return WaitForLevel();
         var game = Game(); game.enabled = false;
         var hazards = Items(P(game, "Hazards"));
         Call(game, "StepSimulation", .4f, 0f, false);
@@ -287,7 +302,7 @@ public sealed class DesertLevelCourseTests
         T("WorldShiftLevelAnalytics").GetField("Sink", Flags).SetValue(null, sink);
         T("WorldShiftLevels").GetProperty("UnlockAll").SetValue(null, true);
         T("WorldShiftLevels").GetMethod("Play").Invoke(null, new object[] { DesertLevel, "menu" });
-        yield return null; yield return null;
+        yield return WaitForLevel();
         var game = Game(); game.enabled = false;
         var ramps = Items(F(P(game, "Course"), "Ramps"));
         RestoreAt(game, 810f);
@@ -302,10 +317,7 @@ public sealed class DesertLevelCourseTests
         Assert.That(dunes.Length, Is.GreaterThan(20), "Desert scenery restores the low dunes.");
         Assert.That(dunes.All(t => !t.GetComponents<Collider>().Any(c => c.enabled)), Is.True);
         var labels = UnityEngine.Object.FindObjectsByType<TMP_Text>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        int movingBlocks = Items(P(game, "Hazards")).Count(h => (bool)F(h, "LateralMotion") && F(h, "Rock") == null);
-        Assert.That(labels.Count(t => t.text == "DAY TO MOVE"), Is.EqualTo(movingBlocks), "Every moving block uses the same cue.");
-        var stormPaint = labels.Single(t => t.text == "STORM");
-        Assert.That(Vector3.Dot(-stormPaint.transform.forward, Vector3.up), Is.GreaterThan(.99f), "STORM is painted facing upward on the road.");
+        Assert.That(labels.Any(t => t.text == "DAY TO MOVE" || t.text == "STORM"), Is.False, "No text on obstacles or the road.");
         Pose(game, 110f, 0f); Call(game, "ApplyWorld", World("Day")); Capture("desert-plain-day");
         Pose(game, 2186f, 0f); Call(game, "ApplyWorld", World("Day")); Capture("desert-storm-entry");
         Pose(game, 2265f, 3.3f); Call(game, "ApplyWorld", World("Echo")); Capture("storm-night-half");
@@ -335,8 +347,7 @@ public sealed class DesertLevelCourseTests
         Pose(game, 2589f, 0f); Call(game, "StepSimulation", .08f, 0f, false);
         Assert.That(Float(game, "CheckpointNoticeRemaining"), Is.GreaterThan(2f), "Passing a real checkpoint shows its confirmation.");
         Capture("checkpoint-reached");
-        var notice = UnityEngine.Object.FindObjectsByType<CanvasGroup>(FindObjectsSortMode.None).Single(c => c.name == "Checkpoint notice");
-        Assert.That(notice.alpha, Is.EqualTo(1f));
+        // The old "Checkpoint notice" HUD banner was replaced by the shared gantry pulse (cfb0597); the timer still drives it.
         Call(game, "TogglePause"); float remaining = Float(game, "CheckpointNoticeRemaining");
         Call(game, "StepSimulation", 3f, 0f, false);
         Assert.That(Float(game, "CheckpointNoticeRemaining"), Is.EqualTo(remaining));

@@ -12,6 +12,7 @@ namespace Outlaws.WorldShift
         public float Distance => Motion.Distance;
         public float Radius => Motion.Radius;
         public float Lateral => LaneCentre + Motion.Lateral * TravelScale;
+        public float LateralAt(float daySeconds) => LaneCentre + Motion.LateralAtTime(daySeconds) * TravelScale;
 
         public WorldShiftLevelRock(float at, float phase, float direction, float speed, float radius = 1f, ShiftRelay flight = null,
             float laneCentre = 0f, float travelScale = 1f)

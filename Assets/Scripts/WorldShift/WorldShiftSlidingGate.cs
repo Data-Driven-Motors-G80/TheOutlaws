@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Outlaws.WorldShift
 {
-    /// <summary>A shared solid block: Day shuttles it to the roadside and back, Night holds its position.</summary>
+    /// <summary>A shared solid block: Day swings it evenly side to side, Night holds its position.</summary>
     public sealed class WorldShiftSlidingGate
     {
         public readonly float Distance, Direction, Speed;
@@ -10,10 +10,15 @@ namespace Outlaws.WorldShift
         public bool Airborne => Flight != null;
         public Vector3 Size => new Vector3(10f, 2.2f, 1.8f);
         public float DaySeconds { get; private set; }
-        public float Lateral => Direction * Mathf.PingPong(DaySeconds * Speed, Size.x + 1f);
+        // The block (a camel caravan / vulture flock in Desert) swings evenly to both sides of the road: Travel m
+        // out one way, back through the middle and the same Travel m out the other way. Each swing opens a side
+        // lane in turn, and the ends of the swing stay close to the road. Speed is the peak speed in m/s.
+        public const float Travel = 4.5f;
+        public float Lateral => LateralAt(DaySeconds);
+        public float LateralAt(float daySeconds) => Direction * Travel * Mathf.Sin(daySeconds * Speed / Travel);
 
         public WorldShiftSlidingGate(float distance, float direction, ShiftRelay flight = null)
-        { Distance = distance; Direction = Mathf.Sign(direction); Flight = flight; Speed = flight == null ? 3.8f : 6f; }
+        { Distance = distance; Direction = Mathf.Sign(direction); Flight = flight; Speed = flight == null ? 3.5f : 4.2f; }
 
         public WorldShiftSlidingGate Copy() => new WorldShiftSlidingGate(Distance, Direction, Flight);
         public void Reset() => DaySeconds = 0f;
@@ -24,6 +29,8 @@ namespace Outlaws.WorldShift
             float end = Distance + 100f; // Keep the return leg moving while the block is still visible behind the car.
             if (world == ShiftWorld.Day && distance >= begin && distance <= end) DaySeconds += delta;
         }
+
+        public void AdvanceAnywhere(float delta, ShiftWorld world) { if (world == ShiftWorld.Day) DaySeconds += delta; }
 
         // Swept box versus box in the same road/flight coordinates used for rendering.
         public bool Touches(float from, float to, float fromX, float toX, float fromY, float toY,

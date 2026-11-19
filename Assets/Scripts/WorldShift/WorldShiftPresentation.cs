@@ -18,6 +18,7 @@ namespace Outlaws.WorldShift
             public GameObject Solid, Ghost;
             public Transform Root;
             public Chunk Chunk;
+            public readonly List<WorldShiftDesertMover> Movers = new List<WorldShiftDesertMover>();
             public readonly List<WorldShiftRetractableBarrier> Barriers = new List<WorldShiftRetractableBarrier>();
             public readonly List<WorldShiftRoadVehicleArt> Traffic = new List<WorldShiftRoadVehicleArt>();
         }
@@ -133,12 +134,6 @@ namespace Outlaws.WorldShift
             {
                 var root = WorldShiftLevelProps.HighwaySign(transform, route, sign);
                 chunks.Add(new Chunk { Root = root.gameObject, At = sign.Distance, Tail = 10f });
-            }
-            foreach (var zone in game.Course.DustZones)
-            {
-                float at = zone.x;
-                Transform root = WorldShiftLevelProps.StormRoadMark(transform, route, at);
-                chunks.Add(new Chunk { Root = root.gameObject, At = at, Tail = 15f });
             }
         }
 
@@ -273,12 +268,20 @@ namespace Outlaws.WorldShift
                     var gate = hazard.Data.Gate;
                     var gatePoint = gate.Airborne ? game.Route.Sample(gate.Flight.Takeoff) : route.Sample(gate.Distance);
                     hazard.Root.SetPositionAndRotation(game.LevelGatePosition(gate), Quaternion.LookRotation(gatePoint.Forward, gatePoint.Up));
+                    PoseMovers(hazard, gate.DaySeconds, gate.LateralAt(gate.DaySeconds + .05f) >= gate.Lateral ? 1f : -1f);
                     continue;
                 }
                 if (hazard.Data.Rock != null)
                 {
                     var rock = hazard.Data.Rock;
                     hazard.Root.position = game.LevelRockPosition(rock);
+                    if (hazard.Movers.Count > 0)
+                    {
+                        // Animals face their direction of travel instead of rolling.
+                        float seconds = rock.Motion.DaySeconds;
+                        PoseMovers(hazard, seconds, rock.LateralAt(seconds + .05f) >= rock.Lateral ? 1f : -1f);
+                        continue;
+                    }
                     hazard.Solid.transform.localRotation = Quaternion.AngleAxis(
                         -rock.Motion.DaySeconds * rock.Motion.MotionSpeed * rock.TravelScale * rock.Motion.Direction
                         / rock.Radius * Mathf.Rad2Deg, Vector3.forward);
@@ -289,6 +292,13 @@ namespace Outlaws.WorldShift
                 RoadPathPoint point = route.Sample((start + end) * .5f);
                 hazard.Root.SetPositionAndRotation(point.Position + point.Right * hazard.Data.LateralOffset, Quaternion.LookRotation(point.Forward, point.Up));
                 foreach (var traffic in hazard.Traffic) traffic.SetTravel(hazard.Data.Start - start);
+                if (hazard.Movers.Count > 0)
+                {
+                    // Desert sliders: offset is -2.8 sin(travel), so the walking direction follows -cos(travel).
+                    float speed = hazard.Data.MotionSpeed, travel = hazard.Data.MotionTravel;
+                    PoseMovers(hazard, Mathf.Abs(travel / (Mathf.Abs(speed) > .001f ? speed : 1f)),
+                        -Mathf.Cos(travel) * Mathf.Sign(speed) >= 0f ? 1f : -1f);
+                }
                 hazard.Chunk.At = start;
                 hazard.Chunk.End = end;
             }
@@ -307,6 +317,11 @@ namespace Outlaws.WorldShift
             }
             if (scenery != null) scenery.UpdateVisibility(distance);
             if (game.IsMerged) RefreshFuel();
+        }
+
+        private static void PoseMovers(HazardView hazard, float clock, float heading)
+        {
+            foreach (var mover in hazard.Movers) mover.Pose(clock, heading);
         }
 
         public void OnHazardImpact(ShiftHazard hit, float lateral)

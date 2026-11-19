@@ -21,6 +21,7 @@ namespace Outlaws.WorldShift
             float x = Direction * (4.1f - Mathf.Abs(Mathf.Repeat(seconds * MotionSpeed + Phase + 4.1f, 16.4f) - 8.2f));
             return MergeSide == 0 ? x : MergeSide * (1.45f + Mathf.PingPong(seconds * MotionSpeed + Phase, 2.1f));
         }
+        public float LateralAtTime(float seconds) => AtTime(seconds);
         public float LateralIn(ShiftWorld world, bool joined) => AtTime(joined && world == ShiftWorld.Echo ? NightSeconds : DaySeconds);
         public DesertTrialRock(float distance, float phase, float direction, float motionSpeed = 1.6f, bool guarded = false, int mergeSide = 0, bool airborne = false, float radius = 1.3f)
         { Distance = distance; Phase = phase; Direction = direction; MotionSpeed = motionSpeed; Guarded = guarded; MergeSide = mergeSide; Airborne = airborne; Radius = mergeSide != 0 || airborne ? 1.1f : radius; }

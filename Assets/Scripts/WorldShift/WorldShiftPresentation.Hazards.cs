@@ -20,20 +20,31 @@ namespace Outlaws.WorldShift
             var ghost = new GameObject("Outline - belongs to other world"); ghost.transform.SetParent(root, false);
             if (data.Gate != null)
             {
-                if (game.LevelMode) WorldShiftSpikePlatform.Build(solid.transform, Vector3.zero, data.Gate.Size);
+                // No text on obstacles: the sideways arrow and the frozen-ice cue explain the block.
+                var gateView = new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk };
+                bool desertGate = game.LevelMode && game.Environment == ShiftLevel.Desert;
+                // Desert: real animals that move sideways. A camel caravan on the ground, a vulture flock in the air.
+                if (desertGate) gateView.Movers.Add(data.Gate.Airborne
+                    ? WorldShiftDesertMover.Flock(solid.transform, Vector3.zero, data.Gate.Size)
+                    : WorldShiftDesertMover.Caravan(solid.transform, Vector3.zero, data.Gate.Size));
+                else if (game.LevelMode) WorldShiftSpikePlatform.Build(solid.transform, Vector3.zero, data.Gate.Size);
                 else WorldShiftObstacleVisual.Build(solid.transform, Vector3.zero, data.Gate.Size, sideMoverPalette);
-                WorldShiftLevelProps.SlidingGateHint(solid.transform);
-                if (game.LevelMode) BuildFrozenCue(root, Vector3.zero, data.Gate.Size, true);
-                hazards.Add(new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk });
+                // No floating ice ring under flying things.
+                if (game.LevelMode && !(desertGate && data.Gate.Airborne)) BuildFrozenCue(root, Vector3.zero, data.Gate.Size, true);
+                hazards.Add(gateView);
                 return;
             }
             if (data.Rock != null)
             {
-                WorldShiftBoulderArt.Build(solid.transform, root, data.Rock.Radius,
-                    game.LevelMode && game.Environment == ShiftLevel.Desert,
+                var rockView = new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk };
+                bool desertRock = game.LevelMode && game.Environment == ShiftLevel.Desert;
+                if (desertRock && data.Rock.Airborne) rockView.Movers.Add(WorldShiftDesertMover.Vulture(solid.transform, root, data.Rock.Radius));
+                else if (desertRock) WorldShiftDesertRockArt.Tumbleweed(solid.transform, root, data.Rock.Radius);
+                else WorldShiftBoulderArt.Build(solid.transform, root, data.Rock.Radius, false,
                     game.LevelMode && game.Environment == ShiftLevel.Ocean);
-                if (game.LevelMode) BuildFrozenCue(root, Vector3.zero, Vector3.one * (data.Rock.Radius * 2f));
-                hazards.Add(new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk });
+                // No floating ice ring under flying vultures.
+                if (game.LevelMode && !(desertRock && data.Rock.Airborne)) BuildFrozenCue(root, Vector3.zero, Vector3.one * (data.Rock.Radius * 2f));
+                hazards.Add(rockView);
                 return;
             }
             if (game.LevelMode && data.Kind == ShiftHazardKind.Oncoming && !data.LateralMotion)
@@ -66,11 +77,14 @@ namespace Outlaws.WorldShift
                 ? WorldShiftLevelProps.Glow(data.World == ShiftWorld.Day ? WorldShiftLevelProps.SwitchColour : WorldShiftLevelProps.NightColour,
                     data.World == ShiftWorld.Day ? .8f : 0f) : null;
             var retractable = new List<WorldShiftRetractableBarrier>();
+            var movers = new List<WorldShiftDesertMover>();
             int oceanVariant = oceanHazardIndex++;
             if (ocean != null && data.LateralMotion) ocean.BuildTrolleyTrack(data);
             void Block(Transform frame, Transform ghostFrame, Vector3 centre, Vector3 size)
             {
-                if (game.LevelMode && data.LateralMotion && data.SharedAcrossWorlds)
+                if (game.LevelMode && data.LateralMotion && data.SharedAcrossWorlds && game.Environment == ShiftLevel.Desert)
+                    movers.Add(WorldShiftDesertMover.Camel(frame, centre, size));
+                else if (game.LevelMode && data.LateralMotion && data.SharedAcrossWorlds)
                     WorldShiftSpikePlatform.Build(frame, centre, size);
                 else if (game.LevelMode && game.Environment == ShiftLevel.Snow && data.SharedAcrossWorlds
                     && data.Kind == ShiftHazardKind.Barrier && !data.LateralMotion && data.MotionSpeed == 0f)
@@ -86,8 +100,6 @@ namespace Outlaws.WorldShift
                 else
                     WorldShiftObstacleVisual.Build(frame, centre, size, palette,
                         data.Kind == ShiftHazardKind.SwitchWall, data.Kind == ShiftHazardKind.Oncoming && !data.LateralMotion);
-                if (game.LevelMode && game.Environment == ShiftLevel.Desert && data.LateralMotion)
-                    WorldShiftLevelProps.SlidingGateHint(frame, size.z, smallBlock: true);
                 if (game.LevelMode && data.SharedAcrossWorlds
                     && (data.LateralMotion || data.MotionSpeed > 0f))
                     BuildFrozenCue(frame, centre, size, data.LateralMotion);
@@ -132,6 +144,7 @@ namespace Outlaws.WorldShift
             }
             var view = new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk };
             view.Barriers.AddRange(retractable);
+            view.Movers.AddRange(movers);
             hazards.Add(view);
         }
 

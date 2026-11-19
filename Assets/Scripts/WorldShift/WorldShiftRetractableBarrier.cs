@@ -32,6 +32,9 @@ namespace Outlaws.WorldShift
             string winterShape=environment!=ShiftLevel.Snow?null:w<=3.1f?"World-coloured block"
                 :w<6f || (variant/5)%2==0?"Upright pines":"World-coloured roadblock";
             if(winterShape!=null) root.name="Retractable "+world+" "+winterShape;
+            // Desert follows Snow's format: half and full-width closures alternate sandstone hoodoos and saguaro cacti.
+            string desertShape=environment!=ShiftLevel.Desert || w<=3.1f?null:(variant/5)%2==0?"Sandstone hoodoos":"Saguaro cacti";
+            if(desertShape!=null) root.name="Retractable "+world+" "+desertShape;
             footing.Box(new Vector3(0,.025f,0), new Vector3(w,.05f,d), new Color(.29f,.31f,.33f));
             // Solid road cover with thick dashed paint, never a raised wireframe or dark opening.
             const float stripe = .22f, dash = .95f, gap = .32f;
@@ -55,6 +58,8 @@ namespace Outlaws.WorldShift
                     new Vector3(.035f,.012f,d-.15f), new Color(.22f,.24f,.26f));
             float panelWidth = w / count;
             if(winterShape=="Upright pines") WorldShiftSnowObstacleArt.UprightPines(body,w,h,d,world);
+            else if(desertShape=="Sandstone hoodoos") WorldShiftDesertObstacleArt.Hoodoos(body,w,h,d,world);
+            else if(desertShape!=null) WorldShiftDesertObstacleArt.Saguaros(body,w,h,d,world);
             else for (int i=0; i<count; i++)
             {
                 float x = -w*.5f + (i+.5f)*panelWidth;
