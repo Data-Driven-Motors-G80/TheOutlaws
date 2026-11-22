@@ -1,0 +1,7 @@
+City street conversations
+
+Original dialogue and stereo crowd mix created for The Outlaws.
+Speech synthesized locally with Windows desktop text-to-speech; no recorded actors or downloaded samples.
+Generator: Tools/Audio/generate_city_voices.ps1 and Tools/Audio/mix_city_crowd.cjs.
+Twenty short phrases are layered into WS_CityCrowd.wav; individual phrases play intermittently from each footpath.
+The generator uses David/Zira when available, with David as the fallback and varied prosody/rates.

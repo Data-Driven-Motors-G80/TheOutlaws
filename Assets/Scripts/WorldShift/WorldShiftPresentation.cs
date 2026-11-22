@@ -335,11 +335,13 @@ namespace Outlaws.WorldShift
         public void StepPedestrians(float delta)
         {
             foreach (PedestrianView person in pedestrians) person.Figure.Step(delta);
+            if (scenery != null && game.State == ShiftRunState.Running) scenery.StepCityLife(delta, view);
         }
 
         public void ResetPedestrians()
         {
             foreach (PedestrianView person in pedestrians) person.Figure.RestoreStanding();
+            if (scenery != null) scenery.ResetCityLife();
             foreach (var hazard in hazards)
                 foreach (var vehicle in hazard.Traffic) vehicle.ResetWarning();
         }

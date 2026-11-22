@@ -30,7 +30,13 @@ namespace Outlaws.WorldShift
             surface.SetFloat("_Finish",3f); surface.SetFloat("_Wear",.15f);
             for (float at = -80; at <= route.Course.Length + 80; at += 3f) roadPoints.Add(route.Sample(at).Position);
             if (route.Course.Training) BuildTrainingYard();
-            else if (route.Course.Environment == ShiftLevel.City) { BuildCity(streetlight); route.VisitRoadPieces(StreetEdges); }
+            else if (route.Course.Environment == ShiftLevel.City)
+            {
+                BuildCity(streetlight);
+                BuildCityTrafficLights();
+                route.VisitRoadPieces(StreetEdges);
+                BuildCityLife();
+            }
             else if (route.Course.Environment == ShiftLevel.Desert) BuildOases();
             else if (IsAlpine) BuildAlpine();
             SetWorld(ShiftWorld.Day);
@@ -105,10 +111,11 @@ namespace Outlaws.WorldShift
                     float lateral = side * 20f;
                     if (!Clear(along, lateral, 10f)) continue;
                     int n = index++;
-                    float height = 11f + n * 7 % 19;
+                    float height = 36f + n * 11 % 37;
                     float width = 9f + n % 3;
                     var root = Root("City block", along, lateral);
-                    Architecture(root,side,n,height,width,colours[n%4]);
+                    if(n%5==4) Architecture(root,side,n,height,width,colours[n%4]);
+                    else CityShop(root,side,n,width,along);
                     if(n%3==0) CityFurniture(along+12f,side,n);
                     float lampAt = along + 7;
                     if (streetlight == null || NearJump(lampAt, 12f) || !Clear(lampAt, side*8f, .55f)) continue;
@@ -201,6 +208,10 @@ namespace Outlaws.WorldShift
             surface.SetColor("_BaseColor",night?new Color(.42f,.53f,.69f):Color.white);
             windows.SetFloat("_Emission",night?.72f:.08f);
             windows.SetColor("_BaseColor",night?new Color(.85f,.90f,1):new Color(.72f,.82f,.88f));
+            if(cityGlassSurface!=null)
+                cityGlassSurface.SetColor("_BaseColor",night?new Color(.38f,.53f,.72f):Color.white);
+            if(cityShopPosters!=null)
+                cityShopPosters.SetColor("_Tint",night?new Color(.85f,.90f,1f):Color.white);
             water.SetColor("_DeepColor",night?new Color(.018f,.07f,.11f):new Color(.015f,.27f,.29f));
             water.SetColor("_ShallowColor",night?new Color(.06f,.20f,.23f):new Color(.09f,.54f,.47f));
             water.SetColor("_SkyColor",night?new Color(.055f,.11f,.17f):new Color(.67f,.76f,.68f));
