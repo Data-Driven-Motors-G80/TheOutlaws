@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -5,42 +6,85 @@ namespace Outlaws.WorldShift
 {
     public sealed partial class WorldShiftEnvironmentScenery
     {
+        private Material cityAdvertisementSurface, cityGlassSurface;
+        private static readonly string[] CityAdvertisementCopy =
+        {
+            "JOIN CSCI526",
+            "CSCI526 ROCKS!",
+            "DOGS > CATS",
+            "BUY HAPPINESS",
+            "PREMIUM AIR",
+            "YOUR AD HERE"
+        };
+        private static readonly Color[] CityAdvertisementAccents =
+        {
+            new Color(.20f,.74f,.80f), new Color(.81f,.30f,.62f),
+            new Color(.55f,.84f,.28f), new Color(.96f,.43f,.40f),
+            new Color(.65f,.48f,.95f), new Color(.30f,.62f,.96f)
+        };
+
         private void Architecture(Transform root, float side, int n, float height, float width, Color colour)
         {
-            var body = new WorldShiftArtMesh(); var glass = new WorldShiftArtMesh();
-            var trim = new Color(.29f,.33f,.37f);
+            var body = new WorldShiftArtMesh(); var glass = new WorldShiftArtMesh(); var officeLights = new WorldShiftArtMesh();
+            if(cityGlassSurface==null)
+            {
+                cityGlassSurface=MakeMaterial("City reflective curtain-wall glass",.025f);
+                cityGlassSurface.SetFloat("_Finish",5f);
+                cityGlassSurface.SetFloat("_Smoothness",.96f);
+                cityGlassSurface.SetFloat("_Specular",.72f);
+                cityGlassSurface.SetFloat("_Wear",0f);
+            }
+            var trim = new Color(.24f,.30f,.35f);
             var stone = new Color(.69f,.67f,.61f);
             var darkGlass = new Color(.14f,.24f,.31f);
             // A grounded podium, upper tower and roof cap give each block a silhouette.
             body.Box(new Vector3(0,-.5f,0),new Vector3(width+1f,9f,15.2f),stone);
             float topWidth = n%3==0 ? width*.77f : width;
-            body.Box(new Vector3(0,(height+4)*.5f,0),new Vector3(topWidth,height-4,14),colour);
+            Color glazing=Color.Lerp(colour,new Color(.16f,.38f,.49f),.82f);
+            glass.Box(new Vector3(0,(height+4)*.5f,0),new Vector3(topWidth,height-4,14),glazing);
             body.Box(new Vector3(0,4.15f,0),new Vector3(width+1.4f,.3f,15.6f),trim);
             body.Box(new Vector3(0,height+.2f,0),new Vector3(topWidth+.6f,.4f,14.6f),stone);
+            // Slender aluminium mullions, uninterrupted glazing and a luminous crown.
+            foreach(float face in new[]{-1f,1f})
+            {
+                for(int column=0;column<=5;column++)
+                    body.Box(new Vector3(face*(topWidth*.5f+.07f),(height+4f)*.5f,-7f+column*2.8f),
+                        new Vector3(.11f,height-4f,.065f),trim);
+                for(int column=0;column<=4;column++)
+                    body.Box(new Vector3(-topWidth*.5f+column*topWidth/4f,(height+4f)*.5f,face*7.07f),
+                        new Vector3(.065f,height-4f,.11f),trim);
+            }
+            officeLights.Box(new Vector3(0,height-.65f,-7.12f),new Vector3(topWidth,.16f,.06f),new Color(.38f,.72f,.78f));
             body.Box(new Vector3(.8f,height+.95f,2.5f),new Vector3(3.2f,1.5f,3.8f),trim);
             if(n%3==0)
             {
                 body.Box(new Vector3(0,height+2.7f,1),new Vector3(2f,2.2f,2.8f),colour);
                 body.Cylinder(new Vector3(0,height+3.8f,1),.10f,.025f,3f,trim,6);
             }
-            // Windows on all visible faces, with frames and alternating warm/cool panes.
+            // Nearly edge-to-edge blue panes replace the small inset masonry windows.
             for(float y=5.8f;y<height-1f;y+=3.1f)
             {
-                for(int z=-5;z<=5;z+=3)
-                {
-                    float x=-side*(topWidth*.5f+.04f);
-                    body.Box(new Vector3(x,y,z),new Vector3(.14f,1.8f,2.1f),trim);
-                    Color pane=((z+(int)y+n)%4==0)?new Color(.94f,.73f,.42f):new Color(.36f,.57f,.67f);
-                    glass.Box(new Vector3(x-side*.08f,y+.03f,z),new Vector3(.045f,1.4f,1.72f),pane);
-                }
+                body.Box(new Vector3(0,y-1.5f,0),new Vector3(topWidth+.13f,.065f,14.13f),trim);
                 foreach(float face in new[]{-1f,1f})
-                    for(float x=-topWidth*.5f+1.4f;x<topWidth*.5f-1f;x+=2.6f)
+                {
+                    for(int column=0;column<5;column++)
                     {
-                        body.Box(new Vector3(x,y,face*7.04f),new Vector3(1.95f,1.8f,.14f),trim);
-                        Color pane=((int)(x+y)+n)%3==0?new Color(.94f,.76f,.49f):new Color(.39f,.59f,.70f);
-                        glass.Box(new Vector3(x,y+.03f,face*7.12f),new Vector3(1.55f,1.4f,.04f),pane);
+                        float z=-5.6f+column*2.8f;
+                        Color pane=Color.Lerp(glazing,new Color(.50f,.72f,.78f),.20f+.15f*Mathf.Sin(y*.10f+column*.7f+n));
+                        glass.Box(new Vector3(face*(topWidth*.5f+.035f),y,z),new Vector3(.04f,3f,2.72f),pane);
+                        if((column+(int)y+n)%13==0)
+                            officeLights.Box(new Vector3(face*(topWidth*.5f+.062f),y,z),new Vector3(.015f,2.5f,2.3f),new Color(.76f,.72f,.53f));
                     }
-                if(n%2==0) body.Box(new Vector3(0,y-1.25f,0),new Vector3(topWidth+.12f,.12f,14.12f),stone);
+                    float paneWidth=topWidth/4f;
+                    for(int column=0;column<4;column++)
+                    {
+                        float x=(column-1.5f)*paneWidth;
+                        Color pane=Color.Lerp(glazing,new Color(.55f,.74f,.79f),.22f+.14f*Mathf.Sin(y*.12f+column+n));
+                        glass.Box(new Vector3(x,y,face*7.035f),new Vector3(paneWidth-.075f,3f,.04f),pane);
+                        if((column+(int)y+n)%11==0)
+                            officeLights.Box(new Vector3(x,y,face*7.062f),new Vector3(paneWidth-.3f,2.5f,.015f),new Color(.76f,.72f,.53f));
+                    }
+                }
             }
             // Shop fronts face the pavement. Awnings use muted colours, never hazard colours.
             float frontage=-side*(width*.5f+.56f);
@@ -50,9 +94,46 @@ namespace Outlaws.WorldShift
                 glass.Box(new Vector3(frontage-side*.06f,1.7f,z),new Vector3(.04f,2.35f,2.75f),darkGlass);
                 body.Box(new Vector3(frontage-side*.65f,3.25f,z),new Vector3(1.5f,.2f,3.4f),colour*.65f);
             }
-            glass.Box(new Vector3(-side*(topWidth*.5f+.16f),height*.62f,0),new Vector3(.08f,.18f,12),new Color(.38f,.63f,.75f));
-            Render(root,"City masonry and shop fronts",body,surface);
-            Render(root,"Inset windows and facade lights",glass,windows);
+            Render(root,"City aluminium framing and shop fronts",body,surface);
+            Render(root,"Reflective glass curtain walls",glass,cityGlassSurface);
+            Render(root,"Office lights and tower crown",officeLights,windows);
+            float screenHeight=16f+n%3*2f;
+            CityAdvertisement(root,new Vector3(0,6f+screenHeight*.5f,-7.45f),Quaternion.identity,
+                topWidth+.35f,screenHeight,n);
+            CityAdvertisement(root,new Vector3(-side*(topWidth*.5f+.3f),height*.46f,0),
+                Quaternion.Euler(0,side*90f,0),14.2f,Mathf.Min(22f,height*.52f),n+CityAdvertisementCopy.Length/2);
+        }
+
+        private void CityAdvertisement(Transform building,Vector3 position,Quaternion rotation,float width,float height,int variant)
+        {
+            if(cityAdvertisementSurface==null)
+            {
+                cityAdvertisementSurface=MakeMaterial("Illuminated City advertisements",.85f);
+                cityAdvertisementSurface.SetColor("_BaseColor",Color.white);
+            }
+            int design=variant%CityAdvertisementCopy.Length;
+            string message=CityAdvertisementCopy[design];
+            var board=new GameObject("City advertisement - "+message).transform;
+            board.SetParent(building,false); board.localPosition=position; board.localRotation=rotation;
+            var frame=new WorldShiftArtMesh();
+            Color accent=CityAdvertisementAccents[design];
+            frame.ChamferBox(Vector3.zero,new Vector3(width+.35f,height+.35f,.30f),.12f,new Color(.12f,.15f,.20f));
+            frame.Box(new Vector3(0,0,-.17f),new Vector3(width,height,.04f),accent);
+            frame.Box(new Vector3(0,0,-.20f),new Vector3(width-.22f,height-.22f,.03f),
+                Color.Lerp(new Color(.018f,.025f,.045f),accent,.11f));
+            foreach(float edge in new[]{-1f,1f})
+                frame.Box(new Vector3(0,edge*(height*.5f-.65f),-.225f),new Vector3(width-.6f,.32f,.015f),accent);
+            Render(board,"Illuminated billboard frame",frame,cityAdvertisementSurface);
+            var label=new GameObject("Advertisement lettering",typeof(TextMeshPro)).GetComponent<TextMeshPro>();
+            label.transform.SetParent(board,false); label.transform.localPosition=new Vector3(0,0,-.24f);
+            WorldShiftTypography.Apply(label,FontStyles.Bold,36f);
+            label.text=message; label.color=new Color(.98f,.96f,.89f);
+            label.alignment=TextAlignmentOptions.Center;
+            label.rectTransform.sizeDelta=new Vector2(width-1f,height-2.2f);
+            label.enableAutoSizing=true; label.fontSizeMin=8f; label.fontSizeMax=22f; label.fontSize=22f;
+            label.textWrappingMode=TextWrappingModes.Normal;
+            label.overflowMode=TextOverflowModes.Overflow;
+            label.GetComponent<Renderer>().shadowCastingMode=ShadowCastingMode.Off;
         }
 
         private void CityFurniture(float at,float side,int index)

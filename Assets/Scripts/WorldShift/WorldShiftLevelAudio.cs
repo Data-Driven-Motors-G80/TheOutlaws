@@ -7,6 +7,13 @@ namespace Outlaws.WorldShift
     {
         private WorldShiftCity game;
         private AudioSource engine, tyres, cues, music, ocean, gull;
+        private AudioSource cityCrowd;
+        private readonly AudioSource[] cityVoices = new AudioSource[2];
+        private readonly float[] cityVoiceIn = { .5f, 1.8f };
+        private readonly int[] cityVoiceIndex = { 0, 5 };
+        private AudioClip[] cityPhrases;
+        private WorldShiftEnvironmentScenery cityScenery;
+        private float cityCrowdGain;
         private AudioLowPassFilter musicFilter;
         private float musicGain;
         private AudioClip takeoff, landing, crash, victory;
@@ -38,6 +45,21 @@ namespace Outlaws.WorldShift
                 gull = Source("Distant gull", "WS_Gull", false);
                 ocean.Play();
             }
+            if (game.Environment == ShiftLevel.City && !game.Course.Training)
+            {
+                cityScenery = game.GetComponentInChildren<WorldShiftEnvironmentScenery>();
+                cityCrowd = Source("City crowd conversation bed", "WS_CityCrowd", true);
+                cityCrowd.priority = 180;
+                cityCrowd.Play();
+                cityPhrases = Resources.LoadAll<AudioClip>("WorldShiftCityVoices");
+                System.Array.Sort(cityPhrases, (a,b) => string.CompareOrdinal(a.name,b.name));
+                for (int i=0;i<cityVoices.Length;i++)
+                {
+                    cityVoices[i] = Source(i==0 ? "Left footpath conversation" : "Right footpath conversation", null, false);
+                    cityVoices[i].panStereo = i==0 ? -.65f : .65f;
+                    cityVoices[i].priority = 155;
+                }
+            }
             engine.Play(); tyres.Play();
             previousState = game.State; previousLateral = game.Lateral;
             previousAirborne = game.IsRelayAirborne;
@@ -62,7 +84,7 @@ namespace Outlaws.WorldShift
             bool pause = WorldShiftAudioSettings.Suspended(game);
             if (pause != suspended)
             {
-                foreach (var source in new[] { engine, tyres, cues, music, ocean, gull })
+                foreach (var source in new[] { engine, tyres, cues, music, ocean, gull, cityCrowd, cityVoices[0], cityVoices[1] })
                     if (source != null) { if (pause) source.Pause(); else source.UnPause(); }
                 suspended = pause;
                 previousLateral = game.Lateral;
@@ -71,6 +93,7 @@ namespace Outlaws.WorldShift
             bool running = game.State == ShiftRunState.Running;
             bool airborne = game.IsRelayAirborne;
             float effects = WorldShiftAudioSettings.Effects;
+            RefreshCityCrowd(delta, running, effects);
             cues.volume = .65f * effects;
             if (previousState == ShiftRunState.Running && game.State == ShiftRunState.Retrying && game.Capturing)
                 cues.PlayOneShot(crash);
@@ -109,6 +132,35 @@ namespace Outlaws.WorldShift
             previousState = game.State;
             previousAirborne = airborne;
             previousLateral = game.Lateral;
+        }
+
+        private void RefreshCityCrowd(float delta, bool running, float effects)
+        {
+            if (cityCrowd == null) return;
+            float left = cityScenery == null ? 0f : cityScenery.CityCrowdPresence(game.Distance,-1f);
+            float right = cityScenery == null ? 0f : cityScenery.CityCrowdPresence(game.Distance,1f);
+            float presence = Mathf.Max(left,right);
+            cityCrowdGain = Mathf.MoveTowards(cityCrowdGain,running ? .44f*presence : 0f,delta*.7f);
+            cityCrowd.volume = effects*cityCrowdGain;
+            for (int i=0;i<cityVoices.Length;i++)
+            {
+                var source=cityVoices[i];
+                if (!running)
+                {
+                    source.Stop(); cityVoiceIn[i]=.5f+i*1.3f;
+                    continue;
+                }
+                float nearby=i==0 ? left : right;
+                source.volume=effects*.30f*nearby;
+                cityVoiceIn[i]-=delta;
+                if(cityVoiceIn[i]>0f || source.isPlaying || cityPhrases.Length==0 || nearby<.15f) continue;
+                int index=cityVoiceIndex[i]%cityPhrases.Length;
+                source.clip=cityPhrases[index];
+                source.pitch=.94f+(index%4)*.045f;
+                source.Play();
+                cityVoiceIndex[i]+=7;
+                cityVoiceIn[i]=2.6f+(index%5)*.37f;
+            }
         }
     }
 }
