@@ -50,6 +50,7 @@ namespace Outlaws.WorldShift
             crashFlash = WorldShiftMenu.Panel(safe, "Crash flash", Vector2.zero, Vector2.one, Color.clear).GetComponent<Image>();
             driving = WorldShiftMenu.Panel(safe, "Driving", Vector2.zero, Vector2.one, Color.clear).gameObject;
             BuildFreezePrompt(driving.transform);
+            BuildIceHint(driving.transform);
             if (game.Course.Training)
             {
                 var edges = WorldShiftMenu.Panel(safe, "Tutorial freeze edge pulse", Vector2.zero, Vector2.one, Color.clear);
@@ -309,6 +310,7 @@ namespace Outlaws.WorldShift
             crashFlash.color = Color.clear; // the crash vignette in WorldShiftFailureHud replaces the flat red flash
             if (oceanHud) RefreshOceanHud();
             RefreshFailurePanel();
+            RefreshIceHint();
             // Space is the switch key; a still-selected button would also receive it as "submit".
             if (game.State == ShiftRunState.Running && EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null)
                 EventSystem.current.SetSelectedGameObject(null);

@@ -40,11 +40,41 @@ namespace Outlaws.WorldShift
                 bool desertRock = game.LevelMode && game.Environment == ShiftLevel.Desert;
                 if (desertRock && data.Rock.Airborne) rockView.Movers.Add(WorldShiftDesertMover.Vulture(solid.transform, root, data.Rock.Radius));
                 else if (desertRock) WorldShiftDesertRockArt.Tumbleweed(solid.transform, root, data.Rock.Radius);
+                // Mountain: a goat trotting across the road (white mountain goats and alpine ibex alternate).
+                // Mountain: a big eagle gliding across a jump.
+                else if (game.LevelMode && game.Environment == ShiftLevel.Mountain && data.Rock.Airborne)
+                    rockView.Eagles.Add(WorldShiftMountainEagle.Build(solid.transform, root, data.Rock.Radius));
+                else if (game.LevelMode && game.Environment == ShiftLevel.Mountain && !data.Rock.Airborne)
+                    rockView.Goats.Add(WorldShiftMountainGoat.Build(solid.transform, root, data.Rock.Radius,
+                        data.Rock.Motion.MotionSpeed * data.Rock.TravelScale, mountainGoatIndex++));
                 else WorldShiftBoulderArt.Build(solid.transform, root, data.Rock.Radius, false,
                     game.LevelMode && game.Environment == ShiftLevel.Ocean);
                 // No floating ice ring under flying vultures.
-                if (game.LevelMode && !(desertRock && data.Rock.Airborne)) BuildFrozenCue(root, Vector3.zero, Vector3.one * (data.Rock.Radius * 2f));
+                bool flyingAnimal = data.Rock.Airborne && (desertRock || game.Environment == ShiftLevel.Mountain);
+                if (game.LevelMode && !flyingAnimal) BuildFrozenCue(root, Vector3.zero, Vector3.one * (data.Rock.Radius * 2f));
                 hazards.Add(rockView);
+                return;
+            }
+            if (game.LevelMode && game.Environment == ShiftLevel.Mountain && data.Kind == ShiftHazardKind.Oncoming
+                && data.SharedAcrossWorlds && !data.LateralMotion)
+            {
+                // Mountain rockslide: a boulder per lane rolls down the road in Day and freezes in Night.
+                const float radius = 1.55f;
+                var slideView = new HazardView { Data = data, Solid = solid, Ghost = ghost, Root = root, Chunk = chunk, RollRadius = radius };
+                for (int lane = 0; lane < 3; lane++)
+                {
+                    if ((data.LaneMask & (1 << lane)) == 0) continue;
+                    Vector3 centre = new Vector3((lane - 1) * WorldShiftLevel.RoadWidth / 3f, radius, 0f);
+                    var cue = new GameObject("Rockslide boulder cue").transform;
+                    cue.SetParent(solid.transform, false);
+                    cue.localPosition = centre;
+                    var roller = new GameObject("Rolling boulder").transform;
+                    roller.SetParent(cue, false);
+                    WorldShiftBoulderArt.Build(roller, cue, radius, sidewaysCue: false);
+                    slideView.Rollers.Add(roller);
+                    BuildFrozenCue(solid.transform, centre, Vector3.one * (radius * 2f));
+                }
+                hazards.Add(slideView);
                 return;
             }
             if (game.LevelMode && data.Kind == ShiftHazardKind.Oncoming && !data.LateralMotion)

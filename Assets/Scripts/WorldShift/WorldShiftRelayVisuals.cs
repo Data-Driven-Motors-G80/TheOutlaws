@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 namespace Outlaws.WorldShift
 {
     /// <summary>Prototype launch arrows and landing targets, deliberately different from pit warnings.</summary>
-    public sealed class WorldShiftRelayVisuals : MonoBehaviour
+    public sealed partial class WorldShiftRelayVisuals : MonoBehaviour
     {
         private sealed class View
         {
@@ -54,6 +54,8 @@ namespace Outlaws.WorldShift
                 EdgeFrame(view.RampPreview.transform, data.Ramp, data.Takeoff, true, "Missing ramp");
                 Threshold(view.Ramp.transform, data.Takeoff, false, "Takeoff edge");
                 Threshold(view.RampPreview.transform, data.Takeoff, true, "Missing takeoff edge");
+                if (route.Course != null && !route.Course.Training && route.Course.Environment == ShiftLevel.Mountain)
+                    BuildSkiJump(view.Ramp.transform, data);
                 BuildSign(view.Root.transform, route.Sample(data.Ramp - 22f), data.Source, data.Destination, true);
                 // The destination marker belongs to the touchdown threshold, never the approach ramp.
                 BuildSign(view.Root.transform, route.Sample(data.Landing), data.Destination, data.Destination, false);

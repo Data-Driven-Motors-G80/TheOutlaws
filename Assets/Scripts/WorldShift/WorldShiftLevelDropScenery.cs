@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 namespace Outlaws.WorldShift
 {
     /// <summary>Collider-free jump dangers shared by Day and Night. The route still owns every fall.</summary>
-    public sealed class WorldShiftLevelDropScenery : MonoBehaviour
+    public sealed partial class WorldShiftLevelDropScenery : MonoBehaviour
     {
         private sealed class Fin { public Transform Root; public Vector3 Centre; public Quaternion Heading; public float Phase; }
         private readonly List<Mesh> meshes = new List<Mesh>();
@@ -43,7 +43,7 @@ namespace Outlaws.WorldShift
             ShiftLevel.Desert => "Sandstone ravine",
             ShiftLevel.Ocean => "Open sea and shark fins",
             ShiftLevel.Snow => "Blue ice crevasse",
-            _ => "Mountain river gorge"
+            _ => "Mountain misty gorge"
         };
 
         public void BuildJump(Transform parent, ShiftRelay jump)
@@ -56,6 +56,7 @@ namespace Outlaws.WorldShift
                 ShiftLevel.Desert => 11f, ShiftLevel.Snow => 12f, _ => 23f };
             float floor = low - depth;
             var bed = new WorldShiftArtMesh(); var detail = new WorldShiftArtMesh(); var flow = new WorldShiftArtMesh();
+            if (environment == ShiftLevel.Mountain) { BuildMountainGorge(root, jump, low); return; }
             if (environment == ShiftLevel.Ocean)
             {
                 // Reuse the continuous sea, rather than placing a second water plane over it.
@@ -210,6 +211,7 @@ namespace Outlaws.WorldShift
             if(game==null || WorldShiftSceneLoading.Active || game.State==ShiftRunState.Paused || game.TrainingLessonPaused) return;
             float dt=Time.deltaTime;clock+=dt;
             water.SetFloat("_OceanTime",clock);
+            AnimateGorgeMist();
             foreach(var fin in fins)
             {
                 if(!fin.Root.gameObject.activeInHierarchy) continue;
@@ -217,7 +219,8 @@ namespace Outlaws.WorldShift
                 fin.Root.SetPositionAndRotation(fin.Centre+fin.Heading*new Vector3(Mathf.Cos(a)*2.8f,0,Mathf.Sin(a)*4.2f),
                     fin.Heading*Quaternion.LookRotation(new Vector3(-Mathf.Sin(a)*2.8f,0,Mathf.Cos(a)*4.2f)));
             }
-            bool falling=game.State==ShiftRunState.Retrying && (game.FailureReason=="NO ROAD" || game.FailureReason=="MISSED RELAY LANDING");
+            // Guardrail-gap falls have their own roll down the slope; the jump splash/burst is for jump drops only.
+            bool falling=game.State==ShiftRunState.Retrying && !game.GapFall && (game.FailureReason=="NO ROAD" || game.FailureReason=="MISSED RELAY LANDING");
             if(!falling) {fallAge=0;wasFalling=false;burstStarted=false;burst.gameObject.SetActive(false);return;}
             if(!wasFalling) {fallAge=0;burstAge=0;wasFalling=true;}
             fallAge+=dt;
@@ -239,7 +242,7 @@ namespace Outlaws.WorldShift
         private void OnDestroy()
         {
             foreach(var mesh in meshes) if(mesh!=null) Destroy(mesh);
-            if(surface!=null) Destroy(surface);if(water!=null) Destroy(water);
+            if(surface!=null) Destroy(surface);if(water!=null) Destroy(water);if(gorgeMist!=null) Destroy(gorgeMist);
         }
     }
 }

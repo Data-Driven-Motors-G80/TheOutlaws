@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -147,6 +148,7 @@ namespace Outlaws.WorldShift
                         i % 2 == 0 ? Granite : new Color(.53f, .49f, .40f), seed + i);
                 }
                 Render(root, "Fractured rock cutting and scree apron", mesh, surface);
+                if (seed % 6 == 3) AddWaterfall(root, seed);
             }
 
             // Sparse wind-shaped fir clusters leave the large rock forms readable.
@@ -168,10 +170,91 @@ namespace Outlaws.WorldShift
                 Render(root, "Alpine tree island", mesh, surface);
             }
             route.VisitRoadPieces(AlpineEdges);
+            BuildGuardrailGaps();
+            BuildMountainSkyLife();
+            BuildMountainDressing();
+        }
+
+        // Each end of a guardrail gap: a bent rail stub and a chevron post facing the driver. No text (rule 3).
+        private readonly List<GameObject> gapBeacons = new List<GameObject>();
+
+        // Each guardrail gap is marked so it reads from far away, Day and Night: tall self-lit red-and-white chevron
+        // boards with flashing amber beacons at both ends and 30 m before, torn rail ends, and red-and-white kerb
+        // paint along the road edge for the whole gap. No text (rule 3).
+        private void BuildGuardrailGaps()
+        {
+            var steel = new Color(.57f, .63f, .63f);
+            var red = new Color(.86f, .08f, .07f);
+            var white = new Color(.97f, .97f, .95f);
+            var warning = MakeMaterial("Guardrail gap warnings", .55f);
+            var beacon = MakeMaterial("Guardrail gap beacons", 1.4f);
+            foreach (var gap in route.Course.EdgeGaps)
+            {
+                float side = gap.z;
+                for (int end = 0; end < 3; end++)
+                {
+                    // 0: start of the gap, 1: end of the gap, 2: advance warning 30 m before it.
+                    float at = end == 0 ? gap.x : end == 1 ? gap.y : gap.x - 30f;
+                    var root = Root(end == 2 ? "Guardrail gap advance warning" : "Guardrail gap marker", at,
+                        side * (WorldShiftLevel.RoadWidth * .5f + 1.1f));
+                    var mesh = new WorldShiftArtMesh();
+                    var board = new WorldShiftArtMesh();
+                    if (end < 2)
+                    {
+                        // The torn rail end bends outwards, away from the road, over the gap.
+                        float into = end == 0 ? 1f : -1f;
+                        mesh.Beam(new Vector3(0f, .85f, -into * 1.6f), new Vector3(0f, .85f, 0f), .13f, .26f, steel);
+                        mesh.Beam(new Vector3(0f, .85f, 0f), new Vector3(side * .7f, .55f, into * 1.1f), .13f, .26f, steel);
+                        // Loose scree where the barrier tore away.
+                        for (int i = 0; i < 3; i++)
+                            mesh.Rock(new Vector3(side * (.3f + i * .35f), .05f, into * (1f + i * 1.3f)),
+                                new Vector3(.45f, .25f + i * .08f, .5f), Granite, Mathf.RoundToInt(at) + i);
+                    }
+                    mesh.Beam(new Vector3(0f, 0f, 0f), new Vector3(0f, 3.0f, 0f), .16f, .16f, steel);
+                    // Tall chevron board on the approach face: white field, three red chevrons pointing back to the road.
+                    const float y = 2.25f, h = .5f;
+                    board.Box(new Vector3(0f, y, -.1f), new Vector3(1.7f, 1.12f, .06f), white);
+                    for (int i = 0; i < 3; i++)
+                    {
+                        float x = side * (.5f - i * .5f);
+                        Vector3 tip = new Vector3(x - side * .26f, y, -.14f);
+                        Vector3 outerTop = new Vector3(x + side * .02f, y + h, -.14f), innerTop = new Vector3(x + side * .24f, y + h, -.14f);
+                        Vector3 outerLow = new Vector3(x + side * .02f, y - h, -.14f), innerLow = new Vector3(x + side * .24f, y - h, -.14f);
+                        Vector3 tipInner = tip + new Vector3(side * .22f, 0f, 0f);
+                        board.Quad(outerTop, innerTop, tipInner, tip, red); board.Quad(tip, tipInner, innerTop, outerTop, red);
+                        board.Quad(tip, tipInner, innerLow, outerLow, red); board.Quad(outerLow, innerLow, tipInner, tip, red);
+                    }
+                    Render(root, end == 2 ? "Advance chevron post" : "Torn guardrail and chevron post", mesh, surface);
+                    Render(root, "Self-lit chevron board", board, warning);
+                    // Flashing amber beacon on top of the post.
+                    var lamp = new WorldShiftArtMesh();
+                    lamp.Cylinder(new Vector3(0f, 3.0f, 0f), .17f, .14f, .3f, new Color(1f, .62f, .08f), 10);
+                    var lampRoot = new GameObject("Flashing gap beacon").transform;
+                    lampRoot.SetParent(root, false);
+                    Render(lampRoot, "Beacon lens", lamp, beacon);
+                    gapBeacons.Add(lampRoot.gameObject);
+                }
+                // Red-and-white kerb paint along the road edge for the whole gap, following the bend.
+                for (float at = gap.x; at < gap.y; at += 1.5f)
+                {
+                    var root = Root("Gap edge kerb paint", at, side * (WorldShiftLevel.RoadWidth * .5f - .42f));
+                    var paint = new WorldShiftArtMesh();
+                    paint.Box(new Vector3(0f, .03f, 0f), new Vector3(.8f, .04f, 1.52f),
+                        Mathf.RoundToInt((at - gap.x) / 1.5f) % 2 == 0 ? red : white);
+                    Render(root, "Kerb stripe", paint, warning);
+                }
+            }
+        }
+
+        // Beacons flash about twice a second on the paused-with-the-game clock.
+        private void FlashGapBeacons(float clock)
+        {
+            bool on = Mathf.Repeat(clock * 2.2f, 1f) < .55f;
+            foreach (var lamp in gapBeacons) if (lamp.activeSelf != on) lamp.SetActive(on);
         }
 
         // Same profile as the mountain roadside: a narrow shelf above a deep valley.
-        private static float MountainGroundHeight(float offsetFromEdge, float side)
+        internal static float MountainGroundHeight(float offsetFromEdge, float side)
         {
             float t = Mathf.Clamp01((offsetFromEdge - 2.6f) / (55f - 2.6f));
             return (side > 0 ? -38f : 16f) * t;
@@ -332,6 +415,8 @@ namespace Outlaws.WorldShift
                 Vector3 nextUp = segment.Sample(segment.Length * (i + 1) / (rows - 1)).Up;
                 foreach (float side in new[] { -1f, 1f })
                 {
+                    // Guardrail gaps: no rail where the car can drive off the edge (WorldShiftLevelCourse.EdgeGap).
+                    if (!IsSnow && route.Course.EdgeGapAt(at, side)) continue;
                     Vector3 a = side < 0 ? left : right, b = side < 0 ? nextLeft : nextRight;
                     if (IsSnow)
                     {
@@ -396,6 +481,7 @@ namespace Outlaws.WorldShift
 
         private void LateUpdate()
         {
+            AnimateSkyLife();
             if (snowfall != null)
             {
                 snowfall.position = route.Sample(distance + 22f).Position + Vector3.up * 12f;
@@ -440,6 +526,7 @@ namespace Outlaws.WorldShift
             Color horizon = night ? new Color(.065f, .11f, .19f)
                 : IsSnow ? new Color(.74f, .85f, .92f) : new Color(.67f, .77f, .82f);
             sky.SetFloat("_Night", night ? 1f : 0f);
+            sky.SetFloat("_Mountain", IsSnow ? 0f : 1f);
             sky.SetColor("_Horizon", horizon);
             sky.SetColor("_Zenith", night ? new Color(.012f, .026f, .07f)
                 : IsSnow ? new Color(.35f, .57f, .75f) : new Color(.20f, .43f, .65f));

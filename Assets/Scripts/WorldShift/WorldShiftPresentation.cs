@@ -21,6 +21,14 @@ namespace Outlaws.WorldShift
             public readonly List<WorldShiftDesertMover> Movers = new List<WorldShiftDesertMover>();
             public readonly List<WorldShiftRetractableBarrier> Barriers = new List<WorldShiftRetractableBarrier>();
             public readonly List<WorldShiftRoadVehicleArt> Traffic = new List<WorldShiftRoadVehicleArt>();
+            // Mountain rockslide boulders roll toward the player as they travel.
+            public readonly List<Transform> Rollers = new List<Transform>();
+            public float RollRadius = 1f;
+            // Sideways movers: arrows aimed along the current direction of travel.
+            public readonly List<WorldShiftMoverArrowHeading> Arrows = new List<WorldShiftMoverArrowHeading>();
+            // Mountain crossings: goats trotting across the road instead of rolling boulders.
+            public readonly List<WorldShiftMountainGoat> Goats = new List<WorldShiftMountainGoat>();
+            public readonly List<WorldShiftMountainEagle> Eagles = new List<WorldShiftMountainEagle>();
         }
         private sealed class PedestrianView
         {
@@ -45,7 +53,7 @@ namespace Outlaws.WorldShift
         private WorldShiftRoadside roadside;
         private WorldShiftOceanPresentation ocean;
         private WorldShiftEnvironmentScenery scenery;
-        private int oceanHazardIndex;
+        private int oceanHazardIndex, mountainGoatIndex;
         private WorldShiftConvergence convergence;
         private WorldShiftRelayVisuals relayVisuals;
         private readonly WorldShiftObstacleVisual.Palette obstaclePalette = new WorldShiftObstacleVisual.Palette();
@@ -97,6 +105,9 @@ namespace Outlaws.WorldShift
                 relayVisuals.Build(game, route);
             }
             foreach (ShiftHazard hazard in game.Hazards) BuildHazard(hazard);
+            foreach (var hazard in hazards)
+                if (hazard.Data.LateralMotion) hazard.Arrows.AddRange(hazard.Root.GetComponentsInChildren<WorldShiftMoverArrowHeading>(true));
+            AimMoverArrows();
             BuildFuel();
             BuildCheckpoints();
             BuildCoastalBridge();
@@ -282,6 +293,13 @@ namespace Outlaws.WorldShift
                         PoseMovers(hazard, seconds, rock.LateralAt(seconds + .05f) >= rock.Lateral ? 1f : -1f);
                         continue;
                     }
+                    if (hazard.Goats.Count > 0 || hazard.Eagles.Count > 0)
+                    {
+                        float seconds = rock.Motion.DaySeconds, heading = SidewaysHeading(hazard.Data);
+                        foreach (var goat in hazard.Goats) goat.Pose(seconds, heading);
+                        foreach (var eagle in hazard.Eagles) eagle.Pose(seconds, heading);
+                        continue;
+                    }
                     hazard.Solid.transform.localRotation = Quaternion.AngleAxis(
                         -rock.Motion.DaySeconds * rock.Motion.MotionSpeed * rock.TravelScale * rock.Motion.Direction
                         / rock.Radius * Mathf.Rad2Deg, Vector3.forward);
@@ -292,6 +310,9 @@ namespace Outlaws.WorldShift
                 RoadPathPoint point = route.Sample((start + end) * .5f);
                 hazard.Root.SetPositionAndRotation(point.Position + point.Right * hazard.Data.LateralOffset, Quaternion.LookRotation(point.Forward, point.Up));
                 foreach (var traffic in hazard.Traffic) traffic.SetTravel(hazard.Data.Start - start);
+                // Rolling toward the player: the top of the boulder turns back down the road, and stops when frozen.
+                foreach (var roller in hazard.Rollers)
+                    roller.localRotation = Quaternion.AngleAxis(-(hazard.Data.Start - start) / hazard.RollRadius * Mathf.Rad2Deg, Vector3.right);
                 if (hazard.Movers.Count > 0)
                 {
                     // Desert sliders: offset is -2.8 sin(travel), so the walking direction follows -cos(travel).
@@ -315,8 +336,35 @@ namespace Outlaws.WorldShift
                 bool preview = ShouldPreview(hazard, distance);
                 hazard.Ghost.SetActive(preview);
             }
+            AimMoverArrows();
             if (scenery != null) scenery.UpdateVisibility(distance);
             if (game.IsMerged) RefreshFuel();
+        }
+
+        /// <summary>
+        /// Points every sideways arrow the way its mover is going right now: +1 toward road right, -1 toward road left.
+        /// Frozen movers keep showing the way they will go when Day resumes.
+        /// </summary>
+        public static float SidewaysHeading(ShiftHazard data)
+        {
+            if (data.Gate != null) return data.Gate.LateralAt(data.Gate.DaySeconds + .05f) >= data.Gate.Lateral ? 1f : -1f;
+            if (data.Rock != null)
+            {
+                float seconds = data.Rock.Motion.DaySeconds;
+                return data.Rock.LateralAt(seconds + .05f) >= data.Rock.Lateral ? 1f : -1f;
+            }
+            // Plain sliders: offset is -2.8 sin(travel), so the direction follows -cos(travel) times the motion sign.
+            return -Mathf.Cos(data.MotionTravel) * Mathf.Sign(data.MotionSpeed) >= 0f ? 1f : -1f;
+        }
+
+        private void AimMoverArrows()
+        {
+            foreach (var hazard in hazards)
+            {
+                if (hazard.Arrows.Count == 0) continue;
+                float heading = SidewaysHeading(hazard.Data);
+                foreach (var arrow in hazard.Arrows) if (arrow != null) arrow.Point(heading);
+            }
         }
 
         private static void PoseMovers(HazardView hazard, float clock, float heading)

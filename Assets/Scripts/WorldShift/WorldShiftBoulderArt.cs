@@ -5,13 +5,15 @@ namespace Outlaws.WorldShift
     /// <summary>Faceted rock inside the existing spherical collision envelope, with a non-rotating cue.</summary>
     internal sealed class WorldShiftBoulderArt : MonoBehaviour
     {
-        private Mesh rockMesh, arrowMesh;
-        private Material rockMaterial, arrowMaterial;
+        private Mesh rockMesh;
+        private Material rockMaterial;
         private GameObject arrow;
 
-        public static void Build(Transform rollingParent, Transform cueParent, float radius, bool tumbleweed = false, bool oilDrum = false)
+        public static void Build(Transform rollingParent, Transform cueParent, float radius, bool tumbleweed = false, bool oilDrum = false,
+            bool sidewaysCue = true)
         {
-            var root = new GameObject(oilDrum ? "Harbour oil drum" : tumbleweed ? "Desert tumbleweed" : "Teal-banded desert boulder");
+            var root = new GameObject(oilDrum ? "Harbour oil drum" : tumbleweed ? "Desert tumbleweed"
+                : sidewaysCue ? "Teal-banded desert boulder" : "Rolling mountain boulder");
             root.transform.SetParent(rollingParent, false);
             var owner = root.AddComponent<WorldShiftBoulderArt>();
             var rock = new WorldShiftArtMesh();
@@ -43,17 +45,11 @@ namespace Outlaws.WorldShift
             owner.rockMaterial=Material("Boulder stone and teal paint",.3f);
             root.AddComponent<MeshFilter>().sharedMesh=owner.rockMesh;
             root.AddComponent<MeshRenderer>().sharedMaterial=owner.rockMaterial;
-            // Outside the rolling hierarchy: the arrow always reads left/right, even when the rock stops tilted.
-            owner.arrow=new GameObject("Boulder sideways direction",typeof(MeshFilter),typeof(MeshRenderer));
-            owner.arrow.transform.SetParent(cueParent,false);
-            owner.arrow.transform.localPosition=new Vector3(0,radius+.32f,-radius*.25f);
-            var cue=new WorldShiftArtMesh();
-            Arrow(cue,radius*.84f,.20f,0f,new Color(.035f,.04f,.055f));
-            Arrow(cue,radius*.75f,.145f,-.012f,Color.white);
-            owner.arrowMesh=cue.Mesh("White sideways arrow with dark outline");
-            owner.arrowMaterial=Material("Boulder arrow",1f);
-            owner.arrow.GetComponent<MeshFilter>().sharedMesh=owner.arrowMesh;
-            owner.arrow.GetComponent<MeshRenderer>().sharedMaterial=owner.arrowMaterial;
+            // Boulders rolling straight down the road do not move sideways, so they carry no left/right arrow (rule 2).
+            if (!sidewaysCue) return;
+            // Outside the rolling hierarchy: the shared arrow stays level and points the way the rock is going.
+            owner.arrow=WorldShiftMoverArrow.Attach(cueParent,radius*.84f,new Vector3(0,radius+.32f,-radius*.25f),
+                Quaternion.identity,Vector3.back).gameObject;
         }
 
         // Tangled, sun-bleached twigs filling the gameplay sphere, like a real tumbleweed.
@@ -140,23 +136,14 @@ namespace Outlaws.WorldShift
             return material;
         }
 
-        private static void Arrow(WorldShiftArtMesh art,float halfWidth,float halfHeight,float z,Color colour)
-        {
-            float shoulder=halfWidth*.58f, shaft=halfHeight*.42f;
-            Vector3 P(float x,float y)=>new Vector3(x,y,z);
-            art.Triangle(P(-shoulder,-shaft),P(-shoulder,shaft),P(shoulder,shaft),colour,true);
-            art.Triangle(P(-shoulder,-shaft),P(shoulder,shaft),P(shoulder,-shaft),colour,true);
-            art.Triangle(P(-halfWidth,0),P(-shoulder,halfHeight),P(-shoulder,-halfHeight),colour,true);
-            art.Triangle(P(halfWidth,0),P(shoulder,-halfHeight),P(shoulder,halfHeight),colour,true);
-        }
-
         private void OnDestroy()
         {
-            Release(rockMesh); Release(arrowMesh); Release(rockMaterial); Release(arrowMaterial);
+            Release(rockMesh); Release(rockMaterial);
             if(arrow != null) Release(arrow);
         }
         private static void Release(Object obj)
         {
+            if(obj == null) return;
             if(Application.isPlaying) Destroy(obj); else DestroyImmediate(obj);
         }
     }

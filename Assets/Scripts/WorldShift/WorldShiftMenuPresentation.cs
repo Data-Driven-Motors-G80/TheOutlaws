@@ -68,12 +68,30 @@ namespace Outlaws.WorldShift
             var gradient=TextureLayer(shade,"Contrast gradient");gradient.texture=Shade();gradient.raycastTarget=false;
             var index=Panel(face,"Route number",new Vector2(.045f,.76f),new Vector2(.17f,.94f),new Color(.02f,.05f,.075f,.90f));RoundCard(index);
             MenuText(index,level.ToString("00"),0,0,1,1,15,open?Cream:Muted,FontStyles.Bold).alignment=TextAlignmentOptions.Center;
+            DifficultyPill(face,WorldShiftLevels.Difficulty(level),open);
             if(beaten) Badge(face,ShiftIcon.Check,RouteTeal,24,new Vector2(.91f,.85f));
             MenuText(face,WorldShiftLevels.Name(level),.055f,.18f,.85f,.37f,32,open?Cream:new Color(.76f,.80f,.81f),FontStyles.Bold);
             string description=open?"":"Complete "+WorldShiftLevels.Name(level-1)+" to unlock";
             if(!string.IsNullOrEmpty(description)) MenuText(face,description,.055f,.055f,.87f,.18f,12,open?new Color(.71f,.79f,.81f):Muted);
             Badge(face,open?ShiftIcon.Next:ShiftIcon.Lock,open?RouteTeal:Muted,19,new Vector2(.93f,.17f));
             return tile;
+        }
+        // Coloured difficulty tag with 1-3 pips beside the route number (TUTORIAL / EASY / MEDIUM / HARD).
+        private static void DifficultyPill(RectTransform face,LevelDifficulty difficulty,bool open)
+        {
+            Color tone=difficulty==LevelDifficulty.Hard?new Color(.93f,.30f,.25f):difficulty==LevelDifficulty.Medium?new Color(.98f,.70f,.18f)
+                :difficulty==LevelDifficulty.Easy?new Color(.34f,.80f,.46f):RouteTeal;
+            if(!open) tone=Color.Lerp(tone,Muted,.55f);
+            var pill=Panel(face,"Difficulty "+difficulty,new Vector2(.19f,.76f),new Vector2(difficulty==LevelDifficulty.Tutorial?.50f:.47f,.94f),new Color(.02f,.05f,.075f,.90f));RoundCard(pill);
+            int pips=difficulty==LevelDifficulty.Tutorial?0:(int)difficulty;
+            float textEnd=pips>0?.66f:.96f;
+            var label=MenuText(pill,difficulty.ToString().ToUpperInvariant(),.07f,0,textEnd,1,13,tone,FontStyles.Bold);
+            label.alignment=TextAlignmentOptions.Center;label.enableWordWrapping=false;
+            for(int i=0;i<3&&pips>0;i++)
+            {
+                var pip=Panel(pill,"Difficulty pip",new Vector2(.70f+i*.085f,.32f),new Vector2(.755f+i*.085f,.68f),i<pips?tone:new Color(1f,1f,1f,.18f));
+                RoundCard(pip);
+            }
         }
         private void UpdateMenuLayout()
         {

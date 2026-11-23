@@ -35,31 +35,32 @@ namespace Outlaws.WorldShift
             // Desert follows Snow's format: half and full-width closures alternate sandstone hoodoos and saguaro cacti.
             string desertShape=environment!=ShiftLevel.Desert || w<=3.1f?null:(variant/5)%2==0?"Sandstone hoodoos":"Saguaro cacti";
             if(desertShape!=null) root.name="Retractable "+world+" "+desertShape;
-            footing.Box(new Vector3(0,.025f,0), new Vector3(w,.05f,d), new Color(.29f,.31f,.33f));
-            // Solid road cover with thick dashed paint, never a raised wireframe or dark opening.
+            // Mountain: every Day/Night closure is a fresh rockslide pile carrying the world panel.
+            bool rockslide=environment==ShiftLevel.Mountain;
+            if(rockslide) root.name="Retractable "+world+" Rockslide pile";
+            // No grey cover: playtesters read the lowered barrier's grey slab as something that might slow them down.
+            // Lowered, only the flat world-coloured dashes show on the road.
+            // Thick dashed paint flush with the road marks where the barrier rises; never a raised wireframe or dark opening.
             const float stripe = .22f, dash = .95f, gap = .32f;
             for(float z=-d*.5f; z<d*.5f; z+=dash+gap)
             {
                 float length=Mathf.Min(dash,d*.5f-z);
                 foreach(float x in new[] {-w*.5f+stripe*.5f,w*.5f-stripe*.5f})
-                    footing.Box(new Vector3(x,.065f,z+length*.5f),new Vector3(stripe,.025f,length),colour);
+                    footing.Box(new Vector3(x,.012f,z+length*.5f),new Vector3(stripe,.012f,length),colour);
             }
             for(float x=-w*.5f; x<w*.5f; x+=dash+gap)
             {
                 float length=Mathf.Min(dash,w*.5f-x);
                 foreach(float z in new[] {-d*.5f+stripe*.5f,d*.5f-stripe*.5f})
-                    footing.Box(new Vector3(x+length*.5f,.065f,z),new Vector3(length,.025f,stripe),colour);
+                    footing.Box(new Vector3(x+length*.5f,.012f,z),new Vector3(length,.012f,stripe),colour);
             }
             // One broad panel per lane, rather than many narrow posts.
             int count = Mathf.Clamp(Mathf.RoundToInt(w / (10f / 3f)), 1, 3);
-            // Lowered seams line up with the same panel divisions.
-            for (int seam = 1; seam < count; seam++)
-                footing.Box(new Vector3(-w*.5f+w*seam/count,.054f,0),
-                    new Vector3(.035f,.012f,d-.15f), new Color(.22f,.24f,.26f));
             float panelWidth = w / count;
             if(winterShape=="Upright pines") WorldShiftSnowObstacleArt.UprightPines(body,w,h,d,world);
             else if(desertShape=="Sandstone hoodoos") WorldShiftDesertObstacleArt.Hoodoos(body,w,h,d,world);
             else if(desertShape!=null) WorldShiftDesertObstacleArt.Saguaros(body,w,h,d,world);
+            else if(rockslide) WorldShiftMountainObstacleArt.RockslidePile(body,w,h,d,world,variant);
             else for (int i=0; i<count; i++)
             {
                 float x = -w*.5f + (i+.5f)*panelWidth;
@@ -166,16 +167,6 @@ namespace Outlaws.WorldShift
                     for (float rx=-w*.5f+.18f; rx<w*.5f-.1f; rx+=.34f)
                         foreach (float ry in new[] {h*.2f,h*.78f})
                             if (!OverIcon(rx,ry,.06f)) FaceBox(rx-.03f,rx+.03f,ry,.06f,.03f,ink);
-                    break;
-                }
-                case ShiftLevel.Mountain:
-                {
-                    // Rockfall wall: staggered stone courses under a timber top rail.
-                    Color mortar = day ? new Color(.18f,.15f,.1f) : new Color(.5f,.52f,.55f);
-                    foreach (float y in new[] {h*.22f,h*.84f}) OnBothFaces(y,.035f,-w*.5f,w*.5f,.02f,mortar);
-                    for (float jx=-w*.5f+.35f; jx<w*.5f; jx+=.7f)
-                        if (!OverIcon(jx,h*.11f,h*.22f)) FaceBox(jx-.017f,jx+.017f,h*.11f,h*.22f,.02f,mortar);
-                    art.Box(new Vector3(x,h-.06f,0),new Vector3(w,.12f,d),wood);
                     break;
                 }
             }

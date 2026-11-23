@@ -7,6 +7,7 @@ Shader "The Outlaws/City and Desert Sky"
         _Zenith ("Zenith", Color) = (.19,.43,.65,1)
         [HideInInspector] _Snow ("Snow sky art", Float) = 0
         [HideInInspector] _SkyTime ("Sky animation time", Float) = 0
+        [HideInInspector] _Mountain ("Mountain night sky", Float) = 0
     }
     SubShader
     {
@@ -20,7 +21,7 @@ Shader "The Outlaws/City and Desert Sky"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             CBUFFER_START(UnityPerMaterial)
                 half4 _Horizon, _Zenith;
-                float _Night, _Snow, _SkyTime;
+                float _Night, _Snow, _SkyTime, _Mountain;
             CBUFFER_END
             struct V { float4 p:SV_POSITION; float3 d:TEXCOORD0; };
             V Vert(float4 p:POSITION) { V o; o.p=TransformObjectToHClip(p.xyz); o.d=p.xyz; return o; }
@@ -34,13 +35,33 @@ Shader "The Outlaws/City and Desert Sky"
                 c+=half3(1,.78,.45)*(disk*.75+pow(saturate(dot(d,sun)),35)*.13)*(1-_Night);
                 float3 moon=normalize(float3(.5,.35,.8));
                 float crescent=smoothstep(.9990,.9995,dot(d,moon))*(1-smoothstep(.9990,.9995,dot(d,normalize(moon+float3(.013,.008,0)))));
-                c+=half3(.65,.77,.9)*crescent*_Night;
+                c+=half3(.65,.77,.9)*crescent*_Night*(1-_Mountain);
                 float2 cloud=d.xz/max(.16,d.y+.2);
                 float band=sin(cloud.x*2.3+sin(cloud.y*1.8))*.5+sin(cloud.y*3.1+cloud.x)*.25;
                 float clouds=smoothstep(.53,.82,band)*smoothstep(.03,.20,h)*(1-smoothstep(.4,.7,h));
                 c=lerp(c,lerp(half3(.90,.88,.82),_Horizon.rgb,_Night),clouds*.32);
                 float star=step(.9985,frac(sin(dot(floor(d*320),float3(12.98,78.23,39.42)))*43758.54));
                 c+=star*_Night*smoothstep(.16,.4,h)*.4;
+                if (_Mountain > .5)
+                {
+                    // Mountain Night: a big full moon low over the peaks, a Milky Way band and dense twinkling stars,
+                    // so Night here looks unlike Snow's aurora or the plain City/Desert sky.
+                    float3 bigMoon=normalize(float3(.32,.2,.93));
+                    float m=dot(d,bigMoon);
+                    float disc=smoothstep(.99790,.99815,m);
+                    float2 mp=(d-bigMoon*m).xy*260;
+                    float maria=.82+.18*sin(mp.x*1.7+sin(mp.y*1.3))*sin(mp.y*1.1);
+                    c=lerp(c,half3(.93,.94,.88)*maria,disc*_Night);
+                    c+=half3(.30,.38,.52)*(pow(saturate(m),900)*.55+pow(saturate(m),60)*.12)*_Night*(1-disc);
+                    float3 galaxy=normalize(float3(.55,.45,-.7));
+                    float across=dot(d,galaxy);
+                    float band=exp(-across*across/.018)*smoothstep(.08,.35,h);
+                    float clump=frac(sin(dot(floor(d*90),float3(4.1,7.3,2.9)))*9134.7);
+                    c+=half3(.16,.17,.24)*band*(.45+.55*clump)*_Night*(1-disc);
+                    float dense=step(.9935-band*.006,frac(sin(dot(floor(d*420),float3(31.1,17.7,52.3)))*24634.6));
+                    float twinkle=.55+.45*sin(_SkyTime*2.3+dot(floor(d*420),float3(3,7,5)));
+                    c+=dense*twinkle*_Night*smoothstep(.1,.35,h)*.55*(1-disc);
+                }
                 if (_Snow > .5)
                 {
                     float azimuth=atan2(d.x,d.z);

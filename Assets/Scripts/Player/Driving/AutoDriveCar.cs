@@ -185,6 +185,13 @@ public sealed class AutoDriveCar : MonoBehaviour
     // Opt-in for an authored finite-route flight. Ordinary roads keep their existing physics.
     public bool ExternalVerticalControl { get; set; }
 
+    // Opt-in for finite-route guardrail gaps: an open edge lets the car steer past the usual road-edge margin.
+    // A closed edge never snaps a car that is already beyond it; the car can only move back inward.
+    public bool OpenLeftEdge { get; set; }
+    public bool OpenRightEdge { get; set; }
+    public const float OpenEdgeTravel = 3f;
+    private float leftEdgeSlack, rightEdgeSlack;
+
     /// <summary>Resolve contact with a finite route's solid lane divider without resetting body response.</summary>
     public void ConstrainExternalLateral(float lateral)
     {
@@ -204,6 +211,7 @@ public sealed class AutoDriveCar : MonoBehaviour
 
     private void ResetHandling()
     {
+        leftEdgeSlack = rightEdgeSlack = 0f;
         driftSpeed = 0f;
         steerHoldTime = 0f;
         Skid = 0f;
@@ -272,7 +280,12 @@ public sealed class AutoDriveCar : MonoBehaviour
 
         float desiredOffset = lateralOffset
             + (lateralSpeed + driftSpeed + holdSide * Skid * skidSlide) * deltaTime;
-        lateralOffset = Mathf.Clamp(desiredOffset, -limit, limit);
+        // Slack is only ever non-zero after an open edge let the car past the margin, so other roads are unchanged.
+        float rightLimit = limit + (OpenRightEdge ? OpenEdgeTravel : rightEdgeSlack);
+        float leftLimit = limit + (OpenLeftEdge ? OpenEdgeTravel : leftEdgeSlack);
+        lateralOffset = Mathf.Clamp(desiredOffset, -leftLimit, rightLimit);
+        rightEdgeSlack = Mathf.Clamp(lateralOffset - limit, 0f, OpenEdgeTravel);
+        leftEdgeSlack = Mathf.Clamp(-lateralOffset - limit, 0f, OpenEdgeTravel);
 
         if (!Mathf.Approximately(desiredOffset, lateralOffset) && lateralSpeed * Mathf.Sign(desiredOffset) > 0f)
             lateralSpeed = 0f;

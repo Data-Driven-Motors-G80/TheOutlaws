@@ -12,10 +12,13 @@ owner to fix in their own level. They were left untouched to avoid merge conflic
    `WorldShiftSnowObstacleArt.WorldPanel(art, centre, width, height, world)`. Examples: the plough blade in
    `WorldShiftRoadVehicleArt.Snow.cs`, the upright pines in `WorldShiftSnowObstacleArt.UprightPines`, and the
    Desert sandstone hoodoos and saguaro cacti in `WorldShiftDesertObstacleArt.Hoodoos` / `.Saguaros`.
-2. **Anything that moves sideways shows the same left/right arrow.** That covers sliders, sliding blocks,
-   crossing rocks, drums, tumbleweeds, vultures and camels. It is a filled white double-headed arrow with a dark
-   outline: `WorldShiftMoverArrow.Attach(...)` or `WorldShiftMoverArrow.OnBothFaces(...)`. Put it on the
-   approach faces, or above a sphere outside the rolling hierarchy so it never tilts.
+2. **Anything that moves sideways shows the same arrow, pointing the way it is going.** That covers sliders,
+   sliding blocks, crossing rocks, drums, trolleys, tumbleweeds, vultures and camels. It is a filled white
+   single-headed arrow with a dark outline: `WorldShiftMoverArrow.Attach(...)` or `WorldShiftMoverArrow.OnBothFaces(...)`.
+   Put it on the approach faces, or above a sphere outside the rolling hierarchy so it never tilts.
+   `WorldShiftPresentation` aims every arrow each frame (`SidewaysHeading`): it flips the moment the mover turns
+   around, and a mover frozen in Night keeps showing the way it will go when Day resumes. (Playtesters had to guess
+   the direction from the old double-headed arrow.) Never draw your own arrow; the shared one is the only one aimed.
 3. **No text on obstacles or painted on the road.** No "DAY TO MOVE", no "STORM". The icons and the
    frozen-ice cue explain everything. (Training's instruction signs are the agreed exception.)
 4. **Sideways movers always move in Day, wherever the player is.** No "wakes up when you get close" behaviour.
@@ -26,6 +29,7 @@ owner to fix in their own level. They were left untouched to avoid merge conflic
    plus the world panel or sideways arrow above. **Sideways movers must be things that really move sideways** (animals, vehicles, carts), not
    objects that can't move on their own (Desert: camels and a camel caravan, not cacti or spike sleds).
    **Floating things must be living, flying animals** (Desert: vultures and a vulture flock).
+   Mountain: Day/Night closures are rockslide piles (`WorldShiftMountainObstacleArt`), sideways movers are goats crossing the road.
 6. **Keep movers on screen.** A sliding block swings evenly side to side, at most 4.5 m each way from the middle (`WorldShiftSlidingGate.Travel`), never far out on one side only.
    No circles or patches under obstacles, and no floating ice ring under flying animals.
 
@@ -56,11 +60,10 @@ Found during the Desert pass. Desert is fixed; each item below names where to fi
   `WorldShiftSnowObstacleArt.WorldPanel`. The sun disc and rays differ, and the moon's inner curve is .55 vs .45.
   **Fix:** have `RetractableBarrier.Icon` reuse the `WorldPanel` icon geometry, so there is exactly one drawing.
 
-### Two different sideways arrows (Ocean, City, Training)
-- Police spike platforms (`WorldShiftSpikePlatform`, used by City, Ocean and Training sliders) and the
-  rock/drum arrow in `WorldShiftBoulderArt` (Ocean oil drums) are two different arrow designs. Desert uses
-  `WorldShiftMoverArrow`, which has the spike-platform shape.
-  **Fix:** switch `WorldShiftSpikePlatform` and `WorldShiftBoulderArt` to `WorldShiftMoverArrow.Attach`.
+### Sideways arrows (resolved for all levels)
+- Spike platforms, boulders/drums (`WorldShiftBoulderArt`) and Ocean cargo trolleys now use `WorldShiftMoverArrow`,
+  so every level shows one arrow design, aimed along the direction of travel. `EverySidewaysMoverArrowPointsTheWayItIsGoing`
+  checks every level.
 - Theming: other levels' sideways movers are still police spike platforms. Desert uses camels (sliders) and camel caravans (sliding blocks).
   Each level could give them a themed body (keep the teal deck and the arrow).
 

@@ -43,7 +43,9 @@ namespace Outlaws.WorldShift
             redLens = cruiser.Find("Red roof light lens").GetComponent<Renderer>();
             blueLens = cruiser.Find("Blue roof light lens").GetComponent<Renderer>();
             lensProperties = new MaterialPropertyBlock();
-            if (game.Environment == ShiftLevel.Ocean) BuildHarbour(); else BuildPassage();
+            if (game.Environment == ShiftLevel.Ocean) BuildHarbour();
+            else if (game.Environment == ShiftLevel.Mountain) BuildMountainTunnel();
+            else BuildPassage();
             if (IsFinale) BuildFinalOverlook();
             engine = Source("Final getaway engine", "WS_Engine", true);
             siren = Source("Receding police siren", "WorldShiftPoliceSiren", true);

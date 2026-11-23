@@ -72,18 +72,8 @@ namespace Outlaws.WorldShift
                     fittings.Cylinder(new Vector3(side*.43f,floor+1.36f,motorZ),.10f,.08f,.14f,new Color(1f,.53f,.13f),12);
                     fittings.Box(new Vector3(side*(h.x-.03f),floor+.7f,0),new Vector3(.035f,.055f,size.z*.87f),Cream);
                 }
-                // The two sideways arrowheads remain readable when the trolley freezes in Night.
-                foreach (float end in new[] {-1f,1f})
-                {
-                    float z=end*(h.z-.03f);
-                    body.ChamferBox(new Vector3(0,floor+1.10f,z),new Vector3(size.x*.92f,.46f,.06f),.02f,Color.white);
-                    foreach (float side in new[] {-1f,1f})
-                    {
-                        Vector3 tip=new Vector3(side*size.x*.32f,floor+1.10f,z);
-                        markings.Beam(tip+new Vector3(-side*.23f,.19f,0),tip,.09f,.05f,Color.white);
-                        markings.Beam(tip,tip+new Vector3(-side*.23f,-.19f,0),.09f,.05f,Color.white);
-                    }
-                }
+                // The shared direction-of-travel arrow stays readable when the trolley freezes in Night.
+                WorldShiftMoverArrow.OnBothFaces(root, Mathf.Min(size.x * .38f, 1.8f), floor + 1.10f, size.z);
             }
             else if (size.x > 6f && variation % 2 == 0)
             {

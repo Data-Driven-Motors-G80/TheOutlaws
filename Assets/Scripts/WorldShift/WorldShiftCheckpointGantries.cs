@@ -222,16 +222,31 @@ namespace Outlaws.WorldShift
                     }
                     break;
                 case ShiftLevel.Mountain:
-                    // Tunnel-portal look: stacked stone around the post feet, a timber lintel and lanterns.
+                    // Alpine pass gate: dry-stone pillars the full height of the posts, a heavy timber beam with
+                    // carved brackets, a small shingle roof and lanterns, instead of the default steel look.
                     foreach (float side in new[] { -1f, 1f })
                     {
-                        for (int i = 0; i < 4; i++)
-                            art.ChamferBox(new Vector3(side * (6.3f + (i % 2) * .08f), .7f + i * .42f, 0),
-                                new Vector3(1.05f - i * .1f, .4f, 1.0f - i * .08f), .1f, new Color(.48f, .46f, .43f) * (.9f + .05f * i));
-                        lit.Box(new Vector3(side * 5.85f, 5.55f, -.12f), new Vector3(.2f, .3f, .2f), new Color(1f, .74f, .35f));
-                        art.Box(new Vector3(side * 5.85f, 5.78f, -.12f), new Vector3(.03f, .2f, .03f), woodDark);
+                        for (int i = 0; i < 14; i++)
+                        {
+                            float shade = .86f + .1f * ((i * 7 + (side > 0 ? 3 : 0)) % 4) / 3f;
+                            Color block = new Color(.50f, .48f, .44f) * shade; block.a = 1f;
+                            art.ChamferBox(new Vector3(side * 6.3f + ((i % 2) - .5f) * .06f, .25f + i * .45f, 0),
+                                new Vector3(1.0f - i * .012f, .43f, .95f - i * .012f), .08f, block);
+                        }
+                        // Timber brackets under the beam and a hanging lantern.
+                        art.Beam(new Vector3(side * 5.85f, 5.6f, 0), new Vector3(side * 5.1f, 6.45f, 0), .2f, .26f, wood);
+                        lit.Box(new Vector3(side * 5.0f, 5.55f, -.12f), new Vector3(.22f, .32f, .22f), new Color(1f, .74f, .35f));
+                        art.Box(new Vector3(side * 5.0f, 5.8f, -.12f), new Vector3(.03f, .22f, .03f), woodDark);
                     }
-                    art.Box(new Vector3(0, 6.84f, .04f), new Vector3(13.2f, .22f, .42f), wood);
+                    foreach (float y in new[] { 6.86f, 6.2f })
+                        art.Box(new Vector3(0, y, .04f), new Vector3(13.4f, .3f, .48f), y > 6.5f ? wood : woodDark);
+                    // Shingle roof over the beam.
+                    foreach (float z in new[] { -1f, 1f })
+                        art.Quad(new Vector3(-7f, 7.05f, z * .62f), new Vector3(7f, 7.05f, z * .62f), new Vector3(7f, 7.45f, 0), new Vector3(-7f, 7.45f, 0),
+                            new Color(.36f, .27f, .2f));
+                    foreach (float z in new[] { -1f, 1f })
+                        art.Quad(new Vector3(7f, 7.05f, z * .62f), new Vector3(-7f, 7.05f, z * .62f), new Vector3(-7f, 7.45f, 0), new Vector3(7f, 7.45f, 0),
+                            new Color(.36f, .27f, .2f));
                     break;
             }
         }

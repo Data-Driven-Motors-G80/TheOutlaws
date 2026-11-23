@@ -3,7 +3,7 @@ using UnityEngine;
 namespace Outlaws.WorldShift
 {
     /// <summary>Presentation only: driving feedback and licensed environment songs.</summary>
-    public sealed class WorldShiftLevelAudio : MonoBehaviour
+    public sealed partial class WorldShiftLevelAudio : MonoBehaviour
     {
         private WorldShiftCity game;
         private AudioSource engine, tyres, cues, music, ocean, gull;
@@ -60,6 +60,7 @@ namespace Outlaws.WorldShift
                     cityVoices[i].priority = 155;
                 }
             }
+            if (game.Environment == ShiftLevel.Mountain && !game.Course.Training) BindMountainAmbience();
             engine.Play(); tyres.Play();
             previousState = game.State; previousLateral = game.Lateral;
             previousAirborne = game.IsRelayAirborne;
@@ -84,7 +85,7 @@ namespace Outlaws.WorldShift
             bool pause = WorldShiftAudioSettings.Suspended(game);
             if (pause != suspended)
             {
-                foreach (var source in new[] { engine, tyres, cues, music, ocean, gull, cityCrowd, cityVoices[0], cityVoices[1] })
+                foreach (var source in new[] { engine, tyres, cues, music, ocean, gull, cityCrowd, cityVoices[0], cityVoices[1], wind, wildlife })
                     if (source != null) { if (pause) source.Pause(); else source.UnPause(); }
                 suspended = pause;
                 previousLateral = game.Lateral;
@@ -129,6 +130,7 @@ namespace Outlaws.WorldShift
                     if (gullIn <= 0f) { gull.Play(); gullIn = 17f; }
                 }
             }
+            if (wind != null) RefreshMountainAmbience(delta, running, effects);
             previousState = game.State;
             previousAirborne = airborne;
             previousLateral = game.Lateral;

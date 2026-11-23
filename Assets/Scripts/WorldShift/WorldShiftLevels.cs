@@ -3,6 +3,8 @@ using UnityEngine.SceneManagement;
 
 namespace Outlaws.WorldShift
 {
+    public enum LevelDifficulty { Tutorial, Easy, Medium, Hard }
+
     /// <summary>Level select, unlock progress and level-to-level flow.</summary>
     public static class WorldShiftLevels
     {
@@ -49,6 +51,22 @@ namespace Outlaws.WorldShift
         }
 
         public static string Name(int level) => level == 0 ? "Training" : Environments[level].ToString();
+
+        /// <summary>
+        /// Shown on each level card so players know what they are picking (playtest feedback: Snow and Desert
+        /// were a surprise). Set from obstacle density: City ~10/km, Ocean ~12/km, Mountain ~19/km (medium-hard),
+        /// Snow (with ice) and Desert ~26/km. Update when a level is retuned.
+        /// </summary>
+        public static LevelDifficulty Difficulty(int level)
+        {
+            switch (level >= 0 && level < Count ? Environments[level] : ShiftLevel.Tutorial)
+            {
+                case ShiftLevel.City: return LevelDifficulty.Easy;
+                case ShiftLevel.Ocean: case ShiftLevel.Mountain: return LevelDifficulty.Medium;
+                case ShiftLevel.Snow: case ShiftLevel.Desert: return LevelDifficulty.Hard;
+                default: return LevelDifficulty.Tutorial;
+            }
+        }
         public static int HighestBeaten => PlayerPrefs.GetInt(BeatenKey, -1);
         public static bool IsBeaten(int level) => level <= HighestBeaten;
         public static bool IsUnlocked(int level) => level >= 0 && level < Count && (level == 0 || UnlockAll || level <= HighestBeaten + 1);

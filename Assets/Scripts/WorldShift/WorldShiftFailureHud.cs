@@ -52,7 +52,8 @@ namespace Outlaws.WorldShift
 
         private void RefreshFailurePanel()
         {
-            bool failed = game.State == ShiftRunState.Retrying;
+            // A guardrail-gap fall is watched for a moment before the card appears.
+            bool failed = game.State == ShiftRunState.Retrying && !game.WatchingGapFall;
             failurePanel.SetActive(failed);
             if (!failed) { failureShownAt = -1f; return; }
             if (failureShownAt < 0f) failureShownAt = Time.unscaledTime;

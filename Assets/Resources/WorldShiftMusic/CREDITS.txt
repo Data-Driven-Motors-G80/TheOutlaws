@@ -7,6 +7,7 @@ https://creativecommons.org/licenses/by/4.0/
 Full original recordings; playback loops, fades and Night filtering applied in-game.
 Original environment songs downloaded from the composer’s official site on 2026-11-16.
 Snow replaced with Ice Flow from the same official site on 2026-11-17.
+Mountain replaced with Comin Round the Mountain from the same official site on 2026-11-21.
 
 City — "Funkorama"
 Source: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100474
@@ -28,7 +29,7 @@ Source: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1200088
 Download: https://incompetech.com/music/royalty-free/mp3-royaltyfree/Ice%20Flow.mp3
 SHA-256: a8c77bcc296157b0a46a60ddf870f7e2c50f2273841907791c50cef662c71653
 
-Mountain — "Mountain Emperor"
-Source: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700012
-Download: https://incompetech.com/music/royalty-free/mp3-royaltyfree/Mountain%20Emperor.mp3
-SHA-256: 5dd109bdeb8f206ec4ca276e47aa6b6b8ca96df4b5580e5e2f078f4a95a00f7b
+Mountain — "Comin Round the Mountain" (traditional American folk song, arranged by Kevin MacLeod)
+Source: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100817
+Download: https://incompetech.com/music/royalty-free/mp3-royaltyfree/Comin%20Round%20the%20Mountain.mp3
+SHA-256: f6d2ca98e96807aba7d72755511b83fcfa73bb9444568c8e53393cbbaf7e8dee

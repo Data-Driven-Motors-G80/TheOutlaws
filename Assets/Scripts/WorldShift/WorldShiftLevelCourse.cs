@@ -39,6 +39,15 @@ namespace Outlaws.WorldShift
         public Vector2[] DustZones = System.Array.Empty<Vector2>();
         // Snow: road stretches of black ice (x = from, y = to). See WorldShiftCity.Ice.cs.
         public Vector2[] IceZones = System.Array.Empty<Vector2>();
+        // Mountain: guardrail gaps on the valley side of bends (x = from, y = to, z = side: -1 left, +1 right).
+        // Driving off the road edge inside one is a fall and a checkpoint retry. See WorldShiftCity.StepSimulation.
+        public Vector3[] EdgeGaps = System.Array.Empty<Vector3>();
+
+        public bool EdgeGapAt(float d, float side)
+        {
+            foreach (var gap in EdgeGaps) if (d >= gap.x && d < gap.y && side * gap.z > 0f) return true;
+            return false;
+        }
 
         public bool IceAt(float d)
         {
@@ -92,11 +101,15 @@ namespace Outlaws.WorldShift
             return 0f;
         }
 
+        // Mountain climbs and descends more steeply than other levels, and the car feels it (GradeSpeedFactor).
+        public const float MountainGrade = .085f, MountainGradeSpeed = 1.6f;
+        /// <summary>Mountain cruise speed scale: slower climbing, faster descending. 1 elsewhere and on jump approaches.</summary>
+        public float GradeSpeedFactor(float d) => Environment == ShiftLevel.Mountain && !Training ? 1f - MountainGradeSpeed * TerrainSlope(d) : 1f;
         public float TerrainSlope(float d)
         {
             float raw = Environment == ShiftLevel.Desert ? .045f * Mathf.Sin(d * Mathf.PI * 2f / 520f)
                 : Environment == ShiftLevel.Ocean ? .025f * Mathf.Sin(d * Mathf.PI * 2f / 340f)
-                : Environment == ShiftLevel.Snow ? -.04f : Environment == ShiftLevel.Mountain ? .06f * Mathf.Sin(d * Mathf.PI * 2f / 600f) : 0f;
+                : Environment == ShiftLevel.Snow ? -.04f : Environment == ShiftLevel.Mountain ? MountainGrade * Mathf.Sin(d * Mathf.PI * 2f / 600f) : 0f;
             return raw * Straight(d) * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(40f, 120f, d));
         }
 
@@ -134,6 +147,7 @@ namespace Outlaws.WorldShift
             private readonly List<bool> airStrikeCurtains = new List<bool>();
             private readonly List<Vector2> dustZones = new List<Vector2>();
             private readonly List<Vector2> iceZones = new List<Vector2>();
+            private readonly List<Vector3> edgeGaps = new List<Vector3>();
             private readonly bool landingCheckpoints;
             private float start;
 
@@ -175,6 +189,7 @@ namespace Outlaws.WorldShift
             public Builder Item(float at, int lane) { items.Add(new Vector2(start + at, lane * WorldShiftLevel.RoadWidth / 3f)); return this; }
             public Builder Dust(float from, float to) { dustZones.Add(new Vector2(start + from, start + to)); return this; }
             public Builder Ice(float from, float to) { iceZones.Add(new Vector2(start + from, start + to)); return this; }
+            public Builder EdgeGap(float at, float length, int side) { edgeGaps.Add(new Vector3(start + at, start + at + length, side)); return this; }
             public Builder Checkpoint(float at, ShiftWorld world, float lateral = 0f)
             { checkpoints.Add(new ShiftCheckpoint(start + at, world, lateral, "", "")); return this; }
 
@@ -234,8 +249,9 @@ namespace Outlaws.WorldShift
 
             private Builder Add(ShiftHazard hazard)
             {
-                // Desert sideways movers never wait for the car (Docs/OBSTACLE_VISUAL_RULES.md, rule 4).
-                hazard.MovesWheneverDay = !course.Training && course.Environment == ShiftLevel.Desert
+                // Desert and Mountain sideways movers never wait for the car (Docs/OBSTACLE_VISUAL_RULES.md, rule 4).
+                hazard.MovesWheneverDay = !course.Training
+                    && (course.Environment == ShiftLevel.Desert || course.Environment == ShiftLevel.Mountain)
                     && hazard.SharedAcrossWorlds && hazard.LateralMotion;
                 hazards.Add(hazard); return this;
             }
@@ -286,6 +302,17 @@ namespace Outlaws.WorldShift
                 return this;
             }
 
+            /// <summary>
+            /// Mountain: a big eagle gliding across the jump just authored, "afterTakeoff" metres into the flight. Like
+            /// every sideways mover it glides in Day and freezes in Night, and it only meets a car that is in the air.
+            /// </summary>
+            public Builder Eagle(float afterTakeoff, float phase, float direction, float speed, float travelScale, float lane = 0f)
+            {
+                var relay = ramps[ramps.Count - 1];
+                return AddRock(new WorldShiftLevelRock(relay.Takeoff + afterTakeoff, phase, direction, speed, flight: relay,
+                    laneCentre: lane, travelScale: travelScale));
+            }
+
             /// <summary>Ends a training section at a plain checkpoint gate.</summary>
             public Builder Gate(float at, ShiftWorld world)
             {
@@ -307,6 +334,7 @@ namespace Outlaws.WorldShift
                 course.Signs = signs.ToArray();
                 course.DustZones = dustZones.ToArray();
                 course.IceZones = iceZones.ToArray();
+                course.EdgeGaps = edgeGaps.ToArray();
                 course.RequiredItems = items.ToArray();
                 course.AirStrikeTargets = airStrikes.ToArray();
                 course.AirStrikeEnds = airStrikeEnds.ToArray();
@@ -448,13 +476,47 @@ namespace Outlaws.WorldShift
             .Permanent(445f, LeftMiddle).Night(455f, All).Ramp(500f, D)
             .Build();
 
-        // Mountain keeps its half-walls and rolling rocks.
+        // Mountain (Level 4), "Rockslide Pass": medium difficulty, between City and Snow. Boulders roll down the road
+        // at you in Day and freeze in Night, but Night has its own rockfall walls, so switching to Day to pass one
+        // restarts the slide. Rockfall boulders tumble across the road whenever it is Day; cliff ledges block half the
+        // road. Guardrail gaps on the valley side of three bends: drive off the edge there and you fall to the last
+        // checkpoint. No sliders, airborne rocks or traffic. Rules: WorldShiftLevelTests.Mountain (re-run after edits).
+        // Medium-hard (playtest: the 35-obstacle version felt too easy). Faster boulders and goats; guardrail gaps sit
+        // beside obstacles that force the right lane, so dodging means passing the drop; boulder slides follow forced
+        // lane changes; Night walls come in quick pairs, forcing Day (and the boulders) back on. Every section ends with
+        // a full-barrier pair 38 m apart (one per world) before the jump: a quick double switch.
         private static LevelCourse Mountain() => new Builder(ShiftLevel.Mountain)
-            .DayHalf(60f, -1).NightHalf(110f, 1).Rock(160f, Middle, 12f).Night(210f, All).Ramp(250f, D)
-            .Day(50f, All).Rock(100f, Middle, 8f).NightHalf(150f, -1).Day(220f, All).Ramp(260f, N)
-            .Rock(60f, Left, 12f).DayHalf(110f, 1).Night(160f, All).Rock(205f, Right, 10f).Ramp(250f, D)
-            .Day(50f, All).NightHalf(100f, 1).Rock(150f, Middle, 11f).Day(220f, All).Ramp(260f, N)
-            .DayHalf(50f, -1).Night(100f, All).DayHalf(150f, 1).Rock(190f, Middle, 11f).Night(230f, All).Ramp(270f, D)
+            // 1 Scree: a ledge, a boulder slide, a squeeze into the right lane beside the drop, then a boulder down that lane.
+            .DayHalf(50f, -1).Rock(100f, Right, 12f).Rock(135f, Middle, 12f).EdgeGap(153f, 24f, 1).Day(166f, LeftMiddle)
+            .Rock(201f, Right, 12f).Night(195f, All).Crossing(240f, 2f, 1f, 4f).Day(272f, LeftMiddle)
+            .Day(298f, All).Night(336f, All).Ramp(380f, D)
+            // Every jump has an eagle soaring across it; freeze it in the air or steer around it.
+            .Eagle(40f, 2f, 1f, 3.5f, .6f)
+            // 2 Avalanche: squeezed right beside the drop in Night, then two Night walls 35 m apart force Day and restart four boulders.
+            .Day(45f, All).Rock(80f, Left, 13f).EdgeGap(98f, 24f, 1).NightHalf(106f, -1).Rock(105f, Right, 13f)
+            .Rock(130f, Middle, 13f).Rock(150f, Right, 13f).Night(150f, All).Night(185f, All).Day(235f, All).NightHalf(285f, 1)
+            .Night(320f, All).Day(358f, All).Ramp(410f, N)
+            .Eagle(52f, 1f, 1f, 3.5f, .8f)
+            // 3 Goat gallery: two goats back to back walking opposite ways, two boulders between walls, a last goat.
+            .Night(50f, All).Crossing(90f, 3f, 1f, 4.4f).Crossing(116f, 1f, -1f, 4.4f).Day(130f, All).Rock(165f, Middle, 14f)
+            .Rock(182f, Left, 14f).Night(205f, All).DayHalf(240f, 1).Crossing(280f, 1.5f, -1f, 4.6f)
+            .Night(320f, All).Day(358f, All).Ramp(410f, D)
+            .Eagle(45f, .5f, -1f, 3.8f, .7f)
+            // 4 Cliff ledges: a Night wall wakes the slide; the boulder you left behind keeps coming; a goat herd; a late squeeze left.
+            .NightHalf(50f, -1).Rock(95f, Right, 13f).Night(120f, All).NightHalf(175f, 1).Rock(200f, Left, 13f)
+            .Day(225f, All)
+            // A goat herd in single file: three goats 5 m apart, each a step behind the last, so you pick a side.
+            .Crossing(256f, 2.5f, 1f, 4.2f).Crossing(261f, 3.5f, 1f, 4.2f).Crossing(266f, 4.5f, 1f, 4.2f)
+            .Night(302f, MiddleRight)
+            .Day(325f, All).Night(362f, All).Ramp(410f, N)
+            .Eagle(52f, 3f, -1f, 3.5f, .8f)
+            // 5 Summit: three forced lanes (right, left between boulders, right again beside the drop), faster everything.
+            .Night(55f, All).Rock(95f, Left, 14f).Rock(120f, Right, 14f).NightHalf(140f, -1)
+            .Crossing(172f, 1.2f, 1f, 4.8f).Day(195f, All).Rock(225f, Middle, 14f).Day(238f, MiddleRight).Rock(242f, Right, 14f)
+            .Night(260f, All).EdgeGap(290f, 24f, 1).DayHalf(300f, -1).Crossing(335f, .4f, 1f, 5f)
+            .Night(368f, All).Day(406f, All).Ramp(450f, D)
+            // The summit jump: two eagles, one early and one just before the finish.
+            .Eagle(30f, 1f, 1f, 4f, .6f).Eagle(70f, 2.5f, -1f, 3f, .45f)
             .Build();
     }
 }

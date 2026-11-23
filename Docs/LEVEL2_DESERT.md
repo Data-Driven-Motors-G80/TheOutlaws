@@ -48,8 +48,8 @@ same shared-world rule. They start closed on each attempt/retry, move whenever i
 Day, wherever the player is, and repeatedly walk 4.5 m to one side and then the same 4.5 m to the other (staying close to the road). Remaining in Night leaves them closed;
 return to Day to create an exit, then freeze the opening if useful. They do not
 vanish on switching. The same swept box footprint drives contact and the visual.
-Every sideways mover carries the same white left/right arrow (`WorldShiftMoverArrow`)
-and no text.
+Every sideways mover carries the same white arrow (`WorldShiftMoverArrow`), pointing the way it is
+going and flipping when it turns around, and no text.
 
 Section 5 has 19 ground rocks (up from 13) in three waves, with mixed initial
 positions and opposing movement. Two sliding blocks and Night roadblocks between waves

@@ -13,7 +13,7 @@ namespace Outlaws.WorldShift
                 case ShiftLevel.Desert: return "Whiskey on the Mississippi";
                 case ShiftLevel.Ocean: return "Surf Shimmy";
                 case ShiftLevel.Snow: return "Ice Flow";
-                case ShiftLevel.Mountain: return "Mountain Emperor";
+                case ShiftLevel.Mountain: return "Comin Round the Mountain";
                 default: return "";
             }
         }
@@ -29,7 +29,7 @@ namespace Outlaws.WorldShift
                 case ShiftLevel.Desert: isrc = "USUAN1100709"; break;
                 case ShiftLevel.Ocean: isrc = "USUAN1700018"; break;
                 case ShiftLevel.Snow: isrc = "USUAN1200088"; break;
-                case ShiftLevel.Mountain: isrc = "USUAN1700012"; break;
+                case ShiftLevel.Mountain: isrc = "USUAN1100817"; break;
                 default: return "https://incompetech.com/";
             }
             return "https://incompetech.com/music/royalty-free/index.html?isrc=" + isrc;

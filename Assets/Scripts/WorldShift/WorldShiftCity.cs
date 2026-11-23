@@ -23,7 +23,13 @@ namespace Outlaws.WorldShift
         public WorldShiftLevelCollection Collection { get; private set; }
         public WorldShiftOceanHelicopter OceanBoss { get; private set; }
         public string FailureReason => State == ShiftRunState.Retrying ? lastFailure : "";
-        private float RetryDuration => lastFailure == "DOLPHIN COLLISION" || lastFailure == "AIR STRIKE" ? 3f : Capturing ? 1.6f : 1.05f;
+        private float RetryDuration => lastFailure == "DOLPHIN COLLISION" || lastFailure == "AIR STRIKE" ? 3f : Capturing ? 1.6f
+            : GapFall ? GapFallWatchSeconds + 1.05f : 1.05f;
+        /// <summary>Mountain: the car drove off through a guardrail gap. The camera watches it drop into the valley first.</summary>
+        public bool GapFall { get; private set; }
+        public const float GapFallWatchSeconds = 1.15f;
+        /// <summary>True while the camera is still watching a gap fall, before the OFF THE ROAD card appears.</summary>
+        public bool WatchingGapFall => State == ShiftRunState.Retrying && GapFall && RetryDuration - retryRemaining < GapFallWatchSeconds;
         public float CheckpointRetryProgress => Mathf.Clamp01(1f - retryRemaining / RetryDuration);
         public GameObject StreetlightPrefab => streetlightPrefab;
         public bool MissedRequiredItem => LevelMode && State == ShiftRunState.Retrying && lastFailure == "MISSED ITEM";
@@ -67,7 +73,8 @@ namespace Outlaws.WorldShift
         public ShiftRelay[] RelayLayout => LevelMode ? course.Ramps : GetawayMode ? escapeRelays : WorldShiftRelay.Sections;
         public string RelayHint => relay?.Hint(Distance, World) ?? "";
         public int RelaysCompleted => relay?.Completed ?? 0;
-        public bool IsBoosting => Speed > WorldShiftLevel.Speed * WorldShiftLevel.CruiseSpeedMultiplier + .1f;
+        public bool IsBoosting => Speed > WorldShiftLevel.Speed * WorldShiftLevel.CruiseSpeedMultiplier
+            * (LevelMode ? course.GradeSpeedFactor(Distance) : 1f) + .1f;
         private readonly FuelState fuel = new FuelState();
         private readonly RiskRunState pursuit = new RiskRunState();
         private readonly System.Collections.Generic.HashSet<ShiftHazard> hitHazards = new System.Collections.Generic.HashSet<ShiftHazard>();
@@ -111,7 +118,7 @@ namespace Outlaws.WorldShift
         private bool JumpSequence => relay?.SectionAt(Distance) != null || (Getaway?.Extras.IsJumpSequence(Distance) ?? false);
         private float BaseSpeed => TrainingFreezeWaiting ? 0f : JumpSequence ? relay?.SpeedAt(Distance) ?? WorldShiftLevel.Speed
             : LevelMode && course.Training ? TrainingSpeed
-            : WorldShiftLevel.Speed * WorldShiftLevel.CruiseSpeedMultiplier;
+            : WorldShiftLevel.Speed * WorldShiftLevel.CruiseSpeedMultiplier * (LevelMode ? course.GradeSpeedFactor(Distance) : 1f);
         public float Speed => BaseSpeed * (JumpSequence ? 1f : Getaway?.Extras.SpeedMultiplier ?? 1f);
         public ChaseCar Police { get; private set; }
         public RearViewCamera RearView { get; private set; }
@@ -398,10 +405,13 @@ namespace Outlaws.WorldShift
                 presentation.StepPedestrians(delta);
                 retryRemaining -= delta;
                 if (Capturing) UpdatePolice(delta);
-                if (lastFailure == "NO ROAD" || lastFailure == "MISSED RELAY LANDING")
+                if (GapFall) StepGapFall(delta);
+                else if (lastFailure == "NO ROAD" || lastFailure == "MISSED RELAY LANDING")
                 {
                     fallVelocity -= 28f * delta;
-                    Player.position += (Player.forward * WorldShiftLevel.Speed * 0.25f + Vector3.up * fallVelocity) * delta;
+                    float overEdge = Mathf.Abs(Lateral) > WorldShiftLevel.RoadWidth * .5f ? Mathf.Sign(Lateral) * 5f : 0f;
+                    Player.position += (Player.forward * WorldShiftLevel.Speed * 0.25f + Player.right * overEdge
+                        + Vector3.up * fallVelocity) * delta;
                     Player.Rotate(35f * delta, 0f, 0f, Space.Self);
                 }
                 if (retryRemaining <= 0f) RestoreCheckpoint();
@@ -442,11 +452,16 @@ namespace Outlaws.WorldShift
                 ApplySurfaceGrip(previous);
                 float airSteering = LevelMode && environment == ShiftLevel.Desert ? .65f
                     : LevelMode && environment == ShiftLevel.Ocean ? .6f : .4f;
+                // Mountain guardrail gaps open the road edge; everywhere else the car stays on the carriageway.
+                bool edgeGaps = LevelMode && course.EdgeGaps.Length > 0 && !IsRelayAirborne;
+                driver.OpenLeftEdge = edgeGaps && course.EdgeGapAt(previous, -1f);
+                driver.OpenRightEdge = edgeGaps && course.EdgeGapAt(previous, 1f);
                 driver.StepExternal(dt, (IsRelayAirborne ? steer * airSteering : steer) * (JumpSequence ? 1f : Getaway?.Extras.SteeringMultiplier ?? 1f), speed);
                 Getaway?.FinishStep(driver.RoadPositionDistance, driver);
                 float nextLateral = driver.LateralOffset;
                 float next = Mathf.Min(RunLength, driver.RoadPositionDistance);
-                ShiftHazard hit = IsRelayAirborne && !(LevelMode && environment == ShiftLevel.Desert) ? null
+                // Desert's vultures and Mountain's eagles can hit a car in the air (a crash sends it back to the checkpoint).
+                ShiftHazard hit = IsRelayAirborne && !(LevelMode && (environment == ShiftLevel.Desert || environment == ShiftLevel.Mountain)) ? null
                     : FindCollision(World, previous, next, previousLateral, nextLateral, true, previousHeight, Player.position.y);
                 Duration += dt;
                 if (!LevelMode && (!GetawayMode || !Getaway.InRecovery))
@@ -471,6 +486,15 @@ namespace Outlaws.WorldShift
                         Impact?.Land(Player.position, Player.forward, environment, World);
                         Notify("LANDED", 1.2f);
                     }
+                }
+                // Driving through a guardrail gap: once the car's centre leaves the road it falls (checkpoint retry).
+                if (LevelMode && !IsRelayAirborne && Mathf.Abs(nextLateral) > WorldShiftLevel.RoadWidth * .5f
+                    && course.EdgeGapAt(next, nextLateral))
+                {
+                    Distance = next;
+                    Lateral = nextLateral;
+                    Fail("NO ROAD");
+                    break;
                 }
                 if (hit != null)
                 {
@@ -586,6 +610,9 @@ namespace Outlaws.WorldShift
                 State = ShiftRunState.Retrying;
                 lastFailure = reason;
                 fallVelocity = -1f;
+                GapFall = reason == "NO ROAD" && course != null && course.EdgeGaps.Length > 0
+                    && Mathf.Abs(Lateral) > WorldShiftLevel.RoadWidth * .5f;
+                if (GapFall) BeginGapFall();
                 retryRemaining = RetryDuration;
                 if (Impact != null)
                 {
