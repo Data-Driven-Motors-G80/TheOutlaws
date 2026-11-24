@@ -17,6 +17,8 @@ namespace Outlaws.WorldShift
         public const string LevelScene = "City_WorldShift";
         private const string BeatenKey = "WorldShift.Levels.HighestBeaten";
         private const string UnlockAllKey = "WorldShift.Levels.UnlockAll";
+        // Bit per level: levels can be played in any order, so "highest beaten" alone cannot say which are done.
+        private const string BeatenMaskKey = "WorldShift.Levels.BeatenMask";
 
         /// <summary>The level being played, or -1 outside level play.</summary>
         public static int Current { get; private set; } = -1;
@@ -69,8 +71,13 @@ namespace Outlaws.WorldShift
             }
         }
         public static int HighestBeaten => PlayerPrefs.GetInt(BeatenKey, -1);
-        public static bool IsBeaten(int level) => level <= HighestBeaten;
-        public static bool IsUnlocked(int level) => level >= 0 && level < Count && (level == 0 || UnlockAll || level <= HighestBeaten + 1);
+        // Older saves only stored the highest level beaten in order; treat everything up to it as beaten.
+        private static int BeatenMask => PlayerPrefs.HasKey(BeatenMaskKey) ? PlayerPrefs.GetInt(BeatenMaskKey)
+            : HighestBeaten < 0 ? 0 : (1 << (Mathf.Min(HighestBeaten, Count - 1) + 1)) - 1;
+        public static bool IsBeaten(int level) => level >= 0 && level < Count && (BeatenMask & (1 << level)) != 0;
+        public static int BeatenCount { get { int n = 0; for (int i = 0; i < Count; i++) if (IsBeaten(i)) n++; return n; } }
+        /// <summary>Every level is open from the start (Drew, 2026-11-23); nothing waits on finishing another level.</summary>
+        public static bool IsUnlocked(int level) => level >= 0 && level < Count;
         public static bool HasNext => Current >= 0 && Current + 1 < Count;
 
         /// <summary>Team testing switch: opens every level without changing saved progress.</summary>
@@ -93,7 +100,7 @@ namespace Outlaws.WorldShift
             }
         }
 
-        public static void ResetProgress() { PlayerPrefs.DeleteKey(BeatenKey); PlayerPrefs.Save(); }
+        public static void ResetProgress() { PlayerPrefs.DeleteKey(BeatenKey); PlayerPrefs.DeleteKey(BeatenMaskKey); PlayerPrefs.Save(); }
 
         public static bool Play(int level, string from = "menu")
         {
@@ -110,7 +117,10 @@ namespace Outlaws.WorldShift
 
         public static void Complete(int level)
         {
-            if (level > HighestBeaten) { PlayerPrefs.SetInt(BeatenKey, level); PlayerPrefs.Save(); }
+            if (level < 0 || level >= Count) return;
+            PlayerPrefs.SetInt(BeatenMaskKey, BeatenMask | (1 << level));
+            if (level > HighestBeaten) PlayerPrefs.SetInt(BeatenKey, level);
+            PlayerPrefs.Save();
         }
 
         /// <summary>Other entry points (older endless escape, validation scenes) are not level play.</summary>

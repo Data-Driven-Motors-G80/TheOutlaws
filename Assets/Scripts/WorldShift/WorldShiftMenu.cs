@@ -50,7 +50,7 @@ namespace Outlaws.WorldShift
                 var old = levels.GetChild(i).gameObject; old.SetActive(false); Destroy(old);
             }
             testBadge.SetActive(WorldShiftLevels.UnlockAll);
-            completedLabel.text = Mathf.Clamp(WorldShiftLevels.HighestBeaten + 1, 0, WorldShiftLevels.Count).ToString("00") + " / 06";
+            completedLabel.text = WorldShiftLevels.BeatenCount.ToString("00") + " / 06";
             GameObject first = null;
             bool firstUnbeaten = false;
             for (int level = 0; level < WorldShiftLevels.Count; level++)

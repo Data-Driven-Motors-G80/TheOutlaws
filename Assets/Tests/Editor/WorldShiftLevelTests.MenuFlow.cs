@@ -130,15 +130,16 @@ public sealed partial class WorldShiftLevelTests
     }
 
     [Test]
-    public void LevelsUnlockInOrderAndTheTestSwitchOpensEverything()
+    public void EveryLevelIsOpenFromTheStartAndProgressIsPerLevel()
     {
         Static(Levels, "ResetProgress");
         PlayerPrefs.SetInt(UnlockAllKey, 0);
-        Assert.That(Static(Levels, "IsUnlocked", 0), Is.True);
-        Assert.That(Static(Levels, "IsUnlocked", 1), Is.False);
+        for (int level = 0; level < 6; level++) Assert.That(Static(Levels, "IsUnlocked", level), Is.True, "Level " + level + " is open from the start.");
+        Static(Levels, "Complete", 4);
+        Assert.That(Static(Levels, "IsBeaten", 4), Is.True);
+        Assert.That(Static(Levels, "IsBeaten", 2), Is.False, "Beating a later level first does not mark earlier ones done.");
+        Static(Levels, "ResetProgress");
         Static(Levels, "Complete", 0);
-        Assert.That(Static(Levels, "IsUnlocked", 1), Is.True);
-        Assert.That(Static(Levels, "IsUnlocked", 2), Is.False);
         Static(Levels, "Complete", 0);
         Assert.That(StaticGet(Levels, "HighestBeaten"), Is.EqualTo(0), "Replaying never lowers progress.");
         Levels.GetProperty("UnlockAll").SetValue(null, true);
@@ -147,7 +148,7 @@ public sealed partial class WorldShiftLevelTests
     }
 
     [UnityTest]
-    public IEnumerator HomeShowsSixLevelsWithLocksUntilBeaten()
+    public IEnumerator HomeShowsSixOpenLevelsWithNoLocks()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
         Static(Levels, "ResetProgress");
@@ -156,15 +157,13 @@ public sealed partial class WorldShiftLevelTests
         var menu = Find("WorldShiftMenu");
         var tiles = menu.GetComponentsInChildren<Button>().Select(b => b.name).ToArray();
         Assert.That(tiles, Is.EqualTo(new[] { "Level 0", "Level 1", "Level 2", "Level 3", "Level 4", "Level 5" }));
-        Assert.That(menu.GetComponentsInChildren<Transform>().Count(t => t.name == "Lock badge"), Is.EqualTo(5));
+        Assert.That(menu.GetComponentsInChildren<Transform>().Count(t => t.name == "Lock badge"), Is.EqualTo(0), "Every level is open from the start.");
+        Assert.That(menu.GetComponentsInChildren<TMPro.TMP_Text>().Any(t => t.text.Contains("to unlock")), Is.False);
         Assert.That(menu.GetComponentsInChildren<TMPro.TMP_Text>().Select(t => t.text), Does.Not.Contain("Upgrade car"));
         Assert.That(menu.GetComponentsInChildren<RawImage>().Where(v=>v.name=="Environment illustration").Count(v=>v.texture!=null),Is.EqualTo(6));
         Capture("menu-locked");
         WorldShiftTestCapture.Capture("menu-locked-4x3",960,720);
         WorldShiftTestCapture.Capture("menu-locked-portrait",720,1080);
-        menu.GetComponentsInChildren<Button>().Single(b => b.name == "Level 3").onClick.Invoke();
-        yield return null;
-        Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo("WorldShift_Menu"), "Locked levels do not start.");
         Levels.GetProperty("UnlockAll").SetValue(null, true);
         Call(menu, "BuildLevels");
         yield return null;
@@ -176,10 +175,8 @@ public sealed partial class WorldShiftLevelTests
     public IEnumerator ContinueButtonsAdvanceExactlyOneLevelThroughTheWholeCampaign()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");yield return new EnterPlayMode();
-        PlayerPrefs.SetInt(BeatenKey,-1);PlayerPrefs.SetInt(UnlockAllKey,0);
+        Static(Levels,"ResetProgress");PlayerPrefs.SetInt(UnlockAllKey,0);
         Static(Levels,"Menu");yield return WaitForNavigation();
-        ClickButton(VisibleButton("Level 3"));yield return null;
-        Assert.That(SceneManager.GetActiveScene().name,Is.EqualTo("WorldShift_Menu"),"Locked cards cannot start a level.");
         ClickButton(VisibleButton("Level 0"));yield return WaitForNavigation();
         for(int level=0;level<6;level++)
         {

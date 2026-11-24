@@ -50,13 +50,13 @@ public sealed partial class WorldShiftLevelTests
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");
         yield return new EnterPlayMode();
-        PlayerPrefs.SetInt(BeatenKey, 2); PlayerPrefs.SetInt(UnlockAllKey, 0);
+        Static(Levels, "ResetProgress"); for (int i = 0; i <= 2; i++) Static(Levels, "Complete", i); PlayerPrefs.SetInt(UnlockAllKey, 0);
         var menu = Find("WorldShiftMenu");
         Call(menu, "BuildLevels");
         yield return null;
         CheckCompletedCards(menu);
         Capture("menu-completed");
-        PlayerPrefs.SetInt(BeatenKey, -1);
+        Static(Levels, "ResetProgress");
     }
 
     private static void CheckCompletedCards(MonoBehaviour menu)

@@ -201,7 +201,7 @@ public sealed partial class WorldShiftLevelTests
         Assert.That(StaticGet(Levels, "HighestBeaten"), Is.EqualTo(0));
         Assert.That(Get(Get(game,"Escape"),"Active"),Is.False,"Training celebrates readiness without pretending it was a real police escape.");
         Assert.That(Static(Levels, "IsUnlocked", 1), Is.True);
-        Assert.That(Static(Levels, "IsUnlocked", 2), Is.False);
+        Assert.That(Static(Levels, "IsBeaten", 1), Is.False, "Training marks only itself as done.");
         yield return null;
         Capture("training-complete");
         WorldShiftTestCapture.Capture("training-complete-4x3",960,720);

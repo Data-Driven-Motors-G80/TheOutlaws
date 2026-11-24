@@ -43,7 +43,8 @@ namespace Outlaws.WorldShift
         private RectTransform DestinationCard(int level,bool open)
         {
             bool beaten=WorldShiftLevels.IsBeaten(level);
-            bool next=open&&!beaten&&level==Mathf.Clamp(WorldShiftLevels.HighestBeaten+1,0,WorldShiftLevels.Count-1);
+            int firstUnbeaten=0;while(firstUnbeaten<WorldShiftLevels.Count-1&&WorldShiftLevels.IsBeaten(firstUnbeaten)) firstUnbeaten++;
+            bool next=open&&!beaten&&level==firstUnbeaten;
             var tile=Panel(levels,"Level "+level,Vector2.zero,Vector2.one,Color.white);RoundCard(tile);
             var border=tile.GetComponent<Image>();border.raycastTarget=true;
             var button=tile.gameObject.AddComponent<Button>();button.targetGraphic=border;
@@ -74,8 +75,6 @@ namespace Outlaws.WorldShift
             DifficultyPill(face,WorldShiftLevels.Difficulty(level),open);
             if(beaten) Badge(face,ShiftIcon.Check,CompletedGreen,26,new Vector2(.92f,.85f));
             MenuText(face,WorldShiftLevels.Name(level),.055f,.18f,.85f,.37f,32,open?Cream:new Color(.76f,.80f,.81f),FontStyles.Bold);
-            string description=open?"":"Complete "+WorldShiftLevels.Name(level-1)+" to unlock";
-            if(!string.IsNullOrEmpty(description)) MenuText(face,description,.055f,.055f,.87f,.18f,12,open?new Color(.71f,.79f,.81f):Muted);
             Badge(face,open?ShiftIcon.Next:ShiftIcon.Lock,open?RouteTeal:Muted,19,new Vector2(.93f,.17f));
             return tile;
         }

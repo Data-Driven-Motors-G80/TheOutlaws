@@ -10,7 +10,7 @@ A low-fidelity Unity driving playtest built around switching between Day and Nig
 
 ## How it plays
 
-- The home screen lists the levels: **0 Training, 1 City, 2 Ocean, 3 Mountain, 4 Snow, 5 Desert**. Beat a level to unlock the next.
+- The home screen lists the levels: **0 Training, 1 City, 2 Ocean, 3 Mountain, 4 Snow, 5 Desert**. Every level is open from the start.
 - Still obstacles belong to Day or Night. The other world's obstacles show as dashed outlines (Day yellow, Night black): you can drive through dashes, but switching while inside one is a crash. Oncoming traffic belongs to one world too.
 - Anything that slides sideways or rolls toward you exists in both worlds, stays orange, moves in Day and freezes in Night.
 - Ocean adds an optional police helicopter: collect Day ammunition to auto-fire; Night freezes attack preparation. Hits weaken the helicopter and 6 bring it down. Missing ammo never fails the level.
