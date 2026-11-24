@@ -8,7 +8,7 @@ namespace Outlaws.WorldShift
     {
         private Material cityShopPosters, cityShopSigns;
         private static readonly string[] CityShopNames =
-            { "SALON", "BARBER SHOP", "LIQUOR STORE", "STRIP CLUB", "PIZZA", "COFFEE", "MINI MART", "RECORDS" };
+            { "SALON", "BARBER SHOP", "ICE CREAM", "BAKERY", "PIZZA", "COFFEE", "MINI MART", "RECORDS" };
         private static readonly Color[] CityShopColours =
         {
             new Color(.82f,.35f,.53f),new Color(.32f,.51f,.65f),new Color(.28f,.58f,.49f),new Color(.62f,.25f,.67f),

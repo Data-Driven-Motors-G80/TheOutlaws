@@ -42,17 +42,19 @@ namespace Outlaws.WorldShift
             // Lowered, only the flat world-coloured dashes show on the road.
             // Thick dashed paint flush with the road marks where the barrier rises; never a raised wireframe or dark opening.
             const float stripe = .22f, dash = .95f, gap = .32f;
+            // Snow ice sheets (and Mountain's graded road) would bury flush paint, so the dashes ride just above them.
+            float paint = environment == ShiftLevel.Snow || environment == ShiftLevel.Mountain ? .058f : .012f;
             for(float z=-d*.5f; z<d*.5f; z+=dash+gap)
             {
                 float length=Mathf.Min(dash,d*.5f-z);
                 foreach(float x in new[] {-w*.5f+stripe*.5f,w*.5f-stripe*.5f})
-                    footing.Box(new Vector3(x,.012f,z+length*.5f),new Vector3(stripe,.012f,length),colour);
+                    footing.Box(new Vector3(x,paint,z+length*.5f),new Vector3(stripe,.012f,length),colour);
             }
             for(float x=-w*.5f; x<w*.5f; x+=dash+gap)
             {
                 float length=Mathf.Min(dash,w*.5f-x);
                 foreach(float z in new[] {-d*.5f+stripe*.5f,d*.5f-stripe*.5f})
-                    footing.Box(new Vector3(x+length*.5f,.012f,z),new Vector3(length,.012f,stripe),colour);
+                    footing.Box(new Vector3(x+length*.5f,paint,z),new Vector3(length,.012f,stripe),colour);
             }
             // One broad panel per lane, rather than many narrow posts.
             int count = Mathf.Clamp(Mathf.RoundToInt(w / (10f / 3f)), 1, 3);

@@ -107,7 +107,7 @@ public sealed partial class WorldShiftLevelTests
         for (int level = 0; level < 6; level++)
         {
             object course = Static(builder, "For", level);
-            string[] expected = { "City", "City", "Ocean", "Snow", "Mountain", "Desert" };
+            string[] expected = { "City", "City", "Ocean", "Mountain", "Snow", "Desert" };
             Assert.That(Field(course, "Environment").ToString(), Is.EqualTo(expected[level]), "Course order must match level select.");
             var ramps = ((Array)Field(course, "Ramps")).Cast<object>().ToArray();
             var hazards = ((Array)Field(course, "Hazards")).Cast<object>().ToArray();
@@ -123,8 +123,9 @@ public sealed partial class WorldShiftLevelTests
                     "The white opening block teaches that permanent hazards survive a switch.");
                 Assert.That(hazards.Any(h => Field(h, "Kind").ToString() == "SwitchWall"), Is.True,
                     "The tutorial has a real orange wall that clears after switching.");
-                Assert.That(hazards.Any(h => Field(h, "Kind").ToString() == "Oncoming" && (bool)Field(h, "SharedAcrossWorlds")), Is.True,
-                    "Oncoming traffic has a separate playable lesson.");
+                Assert.That(hazards.Any(h => Field(h, "Kind").ToString() == "Oncoming" && !(bool)Field(h, "SharedAcrossWorlds")
+                    && Field(h, "World").ToString() == "Day"), Is.True,
+                    "Oncoming traffic has its own lesson: a Day car with the sun badge that turns to dashes in Night, not a freezing mover.");
             }
             for (int i = 1; i < checkpoints.Length; i++)
                 Assert.That((float)Field(checkpoints[i], "Distance"), Is.GreaterThan((float)Field(checkpoints[i - 1], "Distance")));

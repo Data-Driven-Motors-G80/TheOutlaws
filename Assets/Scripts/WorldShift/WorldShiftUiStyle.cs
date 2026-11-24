@@ -16,5 +16,11 @@ namespace Outlaws.WorldShift
         public static readonly Color Gold = new Color(1f, .75f, .32f);
         public static readonly Color Danger = new Color(1f, .52f, .39f);
         public static readonly Color Track = new Color(.12f, .21f, .25f);
+        // Semantic menu colours. One accent (teal) for navigation; green only means "completed";
+        // difficulty is ordered data, so it uses one warm heat ramp (amber, orange, red) instead of a rainbow.
+        public static readonly Color Success = new Color(.40f, .86f, .52f);
+        public static readonly Color HeatMild = new Color(1f, .76f, .30f);
+        public static readonly Color HeatSpicy = new Color(1f, .54f, .24f);
+        public static readonly Color HeatFiery = new Color(.98f, .33f, .26f);
     }
 }

@@ -20,7 +20,7 @@ public sealed partial class WorldShiftLevelTests
         yield return new EnterPlayMode();
         PlayerPrefs.SetInt(UnlockAllKey, 1);
         Static(Levels, "Menu"); yield return WaitForNavigation();
-        string[] environments = { "City", "City", "Ocean", "Snow", "Mountain", "Desert" };
+        string[] environments = { "City", "City", "Ocean", "Mountain", "Snow", "Desert" };
         Vector3[] playerShape=null,policeShape=null;
         Color[] playerPaint=null,policePaint=null;
         for (int level = 0; level < environments.Length; level++)
@@ -185,7 +185,7 @@ public sealed partial class WorldShiftLevelTests
         {
             Assert.That(Get(Find("WorldShiftCity"),"StoryActive"),Is.EqualTo(level==1||level==2),"City and Ocean have skippable introductions.");
             var game=Started();Assert.That(Get(game,"LevelIndex"),Is.EqualTo(level));
-            string[] expected = { "City", "City", "Ocean", "Snow", "Mountain", "Desert" };
+            string[] expected = { "City", "City", "Ocean", "Mountain", "Snow", "Desert" };
             Assert.That(Get(game,"Environment").ToString(),Is.EqualTo(expected[level]));
             Assert.That(Get(Get(game,"Escape"),"IsFinale"),Is.EqualTo(level==DesertLevel),"Only Desert ends the campaign.");
             Assert.That(Get(game,"State").ToString(),Is.EqualTo("Running"));

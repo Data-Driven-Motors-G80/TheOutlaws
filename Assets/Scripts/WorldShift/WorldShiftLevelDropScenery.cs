@@ -133,11 +133,21 @@ namespace Outlaws.WorldShift
                     }
                     if (environment == ShiftLevel.Tutorial)
                     {
-                        for (float x = -3.6f; x <= 3.6f; x += 2.4f)
+                        // Academy stunt pit: one long inflated blue airbag with white straps, yellow/black hazard
+                        // lips along both edges and red/white tyre bumpers on the walls (replaces the orange pads).
+                        bool alternate = Mathf.RoundToInt((d - jump.Ramp) / 4f) % 2 == 0;
+                        Vector3 bag = (AL(0,floor+.7f)+BL(0,floor+.7f))*.5f;
+                        detail.ChamferBox(bag,new Vector3(half*2f-.6f,1.4f,end-d+.05f),.35f,new Color(.16f,.42f,.76f));
+                        detail.Box(bag+Vector3.up*.71f,new Vector3(half*2f-.5f,.05f,.3f),new Color(.90f,.93f,.95f));
+                        foreach (float x in new[] {-half+.5f, half-.5f})
+                            detail.Box((AL(x,floor+1.42f)+BL(x,floor+1.42f))*.5f,new Vector3(.25f,.05f,end-d),new Color(.90f,.93f,.95f));
+                        foreach (float side in new[] {-1f,1f})
                         {
-                            Vector3 centre = (AL(x,floor+.45f)+BL(x,floor+.45f))*.5f;
-                            detail.ChamferBox(centre,new Vector3(2.25f,.8f,end-d-.15f),.14f,new Color(.91f,.38f,.12f));
-                            detail.Beam(centre+Vector3.left*.95f+Vector3.up*.41f,centre+Vector3.right*.95f+Vector3.up*.41f,.035f,.035f,new Color(.98f,.68f,.29f));
+                            float x = side * (half - .12f);
+                            detail.Beam(AL(x,a.Position.y-.18f),BL(x,b.Position.y-.18f),.26f,.22f,
+                                alternate ? new Color(.98f,.78f,.16f) : new Color(.07f,.08f,.09f));
+                            Vector3 tyre = (AL(x-side*.35f,floor+2.2f)+BL(x-side*.35f,floor+2.2f))*.5f;
+                            detail.Cylinder(tyre,.5f,.5f,.3f,alternate ? new Color(.86f,.20f,.18f) : new Color(.88f,.90f,.86f),10);
                         }
                     }
                 }
@@ -193,7 +203,7 @@ namespace Outlaws.WorldShift
 
         private void BuildFallBurst()
         {
-            Color colour=environment switch { ShiftLevel.Tutorial=>new Color(.93f,.58f,.20f),ShiftLevel.City=>new Color(.51f,.72f,.70f),
+            Color colour=environment switch { ShiftLevel.Tutorial=>new Color(.55f,.75f,.95f),ShiftLevel.City=>new Color(.51f,.72f,.70f),
                 ShiftLevel.Desert=>new Color(.85f,.60f,.34f),ShiftLevel.Ocean=>new Color(.75f,.94f,.98f),
                 ShiftLevel.Snow=>new Color(.88f,.96f,1f),_=>new Color(.55f,.55f,.51f) };
             var g=new WorldShiftArtMesh();

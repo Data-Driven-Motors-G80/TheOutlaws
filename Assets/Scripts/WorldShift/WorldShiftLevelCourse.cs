@@ -365,7 +365,9 @@ namespace Outlaws.WorldShift
             .Sign(25f, LevelSignKind.Steer).Permanent(90f, Middle).Permanent(140f, LeftMiddle).Gate(180f, D)
             .Sign(25f, LevelSignKind.Switch).SwitchWall(110f).Gate(170f, N)
             .Day(70f, All).Night(120f, All).Gate(180f, D)
-            .Sign(25f, LevelSignKind.Oncoming).Rock(110f, Middle, 10f).Gate(170f, D)
+            // Day traffic with the sun badge: steer round it, or switch to Night and it becomes passable dashes
+            // (freezing is taught next, so this car never just stops).
+            .Sign(25f, LevelSignKind.Oncoming).DayCar(110f, Middle, 10f).Gate(170f, D)
             .Sign(25f, LevelSignKind.Freeze).Slider(110f, 1.1f).Slider(160f, -1.3f).Slider(210f, 1.1f).Gate(270f, N)
             .Sign(25f, LevelSignKind.Ramp).Night(70f, All).Ramp(120f, D)
             .Build();
@@ -484,26 +486,30 @@ namespace Outlaws.WorldShift
         // Medium-hard (playtest: the 35-obstacle version felt too easy). Faster boulders and goats; guardrail gaps sit
         // beside obstacles that force the right lane, so dodging means passing the drop; boulder slides follow forced
         // lane changes; Night walls come in quick pairs, forcing Day (and the boulders) back on. Every section ends with
-        // a full-barrier pair 38 m apart (one per world) before the jump: a quick double switch.
+        // a run of full walls alternating worlds 36 m apart (the shared minimum switch window), so you switch about
+        // every second and a half; extra quick pairs mid-section and more boulders. Playtest: "a little harder than Ocean".
+        // Section lengths are unchanged so bends, grade and guardrail gaps stay where they were.
         private static LevelCourse Mountain() => new Builder(ShiftLevel.Mountain)
             // 1 Scree: a ledge, a boulder slide, a squeeze into the right lane beside the drop, then a boulder down that lane.
             .DayHalf(50f, -1).Rock(100f, Right, 12f).Rock(135f, Middle, 12f).EdgeGap(153f, 24f, 1).Day(166f, LeftMiddle)
-            .Rock(201f, Right, 12f).Night(195f, All).Crossing(240f, 2f, 1f, 4f).Day(272f, LeftMiddle)
-            .Day(298f, All).Night(336f, All).Ramp(380f, D)
+            .Rock(201f, Right, 12f).Night(195f, All).Crossing(240f, 2f, 1f, 4f).Rock(270f, Left, 13f)
+            // Switch gauntlet: three full walls alternating worlds 36 m apart, a ledge and a boulder down the left lane.
+            .Night(262f, All).Day(272f, LeftMiddle).Day(298f, All).Night(334f, All).Ramp(380f, D)
             // Every jump has an eagle soaring across it; freeze it in the air or steer around it.
             .Eagle(40f, 2f, 1f, 3.5f, .6f)
             // 2 Avalanche: squeezed right beside the drop in Night, then two Night walls 35 m apart force Day and restart four boulders.
             .Day(45f, All).Rock(80f, Left, 13f).EdgeGap(98f, 24f, 1).NightHalf(106f, -1).Rock(105f, Right, 13f)
-            .Rock(130f, Middle, 13f).Rock(150f, Right, 13f).Night(150f, All).Night(185f, All).Day(235f, All).NightHalf(285f, 1)
-            .Night(320f, All).Day(358f, All).Ramp(410f, N)
+            .Rock(130f, Middle, 13f).Rock(150f, Right, 13f).Night(150f, All).Night(185f, All)
+            // Switch gauntlet: four full walls alternating every 36 m, with a boulder down the right lane.
+            .Day(235f, All).Night(271f, All).NightHalf(285f, 1).Rock(300f, Right, 13f).Day(307f, All).Night(343f, All).Ramp(410f, N)
             .Eagle(52f, 1f, 1f, 3.5f, .8f)
             // 3 Goat gallery: two goats back to back walking opposite ways, two boulders between walls, a last goat.
-            .Night(50f, All).Crossing(90f, 3f, 1f, 4.4f).Crossing(116f, 1f, -1f, 4.4f).Day(130f, All).Rock(165f, Middle, 14f)
+            .Night(50f, All).Crossing(90f, 3f, 1f, 4.4f).Crossing(116f, 1f, -1f, 4.4f).Day(130f, All).Night(166f, All).Rock(165f, Middle, 14f)
             .Rock(182f, Left, 14f).Night(205f, All).DayHalf(240f, 1).Crossing(280f, 1.5f, -1f, 4.6f)
             .Night(320f, All).Day(358f, All).Ramp(410f, D)
             .Eagle(45f, .5f, -1f, 3.8f, .7f)
             // 4 Cliff ledges: a Night wall wakes the slide; the boulder you left behind keeps coming; a goat herd; a late squeeze left.
-            .NightHalf(50f, -1).Rock(95f, Right, 13f).Night(120f, All).NightHalf(175f, 1).Rock(200f, Left, 13f)
+            .NightHalf(50f, -1).Rock(95f, Right, 13f).Night(120f, All).Rock(130f, Right, 13f).NightHalf(175f, 1).Night(189f, All).Rock(200f, Left, 13f)
             .Day(225f, All)
             // A goat herd in single file: three goats 5 m apart, each a step behind the last, so you pick a side.
             .Crossing(256f, 2.5f, 1f, 4.2f).Crossing(261f, 3.5f, 1f, 4.2f).Crossing(266f, 4.5f, 1f, 4.2f)
@@ -511,7 +517,7 @@ namespace Outlaws.WorldShift
             .Day(325f, All).Night(362f, All).Ramp(410f, N)
             .Eagle(52f, 3f, -1f, 3.5f, .8f)
             // 5 Summit: three forced lanes (right, left between boulders, right again beside the drop), faster everything.
-            .Night(55f, All).Rock(95f, Left, 14f).Rock(120f, Right, 14f).NightHalf(140f, -1)
+            .Night(55f, All).Rock(60f, Left, 14f).Rock(75f, Right, 14f).Rock(95f, Left, 14f).Rock(120f, Right, 14f).NightHalf(140f, -1)
             .Crossing(172f, 1.2f, 1f, 4.8f).Day(195f, All).Rock(225f, Middle, 14f).Day(238f, MiddleRight).Rock(242f, Right, 14f)
             .Night(260f, All).EdgeGap(290f, 24f, 1).DayHalf(300f, -1).Crossing(335f, .4f, 1f, 5f)
             .Night(368f, All).Day(406f, All).Ramp(450f, D)

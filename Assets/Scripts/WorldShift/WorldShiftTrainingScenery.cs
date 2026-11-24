@@ -98,6 +98,7 @@ namespace Outlaws.WorldShift
                     light.range=22;light.spotAngle=110;light.innerSpotAngle=65;light.intensity=12;light.shadows=LightShadows.None;lamps.Add(light);
                 }
             }
+            BuildTrainingLife();
         }
     }
 }

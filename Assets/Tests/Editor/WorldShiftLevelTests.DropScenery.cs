@@ -19,7 +19,7 @@ public sealed partial class WorldShiftLevelTests
 
     private IEnumerator CheckThemedJumpDrops()
     {
-        string[] themes={"Depot safety pit","City storm drain","Open sea and shark fins","Blue ice crevasse","Mountain misty gorge","Sandstone ravine"};
+        string[] themes={"Depot safety pit","City storm drain","Open sea and shark fins","Mountain misty gorge","Blue ice crevasse","Sandstone ravine"};
         for(int level=0;level<6;level++)
         {
             StartLevel(level);yield return WaitForNavigation();

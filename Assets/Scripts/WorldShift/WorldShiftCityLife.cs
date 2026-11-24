@@ -193,6 +193,7 @@ namespace Outlaws.WorldShift
         {
             streetClock += Mathf.Max(0f,delta);
             RefreshCityTrafficLights();
+            StepTrainingLife();
             foreach (var citizen in citizens)
             {
                 if (!citizen.Root.gameObject.activeSelf) continue;

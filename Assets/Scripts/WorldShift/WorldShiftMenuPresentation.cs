@@ -9,7 +9,8 @@ namespace Outlaws.WorldShift
         private static readonly Color RouteTeal = WorldShiftUiStyle.Accent;
         private static readonly Color Muted = WorldShiftUiStyle.Muted;
         private static Sprite roundedCard;
-        private static Texture2D cardShade;
+        private static Texture2D cardShade, completedWash, chili, chiliEmpty;
+        private static readonly Color CompletedGreen = WorldShiftUiStyle.Success;
         private RectTransform menuSafe;
         private GridLayoutGroup routeGrid;
         private TMP_Text completedLabel;
@@ -47,8 +48,8 @@ namespace Outlaws.WorldShift
             var border=tile.GetComponent<Image>();border.raycastTarget=true;
             var button=tile.gameObject.AddComponent<Button>();button.targetGraphic=border;
             var colours=button.colors;
-            colours.normalColor=next?RouteTeal:new Color(.12f,.21f,.26f);
-            colours.highlightedColor=colours.selectedColor=RouteTeal;colours.pressedColor=Gold;colours.fadeDuration=.12f;
+            colours.normalColor=next?RouteTeal:beaten?CompletedGreen:new Color(.12f,.21f,.26f);
+            colours.highlightedColor=colours.selectedColor=RouteTeal;colours.pressedColor=Cream;colours.fadeDuration=.12f;
             button.colors=colours;
             button.onClick.AddListener(()=>
             {
@@ -66,31 +67,71 @@ namespace Outlaws.WorldShift
             fitter.aspectRatio=art.texture!=null?(float)art.texture.width/art.texture.height:1.5f;
             var shade=Panel(face,"Artwork shade",Vector2.zero,Vector2.one,Color.clear);
             var gradient=TextureLayer(shade,"Contrast gradient");gradient.texture=Shade();gradient.raycastTarget=false;
+            // Beaten levels stay playable: the wash and stamp sit under the number, difficulty and name.
+            if(beaten) CompletedStamp(face);
             var index=Panel(face,"Route number",new Vector2(.045f,.76f),new Vector2(.17f,.94f),new Color(.02f,.05f,.075f,.90f));RoundCard(index);
             MenuText(index,level.ToString("00"),0,0,1,1,15,open?Cream:Muted,FontStyles.Bold).alignment=TextAlignmentOptions.Center;
             DifficultyPill(face,WorldShiftLevels.Difficulty(level),open);
-            if(beaten) Badge(face,ShiftIcon.Check,RouteTeal,24,new Vector2(.91f,.85f));
+            if(beaten) Badge(face,ShiftIcon.Check,CompletedGreen,26,new Vector2(.92f,.85f));
             MenuText(face,WorldShiftLevels.Name(level),.055f,.18f,.85f,.37f,32,open?Cream:new Color(.76f,.80f,.81f),FontStyles.Bold);
             string description=open?"":"Complete "+WorldShiftLevels.Name(level-1)+" to unlock";
             if(!string.IsNullOrEmpty(description)) MenuText(face,description,.055f,.055f,.87f,.18f,12,open?new Color(.71f,.79f,.81f):Muted);
             Badge(face,open?ShiftIcon.Next:ShiftIcon.Lock,open?RouteTeal:Muted,19,new Vector2(.93f,.17f));
             return tile;
         }
-        // Coloured difficulty tag with 1-3 pips beside the route number (TUTORIAL / EASY / MEDIUM / HARD).
+        // Green wash over the whole card plus a tilted COMPLETED! stamp with a check.
+        private static void CompletedStamp(RectTransform face)
+        {
+            var wash=TextureLayer(face,"Completed wash");wash.texture=CompletedWash();
+            var stamp=MenuText(face,"COMPLETED!",.10f,.40f,.90f,.66f,38,CompletedGreen,FontStyles.Bold);
+            stamp.name="Completed stamp";stamp.alignment=TextAlignmentOptions.Center;stamp.textWrappingMode=TextWrappingModes.NoWrap;
+            stamp.characterSpacing=4;stamp.fontSizeMin=18;
+            stamp.outlineWidth=.22f;stamp.outlineColor=new Color32(5,30,16,255);
+            stamp.rectTransform.localRotation=Quaternion.Euler(0,0,6f);
+        }
+        private static Texture2D CompletedWash()
+        {
+            if(completedWash!=null) return completedWash;
+            completedWash=new Texture2D(2,64,TextureFormat.RGBA32,false){name="Completed card wash",filterMode=FilterMode.Bilinear,wrapMode=TextureWrapMode.Clamp};
+            for(int y=0;y<64;y++)
+            {
+                // Strongest behind the name, fading toward the top so the art still shows.
+                float alpha=Mathf.Lerp(.58f,.16f,Mathf.SmoothStep(0,1,y/63f));
+                for(int x=0;x<2;x++) completedWash.SetPixel(x,y,new Color(.07f,.42f,.22f,alpha));
+            }
+            completedWash.Apply(false,true);return completedWash;
+        }
+        public static string HeatName(LevelDifficulty difficulty) => difficulty switch
+        {
+            LevelDifficulty.Easy => "EASY", LevelDifficulty.Medium => "MILD", LevelDifficulty.Hard => "SPICY", _ => "WARM-UP"
+        };
+        public static Color HeatColour(LevelDifficulty difficulty) => difficulty switch
+        {
+            LevelDifficulty.Easy => WorldShiftUiStyle.HeatMild, LevelDifficulty.Medium => WorldShiftUiStyle.HeatSpicy,
+            LevelDifficulty.Hard => WorldShiftUiStyle.HeatFiery, _ => Cream
+        };
+        // Heat badge: a fun name in the heat colour plus three big tilted peppers (lit ones in full colour,
+        // the rest as faint silhouettes). Training is a WARM-UP with no peppers.
         private static void DifficultyPill(RectTransform face,LevelDifficulty difficulty,bool open)
         {
-            Color tone=difficulty==LevelDifficulty.Hard?new Color(.93f,.30f,.25f):difficulty==LevelDifficulty.Medium?new Color(.98f,.70f,.18f)
-                :difficulty==LevelDifficulty.Easy?new Color(.34f,.80f,.46f):RouteTeal;
+            Color tone=HeatColour(difficulty);
             if(!open) tone=Color.Lerp(tone,Muted,.55f);
-            var pill=Panel(face,"Difficulty "+difficulty,new Vector2(.19f,.76f),new Vector2(difficulty==LevelDifficulty.Tutorial?.50f:.47f,.94f),new Color(.02f,.05f,.075f,.90f));RoundCard(pill);
-            int pips=difficulty==LevelDifficulty.Tutorial?0:(int)difficulty;
-            float textEnd=pips>0?.66f:.96f;
-            var label=MenuText(pill,difficulty.ToString().ToUpperInvariant(),.07f,0,textEnd,1,13,tone,FontStyles.Bold);
-            label.alignment=TextAlignmentOptions.Center;label.enableWordWrapping=false;
-            for(int i=0;i<3&&pips>0;i++)
+            int peppers=difficulty==LevelDifficulty.Tutorial?0:(int)difficulty;
+            var pill=Panel(face,"Difficulty "+difficulty,new Vector2(.185f,.735f),new Vector2(peppers>0?.70f:.47f,.95f),new Color(.02f,.05f,.075f,.88f));RoundCard(pill);
+            float textEnd=peppers>0?.42f:.96f;
+            var label=MenuText(pill,HeatName(difficulty),.05f,0,textEnd,1,17,tone,FontStyles.Bold);
+            label.alignment=TextAlignmentOptions.Center;label.textWrappingMode=TextWrappingModes.NoWrap;label.characterSpacing=1.5f;label.fontSizeMin=11;
+            if(peppers==0) return;
+            if(chili==null) chili=Resources.Load<Texture2D>("WorldShiftChili");
+            if(chiliEmpty==null) chiliEmpty=Resources.Load<Texture2D>("WorldShiftChiliEmpty");
+            for(int i=0;i<3;i++)
             {
-                var pip=Panel(pill,"Difficulty pip",new Vector2(.70f+i*.085f,.32f),new Vector2(.755f+i*.085f,.68f),i<pips?tone:new Color(1f,1f,1f,.18f));
-                RoundCard(pip);
+                bool lit=i<peppers;
+                var slot=Panel(pill,"Chili pepper slot",new Vector2(.42f+i*.185f,-.06f),new Vector2(.62f+i*.185f,1.06f),Color.clear);
+                slot.localRotation=Quaternion.Euler(0,0,i%2==0?-10f:8f);
+                var pepper=TextureLayer(slot,lit?"Chili pepper":"Chili pepper (unlit)");pepper.texture=lit?chili:chiliEmpty;
+                pepper.color=!lit?new Color(1f,1f,1f,.16f):open?Color.white:new Color(.55f,.55f,.55f,1f);
+                var fit=pepper.gameObject.AddComponent<AspectRatioFitter>();fit.aspectMode=AspectRatioFitter.AspectMode.FitInParent;fit.aspectRatio=1f;
             }
         }
         private void UpdateMenuLayout()

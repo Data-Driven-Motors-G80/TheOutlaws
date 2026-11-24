@@ -8,10 +8,11 @@ namespace Outlaws.WorldShift
     /// <summary>Level select, unlock progress and level-to-level flow.</summary>
     public static class WorldShiftLevels
     {
-        // Slot 0 is training. Every level runs in the shared City scene; the course
+        // Slot 0 is training. Ordered by difficulty so both Hard levels (Snow, Desert) come last.
+        // Every level runs in the shared City scene; the course
         // sets the environment, so new levels need no new scene.
         public static readonly ShiftLevel[] Environments =
-            { ShiftLevel.Tutorial, ShiftLevel.City, ShiftLevel.Ocean, ShiftLevel.Snow, ShiftLevel.Mountain, ShiftLevel.Desert };
+            { ShiftLevel.Tutorial, ShiftLevel.City, ShiftLevel.Ocean, ShiftLevel.Mountain, ShiftLevel.Snow, ShiftLevel.Desert };
         public static int Count => Environments.Length;
         public const string LevelScene = "City_WorldShift";
         private const string BeatenKey = "WorldShift.Levels.HighestBeaten";

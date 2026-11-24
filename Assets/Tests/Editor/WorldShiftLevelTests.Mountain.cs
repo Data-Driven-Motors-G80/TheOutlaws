@@ -23,7 +23,7 @@ public sealed partial class WorldShiftLevelTests
         Assert.That(ramps.Select(r => Field(r, "Source").ToString()), Is.EqualTo(new[] { "Day", "Echo", "Day", "Echo", "Day" }));
         var hazards = ((Array)Field(course, "Hazards")).Cast<object>().ToArray();
         // Medium-hard: clearly busier than City and Ocean, still below Snow and Desert.
-        Assert.That(hazards.Length, Is.InRange(62, 68));
+        Assert.That(hazards.Length, Is.InRange(72, 80));
         var movers = hazards.Where(h => (bool)Field(h, "SharedAcrossWorlds") && (float)Field(h, "MotionSpeed") > 0f).ToArray();
         Assert.That(movers.Length, Is.GreaterThanOrEqualTo(15), "A rockslide level: most of the challenge moves.");
         foreach (var h in hazards)
@@ -212,10 +212,10 @@ public sealed partial class WorldShiftLevelTests
 
     private static readonly MountainStep[][] MountainLine =
     {
-        new[] { MDay(0f), ML(0f, 3.4f), ML(62f, -3.4f), ML(132f, 3.4f), ML(173f, -1f), MNight(205f), MDodge(205f), ML(245f, 3.4f), MDay(266f), MNight(285f), MDay(318f), MDodge(420f, 100f) },
-        new[] { ML(0f, 0f), ML(96f, 3.4f), ML(113f, 0f), ML(136f, -3.4f), MDay(143f), MNight(215f), MDodge(215f), ML(262f, -3.4f), MDay(300f), MNight(340f), MDodge(440f, 100f) },
+        new[] { MDay(0f), ML(0f, 3.4f), ML(62f, -3.4f), ML(132f, 3.4f), ML(173f, -1f), MNight(205f), MDodge(205f), ML(245f, 3.4f), MDay(252f), MNight(282f), MDay(316f), MDodge(420f, 100f) },
+        new[] { ML(0f, 0f), ML(96f, 3.4f), ML(113f, 0f), ML(136f, -3.4f), MDay(143f), MNight(215f), MDodge(215f), ML(262f, -3.4f), MDay(253f), MNight(289f), MDay(325f), MNight(361f), MDodge(440f, 100f) },
         new[] { MNight(65f), MDodge(65f), MDay(150f), ML(150f, 3.4f), ML(205f, -3.4f), MNight(250f), MDodge(250f), MDay(300f), MNight(340f), MDay(368f), MDodge(440f, 100f) },
-        new[] { ML(0f, 3.4f), ML(62f, -3.4f), MDay(105f), ML(178f, 3.4f), MNight(190f), MDodge(205f, 60f), ML(267f, -3.4f), MDay(342f), MNight(372f), MDodge(440f, 100f) },
+        new[] { ML(0f, 3.4f), ML(62f, -3.4f), MDay(105f), ML(178f, 3.4f), MNight(207f), MDodge(207f, 60f), ML(267f, -3.4f), MDay(342f), MNight(372f), MDodge(440f, 100f) },
         new[] { ML(0f, 0f), ML(124f, 3.4f), MNight(132f), MDodge(147f), ML(198f, -3.4f), MDay(215f), ML(270f, 3.4f), MNight(310f), MDodge(310f, 32f), MDay(350f), MNight(388f), MDay(416f), MDodge(480f, 100f) },
     };
 
