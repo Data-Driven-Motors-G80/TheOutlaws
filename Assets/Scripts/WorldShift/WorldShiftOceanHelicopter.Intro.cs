@@ -24,13 +24,17 @@ namespace Outlaws.WorldShift
             Vector3 close=frame.Position-frame.Forward*18f-frame.Right*12f+Vector3.up*10f;
             var start=game.Route.Sample(0f);var ahead=game.Route.Sample(22f);
             Vector3 follow=start.Position-start.Forward*12f+Vector3.up*6.4f;
-            float blend=Mathf.SmoothStep(0,1,Mathf.InverseLerp(3.3f,IntroDuration,IntroClock));
-            camera.transform.position=Vector3.Lerp(close,follow,blend);
-            // Derive the fly-in pose here too so script execution order cannot cause a frame of lag.
+            var item=game.Collection.Items[0];var pickup=game.Route.Sample(item.x);
+            Vector3 rocketFocus=pickup.Position+pickup.Right*item.y+pickup.Up*2f;
+            Vector3 rocketView=rocketFocus-pickup.Forward*7f-pickup.Right*2f+pickup.Up*3.5f;
+            float lesson=Mathf.SmoothStep(0,1,Mathf.InverseLerp(1.05f,1.55f,IntroClock));
+            float returnToCar=Mathf.SmoothStep(0,1,Mathf.InverseLerp(4.6f,IntroDuration,IntroClock));
+            camera.transform.position=Vector3.Lerp(Vector3.Lerp(close,rocketView,lesson),follow,returnToCar);
+            // Sample the real pickup in the live scene; the lesson never consumes ammo or damages the boss.
             PresentIntroAircraft();
-            Vector3 focus=Vector3.Lerp(craft.position,ahead.Position+Vector3.up*.6f,blend);
+            Vector3 focus=Vector3.Lerp(Vector3.Lerp(craft.position,rocketFocus,lesson),ahead.Position+Vector3.up*.6f,returnToCar);
             camera.transform.rotation=Quaternion.LookRotation(focus-camera.transform.position,Vector3.up);
-            camera.fieldOfView=Mathf.Lerp(57f,70f,blend);
+            camera.fieldOfView=Mathf.Lerp(Mathf.Lerp(57f,43f,lesson),70f,returnToCar);
             return true;
         }
     }

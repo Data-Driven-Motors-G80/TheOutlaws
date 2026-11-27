@@ -54,7 +54,7 @@ namespace Outlaws.WorldShift
             public float Distance, EndDistance, Lateral, Time, ImpactAge=10f;
             public Vector3 Origin;
             public OceanAirAttackKind Kind;
-            public bool Launched, Landed, Combo, Pincer;
+            public bool Launched, Landed, Combo, Pincer, Pressure;
             public PointImpact[] Points;
             public float EscapeLateral;
             public bool IsPointSalvo => Points!=null;
@@ -124,7 +124,7 @@ namespace Outlaws.WorldShift
             }
             if(Defeated)
             {
-                strikes.Clear();active=null;
+                strikes.Clear();pressureStrikes.Clear();active=null;
                 if(shotAge>=RocketFlightSeconds)
                 {
                     if(!defeatExplosionPlayed) BeginDefeatExplosion();
@@ -146,8 +146,9 @@ namespace Outlaws.WorldShift
                 bool spread=game.Course.AirStrikeEnds[candidate]>slots[candidate]+1f;
                 if(from>slots[candidate]-60f || (!final&&!AttackAllowed(candidate)) || !SafePocket(slots[candidate])) continue;
                 // Teach one missile, then frequently mix seven-point fields with legacy attacks.
-                bool points=curtain || spread || final || candidate>=1 && candidate%5!=2 && candidate%5!=3;
-                bool twin=!points && Stage<2 && candidate%5==3;
+                // Keep a twin and pincer in the second section before later compact pockets become Night routes.
+                bool points=curtain || spread || final || candidate>=1 && candidate!=5 && candidate!=6 && candidate%5!=2 && candidate%5!=3;
+                bool twin=!points && Stage<2 && (candidate==5 || candidate%5==3);
                 var kind=curtain ? OceanAirAttackKind.MissileCurtain : final ? OceanAirAttackKind.ClusterSalvo : points ? OceanAirAttackKind.PointSalvo
                     : twin ? OceanAirAttackKind.TwinSalvo : OceanAirAttackKind.Missile;
                 bool pincer=!points && !twin && candidate>=2 && Stage==0;
@@ -200,6 +201,7 @@ namespace Outlaws.WorldShift
                         }
                     }
             }
+            if(StepPressure(dt,from,to,fromX,toX)) {collision=true;CollisionReason="AIR STRIKE";}
             StepCargoAnimations(dt);
             return collision;
         }
@@ -247,6 +249,45 @@ namespace Outlaws.WorldShift
                     LaunchSeconds=launch,ImpactSeconds=impact
                 };
             }
+            if(strike.Spread) ProtectNightPassages(strike);
+        }
+
+        // Only authored Night rows inside a spread field qualify for coordinated missile placement.
+        // Oncoming motion is resolved to encounter coordinates, not the distant spawn position.
+        private static bool NightPassage(ShiftHazard h,float at,float end,out float first,out float last,out float safeX)
+        {
+            first=last=safeX=0f;
+            if(end<=at+1f || h.World!=ShiftWorld.Echo || h.SharedAcrossWorlds || h.LateralMotion) return false;
+            bool car=h.Kind==ShiftHazardKind.Oncoming && (h.LaneMask==1 || h.LaneMask==4);
+            bool wall=h.Kind==ShiftHazardKind.Barrier && (h.LaneMask==3 || h.LaneMask==6 || h.LaneMask==7);
+            if(!car && !wall) return false;
+            float k=h.MotionSpeed/WorldShiftLevel.Speed;
+            first=(h.Start+(h.Start-150f)*k)/(1f+k);
+            last=(h.End+(h.Start-150f)*k)/(1f+k);
+            safeX=h.LaneMask==7 ? 0f : (h.LaneMask==1 || h.LaneMask==3 ? 1f : -1f)*WorldShiftLevel.RoadWidth/3f;
+            return first>=at+12f && last<=end;
+        }
+
+        private void ProtectNightPassages(AirStrike strike)
+        {
+            var keep=new List<PointImpact>(strike.Points);
+            foreach(var h in game.Hazards)
+            {
+                if(!NightPassage(h,strike.Distance,strike.EndDistance,out float first,out float last,out float safeX)) continue;
+                if(h.LaneMask==7)
+                {
+                    // A mandatory return to Day gets a genuinely clear window, even after impact.
+                    // Decide before showing warnings; never delete a missile that the player already saw.
+                    keep.RemoveAll(p=>p.Distance>=first-22f && p.Distance<=last+22f);
+                    continue;
+                }
+                foreach(var point in keep)
+                {
+                    if(point.Distance<first-16f || point.Distance>last+16f) continue;
+                    point.Lateral=safeX>0f ? Mathf.Min(point.Lateral,.75f) : Mathf.Max(point.Lateral,-.75f);
+                }
+            }
+            strike.Points=keep.ToArray();
         }
 
         private bool StepPoints(AirStrike strike,float dt,float previousTime,float from,float to,float fromX,float toX)
@@ -296,14 +337,17 @@ namespace Outlaws.WorldShift
             {
                 h.BoundsAt(at,out float h0,out float h1);
                 h.BoundsAt(end,out float h2,out float h3);
-                if(Mathf.Max(h1,h3)>=at-18f && Mathf.Min(h0,h2)<=end+18f) return false;
+                if(Mathf.Max(h1,h3)<at-18f || Mathf.Min(h0,h2)>end+18f) continue;
+                if(index<0 || game.Course.AirStrikeCurtains[index]
+                    || !NightPassage(h,at,end,out _,out _,out _)) return false;
             }
             return true;
         }
 
         public void Restore(float distance)
         {
-            strikes.Clear();active=null;nextSlot=0;MotionTime=0;
+            strikes.Clear();pressureStrikes.Clear();pressureCooldown=0f;pressureResumeAt=distance+15f;PressureShotsFired=0;
+            active=null;nextSlot=0;MotionTime=0;
             if(distance<=0f) savedFinalSalvo=false;
             FinalSalvoSent=savedFinalSalvo || Defeated;
             while(nextSlot<slots.Count && slots[nextSlot]<distance+60f) nextSlot++;

@@ -116,7 +116,7 @@ public sealed partial class WorldShiftLevelTests
             Assert.That(((Array)Field(course, "Signs")).Length, Is.EqualTo(level == 0 ? 5 : 0),
                 "Only Training has instructional highway signs.");
             Assert.That(ramps.Length, Is.EqualTo(level == 0 ? 1 : level == DesertLevel ? 6 : 5), "level " + level);
-            Assert.That(checkpoints.Length, Is.EqualTo(level == DesertLevel ? 7 : level == 0 ? 6 : 5), "Respawn positions, including the initial spawn, level " + level);
+            Assert.That(checkpoints.Length, Is.EqualTo(level == DesertLevel ? 7 : level == 0 || level == OceanLevel ? 6 : 5), "Respawn positions, including the initial spawn, level " + level);
             if (level == 0)
             {
                 Assert.That(hazards.Any(h => (float)Field(h, "Start") == 90f && (bool)Field(h, "SharedAcrossWorlds")), Is.True,

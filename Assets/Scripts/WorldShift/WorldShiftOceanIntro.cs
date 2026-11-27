@@ -9,6 +9,7 @@ namespace Outlaws.WorldShift
     public sealed partial class WorldShiftLevelHud
     {
         private Image oceanIntroProgress;
+        private TMP_Text oceanIntroDetail;
         private void BuildOceanIntro(Transform safe)
         {
             storyRoot=WorldShiftMenu.Panel(safe,"Ocean helicopter fly-in",Vector2.zero,Vector2.one,Color.clear).gameObject;
@@ -19,7 +20,7 @@ namespace Outlaws.WorldShift
             storyTitle.enableAutoSizing=true;storyTitle.fontSizeMin=22;storyTitle.fontSizeMax=36;
             storyLine=PauseLabel(bottom,"The police called for backup.",.045f,.3f,.78f,.82f,26,Cream,FontStyles.Bold);
             storyLine.enableAutoSizing=true;storyLine.fontSizeMin=18;storyLine.fontSizeMax=26;
-            PauseLabel(bottom,"OCEAN  /  POLICE AIR UNIT",.045f,.09f,.78f,.31f,13,PauseMuted);
+            oceanIntroDetail=PauseLabel(bottom,"OCEAN  /  POLICE AIR UNIT",.045f,.09f,.78f,.31f,17,PauseMuted);
             var skip=PauseAction(top,"Skip",new Vector2(.81f,.23f),new Vector2(.96f,.77f),ShiftIcon.Play,EndCityStory,true);
             PauseLabel(bottom,"ENTER / ESC TO SKIP",.78f,.14f,.96f,.5f,13,PauseMuted).alignment=TextAlignmentOptions.Right;
             var track=WorldShiftMenu.Panel(bottom,"Intro duration",new Vector2(.045f,.05f),new Vector2(.955f,.07f),PauseMuted*.4f);
@@ -42,7 +43,11 @@ namespace Outlaws.WorldShift
             storyRoot.SetActive(game.StoryActive);
             if(!game.StoryActive||game.OceanBoss==null) return;
             float t=game.OceanBoss.IntroClock;
-            storyLine.text=t<2.4f ? "The police called for backup." : "Collect rockets. Switch to Night to freeze missiles.";
+            bool lesson=t>=1.1f;
+            storyTitle.text=lesson ? "DAY ONLY: COLLECT ROCKETS" : "AIR SUPPORT INBOUND";
+            storyLine.text=lesson ? "AUTO-FIRE AT THE HELICOPTER" : "The police called for backup.";
+            oceanIntroDetail.text=lesson ? "DESTROY IT TO STOP THE BOMBING" : "OCEAN  /  POLICE AIR UNIT";
+            oceanIntroDetail.color=lesson ? PauseAccent : PauseMuted;
             oceanIntroProgress.rectTransform.anchorMax=new Vector2(Mathf.Clamp01(t/WorldShiftOceanHelicopter.IntroDuration),1);
         }
     }

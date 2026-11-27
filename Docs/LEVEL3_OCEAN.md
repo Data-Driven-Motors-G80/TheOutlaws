@@ -1,7 +1,9 @@
 # Level 2 Ocean — optional helicopter pursuit
 
-Five sections, one-hit collisions and four saved landing checkpoints remain. Ocean
-still ends with the ferry escape and unlocks Snow. Existing scenery, traffic and
+Five sections, one-hit collisions and four saved landing checkpoints remain. An
+additional save at 460 m, before the first ramp, lets players retry the first jump
+without replaying the opening. Ocean still ends with the ferry escape; Mountain
+is the next destination in the current level order. Existing scenery, traffic and
 world-switch mechanics are preserved; dry approaches are longer to reserve safe
 helicopter strike pockets.
 
@@ -29,15 +31,15 @@ sparks, a brief flash, a small aircraft kick and a synthesized metallic hit cue.
 
 ## Attacks and switching
 
-The five sections have 20 attack starts (3 / 4 / 4 / 4 / 5). Each section now
+The five sections have 13 heavy attack starts (3 / 4 / 2 / 2 / 2). Each section now
 reserves one **108 m spread field**, replacing two compact encounters instead
-of stacking a long attack on top of the old Night walls. Other attacks normally
-start 72 m apart. All damage stages use the available pockets; damage removes
+of stacking a long attack on top of the old Night walls. Early compact attacks normally
+start 72 m apart. Sections 3-5 replace their later compact pockets with Night
+driving sequences; recurring Day missiles continue where placement is safe. The
+second section retains a twin salvo and a pincer so heavy attack variety remains. All damage stages use the available pockets; damage removes
 cargo combinations and eventually twins instead of skipping attacks.
 
 - **Missile / twin:** the existing single-lane and adjacent-lane strikes.
-- **Compact point saturation:** seven separate 1.8 m square impacts in a small
-  pocket, with a marked outside exit.
 - **Spread point saturation:** seven individual targets 18 m apart, covering
   left, middle and right over 108 m. Later impacts are timed to their road
   distance, creating repeated steering decisions. Each square has its own
@@ -46,7 +48,9 @@ cargo combinations and eventually twins instead of skipping attacks.
 - **Repeated last stand:** at 1 HP, every subsequent ordinary safe attack start
   becomes an 18-missile barrage until the boss is killed. Compact pockets retain
   an outside exit. Spread pockets have three six-missile waves 54 m apart,
-  alternating the free outside lane. Saving a checkpoint does not suppress later
+  alternating the free outside lane except beside a Night obstacle, where the
+  current slalom exit takes priority. Impacts beside a forced Day-return gate are
+  omitted before warnings appear, including the last wave of a dense field. Saving a checkpoint does not suppress later
   barrages. The five curtain encounters retain their slower timing at 1 HP.
 - **Slow missile curtain:** one authored opportunity per section, five at most
   if the aircraft survives. Fifteen missiles cover almost the full road in three
@@ -62,10 +66,30 @@ worlds. Warning squares alone cause no damage. Full-health single/twin encounter
 can still combine with Day cargo; Night lowers that cargo. Point fields and
 curtains never add cargo.
 
-Course data explicitly reserves each field's start and end. The whole span stays
-clear of ordinary hazards, pickups, ramps and checkpoint recovery. Night closure
-edges stay at least 28 m beyond attack-pocket edges. Existing separated Night
-closures require a return to Day, and ammo remains Day-only. Passed attacks expire
+Course data explicitly reserves each field's start and end. Pickups, ramps and
+checkpoint recovery stay clear. Section 1 retains the gentle single Night car.
+Sections 2-5 now have a Night slalom inside each spread field: opposite two-lane
+closures at +16 / +58 m, side-lane oncoming cars at +22 / +76 m, then a full Night
+gate at +100 m. The two half closures are 42 m apart. Their safe side alternates;
+missile points beside each closure protect that side rather than one permanent
+outside lane. The full gate forces a return to Day. All planned impacts within
+22 m of this gate are removed before the warning is shown, leaving a clear
+return window even if the player let the other missiles land. Twelve full
+Night closures across the course prevent permanent Night camping. The slow
+missile curtains remain separate, with an empty Night route. Ammo is Day-only.
+
+**Routine single missiles:** while the helicopter lives, Day also has recurring
+small-square strikes, about every .95 seconds where placement is safe (1.3 seconds
+in the opening). Each locks 60 m ahead, launches after .3 seconds and lands after
+1.8 seconds of Day time. Three lightweight pooled views reuse the existing art.
+Night freezes them and stops new launches; passing a shot or defeating the boss
+clears it. The scheduler does not bank skipped shots for a later burst. It avoids
+ramps, respawn approaches, pickups, moving spikes, heavy compact salvos and full
+world-switch gates. Ordinary obstacles and existing missile warnings are checked
+together to leave at least one common outside/centre passage. Authored spread
+fields can overlap this small-shot pressure without filling the protected exit.
+
+Passed attacks expire
 only after their final target, including a long field's distant waves. Pausing
 freezes simulation; retry clears live effects and restores banked damage. A kill
 immediately cancels every attack, with no unavoidable after-death barrage. The
@@ -73,22 +97,51 @@ Night freeze rule itself has not been weakened or given an energy/cooldown limit
 
 ## Restored ordinary road hazards
 
-The five sections include 15 ordinary Day barrier rows, alongside the ten
-oncoming vehicles and helicopter attacks. They reuse the existing retractable
+The five sections include 15 ordinary Day barrier rows, alongside thirty-six
+oncoming vehicles (four Day, thirty-two Night) and helicopter attacks. The first section
+omits the opening Day car and narrows its second barrier to one lane, avoiding
+an immediate traffic/barrier combination. They reuse the existing retractable
 sun-marked barriers, including their original colours and sinking animation.
 Two original teal police spike sliders per section (ten total) use the unchanged
 WorldShiftSpikePlatform factory: metal cones, teal base and white direction
-arrows. They move in Day and freeze while remaining solid in Night.
+arrows. They move continuously throughout Day, including before the car approaches,
+and freeze while remaining solid in Night. Their model, colours and speed are unchanged.
 
-Spikes sit at section offsets 124 m and 347 m. Later compact missile pockets move
-8 m forward to clear the second spike. The long bombing fields, all 20 helicopter
+Spikes sit at section offsets 124 m and 347 m. The second section's later compact missile pockets move
+8 m forward to clear the second spike. The long bombing fields, all 13 heavy helicopter
 opportunities, 12 ammo pickups and five slow curtains remain. Selected late
 closures now belong to Day, leaving readable separation from Night rows; the
 last 34 m before each ramp stays clear.
 
-## Two giant airborne dolphins
+## Night difficulty by checkpoint
 
-Each 132 m flight has two large, bright swimmers, at takeoff +38 m and +98 m.
+Landing sections 1-5 have 4 / 9 / 14 / 15 / 18 world-specific Night hazards
+(rows and individual cars), including 2 / 4 / 8 / 8 / 10 oncoming vehicles.
+Their maximum traffic speed settings increase from 16 to 26 / 32 / 38 / 44;
+Night traffic keeps moving and retains the existing moon roof badge. The short
+pre-first-ramp retry checkpoint does not introduce another difficulty jump.
+
+Sections 3-5 add a late sequence at offsets 372 / 402 / 432 / 462 m: a centre-only
+opening, paired oncoming traffic, another centre-only opening and another paired
+traffic row. Sections 4-5 add another centre-only gate at 492 m. The final section
+also adds paired traffic at 522 m and a full Night closure at 534 m, returning to
+a protected Day window. No new models or obstacle rules are introduced. The
+second section's twin/pincer salvos and continuous safe Day missile scheduler
+retain pressure in Day while these later sequences make Night a driving challenge.
+
+The same five ramps and checkpoint coordinates are retained (0, 460, 736, 1512,
+2298 and 3114 m). Initial difficulty and first-jump recovery are unchanged. The
+late gauntlets use normal steering, with about 30 m between single-lane centre/side decisions;
+ordinary opposite-world obstacles stay at least 28 m apart at their encounter
+positions. Routine missiles may not close the only passage or the full Night gate's
+Day-return window. The original spike meshes and all coastal scenery are retained.
+
+## Giant airborne dolphins
+
+The first 132 m flight has just one swimmer at takeoff +62 m, allowing time to
+read the opening after launch. Its pre-ramp checkpoint at 460 m restores actual
+collected ammunition and boss damage. Later flights retain two large, bright
+swimmers, at takeoff +38 m and +98 m (nine dolphins total).
 They face sideways and cross in opposite directions at 9 m/s, reaching beyond
 both road edges. Centred bodies cover all three lanes: use Day to move them aside,
 then either steer through or freeze the opening in Night. The second swimmer asks
@@ -110,8 +163,11 @@ lives in WorldShiftLevelTests.Ocean.cs. Existing death analytics records AIR STR
 ## Skippable helicopter introduction
 
 Fresh Ocean entries (menu or Next Level) show a 5.5-second fly-in using the real
-helicopter and coastal scenery. The camera follows the aircraft, then returns to
-the car. Brief captions introduce rocket pickups and freezing missiles. Skip,
+helicopter and coastal scenery. After a brief fly-in, the camera focuses on the
+actual first rocket pickup for about three seconds, then returns to the car.
+The short instruction reads DAY ONLY: COLLECT ROCKETS / AUTO-FIRE AT THE HELICOPTER /
+DESTROY IT TO STOP THE BOMBING. This is a demonstration view only: it consumes no
+pickup and does not damage the boss or advance the run. Skip,
 Enter or Escape starts play immediately; otherwise the intro ends automatically.
 Driving, attack/dolphin clocks, chase audio and attempt analytics wait until it
 finishes. Checkpoint retries and full-level retries skip it. No new raster art,
@@ -138,7 +194,7 @@ art factories remain available, but are not part of this revised authored layout
 
 Oncoming traffic in the shared level renderer uses vehicles facing the player,
 with approaching headlights, mirrors, windows, bumpers and rotating wheels. Ocean
-includes ten oncoming service vehicles (five in each world), with broad sun/moon
+includes twenty-two oncoming service vehicles (four Day, eighteen Night), with broad sun/moon
 plates matching the shared barrier symbols. Day and Night encounter rows are separated.
 Retractable harbour panels gain framed steel ribs and reflective trim without changing
 collision or the sinking animation. Background art is unchanged.

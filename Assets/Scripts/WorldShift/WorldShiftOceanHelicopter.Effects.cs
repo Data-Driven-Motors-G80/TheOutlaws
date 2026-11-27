@@ -11,9 +11,14 @@ namespace Outlaws.WorldShift
         {
             public Transform Root, Marker, Wreck, Beam, Shock, Fragments, Dust, Scorch, EscapeLane;
             public readonly WorldShiftRetractableBarrier[] DayBarriers=new WorldShiftRetractableBarrier[2];
-            public readonly Transform[] Missile=new Transform[MaximumMissiles], Flame=new Transform[MaximumMissiles], Trail=new Transform[MaximumMissiles], Blast=new Transform[MaximumMissiles], Reticle=new Transform[MaximumMissiles];
-            public readonly Transform[] PointMarker=new Transform[MaximumMissiles], PointWreck=new Transform[MaximumMissiles];
+            public readonly Transform[] Missile, Flame, Trail, Blast, Reticle, PointMarker, PointWreck;
             public Material Warning;
+            public StrikeView(int capacity)
+            {
+                Missile=new Transform[capacity];Flame=new Transform[capacity];Trail=new Transform[capacity];
+                Blast=new Transform[capacity];Reticle=new Transform[capacity];
+                PointMarker=new Transform[capacity];PointWreck=new Transform[capacity];
+            }
         }
         private readonly StrikeView[] strikeViews=new StrikeView[3];
         private Material fireMaterial, hitMaterial, trailMaterial;
@@ -68,6 +73,7 @@ namespace Outlaws.WorldShift
             hitBurst=EffectRock("Helicopter rocket impact flash",transform,hitMaterial);
             hitSparks=BuildFragments("Aircraft hit sparks",hitMaterial,12,.12f);
             for(int i=0;i<strikeViews.Length;i++) strikeViews[i]=BuildStrikeView(i);
+            for(int i=0;i<pressureViews.Length;i++) pressureViews[i]=BuildStrikeView(strikeViews.Length+i,1);
             launcherRest=launcherBarrel.localPosition;
             // Original synthesized cues; no downloaded audio or large imported assets.
             shotClip=CreateCombatCue("Ocean rocket launch",.3f,0);
@@ -95,9 +101,9 @@ namespace Outlaws.WorldShift
             return root;
         }
 
-        private StrikeView BuildStrikeView(int index)
+        private StrikeView BuildStrikeView(int index,int capacity=MaximumMissiles)
         {
-            var view=new StrikeView();
+            var view=new StrikeView(capacity);
             view.Root=new GameObject("Air strike effects "+index).transform;view.Root.SetParent(transform,false);
             view.Warning=Mat("Air strike danger "+index,new Color(1,.52f,.08f),.9f);
             var warning=new WorldShiftArtMesh();
@@ -205,6 +211,12 @@ namespace Outlaws.WorldShift
                 view.Root.gameObject.SetActive(show);
                 if(show) PresentStrike(view,strikes[i]);
             }
+            for(int i=0;i<pressureViews.Length;i++)
+            {
+                var view=pressureViews[i];bool show=visible && i<pressureStrikes.Count;
+                view.Root.gameObject.SetActive(show);
+                if(show) PresentStrike(view,pressureStrikes[i]);
+            }
         }
         private void PresentStrike(StrikeView view,AirStrike strike)
         {
@@ -286,7 +298,7 @@ namespace Outlaws.WorldShift
             view.Warning.SetColor("_BaseColor",night ? new Color(.2f,.85f,1f) : new Color(1f,.34f,.055f));
             var road=game.Route.Sample(strike.Distance);
             Quaternion facing=Quaternion.LookRotation(road.Forward,road.Up);
-            view.EscapeLane.gameObject.SetActive(!strike.Spread && strike.Kind!=OceanAirAttackKind.MissileCurtain);
+            view.EscapeLane.gameObject.SetActive(!strike.Pressure && !strike.Spread && strike.Kind!=OceanAirAttackKind.MissileCurtain);
             view.EscapeLane.SetPositionAndRotation(road.Position+road.Right*strike.EscapeLateral+road.Up*.13f,facing);
             for(int i=0;i<view.Missile.Length;i++)
             {

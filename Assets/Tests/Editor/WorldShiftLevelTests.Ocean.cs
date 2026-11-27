@@ -14,6 +14,211 @@ using UnityEngine.UI;
 public sealed partial class WorldShiftLevelTests
 {
     [UnityTest]
+    public IEnumerator OceanNightProgressionHasReachableCentreAndTrafficExits()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");yield return new EnterPlayMode();
+        StartLevel(OceanLevel);yield return WaitForNavigation();var game=Started();var boss=Get(game,"OceanBoss");
+        var course=Get(game,"Course");var ramps=(Array)Field(course,"Ramps");
+        int previousCount=0;float previousSpeed=0f;
+        for(int section=0;section<ramps.Length;section++)
+        {
+            float start=section==0 ? 0f : (float)Field(ramps.GetValue(section-1),"End");
+            float ramp=(float)Field(ramps.GetValue(section),"Ramp");
+            int count=0,centreGates=0;float fastest=0f;
+            foreach(var h in (IEnumerable)Get(game,"Hazards"))
+            {
+                if(!Field(h,"World").Equals(World("Echo")) || (bool)Field(h,"SharedAcrossWorlds")) continue;
+                float speed=(float)Field(h,"MotionSpeed"),k=speed/28f;
+                float at=(float)Field(h,"Start")-150f*k/(1f+k);
+                if(at<start || at>=ramp) continue;
+                count++;fastest=Mathf.Max(fastest,speed);
+                if(Field(h,"Kind").ToString()=="Barrier" && (int)Field(h,"LaneMask")==5) centreGates++;
+            }
+            Assert.That(count,Is.GreaterThan(previousCount),"Each landing increases Night hazards.");
+            Assert.That(fastest,Is.GreaterThan(previousSpeed),"Later checkpoint traffic closes faster.");
+            previousCount=count;previousSpeed=fastest;
+            TestContext.WriteLine("Ocean section "+(section+1)+": "+count+" Night hazards, traffic speed "+fastest);
+            if(section<2) continue;
+            Assert.That(centreGates,Is.GreaterThanOrEqualTo(section==2 ? 1 : 2));
+            // Keyboard steering, not pose teleports, must fit through the later centre/side sequence.
+            Call(boss,"Restore",start+355f);Call(game,"ApplyWorld",World("Echo"));Pose(game,start+355f,0f);
+            var driver=Field(game,"driver");float finish=section==2 ? 477f : section==3 ? 505f : 545f;
+            for(int frame=0;frame<190 && (float)Get(game,"Distance")<start+finish;frame++)
+            {
+                float d=(float)Get(game,"Distance")-start,goal=0f;
+                if(d>381f && d<=408f) goal=section==3 ? 3.333f : -3.333f;
+                else if(d>408f && d<=441f) goal=0f;
+                else if(d>441f && d<=469f) goal=section==3 ? -3.333f : 3.333f;
+                else if(d>501f) goal=-3.333f;
+                if(section==4 && d>528f && Get(game,"World").ToString()=="Echo") Call(game,"TrySwitch");
+                float command=goal-(float)Get(game,"Lateral")-(float)Field(driver,"lateralSpeed")*.18f;
+                Step(game,.05f,Mathf.Abs(command)<.12f ? 0f : Mathf.Sign(command));
+                Assert.That(Get(game,"State").ToString(),Is.EqualTo("Running"),"Late Night section "+(section+1)+" at "+d);
+                if(section==4 && frame==1) {Call(boss,"Present");Call(game,"UpdateCamera",true);Capture("ocean-late-night-centre-opening");}
+            }
+            Assert.That((float)Get(game,"Distance"),Is.GreaterThanOrEqualTo(start+finish));
+            // Every routine missile proposal also leaves a real common lane through the local traffic.
+            for(float at=start+365f;at<start+finish;at+=2f)
+            {
+                object[] args={at,0,0f};
+                if(!(bool)Call(boss,"PressureLane",args)) continue;
+                float missileX=(float)args[2];bool clear=false;
+                foreach(float x in new[]{-3.333f,0f,3.333f})
+                    clear|=Mathf.Abs(x-missileX)>1.7f
+                        && Call(game,"FindCollision",World("Day"),at-2.5f,at+2.5f,x,x,false,float.NaN,float.NaN)==null
+                        && Call(game,"FindCollision",World("Echo"),at-2.5f,at+2.5f,x,x,false,float.NaN,float.NaN)==null;
+                Assert.That(clear,Is.True,"Routine shot must not seal the Night opening at "+at);
+            }
+        }
+    }
+
+    [UnityTest]
+    public IEnumerator OceanNightPassagesAndFirstJumpRetryRemainPlayable()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");yield return new EnterPlayMode();
+        StartLevel(OceanLevel);yield return WaitForNavigation();var game=Started();var boss=Get(game,"OceanBoss");
+        var course=Get(game,"Course");var targets=(float[])Field(course,"AirStrikeTargets");
+        var ends=(float[])Field(course,"AirStrikeEnds");
+        var collection=Get(game,"Collection");var items=(Vector2[])Field(collection,"Items");
+        // Exercise every corridor, both directions and all damage stages, including landed debris.
+        foreach(int damage in new[]{0,3,5})
+        {
+            Call(collection,"Restore",0f);
+            for(int shot=0;shot<damage;shot++) Call(collection,"Step",items[shot].x-1f,items[shot].x+1f,items[shot].y,items[shot].y,true);
+            int section=0;
+            for(int slot=0;slot<targets.Length;slot++)
+            {
+                if(ends[slot]<=targets[slot]+1f) continue;
+                section++;float target=targets[slot],end=ends[slot];float safe=section%2==0 ? 3.333f : -3.333f;
+                Call(boss,"Restore",0f);Call(game,"ApplyWorld",World("Day"));
+                Pose(game,target-91,safe);Call(boss,"Present");Call(boss,"Step",.05f,target-91,target-89,safe,safe);
+                Assert.That(Get(boss,"TargetDistance"),Is.EqualTo(target),"Night hazards must not silently suppress a strike.");
+                var strike=Field(boss,"active");var points=((IEnumerable)Field(strike,"Points")).Cast<object>().ToArray();
+                // Let all missiles land before switching: the exit must still exist, even in last stand.
+                Call(boss,"Step",12f,target-89,target-88,safe,safe);Call(game,"ApplyWorld",World("Echo"));
+                int passages=section==1 ? 1 : 2;
+                for(int pass=0;pass<passages;pass++)
+                {
+                    float x=pass==0 ? safe : -safe;
+                    float first=section==1 ? 24f : pass==0 ? 14f : 56f;
+                    float last=section==1 ? 50f : pass==0 ? 30f : 89f;
+                    for(float d=target+first;d<target+last;d+=1f)
+                    {
+                        Assert.That(Call(game,"FindCollision",World("Echo"),d,d+.5f,x,x,false,float.NaN,float.NaN),Is.Null);
+                        Assert.That(Call(boss,"StepPoints",strike,0f,12f,d,d+.5f,x,x),Is.False,
+                            "Landed missiles must preserve Night exit at "+d+", damage "+damage);
+                    }
+                }
+                if(section>1)
+                {
+                    float gate=target+100f;
+                    foreach(float x in new[]{-3.333f,0f,3.333f})
+                    {
+                        Assert.That(Call(game,"FindCollision",World("Echo"),gate,gate+1f,x,x,false,float.NaN,float.NaN),Is.Not.Null);
+                        Assert.That(Call(game,"FindCollision",World("Day"),gate-12f,gate+9f,x,x,false,float.NaN,float.NaN),Is.Null);
+                        Assert.That(Call(boss,"StepPoints",strike,0f,12f,gate-12f,gate+9f,x,x),Is.False,"A clear Day return window at every full Night gate.");
+                    }
+                    Assert.That(Call(boss,"PressureLane",gate,0,0f),Is.False,"Routine missiles cannot fill the mandatory return window.");
+                }
+                if(damage!=0) continue;
+                // A real driver can traverse the Night field without teleporting between obstacles.
+                Call(boss,"Restore",target-91f);Call(game,"ApplyWorld",World("Echo"));Pose(game,target-18f,0f);
+                var driver=Field(game,"driver");
+                for(int frame=0;frame<115 && (float)Get(game,"Distance")<end+4f;frame++)
+                {
+                    float at=(float)Get(game,"Distance");
+                    float goal=section>1 && at>target+30f ? -safe : safe;
+                    if(section>1 && at>target+88f && Get(game,"World").ToString()=="Echo") Call(game,"TrySwitch");
+                    float command=goal-(float)Get(game,"Lateral")-(float)Field(driver,"lateralSpeed")*.18f;
+                    Step(game,.05f,Mathf.Abs(command)<.12f ? 0f : Mathf.Sign(command));
+                    Assert.That(Get(game,"State").ToString(),Is.EqualTo("Running"),"Night corridor "+section+" at "+Get(game,"Distance"));
+                    if(section==2 && frame==45) {Call(boss,"Present");Capture("ocean-night-passage");}
+                }
+                Assert.That((float)Get(game,"Distance"),Is.GreaterThan(end),"Complete the full corridor.");
+                // Every section still has a mandatory Day return, before this spread field.
+                float wall=target-39f;
+                Assert.That(Call(game,"FindCollision",World("Echo"),wall,wall+1f,0f,0f,false,float.NaN,float.NaN),Is.Not.Null);
+                Assert.That(Call(game,"FindCollision",World("Day"),wall,wall+1f,0f,0f,false,float.NaN,float.NaN),Is.Null);
+            }
+        }
+        // New pre-ramp save uses ordinary checkpoint banking and the existing visible gantry.
+        Call(game,"RestartRun");
+        if(Get(game,"State").ToString()=="Ready") Call(game,"Start");
+        var checkpoints=(Array)Get(game,"Checkpoints");float savedAt=(float)Field(checkpoints.GetValue(1),"Distance");
+        var firstFlight=((Array)Field(course,"Ramps")).GetValue(0);
+        Assert.That(savedAt,Is.EqualTo((float)Field(firstFlight,"Ramp")-28f));
+        Call(collection,"Step",94f,96f,items[0].y,items[0].y,true);
+        Pose(game,savedAt-1f,0f);Call(game,"ApplyWorld",World("Day"));Step(game,.1f);
+        Assert.That(Get(game,"CheckpointIndex"),Is.EqualTo(1));
+        Call(game,"Fail","DOLPHIN COLLISION");Call(game,"RetryCheckpoint");
+        Assert.That(Get(game,"Distance"),Is.EqualTo(savedAt));
+        Assert.That(Get(boss,"Health"),Is.EqualTo(5),"Actually collected ammo stays banked at the new save.");
+        int firstFishCount=0;
+        foreach(var fish in (IEnumerable)Field(boss,"dolphins"))
+        {
+            if(!ReferenceEquals(Field(fish,"Flight"),firstFlight)) continue;
+            firstFishCount++;
+            Assert.That((float)Field(fish,"At")-(float)Field(firstFlight,"Takeoff"),Is.GreaterThanOrEqualTo(60f));
+        }
+        Assert.That(firstFishCount,Is.EqualTo(1));
+        Pose(game,savedAt-12f,0f);Call(boss,"Present");Capture("ocean-first-jump-checkpoint");
+    }
+
+    [UnityTest]
+    public IEnumerator OceanRoutineMissilesStayVisibleFreezeAndStopWhenBossFalls()
+    {
+        EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");yield return new EnterPlayMode();
+        StartLevel(OceanLevel);yield return WaitForNavigation();var game=Started();var boss=Get(game,"OceanBoss");
+        var course=Get(game,"Course");var ramps=(Array)Field(course,"Ramps");
+        float from=(float)Field(ramps.GetValue(0),"End"),until=(float)Field(ramps.GetValue(1),"Ramp")-56f;
+        Call(boss,"Restore",from);Call(game,"ApplyWorld",World("Day"));
+        int maximum=0;bool captured=false;
+        for(float d=from;d<until;d+=1.26f)
+        {
+            Pose(game,d,0f);Call(boss,"Step",.05f,d,d+1.26f,0f,0f);
+            int count=(int)Get(boss,"PressureStrikeCount");maximum=Mathf.Max(maximum,count);
+            Assert.That(count,Is.LessThanOrEqualTo(3),"Bound the real collision and visual pools together.");
+            if(count>0 && !captured)
+            {
+                Call(boss,"Present");Capture("ocean-routine-missile-warning");captured=true;
+                var views=(Array)Field(boss,"pressureViews");
+                Assert.That(((Transform)Field(views.GetValue(0),"Root")).gameObject.activeInHierarchy,Is.True);
+                var shots=((IEnumerable)Field(boss,"pressureStrikes")).Cast<object>().ToArray();
+                float before=(float)Field(shots[0],"Time");int fired=(int)Get(boss,"PressureShotsFired");
+                Call(game,"ApplyWorld",World("Echo"));Call(boss,"Step",1f,d,d+.01f,0f,0f);
+                Assert.That(Field(shots[0],"Time"),Is.EqualTo(before));Assert.That(Get(boss,"PressureShotsFired"),Is.EqualTo(fired));
+                Call(game,"ApplyWorld",World("Day"));
+            }
+            foreach(var shot in (IEnumerable)Field(boss,"pressureStrikes"))
+            {
+                float at=(float)Field(shot,"Distance");bool route=false;
+                foreach(float x in new[]{-3.333f,0f,3.333f})
+                {
+                    bool clear=Call(game,"FindCollision",World("Day"),at-2.5f,at+2.5f,x,x,false,float.NaN,float.NaN)==null
+                        && Call(game,"FindCollision",World("Echo"),at-2.5f,at+2.5f,x,x,false,float.NaN,float.NaN)==null;
+                    foreach(var list in new[]{(IEnumerable)Field(boss,"strikes"),(IEnumerable)Field(boss,"pressureStrikes")})
+                        foreach(var strike in list)
+                        {
+                            var points=Field(strike,"Points") as IEnumerable;if(points==null) continue;
+                            foreach(var point in points)
+                                if(Mathf.Abs((float)Field(point,"Distance")-at)<6f && Mathf.Abs((float)Field(point,"Lateral")-x)<1.7f) clear=false;
+                        }
+                    route|=clear;
+                }
+                Assert.That(route,Is.True,"Even future impacts must leave a common route near routine shot "+at);
+            }
+        }
+        Assert.That((int)Get(boss,"PressureShotsFired"),Is.GreaterThanOrEqualTo(5),"Single missiles recur throughout normal driving, not only one encounter.");
+        Assert.That(maximum,Is.GreaterThanOrEqualTo(2));
+        var collection=Get(game,"Collection");var items=(Vector2[])Field(collection,"Items");
+        for(int i=0;i<6;i++) Call(collection,"Step",items[i].x-1,items[i].x+1,items[i].y,items[i].y,true);
+        Call(boss,"Step",.01f,until,until+.1f,0f,0f);
+        Assert.That(Get(boss,"PressureStrikeCount"),Is.Zero);Assert.That(Get(boss,"AttackActive"),Is.False);
+        Call(game,"RestartRun");Assert.That(Get(boss,"PressureStrikeCount"),Is.Zero);
+        Assert.That(Get(boss,"PressureShotsFired"),Is.Zero);
+    }
+
+    [UnityTest]
     public IEnumerator OceanFlyInHoldsPlayCanSkipAndDoesNotRepeatOnRetry()
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");yield return new EnterPlayMode();
@@ -25,7 +230,14 @@ public sealed partial class WorldShiftLevelTests
         Assert.That(analytics.Count(a=>a.name=="wl_level_start"),Is.Zero);
         var audio=Find("WorldShiftLevelAudio");Call(audio,"Refresh",1f);Assert.That(Get(audio,"Suspended"),Is.True);
         Call(boss,"AdvanceIntro",1.8f);Call(boss,"Present");Call(game,"UpdateCamera",true);
-        Capture("ocean-intro-air-support");WorldShiftTestCapture.Capture("ocean-intro-4x3",960,720);
+        Call(hud,"RefreshOceanIntro");
+        Assert.That(((TMPro.TMP_Text)Field(hud,"storyTitle")).text,Does.Contain("DAY ONLY"));
+        Assert.That(((TMPro.TMP_Text)Field(hud,"storyLine")).text,Does.Contain("AUTO-FIRE"));
+        Assert.That(((TMPro.TMP_Text)Field(hud,"oceanIntroDetail")).text,Does.Contain("STOP THE BOMBING"));
+        var crate=GameObject.Find("Ocean rocket ammunition 1");var camera=(Camera)Field(game,"view");
+        Assert.That(Vector3.Distance(camera.transform.position,crate.transform.position),Is.LessThan(11f));
+        Assert.That(Get(Get(game,"Collection"),"Count"),Is.Zero);Assert.That(Get(boss,"Health"),Is.EqualTo(6));
+        Capture("ocean-intro-rocket-instruction");WorldShiftTestCapture.Capture("ocean-intro-rocket-4x3",960,720);
         Call(boss,"AdvanceIntro",10f);Call(hud,"UpdateOceanIntro");
         Assert.That(Get(game,"StoryActive"),Is.False);Assert.That(Get(game,"State").ToString(),Is.EqualTo("Running"));
         Assert.That((float)Get(game,"Distance"),Is.Zero);Assert.That((float)Get(game,"Duration"),Is.Zero);
@@ -151,9 +363,10 @@ public sealed partial class WorldShiftLevelTests
         Assert.That(dense.Length,Is.EqualTo(18));
         for(int wave=0;wave<3;wave++)
         {
-            float safe=(wave%2==0?1f:-1f)*-Mathf.Sign((float)Get(boss,"TargetLateral"))*3.333f;
-            foreach(var point in dense.Skip(wave*6).Take(6))
-                Assert.That(Mathf.Abs((float)Field(point,"Lateral")-safe),Is.GreaterThan(1.7f));
+            var wavePoints=dense.Skip(wave*6).Take(6).ToArray();
+            Assert.That(new[]{-3.333f,3.333f}.Any(safe=>wavePoints.All(point=>
+                Mathf.Abs((float)Field(point,"Lateral")-safe)>1.7f)),Is.True,
+                "Every dense wave retains an outside exit, including the Night passage adjustment.");
         }
     }
 
@@ -191,7 +404,7 @@ public sealed partial class WorldShiftLevelTests
         var items=(Vector2[])Field(course,"RequiredItems");Assert.That(items.Length,Is.EqualTo(12));
         var hazards=((IEnumerable)Field(course,"Hazards")).Cast<object>().ToArray();
         Assert.That(hazards.Count(h=>Field(h,"World").Equals(World("Echo")) && (int)Field(h,"LaneMask")==7),Is.GreaterThanOrEqualTo(10),"Every section must break permanent Night camping.");
-        Assert.That(hazards.Count(h=>Field(h,"World").Equals(World("Echo")) && Field(h,"Kind").ToString()=="Oncoming"),Is.EqualTo(5));
+        Assert.That(hazards.Count(h=>Field(h,"World").Equals(World("Echo")) && Field(h,"Kind").ToString()=="Oncoming"),Is.EqualTo(32));
         var c=Activator.CreateInstance(TypeFor("WorldShiftLevelCollection"),new object[]{items,true});
         Assert.That(Call(c,"Step",90f,110f,0f,0f,false),Is.True);
         Assert.That(Get(c,"Count"),Is.EqualTo(0),"Night cannot collect ammo.");
@@ -227,7 +440,8 @@ public sealed partial class WorldShiftLevelTests
         }
         foreach(var slider in sliders)
         {
-            float distance=(float)Field(slider,"Start")-30f;
+            float distance=(float)Field(slider,"Start")-400f;
+            Assert.That(Field(slider,"MovesWheneverDay"),Is.True);
             Call(slider,"Advance",.6f,distance,World("Day"));
             float x=(float)Get(slider,"LateralOffset");Assert.That(Mathf.Abs(x),Is.GreaterThan(.5f));
             Call(slider,"Advance",1f,distance,World("Echo"));
@@ -308,6 +522,11 @@ public sealed partial class WorldShiftLevelTests
             foreach(var night in hazards.Where(h=>Field(h,"World").Equals(World("Echo"))))
             {
                 Vector2 b=Encounter(night);
+                bool insideSpread=ends[i]>targets[i]+1f && b.x>=targets[i]+12f && b.y<=ends[i];
+                if(insideSpread)
+                {
+                    continue; // Runtime coverage checks the slalom exits and missile-free full-gate window.
+                }
                 Assert.That(Mathf.Max(b.x-(ends[i]+5),targets[i]-5-b.y),Is.GreaterThanOrEqualTo(28f),"Missile Day cargo must not border a Night wall.");
             }
     }
@@ -317,7 +536,7 @@ public sealed partial class WorldShiftLevelTests
     {
         EditorSceneManager.OpenScene("Assets/Scenes/WorldShift_Menu.unity");yield return new EnterPlayMode();
         StartLevel(OceanLevel);yield return WaitForNavigation();var game=Started();var boss=Get(game,"OceanBoss");
-        Assert.That(Get(boss,"DolphinCount"),Is.EqualTo(10));
+        Assert.That(Get(boss,"DolphinCount"),Is.EqualTo(9));
         var dolphins=((IEnumerable)Field(boss,"dolphins")).Cast<object>().ToArray();
         var flights=((IEnumerable)Field(Get(game,"Course"),"Ramps")).Cast<object>().ToArray();
         for(int index=0;index<flights.Length;index++)
@@ -330,12 +549,13 @@ public sealed partial class WorldShiftLevelTests
             // Release a blocked Night launch; move the first swimmer toward the right bank.
             Call(game,"ApplyWorld",World("Day"));Step(game,.65f);
             Call(game,"ApplyWorld",World("Echo"));
-            var first=dolphins[index*2];Vector3 frozen=(Vector3)Field(first,"Position");
-            if(index==0) {Call(boss,"Present");Capture("ocean-two-giant-dolphins-frozen");}
+            var first=dolphins.First(d=>ReferenceEquals(Field(d,"Flight"),flight));Vector3 frozen=(Vector3)Field(first,"Position");
+            if(index==0) {Call(boss,"Present");Capture("ocean-first-single-dolphin-frozen");}
             Step(game,.4f);
             Assert.That(Vector3.Distance(frozen,(Vector3)Field(first,"Position")),Is.LessThan(.001f));
             // After clearing the first fish, steer across its frozen opening to the second.
-            Step(game,.9f,1f);Step(game,.6f);
+            if(index==0) Step(game,1.5f); // First jump teaches a single opening, without a second slalom.
+            else {Step(game,.9f,1f);Step(game,.6f);}
             Assert.That(Get(game,"State").ToString(),Is.EqualTo("Running"),"Two frozen swimmers have a steerable route, jump "+index);
             Call(game,"ApplyWorld",Get(flight,"Destination"));Step(game,.7f);
             Assert.That(Get(game,"State").ToString(),Is.EqualTo("Running").Or.EqualTo("Won"));
@@ -365,12 +585,12 @@ public sealed partial class WorldShiftLevelTests
         var boss=Get(game,"OceanBoss");var c=Get(game,"Collection");
         Assert.That(boss,Is.Not.Null);Assert.That(Get(boss,"Health"),Is.EqualTo(6));
         var slots=((IEnumerable)Get(boss,"AttackSlots")).Cast<float>().ToArray();
-        Assert.That(slots.Length,Is.EqualTo(20));
+        Assert.That(slots.Length,Is.EqualTo(13));
         foreach(float at in slots) Assert.That(Call(boss,"SafePocket",at),Is.True,"Strike pocket "+at);
         Pose(game,70f,0);Call(boss,"Present");Capture("ocean-helicopter-day");
         var traffic=UnityEngine.Object.FindObjectsByType<MonoBehaviour>(FindObjectsInactive.Include,FindObjectsSortMode.None)
             .Where(c=>c.GetType().Name=="WorldShiftRoadVehicleArt").ToArray();
-        Assert.That(traffic.Length,Is.EqualTo(10));
+        Assert.That(traffic.Length,Is.EqualTo(36));
         foreach(var car in traffic) Assert.That(car.GetComponentsInChildren<Transform>(true).Any(t=>t.name.EndsWith("traffic sun-moon badge")),Is.True);
         Call(game,"ApplyWorld",World("Echo"));Pose(game,76f,3.333f);Capture("ocean-night-traffic-badge");
         Call(game,"ApplyWorld",World("Echo"));Pose(game,82f,3.333f);Step(game,.65f);
@@ -405,8 +625,8 @@ public sealed partial class WorldShiftLevelTests
         Call(game,"Fail","AIR STRIKE");Capture("ocean-missile-retry-hint");
         Assert.That(((TMPro.TMP_Text)Field(Find("WorldShiftLevelHud"),"failureHint")).text,Does.Contain("ROCKETS: HIT HELI"));
         Call(game,"RetryCheckpoint");
-        // The fourth encounter combines a two-lane salvo and Day cargo; Night opens the outside exit.
-        Call(boss,"Restore",0f);target=slots[13];
+        // The second section retains a two-lane salvo and Day cargo; Night opens the outside exit.
+        Call(boss,"Restore",0f);target=slots[5];
         Call(game,"ApplyWorld",World("Day"));Call(boss,"Step",.1f,target-91,target-89,-3f,-3f);
         Assert.That(Get(boss,"AttackKind").ToString(),Is.EqualTo("TwinSalvo"));
         Assert.That(Get(boss,"ComboActive"),Is.True);
@@ -424,7 +644,7 @@ public sealed partial class WorldShiftLevelTests
         Call(game,"ApplyWorld",World("Day"));
         Assert.That((int)Get(boss,"LiveStrikeCount"),Is.LessThanOrEqualTo(3));
         // Repeated pincer rows keep the middle open until the centre missile lands.
-        Call(boss,"Restore",0f);target=slots[17];Call(game,"ApplyWorld",World("Day"));
+        Call(boss,"Restore",0f);target=slots[6];Call(game,"ApplyWorld",World("Day"));
         Call(boss,"Step",.1f,target-91,target-89,3.333f,3.333f);
         Assert.That(Get(boss,"TargetLateral"),Is.EqualTo(0f));
         Pose(game,target-28,3.333f);Call(boss,"Present");Capture("ocean-day-pincer-warnings");
@@ -457,7 +677,7 @@ public sealed partial class WorldShiftLevelTests
                 int attacks=0;
                 for(int candidate=0;candidate<slots.Length;candidate++)
                     if((bool)Call(boss,"AttackAllowed",candidate)) attacks++;
-                Assert.That(attacks,Is.EqualTo(20),"Both damaged stages retain the faster ordinary attack cadence.");
+                Assert.That(attacks,Is.EqualTo(slots.Length),"Both damaged stages retain the faster ordinary attack cadence.");
             }
         }
         Assert.That(Get(boss,"Defeated"),Is.True);

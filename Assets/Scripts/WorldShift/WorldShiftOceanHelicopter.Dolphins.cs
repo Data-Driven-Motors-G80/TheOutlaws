@@ -30,10 +30,10 @@ namespace Outlaws.WorldShift
             dolphinFrost=Mat("Frozen dolphin outline",new Color(.3f,.85f,1),.85f);
             for(int section=0;section<game.Course.Ramps.Length;section++)
             {
-                var flight=game.Course.Ramps[section];const int count=2;
+                var flight=game.Course.Ramps[section];int count=section==0 ? 1 : 2;
                 for(int i=0;i<count;i++)
                 {
-                    var d=new AirDolphin {Flight=flight,At=flight.Takeoff+(i==0?38f:98f),
+                    var d=new AirDolphin {Flight=flight,At=flight.Takeoff+(section==0 ? 62f : i==0 ? 38f : 98f),
                         Phase=i*.7f,Side=i==0?1:-1};
                     d.Body=new GameObject("Giant crossing dolphin").transform;d.Body.SetParent(transform,false);d.Body.localScale=DolphinScale;
                     var body=new WorldShiftArtMesh();

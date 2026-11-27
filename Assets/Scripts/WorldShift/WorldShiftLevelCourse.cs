@@ -206,27 +206,48 @@ namespace Outlaws.WorldShift
             public Builder OceanSection(int section, float rampAt, ShiftWorld launch)
             {
                 Day(38f, Sides);
-                DayCar(62f, section % 2 == 0 ? Left : Right, 18f);
-                Day(66f,section%2==0 ? LeftMiddle : MiddleRight);
-                NightCar(100f, Middle, 16f);
+                // Let the first section introduce one hazard at a time; later sections keep the overlap.
+                if(section>1) DayCar(62f, section % 2 == 0 ? Left : Right, 18f);
+                Day(66f,section==1 ? Right : section%2==0 ? LeftMiddle : MiddleRight);
+                float nightSpeed=section==1 ? 16f : 14f+section*6f;
+                NightCar(100f, Middle, nightSpeed);
+                if(section>1) NightCar(100f,section%2==0 ? Left : Right,nightSpeed);
                 // Reuse the original teal police spike platform and its shared Day-move/Night-freeze rule.
                 Slider(124f,section%2==0 ? -1.25f : 1.25f);
                 Slider(347f,section%2==0 ? 1.4f : -1.4f);
                 Item(95f, section % 2 == 0 ? -1 : 1);
                 // A long point-bombing corridor replaces the second/third compact attacks.
-                // Reserve its entire span: no hidden Night wall, ammo or cargo inside it.
+                // Night weaves between opposite closures, then returns to Day through a cleared missile window.
+                // The separate slow curtains still keep a completely clear Night route.
                 int index=0;
                 float lastDayRow=66f;
                 for(float authoredAt=150f;authoredAt<=rampAt-80f;authoredAt+=72f,index++)
                 {
                     if(index==2) continue; // consumed by the 108 m corridor starting at index 1
+                    // Later checkpoints trade compact bombing pockets for a denser Night driving sequence.
+                    // Routine Day missiles still run here, protecting the current Night opening.
+                    if(section>=3 && index>=3) continue;
                     float at=authoredAt+(index>=3?8f:0f); // room for the second spike platform after the long field
                     bool spread=index==1;
                     airStrikes.Add(start+at);
                     airStrikeEnds.Add(start+at+(spread?108f:0f));
                     // One slow, almost full-width missile curtain per section, five at most.
                     airStrikeCurtains.Add(section==1 ? index==3 : index==0);
-                    if(spread) continue;
+                    if(spread)
+                    {
+                        int blockedSide=section%2==0 ? Left : Right;
+                        if(section==1) NightCar(at+30f,blockedSide,12f);
+                        else
+                        {
+                            // Night is a short slalom, not a permanent shelter. The last gate forces Day.
+                            Night(at+16f,blockedSide==Left ? LeftMiddle : MiddleRight);
+                            NightCar(at+22f,blockedSide,nightSpeed);
+                            Night(at+58f,blockedSide==Left ? MiddleRight : LeftMiddle);
+                            NightCar(at+76f,blockedSide==Left ? Right : Left,nightSpeed);
+                            Night(at+100f,All);
+                        }
+                        continue;
+                    }
                     float gap=at+33f;
                     if(gap>rampAt-45f) continue;
                     bool ammo=index==0 || (section>=4 && index==3);
@@ -238,20 +259,44 @@ namespace Outlaws.WorldShift
                     }
                     // These separated closures break permanent Night camping without occupying
                     // any missile footprint. The active bombing corridor itself remains fair.
-                    if(ammo || index%3==0 || index%3==2) Night(gap,All);
-                    else Night(gap,(section+index)%2==0 ? LeftMiddle : MiddleRight);
+                    Night(gap,All);
                 }
+                if(section>=3) OceanNightGauntlet(section,nightSpeed);
                 if(rampAt-40f-lastDayRow>=28f)
                     Day(rampAt-40f,section%2==0 ? MiddleRight : LeftMiddle);
+                // Save after the final barrier: a failed first jump need not replay the entire opening.
+                if(section==1) Checkpoint(rampAt-28f,launch);
                 // Keep the final 34 m clear so the player can line up and select the launch world.
                 return Ramp(rampAt,launch,flightLength:132f);
             }
 
+            // Snow-style centre openings, then fast paired traffic and offset exits. Distances are
+            // encounters (not car spawns). Centre/side exits alternate by ONE lane every 30 m.
+            // Never demand an immediate two-lane swerve after a wall or fast car.
+            private void OceanNightGauntlet(int section,float speed)
+            {
+                Night(372f,Sides);
+                NightCar(402f,Middle,speed);NightCar(402f,section%2==0 ? Left : Right,speed);
+                Night(432f,Sides);
+                NightCar(462f,section%2==0 ? Right : Left,speed);NightCar(462f,Middle,speed);
+                if(section>=4)
+                {
+                    Item(407f,1); // Preserve the twelve optional Day rockets, including the late third pickup.
+                    Night(492f,Sides);
+                }
+                if(section>=5)
+                {
+                    NightCar(522f,Middle,speed);NightCar(522f,Right,speed);
+                    // Day is clear here, including a protected routine-missile window.
+                    Night(534f,All);
+                }
+            }
+
             private Builder Add(ShiftHazard hazard)
             {
-                // Desert and Mountain sideways movers never wait for the car (Docs/OBSTACLE_VISUAL_RULES.md, rule 4).
+                // These levels' sideways movers never wait for the car (obstacle visual rule 4).
                 hazard.MovesWheneverDay = !course.Training
-                    && (course.Environment == ShiftLevel.Desert || course.Environment == ShiftLevel.Mountain)
+                    && (course.Environment == ShiftLevel.Desert || course.Environment == ShiftLevel.Mountain || course.Environment == ShiftLevel.Ocean)
                     && hazard.SharedAcrossWorlds && hazard.LateralMotion;
                 hazards.Add(hazard); return this;
             }
