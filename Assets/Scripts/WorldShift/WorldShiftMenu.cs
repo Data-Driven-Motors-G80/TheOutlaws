@@ -86,6 +86,7 @@ namespace Outlaws.WorldShift
             var scaler = root.AddComponent<CanvasScaler>(); scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1280f, 720f); scaler.matchWidthOrHeight = .5f;
             root.AddComponent<GraphicRaycaster>();
+            root.AddComponent<WorldShiftMobileScreen>().Configure(canvas, scaler);
             // CanvasScaler.OnEnable must see the final settings, rather than its defaults.
             root.SetActive(true);
             Canvas.ForceUpdateCanvases();

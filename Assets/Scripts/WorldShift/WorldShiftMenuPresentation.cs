@@ -16,6 +16,7 @@ namespace Outlaws.WorldShift
         private TMP_Text completedLabel;
         private Vector2 lastGridSize = new Vector2(-1,-1);
         private Rect lastSafeArea;
+        private Vector2 lastScreenSize;
 
         private void BuildMenuPresentation(RectTransform root)
         {
@@ -24,7 +25,7 @@ namespace Outlaws.WorldShift
             var wash=TextureLayer(glow,"Atmosphere wash");
             wash.texture=Shade();wash.color=new Color(.22f,.55f,.58f,.10f);wash.raycastTarget=false;
             menuSafe=Panel(root,"Safe area",Vector2.zero,Vector2.one,Color.clear);
-            Rect area=Screen.safeArea;
+            Rect area=WorldShiftMobileScreen.ContentArea;
             menuSafe.anchorMin=new Vector2(area.xMin/Screen.width,area.yMin/Screen.height);
             menuSafe.anchorMax=new Vector2(area.xMax/Screen.width,area.yMax/Screen.height);
             var stripe=Panel(menuSafe,"Brand accent",new Vector2(.05f,.955f),new Vector2(.10f,.961f),RouteTeal);RoundCard(stripe);
@@ -136,10 +137,11 @@ namespace Outlaws.WorldShift
         private void UpdateMenuLayout()
         {
             if(routeGrid==null||menuSafe==null) return;
-            Rect area=Screen.safeArea;
-            if(area!=lastSafeArea)
+            Rect area=WorldShiftMobileScreen.ContentArea;
+            if(area!=lastSafeArea || lastScreenSize!=new Vector2(Screen.width,Screen.height))
             {
                 lastSafeArea=area;
+                lastScreenSize=new Vector2(Screen.width,Screen.height);
                 menuSafe.anchorMin=new Vector2(area.xMin/Screen.width,area.yMin/Screen.height);
                 menuSafe.anchorMax=new Vector2(area.xMax/Screen.width,area.yMax/Screen.height);
                 menuSafe.ForceUpdateRectTransforms();

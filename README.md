@@ -30,6 +30,8 @@ A low-fidelity Unity driving playtest built around switching between Day and Nig
 | Pause/resume | Esc or the on-screen pause button |
 | Continue (Training signs, results) | Enter |
 
+On touch devices, use the left/right buttons to steer and the sun/moon button to switch worlds. Tap anywhere to continue past a Training signboard. The original landscape view fits inside the screen's safe area, with margins where needed to keep the game and UI fully visible. You can preview this in Unity's Device Simulator.
+
 ## Adding or tuning a level
 
 All layouts live in `Assets/Scripts/WorldShift/WorldShiftLevelCourse.cs`. Each level is a chain like

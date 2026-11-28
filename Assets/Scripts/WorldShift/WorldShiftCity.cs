@@ -66,6 +66,7 @@ namespace Outlaws.WorldShift
         [SerializeField] private GameObject streetlightPrefab;
         [SerializeField] private GameObject fuelPrefab;
         private WorldShiftPresentation presentation;
+        private WorldShiftLevelHud levelHud;
         private AutoDriveCar driver;
         private WorldShiftRelay relay;
         public bool IsRelayAirborne => relay != null && relay.IsAirborne;
@@ -231,7 +232,8 @@ namespace Outlaws.WorldShift
                 Escape=gameObject.AddComponent<WorldShiftLevelEscape>();Escape.Bind(this,view);
                 if (environment == ShiftLevel.Ocean)
                 { OceanBoss = gameObject.AddComponent<WorldShiftOceanHelicopter>(); OceanBoss.Bind(this); }
-                gameObject.AddComponent<WorldShiftLevelHud>().Bind(this);
+                levelHud = gameObject.AddComponent<WorldShiftLevelHud>();
+                levelHud.Bind(this);
             }
             else if (GetawayMode) { Getaway = gameObject.AddComponent<WorldShiftGetaway>(); Getaway.Bind(this); }
             else gameObject.AddComponent<WorldShiftHud>().Bind(this);
@@ -252,6 +254,9 @@ namespace Outlaws.WorldShift
             if (WorldShiftSceneLoading.Active || StoryActive || storyFinishedFrame == Time.frameCount) return;
             var keyboard = Keyboard.current;
             bool switchPressed = keyboard != null && keyboard.spaceKey.wasPressedThisFrame;
+            if (TrainingLessonPaused && Touchscreen.current != null)
+                foreach (var touch in Touchscreen.current.touches)
+                    if (touch.press.wasPressedThisFrame) { ContinueTrainingLessonFromTouch(); break; }
             if (keyboard != null)
             {
                 if (keyboard.escapeKey.wasPressedThisFrame) TogglePause();
@@ -272,6 +277,11 @@ namespace Outlaws.WorldShift
             float steer = keyboard == null ? 0f :
                 ((keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed) ? 1f : 0f)
                 - ((keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed) ? 1f : 0f);
+            if (levelHud != null)
+            {
+                steer = Mathf.Clamp(steer + levelHud.TouchSteering, -1f, 1f);
+                switchPressed |= levelHud.ConsumeTouchSwitch();
+            }
             StepSimulation(Time.deltaTime, steer, switchPressed);
             if ((keyboard != null && keyboard.fKey.wasPressedThisFrame) || (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame
                 && (UnityEngine.EventSystems.EventSystem.current == null || !UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject()))) Combat?.TryShoot();
@@ -300,6 +310,17 @@ namespace Outlaws.WorldShift
             storyFinishedFrame = Time.frameCount;
             if(OceanBoss!=null) UpdateCamera(true);
             BeginRun();
+        }
+
+        public void ContinueTrainingLessonFromTouch()
+        {
+            if (LevelMode && course.Training && !WorldShiftSceneLoading.Active && !StoryActive
+                && Time.realtimeSinceStartup - trainingSignShownAt >= TrainingSignInputDelay)
+            {
+                bool wasPaused = TrainingLessonPaused;
+                ContinueTrainingLesson();
+                if (wasPaused && !TrainingLessonPaused) levelHud?.WaitForTrainingTapRelease();
+            }
         }
 
         public void ContinueTrainingLesson()
