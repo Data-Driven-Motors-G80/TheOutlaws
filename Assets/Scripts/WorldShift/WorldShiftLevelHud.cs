@@ -36,6 +36,8 @@ namespace Outlaws.WorldShift
         private CanvasGroup freezeEdges;
         private ShiftWorld previousFeedbackWorld;
         private float freezePulse;
+        private RectTransform hudSafeArea;
+        private TMP_Text trainingContinueKey;
 
 
         public void Bind(WorldShiftCity controller)
@@ -43,9 +45,8 @@ namespace Outlaws.WorldShift
             game = controller;
             var canvas = WorldShiftMenu.CreateCanvas(transform, "Level HUD");
             var safe = WorldShiftMenu.Panel(canvas, "Safe area", Vector2.zero, Vector2.one, Color.clear);
-            Rect area = Screen.safeArea;
-            safe.anchorMin = new Vector2(area.xMin / Screen.width, area.yMin / Screen.height);
-            safe.anchorMax = new Vector2(area.xMax / Screen.width, area.yMax / Screen.height);
+            hudSafeArea = safe;
+            WorldShiftMobileScreen.ApplySafeArea(safe);
 
             crashFlash = WorldShiftMenu.Panel(safe, "Crash flash", Vector2.zero, Vector2.one, Color.clear).GetComponent<Image>();
             driving = WorldShiftMenu.Panel(safe, "Driving", Vector2.zero, Vector2.one, Color.clear).gameObject;
@@ -129,8 +130,9 @@ namespace Outlaws.WorldShift
                 CardChrome(card, shadowSpread: 4f, shadowDrop: 9f);
                 var keyCap = WorldShiftMenu.Panel(card, "Enter key", new Vector2(.06f, .2f), new Vector2(.40f, .8f), Cream);
                 Round(keyCap, Cream);
-                var keyText = PauseLabel(keyCap, "ENTER", 0, 0, 1, 1, 17, PauseFace, FontStyles.Bold);
+                var keyText = PauseLabel(keyCap, WorldShiftMobileScreen.Active ? "TAP" : "ENTER", 0, 0, 1, 1, 17, PauseFace, FontStyles.Bold);
                 keyText.alignment = TextAlignmentOptions.Center;
+                trainingContinueKey = keyText;
                 var continueText = PauseLabel(card, "Continue", .45f, .1f, .95f, .9f, 24, Cream, FontStyles.Bold);
                 continueText.alignment = TextAlignmentOptions.Center;
 
@@ -140,6 +142,7 @@ namespace Outlaws.WorldShift
             if (game.Environment == ShiftLevel.Ocean) PolishOceanHud();
             BuildFailurePanel(safe);
             BuildCityStory(safe);
+            BuildTouchControls(driving.transform);
             Refresh();
         }
 
@@ -317,6 +320,9 @@ namespace Outlaws.WorldShift
             bool won = game.State == ShiftRunState.Won;
             if(won) game.Escape.EnsureStarted();
             driving.SetActive(!game.StoryActive && !won && game.State != ShiftRunState.Paused);
+            WorldShiftMobileScreen.ApplySafeArea(hudSafeArea);
+            RefreshTouchControls();
+            if (trainingContinueKey != null) trainingContinueKey.text = WorldShiftMobileScreen.Active ? "TAP" : "ENTER";
             RefreshCityStory();
             RefreshLessonPreview();
             pause.SetActive(game.State == ShiftRunState.Paused);
